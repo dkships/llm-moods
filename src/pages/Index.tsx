@@ -23,8 +23,8 @@ const HOW_IT_WORKS = [
   },
   {
     icon: CheckCircle,
-    title: "You Decide",
-    description: "See real-time vibes at a glance and report your own experience to the community.",
+    title: "You Check",
+    description: "Check real-time vibes at a glance. No voting needed — the data speaks for itself.",
   },
 ];
 
