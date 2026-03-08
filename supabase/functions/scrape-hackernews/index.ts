@@ -8,13 +8,14 @@ const corsHeaders = {
 };
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
-  claude: ["claude", "anthropic"],
-  chatgpt: ["chatgpt", "gpt", "gpt-4", "gpt-4o", "openai"],
-  gemini: ["gemini", "google ai", "deepmind"],
-  grok: ["grok"],
+  claude: ["claude", "sonnet", "opus", "anthropic"],
+  chatgpt: ["chatgpt", "gpt-5", "gpt-4", "gpt-4o", "gpt", "openai"],
+  gemini: ["gemini", "gemini pro", "google ai"],
+  grok: ["grok", "grok 4", "xai"],
+  deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
 };
 
-const RELEVANT_DOMAINS = ["anthropic.com", "openai.com", "deepmind.google"];
+const RELEVANT_DOMAINS = ["anthropic.com", "openai.com", "deepmind.google", "deepseek.com"];
 const HN_API = "https://hacker-news.firebaseio.com/v0";
 
 function matchModels(text: string, url?: string): string[] {
