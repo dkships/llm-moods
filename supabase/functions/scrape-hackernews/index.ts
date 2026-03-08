@@ -34,7 +34,10 @@ function matchModels(text: string, url?: string): string[] {
     const lowerUrl = url.toLowerCase();
     for (const domain of RELEVANT_DOMAINS) {
       if (lowerUrl.includes(domain)) {
-        const slug = domain.includes("anthropic") ? "claude" : domain.includes("openai") ? "chatgpt" : "gemini";
+        const slug = domain.includes("anthropic") ? "claude"
+          : domain.includes("openai") ? "chatgpt"
+          : domain.includes("deepseek") ? "deepseek"
+          : "gemini";
         if (!matched.includes(slug)) matched.push(slug);
       }
     }

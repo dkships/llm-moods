@@ -62,7 +62,7 @@ const Dashboard = () => {
               initial="hidden"
               animate="visible"
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
             >
               {(models || []).map((m, i) => {
                 const vibe = getVibeStatus(m.latestScore);

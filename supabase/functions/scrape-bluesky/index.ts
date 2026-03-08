@@ -8,15 +8,16 @@ const corsHeaders = {
 };
 
 const SEARCH_TERMS = [
-  "Claude AI", "ChatGPT", "GPT-4", "Gemini AI", "Grok AI",
-  "Claude dumb", "ChatGPT worse", "Claude lazy",
+  "Claude AI", "ChatGPT", "GPT-4", "Gemini AI", "Grok AI", "DeepSeek",
+  "Claude dumb", "ChatGPT worse", "Claude lazy", "DeepSeek dumb", "DeepSeek worse",
 ];
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
-  claude: ["claude", "anthropic"],
-  chatgpt: ["chatgpt", "gpt", "gpt-4", "gpt-4o", "openai"],
-  gemini: ["gemini"],
-  grok: ["grok"],
+  claude: ["claude", "sonnet", "opus", "anthropic"],
+  chatgpt: ["chatgpt", "gpt-5", "gpt-4", "gpt-4o", "gpt", "openai"],
+  gemini: ["gemini", "gemini pro", "google ai"],
+  grok: ["grok", "grok 4", "xai"],
+  deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
 };
 
 function matchModels(text: string): string[] {
