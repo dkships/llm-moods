@@ -192,21 +192,7 @@ const Index = () => {
         </section>
 
         {/* Footer */}
-        <footer className="border-t border-border">
-          <div className="container flex flex-col sm:flex-row items-center justify-between gap-4 py-8">
-            <p className="text-sm text-muted-foreground font-mono">
-              Built for the AI-obsessed. LLM Vibes 2025.
-            </p>
-            <div className="flex items-center gap-4">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Twitter className="h-4 w-4" />
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Github className="h-4 w-4" />
-              </a>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </PageTransition>
   );
