@@ -22,9 +22,6 @@ const NavBar = () => {
               Dashboard
             </Link>
           )}
-          <Button size="sm" className="font-mono text-xs">
-            Report a Vibe
-          </Button>
         </div>
       </div>
     </header>
