@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
+import Footer from "@/components/Footer";
 
 const MODELS = [
   {
