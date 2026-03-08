@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
+import Footer from "@/components/Footer";
 
 const MODELS = [
   {
