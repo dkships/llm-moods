@@ -1,4 +1,4 @@
-import { Sun, CloudSun, CloudLightning, TrendingUp, TrendingDown, Minus, Monitor, Brain, CheckCircle, ArrowRight, Github, Twitter } from "lucide-react";
+import { Sun, CloudSun, CloudLightning, TrendingUp, TrendingDown, Minus, Monitor, Brain, CheckCircle, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
