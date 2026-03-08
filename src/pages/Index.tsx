@@ -77,9 +77,9 @@ const Index = () => {
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="container flex h-16 items-center justify-between">
-          <span className="font-display text-lg font-bold tracking-tight text-foreground">
+          <Link to="/" className="font-display text-lg font-bold tracking-tight text-foreground">
             🌊 LLM <span className="text-primary">Vibes</span>
-          </span>
+          </Link>
           <div className="flex items-center gap-4">
             <span className="hidden sm:inline text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
               Dashboard
