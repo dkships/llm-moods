@@ -14,6 +14,30 @@ export type Database = {
   }
   public: {
     Tables: {
+      error_log: {
+        Row: {
+          context: string | null
+          created_at: string
+          error_message: string
+          function_name: string
+          id: string
+        }
+        Insert: {
+          context?: string | null
+          created_at?: string
+          error_message: string
+          function_name: string
+          id?: string
+        }
+        Update: {
+          context?: string | null
+          created_at?: string
+          error_message?: string
+          function_name?: string
+          id?: string
+        }
+        Relationships: []
+      }
       models: {
         Row: {
           accent_color: string | null
