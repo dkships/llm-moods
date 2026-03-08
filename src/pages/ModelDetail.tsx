@@ -3,11 +3,13 @@ import { Sun, CloudSun, CloudLightning, TrendingUp, TrendingDown, ArrowLeft } fr
 import { motion } from "framer-motion";
 import {
   LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, ReferenceLine,
-  BarChart, Bar, Cell,
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useState } from "react";
+import NavBar from "@/components/NavBar";
+import PageTransition from "@/components/PageTransition";
+import usePageTitle from "@/hooks/usePageTitle";
 
 // Seed-based pseudo-random for consistent mock data
 const seededRandom = (seed: number) => {
