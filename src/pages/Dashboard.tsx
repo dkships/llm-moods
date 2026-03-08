@@ -8,7 +8,7 @@ import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
 import Footer from "@/components/Footer";
 import { useModelsWithLatestVibes, useRecentChatter } from "@/hooks/useVibesData";
-import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
+import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, SOURCE_LABELS } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
 const Dashboard = () => {

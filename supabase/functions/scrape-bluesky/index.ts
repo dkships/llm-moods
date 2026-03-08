@@ -8,14 +8,8 @@ const corsHeaders = {
 };
 
 const SEARCH_TERMS = [
-  "Claude AI",
-  "ChatGPT",
-  "GPT-4",
-  "Gemini AI",
-  "Grok AI",
-  "Claude dumb",
-  "ChatGPT worse",
-  "Claude lazy",
+  "Claude AI", "ChatGPT", "GPT-4", "Gemini AI", "Grok AI",
+  "Claude dumb", "ChatGPT worse", "Claude lazy",
 ];
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
@@ -40,24 +34,27 @@ function matchModels(text: string): string[] {
   return matched;
 }
 
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 10000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { ...options, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function classifyPost(
-  title: string,
-  content: string,
-  apiKey: string
+  title: string, content: string, apiKey: string
 ): Promise<{ sentiment: string; complaint_category: string | null }> {
   const truncated = (content || "").slice(0, 500);
   const prompt = `Classify this social media post about an AI model. Return ONLY valid JSON with two fields: sentiment (positive/negative/neutral) and complaint_category (lazy_responses/hallucinations/refusals/coding_quality/speed/general_drop or null if not negative). Post: ${title} ${truncated}`;
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
-        messages: [{ role: "user", content: prompt }],
-      }),
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages: [{ role: "user", content: prompt }] }),
     });
     if (!res.ok) { await res.text(); return { sentiment: "neutral", complaint_category: null }; }
     const data = await res.json();
@@ -68,10 +65,20 @@ async function classifyPost(
       return { sentiment: parsed.sentiment || "neutral", complaint_category: parsed.complaint_category || null };
     }
     return { sentiment: "neutral", complaint_category: null };
-  } catch { return { sentiment: "neutral", complaint_category: null }; }
+  } catch {
+    return { sentiment: "neutral", complaint_category: null };
+  }
 }
 
 function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
+
+async function logToErrorLog(supabase: any, functionName: string, errorMessage: string, context?: string) {
+  try {
+    await supabase.from("error_log").insert({ function_name: functionName, error_message: errorMessage, context: context || null });
+  } catch (e) {
+    console.error("Failed to log to error_log:", e);
+  }
+}
 
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -85,7 +92,7 @@ serve(async (req) => {
     for (const m of models || []) modelMap[m.slug] = m.id;
 
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "bluesky");
-    const existingUrls = new Set((existing || []).map((e) => e.source_url).filter(Boolean));
+    const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, errors: [] as string[] };
@@ -96,8 +103,13 @@ serve(async (req) => {
 
       try {
         const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(term)}&limit=25&sort=latest`;
-        const res = await fetch(url);
-        if (!res.ok) { const t = await res.text(); console.error(`Bluesky search failed for "${term}":`, res.status, t); summary.errors.push(`"${term}": HTTP ${res.status}`); continue; }
+        const res = await fetchWithTimeout(url);
+        if (!res.ok) {
+          const msg = `"${term}": HTTP ${res.status}`;
+          summary.errors.push(msg);
+          await logToErrorLog(supabase, "scrape-bluesky", `Bluesky search failed: ${msg}`, term);
+          continue;
+        }
 
         const json = await res.json();
         const posts = json.posts || [];
@@ -112,7 +124,6 @@ serve(async (req) => {
           if (matchedSlugs.length === 0) continue;
           summary.filtered++;
 
-          // Build bsky.app URL from URI
           const handle = post.author?.handle || "";
           const uriParts = (post.uri || "").split("/");
           const rkey = uriParts[uriParts.length - 1];
@@ -126,29 +137,31 @@ serve(async (req) => {
             const modelId = modelMap[slug];
             if (!modelId) continue;
             const { error } = await supabase.from("scraped_posts").insert({
-              model_id: modelId,
-              source: "bluesky",
-              source_url: sourceUrl,
-              title: text.slice(0, 120),
-              content: text.slice(0, 2000),
-              sentiment: classification.sentiment,
-              complaint_category: classification.complaint_category,
-              score: post.likeCount || 0,
-              posted_at: createdAt.toISOString(),
+              model_id: modelId, source: "bluesky", source_url: sourceUrl,
+              title: text.slice(0, 120), content: text.slice(0, 2000),
+              sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+              score: post.likeCount || 0, posted_at: createdAt.toISOString(),
             });
-            if (error) { summary.errors.push(`Insert: ${error.message}`); } else { summary.inserted++; existingUrls.add(sourceUrl); }
+            if (error) {
+              summary.errors.push(`Insert: ${error.message}`);
+              await logToErrorLog(supabase, "scrape-bluesky", error.message, `insert for ${slug}`);
+            } else { summary.inserted++; existingUrls.add(sourceUrl); }
           }
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        console.error(`Error for "${term}":`, msg);
         summary.errors.push(`"${term}": ${msg}`);
+        await logToErrorLog(supabase, "scrape-bluesky", msg, term);
       }
     }
 
+    await logToErrorLog(supabase, "scrape-bluesky", `Successfully scraped ${summary.inserted} posts from bluesky`, `fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified}`);
+
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
-    console.error("scrape-bluesky error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+    const msg = e instanceof Error ? e.message : "Unknown";
+    await logToErrorLog(supabase, "scrape-bluesky", msg, "top-level error");
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
