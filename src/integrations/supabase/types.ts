@@ -14,7 +14,165 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      models: {
+        Row: {
+          accent_color: string | null
+          created_at: string
+          id: string
+          name: string
+          slug: string
+        }
+        Insert: {
+          accent_color?: string | null
+          created_at?: string
+          id?: string
+          name: string
+          slug: string
+        }
+        Update: {
+          accent_color?: string | null
+          created_at?: string
+          id?: string
+          name?: string
+          slug?: string
+        }
+        Relationships: []
+      }
+      scraped_posts: {
+        Row: {
+          complaint_category: string | null
+          content: string | null
+          created_at: string
+          id: string
+          model_id: string
+          posted_at: string | null
+          score: number | null
+          sentiment: string | null
+          source: string
+          source_url: string | null
+          title: string | null
+        }
+        Insert: {
+          complaint_category?: string | null
+          content?: string | null
+          created_at?: string
+          id?: string
+          model_id: string
+          posted_at?: string | null
+          score?: number | null
+          sentiment?: string | null
+          source: string
+          source_url?: string | null
+          title?: string | null
+        }
+        Update: {
+          complaint_category?: string | null
+          content?: string | null
+          created_at?: string
+          id?: string
+          model_id?: string
+          posted_at?: string | null
+          score?: number | null
+          sentiment?: string | null
+          source?: string
+          source_url?: string | null
+          title?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "scraped_posts_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_reports: {
+        Row: {
+          comment: string | null
+          complaint_category: string | null
+          created_at: string
+          id: string
+          model_id: string
+          sentiment: string
+        }
+        Insert: {
+          comment?: string | null
+          complaint_category?: string | null
+          created_at?: string
+          id?: string
+          model_id: string
+          sentiment: string
+        }
+        Update: {
+          comment?: string | null
+          complaint_category?: string | null
+          created_at?: string
+          id?: string
+          model_id?: string
+          sentiment?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_reports_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vibes_scores: {
+        Row: {
+          created_at: string
+          id: string
+          model_id: string
+          negative_count: number | null
+          neutral_count: number | null
+          period: string
+          period_start: string
+          positive_count: number | null
+          score: number
+          top_complaint: string | null
+          total_posts: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          model_id: string
+          negative_count?: number | null
+          neutral_count?: number | null
+          period: string
+          period_start: string
+          positive_count?: number | null
+          score: number
+          top_complaint?: string | null
+          total_posts?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          model_id?: string
+          negative_count?: number | null
+          neutral_count?: number | null
+          period?: string
+          period_start?: string
+          positive_count?: number | null
+          score?: number
+          top_complaint?: string | null
+          total_posts?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vibes_scores_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
