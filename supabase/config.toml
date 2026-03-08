@@ -2,3 +2,6 @@ project_id = "trhmcunttvpmylcxjkbd"
 
 [functions.scrape-reddit]
 verify_jwt = false
+
+[functions.scrape-hackernews]
+verify_jwt = false
