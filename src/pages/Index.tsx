@@ -81,9 +81,9 @@ const Index = () => {
             🌊 LLM <span className="text-primary">Vibes</span>
           </Link>
           <div className="flex items-center gap-4">
-            <span className="hidden sm:inline text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+            <Link to="/dashboard" className="hidden sm:inline text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
               Dashboard
-            </span>
+            </Link>
             <Button size="sm" className="font-mono text-xs">
               Report a Vibe
             </Button>
