@@ -306,6 +306,7 @@ const Dashboard = () => {
             })}
           </motion.div>
         </section>
+        <Footer />
       </div>
     </PageTransition>
   );

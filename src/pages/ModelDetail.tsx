@@ -416,6 +416,7 @@ const ModelDetail = () => {
           })}
         </motion.div>
       </section>
+      <Footer />
     </div>
     </PageTransition>
   );
