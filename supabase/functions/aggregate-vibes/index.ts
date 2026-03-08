@@ -8,31 +8,21 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL")!,
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
-    );
+    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
     const { data: models } = await supabase.from("models").select("id, name, slug");
     if (!models || models.length === 0) {
       return new Response(JSON.stringify({ error: "No models found" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
     const now = new Date();
-
-    // Daily: start of today UTC
     const dailyStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    // Hourly: start of current hour UTC
     const hourlyStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours()));
-
     const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
     const since1h = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
 
@@ -52,6 +42,28 @@ serve(async (req) => {
         const result = computeScore(dailyPosts);
         await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), result);
         modelSummary.daily = { posts: dailyPosts.length, score: result.score };
+      } else {
+        // No posts — keep previous day's score
+        const { data: prevScore } = await supabase
+          .from("vibes_scores")
+          .select("*")
+          .eq("model_id", model.id)
+          .eq("period", "daily")
+          .order("period_start", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (prevScore) {
+          await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), {
+            score: prevScore.score,
+            positive_count: prevScore.positive_count || 0,
+            negative_count: prevScore.negative_count || 0,
+            neutral_count: prevScore.neutral_count || 0,
+            total_posts: prevScore.total_posts || 0,
+            top_complaint: prevScore.top_complaint,
+          });
+          modelSummary.daily = { posts: 0, score: prevScore.score, carried_forward: true };
+        }
       }
 
       // --- Hourly aggregation (last 1h) ---
@@ -70,11 +82,28 @@ serve(async (req) => {
       summary[model.slug] = modelSummary;
     }
 
+    // Log success
+    try {
+      await supabase.from("error_log").insert({
+        function_name: "aggregate-vibes",
+        error_message: `Successfully aggregated vibes for ${models.length} models`,
+        context: JSON.stringify(summary),
+      });
+    } catch {}
+
     return new Response(JSON.stringify({ aggregated: summary }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("aggregate-vibes error:", e);
+    try {
+      const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+      await supabase.from("error_log").insert({
+        function_name: "aggregate-vibes",
+        error_message: e instanceof Error ? e.message : "Unknown",
+        context: "top-level error",
+      });
+    } catch {}
     return new Response(
       JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -91,9 +120,7 @@ interface ScoreResult {
   top_complaint: string | null;
 }
 
-function computeScore(
-  posts: { sentiment: string | null; complaint_category: string | null }[]
-): ScoreResult {
+function computeScore(posts: { sentiment: string | null; complaint_category: string | null }[]): ScoreResult {
   let positive = 0, negative = 0, neutral = 0;
   const complaints: Record<string, number> = {};
 
@@ -101,37 +128,24 @@ function computeScore(
     if (p.sentiment === "positive") positive++;
     else if (p.sentiment === "negative") {
       negative++;
-      if (p.complaint_category) {
-        complaints[p.complaint_category] = (complaints[p.complaint_category] || 0) + 1;
-      }
+      if (p.complaint_category) complaints[p.complaint_category] = (complaints[p.complaint_category] || 0) + 1;
     } else neutral++;
   }
 
   const total = posts.length;
-  // neutral counts as 0.5 positive
   const effectivePositive = positive + neutral * 0.5;
   const score = Math.round((effectivePositive / total) * 100);
 
   let topComplaint: string | null = null;
   let maxCount = 0;
   for (const [cat, count] of Object.entries(complaints)) {
-    if (count > maxCount) {
-      maxCount = count;
-      topComplaint = cat;
-    }
+    if (count > maxCount) { maxCount = count; topComplaint = cat; }
   }
 
   return { score, positive_count: positive, negative_count: negative, neutral_count: neutral, total_posts: total, top_complaint: topComplaint };
 }
 
-async function upsertScore(
-  supabase: any,
-  modelId: string,
-  period: string,
-  periodStart: string,
-  result: ScoreResult
-) {
-  // Check if exists
+async function upsertScore(supabase: any, modelId: string, period: string, periodStart: string, result: ScoreResult) {
   const { data: existing } = await supabase
     .from("vibes_scores")
     .select("id")
@@ -140,29 +154,18 @@ async function upsertScore(
     .eq("period_start", periodStart)
     .maybeSingle();
 
+  const payload = {
+    score: result.score,
+    positive_count: result.positive_count,
+    negative_count: result.negative_count,
+    neutral_count: result.neutral_count,
+    total_posts: result.total_posts,
+    top_complaint: result.top_complaint,
+  };
+
   if (existing) {
-    await supabase
-      .from("vibes_scores")
-      .update({
-        score: result.score,
-        positive_count: result.positive_count,
-        negative_count: result.negative_count,
-        neutral_count: result.neutral_count,
-        total_posts: result.total_posts,
-        top_complaint: result.top_complaint,
-      })
-      .eq("id", existing.id);
+    await supabase.from("vibes_scores").update(payload).eq("id", existing.id);
   } else {
-    await supabase.from("vibes_scores").insert({
-      model_id: modelId,
-      period,
-      period_start: periodStart,
-      score: result.score,
-      positive_count: result.positive_count,
-      negative_count: result.negative_count,
-      neutral_count: result.neutral_count,
-      total_posts: result.total_posts,
-      top_complaint: result.top_complaint,
-    });
+    await supabase.from("vibes_scores").insert({ model_id: modelId, period, period_start: periodStart, ...payload });
   }
 }

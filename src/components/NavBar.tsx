@@ -1,5 +1,4 @@
 import { Link, useLocation } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 
 const NavBar = () => {
   const { pathname } = useLocation();
@@ -22,9 +21,6 @@ const NavBar = () => {
               Dashboard
             </Link>
           )}
-          <Button size="sm" className="font-mono text-xs">
-            Report a Vibe
-          </Button>
         </div>
       </div>
     </header>

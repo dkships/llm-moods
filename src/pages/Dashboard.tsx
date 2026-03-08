@@ -8,7 +8,7 @@ import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
 import Footer from "@/components/Footer";
 import { useModelsWithLatestVibes, useRecentChatter } from "@/hooks/useVibesData";
-import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
+import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, SOURCE_LABELS } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
 const Dashboard = () => {
@@ -33,7 +33,14 @@ const Dashboard = () => {
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
             <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
             <p className="mt-2 text-sm text-muted-foreground font-mono">
-              {today} · Last updated: just now
+              {today} · Last updated: {(() => {
+                const latest = models?.reduce((newest, m) => {
+                  if (!m.lastUpdated) return newest;
+                  return !newest || new Date(m.lastUpdated) > new Date(newest) ? m.lastUpdated : newest;
+                }, null as string | null);
+                if (!latest) return "—";
+                return formatTimeAgo(latest);
+              })()}
             </p>
           </motion.div>
         </section>

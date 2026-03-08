@@ -109,7 +109,7 @@ const Index = () => {
                         <div className="mt-3 flex items-center justify-between">
                           <TrendIcon trend={m.trend.direction} />
                           <span className="text-xs font-mono text-muted-foreground">
-                            +{m.reportsToday} reports today
+                            {(m.totalPosts || 0).toLocaleString()} posts analyzed
                           </span>
                         </div>
                       </div>
