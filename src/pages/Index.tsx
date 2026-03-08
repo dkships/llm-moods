@@ -1,5 +1,6 @@
 import { Sun, CloudSun, CloudLightning, TrendingUp, TrendingDown, Minus, Monitor, Brain, CheckCircle, ArrowRight, Github, Twitter } from "lucide-react";
 import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 const MODELS = [
@@ -76,13 +77,13 @@ const Index = () => {
       {/* Nav */}
       <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
         <div className="container flex h-16 items-center justify-between">
-          <span className="font-display text-lg font-bold tracking-tight text-foreground">
+          <Link to="/" className="font-display text-lg font-bold tracking-tight text-foreground">
             🌊 LLM <span className="text-primary">Vibes</span>
-          </span>
+          </Link>
           <div className="flex items-center gap-4">
-            <span className="hidden sm:inline text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+            <Link to="/dashboard" className="hidden sm:inline text-sm text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
               Dashboard
-            </span>
+            </Link>
             <Button size="sm" className="font-mono text-xs">
               Report a Vibe
             </Button>
@@ -113,10 +114,12 @@ const Index = () => {
             Real-time community sentiment tracking for Claude, ChatGPT, Gemini, Grok, and more. Know when the vibes are off.
           </motion.p>
           <motion.div variants={fadeUp} custom={3}>
-            <Button size="lg" className="mt-8 font-mono text-sm gap-2 group">
-              Check the Vibes
-              <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-            </Button>
+            <Link to="/dashboard">
+              <Button size="lg" className="mt-8 font-mono text-sm gap-2 group">
+                Check the Vibes
+                <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+              </Button>
+            </Link>
           </motion.div>
         </motion.div>
       </section>
