@@ -2,8 +2,10 @@ import { Sun, CloudSun, CloudLightning, TrendingUp, TrendingDown, MessageSquare,
 import { motion } from "framer-motion";
 import { LineChart, Line, ResponsiveContainer, YAxis } from "recharts";
 import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import NavBar from "@/components/NavBar";
+import PageTransition from "@/components/PageTransition";
+import usePageTitle from "@/hooks/usePageTitle";
 
 const MODELS = [
   {
@@ -146,6 +148,8 @@ const fadeUp = {
 };
 
 const Dashboard = () => {
+  usePageTitle("Dashboard — LLM Vibes");
+
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
@@ -154,163 +158,155 @@ const Dashboard = () => {
   });
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-        <div className="container flex h-16 items-center justify-between">
-          <Link to="/" className="font-display text-lg font-bold tracking-tight text-foreground">
-            🌊 LLM <span className="text-primary">Vibes</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <span className="text-sm text-foreground font-medium">Dashboard</span>
-            <Button size="sm" className="font-mono text-xs">Report a Vibe</Button>
-          </div>
-        </div>
-      </header>
+    <PageTransition>
+      <div className="min-h-screen bg-background">
+        <NavBar />
 
-      {/* Page Header */}
-      <section className="container pt-10 pb-8">
-        <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-          <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
-          <p className="mt-2 text-sm text-muted-foreground font-mono">
-            {today} · Last updated: 4 minutes ago
-          </p>
-        </motion.div>
-      </section>
+        {/* Page Header */}
+        <section className="container pt-10 pb-8">
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+            <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
+            <p className="mt-2 text-sm text-muted-foreground font-mono">
+              {today} · Last updated: 4 minutes ago
+            </p>
+          </motion.div>
+        </section>
 
-      {/* Model Cards */}
-      <section className="container pb-12">
-        <motion.div
-          initial="hidden"
-          animate="visible"
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
-        >
-          {MODELS.map((m, i) => (
-            <Link key={m.name} to={`/model/${m.slug}`}>
-              <motion.div
-                variants={fadeUp}
-                custom={i}
-                className="glass rounded-xl overflow-hidden hover:glow-border transition-all duration-300 cursor-pointer h-full"
-              >
-              <div className="h-1" style={{ background: m.accent }} />
-              <div className="p-6">
-                {/* Top row */}
-                <div className="flex items-start justify-between">
-                  <div>
-                    <p className="font-display text-base font-semibold text-foreground">{m.name}</p>
-                    <div className="mt-2 flex items-center gap-2">
-                      <m.vibeIcon className="h-5 w-5" style={{ color: m.accent }} />
-                      <span className="font-mono text-sm text-foreground">{m.vibe}</span>
+        {/* Model Cards */}
+        <section className="container pb-12">
+          <motion.div
+            initial="hidden"
+            animate="visible"
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+            className="grid grid-cols-1 md:grid-cols-2 gap-4"
+          >
+            {MODELS.map((m, i) => (
+              <Link key={m.name} to={`/model/${m.slug}`} className="block">
+                <motion.div
+                  variants={fadeUp}
+                  custom={i}
+                  className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer h-full hover:-translate-y-1"
+                  whileHover={{ boxShadow: `0 0 24px ${m.accent}25, 0 8px 32px ${m.accent}15` }}
+                >
+                  <div className="h-1" style={{ background: m.accent }} />
+                  <div className="p-6">
+                    {/* Top row */}
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="font-display text-base font-semibold text-foreground">{m.name}</p>
+                        <div className="mt-2 flex items-center gap-2">
+                          <m.vibeIcon className="h-5 w-5" style={{ color: m.accent }} />
+                          <span className="font-mono text-sm text-foreground">{m.vibe}</span>
+                        </div>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-4xl font-bold font-mono text-foreground">{m.score}</p>
+                        <p className="text-xs text-muted-foreground font-mono mt-0.5">/ 100</p>
+                      </div>
+                    </div>
+
+                    {/* Sparkline */}
+                    <div className="mt-4 h-12">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={m.sparkline.map((v, idx) => ({ day: idx, score: v }))}>
+                          <YAxis domain={["dataMin - 5", "dataMax + 5"]} hide />
+                          <Line
+                            type="monotone"
+                            dataKey="score"
+                            stroke={m.accent}
+                            strokeWidth={2}
+                            dot={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+
+                    {/* Bottom row */}
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                      <div className="flex items-center gap-1.5">
+                        {m.trend.direction === "up" ? (
+                          <TrendingUp className="h-3.5 w-3.5 text-primary" />
+                        ) : (
+                          <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                        )}
+                        <span className={m.trend.direction === "up" ? "text-primary" : "text-destructive"}>
+                          {m.trend.direction === "up" ? "up" : "down"} {m.trend.pts} pts from yesterday
+                        </span>
+                      </div>
+                      <span className="text-muted-foreground">Based on {m.posts.toLocaleString()} posts</span>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-2 text-xs">
+                      <Zap className="h-3.5 w-3.5 text-muted-foreground" />
+                      <span className="text-muted-foreground">Top complaint:</span>
+                      <span className="text-foreground font-medium">{m.topComplaint}</span>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className="text-4xl font-bold font-mono text-foreground">{m.score}</p>
-                    <p className="text-xs text-muted-foreground font-mono mt-0.5">/ 100</p>
-                  </div>
-                </div>
+                </motion.div>
+              </Link>
+            ))}
+          </motion.div>
+        </section>
 
-                {/* Sparkline */}
-                <div className="mt-4 h-12">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={m.sparkline.map((v, idx) => ({ day: idx, score: v }))}>
-                      <YAxis domain={["dataMin - 5", "dataMax + 5"]} hide />
-                      <Line
-                        type="monotone"
-                        dataKey="score"
-                        stroke={m.accent}
-                        strokeWidth={2}
-                        dot={false}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+        {/* Community Chatter */}
+        <section className="container pb-20">
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.4 }}
+          >
+            <div className="flex items-center gap-2 mb-6">
+              <MessageSquare className="h-5 w-5 text-primary" />
+              <h2 className="text-xl font-bold text-foreground">Recent Community Chatter</h2>
+            </div>
+          </motion.div>
 
-                {/* Bottom row */}
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-                  <div className="flex items-center gap-1.5">
-                    {m.trend.direction === "up" ? (
-                      <TrendingUp className="h-3.5 w-3.5 text-primary" />
-                    ) : (
-                      <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-                    )}
-                    <span className={m.trend.direction === "up" ? "text-primary" : "text-destructive"}>
-                      {m.trend.direction === "up" ? "up" : "down"} {m.trend.pts} pts from yesterday
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, margin: "-40px" }}
+            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
+            className="space-y-3"
+          >
+            {CHATTER.map((post, i) => {
+              const s = SENTIMENT_STYLES[post.sentiment];
+              return (
+                <motion.div
+                  key={i}
+                  variants={fadeUp}
+                  custom={i}
+                  className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+                >
+                  {/* Source badge */}
+                  <div className="flex items-center gap-3 sm:w-28 shrink-0">
+                    <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border">
+                      {post.source === "Reddit" ? "🟠" : "🟡"} {post.sub}
                     </span>
                   </div>
-                  <span className="text-muted-foreground">Based on {m.posts.toLocaleString()} posts</span>
-                </div>
 
-                <div className="mt-3 flex items-center gap-2 text-xs">
-                  <Zap className="h-3.5 w-3.5 text-muted-foreground" />
-                  <span className="text-muted-foreground">Top complaint:</span>
-                  <span className="text-foreground font-medium">{m.topComplaint}</span>
-                </div>
-              </div>
-            </motion.div>
-            </Link>
-          ))}
-        </motion.div>
-      </section>
+                  {/* Snippet */}
+                  <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">{post.snippet}</p>
 
-      {/* Community Chatter */}
-      <section className="container pb-20">
-        <motion.div
-          initial={{ opacity: 0, y: 12 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.4 }}
-        >
-          <div className="flex items-center gap-2 mb-6">
-            <MessageSquare className="h-5 w-5 text-primary" />
-            <h2 className="text-xl font-bold text-foreground">Recent Community Chatter</h2>
-          </div>
-        </motion.div>
-
-        <motion.div
-          initial="hidden"
-          whileInView="visible"
-          viewport={{ once: true, margin: "-40px" }}
-          variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
-          className="space-y-3"
-        >
-          {CHATTER.map((post, i) => {
-            const s = SENTIMENT_STYLES[post.sentiment];
-            return (
-              <motion.div
-                key={i}
-                variants={fadeUp}
-                custom={i}
-                className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3"
-              >
-                {/* Source badge */}
-                <div className="flex items-center gap-3 sm:w-28 shrink-0">
-                  <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border">
-                    {post.source === "Reddit" ? "🟠" : "🟡"} {post.sub}
-                  </span>
-                </div>
-
-                {/* Snippet */}
-                <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">{post.snippet}</p>
-
-                {/* Meta */}
-                <div className="flex items-center gap-2 shrink-0">
-                  <span
-                    className="h-2 w-2 rounded-full shrink-0"
-                    style={{ background: MODEL_COLORS[post.model] }}
-                  />
-                  <span className="text-xs font-mono text-muted-foreground">{post.model}</span>
-                  <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
-                    {s.label}
-                  </Badge>
-                  <span className="text-xs text-muted-foreground font-mono">{post.time}</span>
-                </div>
-              </motion.div>
-            );
-          })}
-        </motion.div>
-      </section>
-    </div>
+                  {/* Meta */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span
+                      className="h-2 w-2 rounded-full shrink-0"
+                      style={{ background: MODEL_COLORS[post.model] }}
+                    />
+                    <span className="text-xs font-mono text-muted-foreground">{post.model}</span>
+                    <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
+                      {s.label}
+                    </Badge>
+                    <span className="text-xs text-muted-foreground font-mono">{post.time}</span>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </motion.div>
+        </section>
+      </div>
+    </PageTransition>
   );
 };
 
