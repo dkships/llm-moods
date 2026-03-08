@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 
 const MODELS = [
   {
+    slug: "claude",
     name: "Claude",
     accent: "#E87B35",
     vibe: "Mixed Signals",
@@ -18,6 +19,7 @@ const MODELS = [
     posts: 847,
   },
   {
+    slug: "chatgpt",
     name: "ChatGPT",
     accent: "#10A37F",
     vibe: "Good Vibes",
