@@ -43,6 +43,7 @@ const MODELS = [
     posts: 612,
   },
   {
+    slug: "grok",
     name: "Grok",
     accent: "#FF0000",
     vibe: "Bad Vibes",
