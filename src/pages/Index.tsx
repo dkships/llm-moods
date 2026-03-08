@@ -129,30 +129,30 @@ const Index = () => {
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
           >
-            {MODELS.map((m, i) => (
-              <motion.div
-                key={m.name}
-                variants={fadeUp}
-                custom={i}
-                className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer group hover:-translate-y-1"
-                style={{ boxShadow: undefined }}
-                whileHover={{ boxShadow: `0 0 20px ${m.accent}20, 0 8px 30px ${m.accent}10` }}
-              >
-                <div className="h-1" style={{ background: m.accent }} />
-                <div className="p-5">
-                  <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <m.icon className="h-5 w-5" style={{ color: m.accent }} />
-                    <span className="font-mono text-sm text-foreground">{m.vibe}</span>
+          {MODELS.map((m, i) => (
+              <Link key={m.name} to={`/model/${m.slug}`}>
+                <motion.div
+                  variants={fadeUp}
+                  custom={i}
+                  className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer group hover:-translate-y-1 h-full"
+                  whileHover={{ boxShadow: `0 0 20px ${m.accent}20, 0 8px 30px ${m.accent}10` }}
+                >
+                  <div className="h-1" style={{ background: m.accent }} />
+                  <div className="p-5">
+                    <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <m.icon className="h-5 w-5" style={{ color: m.accent }} />
+                      <span className="font-mono text-sm text-foreground">{m.vibe}</span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <TrendIcon trend={m.trend} />
+                      <span className="text-xs font-mono text-muted-foreground">
+                        +{m.reports} reports today
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <TrendIcon trend={m.trend} />
-                    <span className="text-xs font-mono text-muted-foreground">
-                      +{m.reports} reports today
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
+                </motion.div>
+              </Link>
             ))}
           </motion.div>
         </section>
