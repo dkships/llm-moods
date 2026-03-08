@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 
 const MODELS = [
   {
+    slug: "claude",
     name: "Claude",
     accent: "#E87B35",
     vibe: "Mixed Signals",
@@ -18,6 +19,7 @@ const MODELS = [
     posts: 847,
   },
   {
+    slug: "chatgpt",
     name: "ChatGPT",
     accent: "#10A37F",
     vibe: "Good Vibes",
@@ -29,6 +31,7 @@ const MODELS = [
     posts: 1243,
   },
   {
+    slug: "gemini",
     name: "Gemini",
     accent: "#4285F4",
     vibe: "Good Vibes",
@@ -40,6 +43,7 @@ const MODELS = [
     posts: 612,
   },
   {
+    slug: "grok",
     name: "Grok",
     accent: "#FF0000",
     vibe: "Bad Vibes",
@@ -183,12 +187,12 @@ const Dashboard = () => {
           className="grid grid-cols-1 md:grid-cols-2 gap-4"
         >
           {MODELS.map((m, i) => (
-            <motion.div
-              key={m.name}
-              variants={fadeUp}
-              custom={i}
-              className="glass rounded-xl overflow-hidden hover:glow-border transition-all duration-300"
-            >
+            <Link key={m.name} to={`/model/${m.slug}`}>
+              <motion.div
+                variants={fadeUp}
+                custom={i}
+                className="glass rounded-xl overflow-hidden hover:glow-border transition-all duration-300 cursor-pointer h-full"
+              >
               <div className="h-1" style={{ background: m.accent }} />
               <div className="p-6">
                 {/* Top row */}
@@ -244,6 +248,7 @@ const Dashboard = () => {
                 </div>
               </div>
             </motion.div>
+            </Link>
           ))}
         </motion.div>
       </section>
