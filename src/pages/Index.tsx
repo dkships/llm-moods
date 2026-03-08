@@ -9,6 +9,7 @@ import Footer from "@/components/Footer";
 
 const MODELS = [
   {
+    slug: "claude",
     name: "Claude",
     accent: "#E87B35",
     vibe: "Mixed Signals",
@@ -17,6 +18,7 @@ const MODELS = [
     reports: 34,
   },
   {
+    slug: "chatgpt",
     name: "ChatGPT",
     accent: "#10A37F",
     vibe: "Good Vibes",
