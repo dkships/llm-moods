@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.aggregate-vibes]
 verify_jwt = false
+
+[functions.scrape-bluesky]
+verify_jwt = false
