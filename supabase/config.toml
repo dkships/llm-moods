@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.scrape-hackernews]
 verify_jwt = false
+
+[functions.aggregate-vibes]
+verify_jwt = false
