@@ -1,1 +1,4 @@
 project_id = "trhmcunttvpmylcxjkbd"
+
+[functions.scrape-reddit]
+verify_jwt = false
