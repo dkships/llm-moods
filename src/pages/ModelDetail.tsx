@@ -183,16 +183,20 @@ const ModelDetail = () => {
 
   const model = slug ? MODEL_DATA[slug] : undefined;
 
+  usePageTitle(model ? `${model.name} Vibes — LLM Vibes` : "Model Not Found — LLM Vibes");
+
   if (!model) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-2xl font-bold text-foreground mb-4">Model not found</p>
-          <Link to="/dashboard">
-            <Button variant="outline" className="font-mono text-sm">Back to Dashboard</Button>
-          </Link>
+      <PageTransition>
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="text-center">
+            <p className="text-2xl font-bold text-foreground mb-4">Model not found</p>
+            <Link to="/dashboard">
+              <Button variant="outline" className="font-mono text-sm">Back to Dashboard</Button>
+            </Link>
+          </div>
         </div>
-      </div>
+      </PageTransition>
     );
   }
 
@@ -200,21 +204,9 @@ const ModelDetail = () => {
   const VibeIcon = model.vibeIcon;
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Nav */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-        <div className="container flex h-16 items-center justify-between">
-          <Link to="/" className="font-display text-lg font-bold tracking-tight text-foreground">
-            🌊 LLM <span className="text-primary">Vibes</span>
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link to="/dashboard" className="text-sm text-muted-foreground hover:text-foreground transition-colors">
-              Dashboard
-            </Link>
-            <Button size="sm" className="font-mono text-xs">Report a Vibe</Button>
-          </div>
-        </div>
-      </header>
+    <PageTransition>
+      <div className="min-h-screen bg-background">
+        <NavBar />
 
       {/* Model Header */}
       <section className="container pt-10 pb-8">
