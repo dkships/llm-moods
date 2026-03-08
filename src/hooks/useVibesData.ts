@@ -18,20 +18,6 @@ export function useModelsWithLatestVibes() {
         .order("period_start", { ascending: false });
       if (sErr) throw sErr;
 
-      // Get today's report counts
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const { data: reports, error: rErr } = await supabase
-        .from("user_reports")
-        .select("model_id")
-        .gte("created_at", todayStart.toISOString());
-      if (rErr) throw rErr;
-
-      const reportCounts: Record<string, number> = {};
-      (reports || []).forEach((r) => {
-        reportCounts[r.model_id] = (reportCounts[r.model_id] || 0) + 1;
-      });
-
       return (models || []).map((model) => {
         const modelScores = (scores || []).filter((s) => s.model_id === model.id);
         const latest = modelScores[0];
@@ -47,7 +33,7 @@ export function useModelsWithLatestVibes() {
           sparkline: sparkline.map((s) => s.score),
           topComplaint: latest?.top_complaint ?? null,
           totalPosts: latest?.total_posts ?? 0,
-          reportsToday: reportCounts[model.id] || 0,
+          lastUpdated: latest?.created_at ?? null,
         };
       });
     },
