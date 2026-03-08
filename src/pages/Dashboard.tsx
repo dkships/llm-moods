@@ -32,31 +32,37 @@ const Dashboard = () => {
         <section className="container pt-10 pb-8">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
             <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
-            <p className="mt-2 text-sm text-muted-foreground font-mono">
-              {today} · Last updated: {(() => {
-                const latest = models?.reduce((newest, m) => {
-                  if (!m.lastUpdated) return newest;
-                  return !newest || new Date(m.lastUpdated) > new Date(newest) ? m.lastUpdated : newest;
-                }, null as string | null);
-                if (!latest) return "—";
-                return formatTimeAgo(latest);
-              })()}
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <p className="text-sm text-muted-foreground font-mono">
+                {today} · Last updated: {(() => {
+                  const latest = models?.reduce((newest, m) => {
+                    if (!m.lastUpdated) return newest;
+                    return !newest || new Date(m.lastUpdated) > new Date(newest) ? m.lastUpdated : newest;
+                  }, null as string | null);
+                  if (!latest) return "—";
+                  return formatTimeAgo(latest);
+                })()}
+              </p>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-2.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                <span className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-pulse" />
+                Data updates every hour
+              </span>
+            </div>
           </motion.div>
         </section>
 
         {/* Model Cards */}
         <section className="container pb-12">
           {modelsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 5 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
             </div>
           ) : (
             <motion.div
               initial="hidden"
               animate="visible"
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
             >
               {(models || []).map((m, i) => {
                 const vibe = getVibeStatus(m.latestScore);

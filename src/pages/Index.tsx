@@ -23,8 +23,8 @@ const HOW_IT_WORKS = [
   },
   {
     icon: CheckCircle,
-    title: "You Decide",
-    description: "See real-time vibes at a glance and report your own experience to the community.",
+    title: "You Check",
+    description: "Check real-time vibes at a glance. No voting needed — the data speaks for itself.",
   },
 ];
 
@@ -60,7 +60,7 @@ const Index = () => {
               a <span className="text-primary glow-text">bad day</span>?
             </motion.h1>
             <motion.p variants={fadeUp} custom={2} className="mt-5 text-lg sm:text-xl text-muted-foreground max-w-xl leading-relaxed">
-              Real-time community sentiment tracking for Claude, ChatGPT, Gemini, Grok, and more. Know when the vibes are off.
+              We scan Reddit, Hacker News, and Bluesky so you don't have to. Know when the vibes are off.
             </motion.p>
             <motion.div variants={fadeUp} custom={3}>
               <Link to="/dashboard">
@@ -76,8 +76,8 @@ const Index = () => {
         {/* Live Vibes Preview */}
         <section className="container pb-24">
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+              {Array.from({ length: 5 }).map((_, i) => <CardSkeleton key={i} />)}
             </div>
           ) : (
             <motion.div
@@ -85,7 +85,7 @@ const Index = () => {
               whileInView="visible"
               viewport={{ once: true, margin: "-80px" }}
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4"
             >
               {(models || []).map((m, i) => {
                 const vibe = getVibeStatus(m.latestScore);

@@ -7,13 +7,14 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SUBREDDITS = ["ClaudeAI", "ChatGPT", "LocalLLaMA", "GoogleGemini", "singularity", "artificial"];
+const SUBREDDITS = ["ClaudeAI", "ChatGPT", "LocalLLaMA", "GoogleGemini", "singularity", "artificial", "deepseek"];
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
-  claude: ["claude"],
-  chatgpt: ["chatgpt", "gpt", "gpt-4", "gpt-4o"],
-  gemini: ["gemini"],
-  grok: ["grok"],
+  claude: ["claude", "sonnet", "opus", "anthropic"],
+  chatgpt: ["chatgpt", "gpt-5", "gpt-4", "gpt-4o", "gpt", "openai"],
+  gemini: ["gemini", "gemini pro", "google ai"],
+  grok: ["grok", "grok 4", "xai"],
+  deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
 };
 
 const USER_AGENT = "llmvibes:v1.0 (contact: hello@llmvibes.ai)";
