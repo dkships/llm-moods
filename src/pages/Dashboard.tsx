@@ -31,6 +31,7 @@ const MODELS = [
     posts: 1243,
   },
   {
+    slug: "gemini",
     name: "Gemini",
     accent: "#4285F4",
     vibe: "Good Vibes",
