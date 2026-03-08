@@ -248,6 +248,7 @@ const Dashboard = () => {
                 </div>
               </div>
             </motion.div>
+            </Link>
           ))}
         </motion.div>
       </section>
