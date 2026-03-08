@@ -54,8 +54,8 @@ const Dashboard = () => {
         {/* Model Cards */}
         <section className="container pb-12">
           {modelsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {Array.from({ length: 5 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
             </div>
           ) : (
             <motion.div
