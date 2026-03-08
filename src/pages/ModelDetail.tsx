@@ -10,6 +10,7 @@ import { useState } from "react";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
+import Footer from "@/components/Footer";
 
 // Seed-based pseudo-random for consistent mock data
 const seededRandom = (seed: number) => {
@@ -415,6 +416,7 @@ const ModelDetail = () => {
           })}
         </motion.div>
       </section>
+      <Footer />
     </div>
     </PageTransition>
   );

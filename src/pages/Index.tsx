@@ -1,13 +1,15 @@
-import { Sun, CloudSun, CloudLightning, TrendingUp, TrendingDown, Minus, Monitor, Brain, CheckCircle, ArrowRight, Github, Twitter } from "lucide-react";
+import { Sun, CloudSun, CloudLightning, TrendingUp, TrendingDown, Minus, Monitor, Brain, CheckCircle, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
+import Footer from "@/components/Footer";
 
 const MODELS = [
   {
+    slug: "claude",
     name: "Claude",
     accent: "#E87B35",
     vibe: "Mixed Signals",
@@ -16,6 +18,7 @@ const MODELS = [
     reports: 34,
   },
   {
+    slug: "chatgpt",
     name: "ChatGPT",
     accent: "#10A37F",
     vibe: "Good Vibes",
@@ -24,6 +27,7 @@ const MODELS = [
     reports: 12,
   },
   {
+    slug: "gemini",
     name: "Gemini",
     accent: "#4285F4",
     vibe: "Good Vibes",
@@ -32,6 +36,7 @@ const MODELS = [
     reports: 8,
   },
   {
+    slug: "grok",
     name: "Grok",
     accent: "#FF0000",
     vibe: "Bad Vibes",
@@ -124,30 +129,30 @@ const Index = () => {
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
             className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
           >
-            {MODELS.map((m, i) => (
-              <motion.div
-                key={m.name}
-                variants={fadeUp}
-                custom={i}
-                className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer group hover:-translate-y-1"
-                style={{ boxShadow: undefined }}
-                whileHover={{ boxShadow: `0 0 20px ${m.accent}20, 0 8px 30px ${m.accent}10` }}
-              >
-                <div className="h-1" style={{ background: m.accent }} />
-                <div className="p-5">
-                  <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
-                  <div className="mt-3 flex items-center gap-2">
-                    <m.icon className="h-5 w-5" style={{ color: m.accent }} />
-                    <span className="font-mono text-sm text-foreground">{m.vibe}</span>
+          {MODELS.map((m, i) => (
+              <Link key={m.name} to={`/model/${m.slug}`}>
+                <motion.div
+                  variants={fadeUp}
+                  custom={i}
+                  className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer group hover:-translate-y-1 h-full"
+                  whileHover={{ boxShadow: `0 0 20px ${m.accent}20, 0 8px 30px ${m.accent}10` }}
+                >
+                  <div className="h-1" style={{ background: m.accent }} />
+                  <div className="p-5">
+                    <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
+                    <div className="mt-3 flex items-center gap-2">
+                      <m.icon className="h-5 w-5" style={{ color: m.accent }} />
+                      <span className="font-mono text-sm text-foreground">{m.vibe}</span>
+                    </div>
+                    <div className="mt-3 flex items-center justify-between">
+                      <TrendIcon trend={m.trend} />
+                      <span className="text-xs font-mono text-muted-foreground">
+                        +{m.reports} reports today
+                      </span>
+                    </div>
                   </div>
-                  <div className="mt-3 flex items-center justify-between">
-                    <TrendIcon trend={m.trend} />
-                    <span className="text-xs font-mono text-muted-foreground">
-                      +{m.reports} reports today
-                    </span>
-                  </div>
-                </div>
-              </motion.div>
+                </motion.div>
+              </Link>
             ))}
           </motion.div>
         </section>
@@ -187,21 +192,7 @@ const Index = () => {
         </section>
 
         {/* Footer */}
-        <footer className="border-t border-border">
-          <div className="container flex flex-col sm:flex-row items-center justify-between gap-4 py-8">
-            <p className="text-sm text-muted-foreground font-mono">
-              Built for the AI-obsessed. LLM Vibes 2025.
-            </p>
-            <div className="flex items-center gap-4">
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Twitter className="h-4 w-4" />
-              </a>
-              <a href="#" className="text-muted-foreground hover:text-foreground transition-colors">
-                <Github className="h-4 w-4" />
-              </a>
-            </div>
-          </div>
-        </footer>
+        <Footer />
       </div>
     </PageTransition>
   );
