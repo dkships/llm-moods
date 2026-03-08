@@ -80,20 +80,18 @@ async function classifyPost(
   const truncated = (content || "").slice(0, 500);
   const prompt = `Classify this social media post about an AI model. Return ONLY valid JSON with two fields: sentiment (positive/negative/neutral) and complaint_category (lazy_responses/hallucinations/refusals/coding_quality/speed/general_drop or null if not negative). Post: ${title} ${truncated}`;
   try {
-    const res = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions");
-    // Need POST method - use regular fetch with timeout
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10000);
     try {
-      const res2 = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages: [{ role: "user", content: prompt }] }),
         signal: controller.signal,
       });
       clearTimeout(timer);
-      if (!res2.ok) { await res2.text(); return { sentiment: "neutral", complaint_category: null }; }
-      const data = await res2.json();
+      if (!res.ok) { await res.text(); return { sentiment: "neutral", complaint_category: null }; }
+      const data = await res.json();
       const raw = data.choices?.[0]?.message?.content || "";
       const jsonMatch = raw.match(/\{[\s\S]*?\}/);
       if (jsonMatch) {
@@ -101,7 +99,7 @@ async function classifyPost(
         return { sentiment: parsed.sentiment || "neutral", complaint_category: parsed.complaint_category || null };
       }
     } catch {
-      // classification failed, default
+      // classification failed
     }
     return { sentiment: "neutral", complaint_category: null };
   } catch {
