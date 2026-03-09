@@ -256,6 +256,8 @@ const ModelDetail = () => {
                   <p className="text-sm text-muted-foreground">No source data yet</p>
                 )}
               </motion.div>
+
+              <UserReportForm modelId={model.id} modelName={model.name} accent={accent} />
             </div>
           </div>
         </section>
