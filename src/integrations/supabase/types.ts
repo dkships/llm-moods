@@ -153,6 +153,39 @@ export type Database = {
           },
         ]
       }
+      scraper_runs: {
+        Row: {
+          completed_at: string | null
+          errors: string[] | null
+          id: string
+          posts_classified: number | null
+          posts_found: number | null
+          source: string
+          started_at: string
+          status: string
+        }
+        Insert: {
+          completed_at?: string | null
+          errors?: string[] | null
+          id?: string
+          posts_classified?: number | null
+          posts_found?: number | null
+          source: string
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          completed_at?: string | null
+          errors?: string[] | null
+          id?: string
+          posts_classified?: number | null
+          posts_found?: number | null
+          source?: string
+          started_at?: string
+          status?: string
+        }
+        Relationships: []
+      }
       user_reports: {
         Row: {
           comment: string | null

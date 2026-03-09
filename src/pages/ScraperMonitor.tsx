@@ -1,0 +1,146 @@
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import NavBar from "@/components/NavBar";
+import Footer from "@/components/Footer";
+import { formatTimeAgo } from "@/lib/vibes";
+import usePageTitle from "@/hooks/usePageTitle";
+
+function statusBadge(status: string) {
+  if (status === "success") return "text-primary bg-primary/10 border-primary/20";
+  if (status === "partial") return "text-yellow-400 bg-yellow-400/10 border-yellow-400/20";
+  return "text-destructive bg-destructive/10 border-destructive/20";
+}
+
+const ScraperMonitor = () => {
+  usePageTitle("Scraper Monitor — LLM Vibes");
+
+  const { data: runs, isLoading } = useQuery({
+    queryKey: ["scraper-runs"],
+    refetchInterval: 30_000,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("scraper_runs")
+        .select("*")
+        .order("started_at", { ascending: false })
+        .limit(100);
+      if (error) throw error;
+      return data || [];
+    },
+  });
+
+  // Group latest run per source
+  const latestBySource = new Map<string, any>();
+  (runs || []).forEach((r: any) => {
+    if (!latestBySource.has(r.source)) latestBySource.set(r.source, r);
+  });
+
+  return (
+    <div className="min-h-screen bg-background">
+      <NavBar />
+      <main className="max-w-5xl mx-auto px-4 py-12">
+        <h1 className="text-2xl font-bold text-foreground mb-2">Scraper Monitor</h1>
+        <p className="text-sm text-muted-foreground font-mono mb-8">
+          Latest runs from automated scrapers. Refreshes every 30s.
+        </p>
+
+        {/* Summary cards */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
+          {[
+            { label: "Total runs", value: runs?.length ?? "—" },
+            { label: "Succeeded", value: runs?.filter((r: any) => r.status === "success").length ?? "—" },
+            { label: "Partial", value: runs?.filter((r: any) => r.status === "partial").length ?? "—" },
+            { label: "Failed", value: runs?.filter((r: any) => r.status === "failed").length ?? "—" },
+          ].map((s) => (
+            <div key={s.label} className="glass rounded-lg p-4">
+              <p className="text-xs text-muted-foreground font-mono">{s.label}</p>
+              <p className="text-xl font-bold text-foreground">{s.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Latest per source */}
+        <h2 className="text-lg font-semibold text-foreground mb-3">Latest by Source</h2>
+        <div className="glass rounded-xl overflow-hidden mb-8">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground font-mono text-xs">
+                <th className="text-left px-4 py-3">Source</th>
+                <th className="text-left px-4 py-3">Status</th>
+                <th className="text-right px-4 py-3">Found</th>
+                <th className="text-right px-4 py-3">Classified</th>
+                <th className="text-right px-4 py-3">When</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">Loading...</td></tr>
+              ) : (
+                Array.from(latestBySource.values()).map((r: any) => (
+                  <tr key={r.id} className="border-b border-border/50 hover:bg-secondary/20">
+                    <td className="px-4 py-3 font-mono text-foreground">{r.source}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-mono border ${statusBadge(r.status)}`}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{r.posts_found}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{r.posts_classified}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground font-mono text-xs">
+                      {r.started_at ? formatTimeAgo(r.started_at) : "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Full run history */}
+        <h2 className="text-lg font-semibold text-foreground mb-3">Run History</h2>
+        <div className="glass rounded-xl overflow-hidden">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-muted-foreground font-mono text-xs">
+                <th className="text-left px-4 py-3">Source</th>
+                <th className="text-left px-4 py-3">Status</th>
+                <th className="text-right px-4 py-3">Found</th>
+                <th className="text-right px-4 py-3">Classified</th>
+                <th className="text-left px-4 py-3">Errors</th>
+                <th className="text-right px-4 py-3">Started</th>
+              </tr>
+            </thead>
+            <tbody>
+              {isLoading ? (
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">Loading...</td></tr>
+              ) : (runs || []).length === 0 ? (
+                <tr><td colSpan={6} className="px-4 py-6 text-center text-muted-foreground">No runs yet. The cron job will trigger every 15 minutes.</td></tr>
+              ) : (
+                (runs || []).map((r: any) => (
+                  <tr key={r.id} className="border-b border-border/50 hover:bg-secondary/20">
+                    <td className="px-4 py-3 font-mono text-foreground">{r.source}</td>
+                    <td className="px-4 py-3">
+                      <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-mono border ${statusBadge(r.status)}`}>
+                        {r.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{r.posts_found}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{r.posts_classified}</td>
+                    <td className="px-4 py-3 text-muted-foreground text-xs max-w-[200px] truncate">
+                      {(r.errors && r.errors.length > 0) ? r.errors.join("; ").slice(0, 100) : "—"}
+                    </td>
+                    <td className="px-4 py-3 text-right text-muted-foreground font-mono text-xs">
+                      {r.started_at ? formatTimeAgo(r.started_at) : "—"}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </main>
+      <Footer />
+    </div>
+  );
+};
+
+export default ScraperMonitor;
