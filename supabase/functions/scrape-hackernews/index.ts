@@ -14,6 +14,13 @@ const MODEL_KEYWORDS: Record<string, string[]> = {
   deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
 };
 
+function isEnglish(text: string): boolean {
+  const noWhitespace = text.replace(/\s/g, "");
+  if (noWhitespace.length < 5) return true;
+  const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
+  return latinCount / noWhitespace.length >= 0.6;
+}
+
 const RELEVANT_DOMAINS = ["anthropic.com", "openai.com", "deepmind.google", "deepseek.com"];
 const HN_API = "https://hacker-news.firebaseio.com/v0";
 
