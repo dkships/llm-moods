@@ -1,29 +1,45 @@
 import { useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCallback } from "react";
+import type { Database } from "@/integrations/supabase/types";
+
+type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Returns"][number];
+type SparklineRow = Database["public"]["Functions"]["get_sparkline_scores"]["Returns"][number];
+
+export interface ModelWithVibes {
+  id: string;
+  name: string;
+  slug: string;
+  accent_color: string | null;
+  latestScore: number;
+  vibe: number;
+  trend: { direction: "up" | "down"; pts: number };
+  sparkline: number[];
+  topComplaint: string | null;
+  totalPosts: number;
+  lastUpdated: string | null;
+}
 
 export function useModelsWithLatestVibes() {
-  return useQuery({
+  return useQuery<ModelWithVibes[]>({
     queryKey: ["models-with-vibes"],
     refetchInterval: 60_000,
     staleTime: 60_000,
     queryFn: async () => {
-      // Single RPC call for landing/dashboard data
       const { data: landing, error: lErr } = await supabase.rpc("get_landing_vibes");
       if (lErr) throw lErr;
 
-      // Single RPC call for sparklines (7 scores per model)
       const { data: sparklines, error: sErr } = await supabase.rpc("get_sparkline_scores");
       if (sErr) throw sErr;
 
       const sparkMap = new Map<string, number[]>();
-      (sparklines || []).forEach((s: { model_id: string; score: number }) => {
+      (sparklines || []).forEach((s: SparklineRow) => {
         const arr = sparkMap.get(s.model_id) || [];
         arr.push(s.score);
         sparkMap.set(s.model_id, arr);
       });
 
-      return (landing || []).map((m: any) => {
+      return (landing || []).map((m: LandingVibesRow): ModelWithVibes => {
         const sparkline = sparkMap.get(m.model_id) || [];
         const trendPts = m.previous_score != null ? m.latest_score - m.previous_score : 0;
 
@@ -34,7 +50,7 @@ export function useModelsWithLatestVibes() {
           accent_color: m.accent_color,
           latestScore: m.latest_score ?? 50,
           vibe: m.latest_score ?? 50,
-          trend: { direction: trendPts >= 0 ? ("up" as const) : ("down" as const), pts: Math.abs(trendPts) },
+          trend: { direction: trendPts >= 0 ? "up" : "down", pts: Math.abs(trendPts) },
           sparkline,
           topComplaint: m.top_complaint ?? null,
           totalPosts: m.total_posts ?? 0,
@@ -133,7 +149,7 @@ export function useVibesHistory(modelId: string | undefined, period: string, ran
         .eq("period", period)
         .gte("period_start", since.toISOString())
         .order("period_start", { ascending: true })
-        .limit(200);
+        .limit(90);
       if (error) throw error;
       return data || [];
     },
@@ -149,8 +165,8 @@ export function useComplaintBreakdown(modelId: string | undefined) {
       const { data, error } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId! });
       if (error) throw error;
 
-      const total = (data || []).reduce((sum: number, r: any) => sum + Number(r.count), 0);
-      return (data || []).map((r: any) => ({
+      const total = (data || []).reduce((sum: number, r) => sum + Number(r.count), 0);
+      return (data || []).map((r) => ({
         category: r.category,
         count: Number(r.count),
         pct: total > 0 ? Math.round((Number(r.count) / total) * 100) : 0,
@@ -168,8 +184,8 @@ export function useSourceBreakdown(modelId: string | undefined) {
       const { data, error } = await supabase.rpc("get_source_breakdown", { p_model_id: modelId! });
       if (error) throw error;
 
-      const total = (data || []).reduce((sum: number, r: any) => sum + Number(r.count), 0);
-      return (data || []).map((r: any) => ({
+      const total = (data || []).reduce((sum: number, r) => sum + Number(r.count), 0);
+      return (data || []).map((r) => ({
         source: r.source,
         count: Number(r.count),
         pct: total > 0 ? Math.round((Number(r.count) / total) * 100) : 0,
@@ -178,7 +194,7 @@ export function useSourceBreakdown(modelId: string | undefined) {
   });
 }
 
-export function useModelPosts(modelId: string | undefined, limit = 10, enabled = true) {
+export function useModelPosts(modelId: string | undefined, limit = 25, enabled = true) {
   return useQuery({
     queryKey: ["model-posts", modelId, limit],
     enabled: !!modelId && enabled,
@@ -201,7 +217,6 @@ export function usePrefetchModelDetail() {
   const queryClient = useQueryClient();
 
   return useCallback((slug: string, modelId: string) => {
-    // Prefetch vibes history
     queryClient.prefetchQuery({
       queryKey: ["vibes-history", modelId, "daily", "30d"],
       staleTime: 60_000,
@@ -214,19 +229,18 @@ export function usePrefetchModelDetail() {
           .eq("period", "daily")
           .gte("period_start", since)
           .order("period_start", { ascending: true })
-          .limit(200);
+          .limit(90);
         return data || [];
       },
     });
 
-    // Prefetch complaint breakdown
     queryClient.prefetchQuery({
       queryKey: ["complaint-breakdown", modelId],
       staleTime: 60_000,
       queryFn: async () => {
         const { data } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId });
-        const total = (data || []).reduce((sum: number, r: any) => sum + Number(r.count), 0);
-        return (data || []).map((r: any) => ({
+        const total = (data || []).reduce((sum: number, r) => sum + Number(r.count), 0);
+        return (data || []).map((r) => ({
           category: r.category,
           count: Number(r.count),
           pct: total > 0 ? Math.round((Number(r.count) / total) * 100) : 0,

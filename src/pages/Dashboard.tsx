@@ -9,7 +9,7 @@ import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
 import Footer from "@/components/Footer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, useDataFreshness } from "@/hooks/useVibesData";
+import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, useDataFreshness, type ModelWithVibes } from "@/hooks/useVibesData";
 import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
@@ -32,7 +32,7 @@ const LastUpdatedTimer = memo(({ lastUpdated }: { lastUpdated: string | null }) 
 LastUpdatedTimer.displayName = "LastUpdatedTimer";
 
 /** Memoized model card */
-const ModelCard = memo(({ m, i, onHover }: { m: any; i: number; onHover: (slug: string, id: string) => void }) => {
+const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }) => {
   const vibe = getVibeStatus(m.latestScore);
   const VibeIcon = vibe.icon;
   const accent = m.accent_color || "#888";
@@ -76,7 +76,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: any; i: number; onHover: (slug: 
 
           {/* Sparkline — lazy loaded */}
           {m.sparkline.length > 1 && (
-            <div className="mt-4 h-12">
+            <div className="mt-4 h-12" aria-hidden="true">
               <Suspense fallback={<div className="h-12 animate-pulse rounded bg-secondary/40" />}>
                 <LazySparkline data={m.sparkline} accent={accent} />
               </Suspense>
@@ -145,9 +145,48 @@ const DataFreshnessIndicator = memo(() => {
 });
 DataFreshnessIndicator.displayName = "DataFreshnessIndicator";
 
+/** Memoized chatter post */
+const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: number }) => {
+  const sentiment = (post.sentiment as string) || "neutral";
+  const s = SENTIMENT_STYLES[sentiment];
+  const src = formatSourceDisplay(post.source as string);
+  const modelData = post.models as { name: string; accent_color: string | null; slug: string } | null;
+  return (
+    <motion.div
+      variants={fadeUp}
+      custom={i}
+      className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+    >
+      <div className="flex items-center gap-3 sm:w-28 shrink-0">
+        <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border">
+          {src.emoji} {src.label}
+        </span>
+      </div>
+      <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">
+        {(post.content as string) || (post.title as string)}
+      </p>
+      <div className="flex items-center gap-2 shrink-0">
+        {modelData && (
+          <>
+            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: modelData.accent_color || "#888" }} />
+            <span className="text-xs font-mono text-muted-foreground">{modelData.name}</span>
+          </>
+        )}
+        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
+          {s.label}
+        </Badge>
+        {post.posted_at && (
+          <span className="text-xs text-muted-foreground font-mono">{formatTimeAgo(post.posted_at as string)}</span>
+        )}
+      </div>
+    </motion.div>
+  );
+});
+ChatterPost.displayName = "ChatterPost";
+
 const Dashboard = () => {
   usePageTitle("Dashboard — LLM Vibes");
-  const { data: models, isLoading: modelsLoading } = useModelsWithLatestVibes();
+  const { data: models, isLoading: modelsLoading, isError: modelsError } = useModelsWithLatestVibes();
   const prefetch = usePrefetchModelDetail();
 
   // Lazy load chatter when section is in view
@@ -164,7 +203,7 @@ const Dashboard = () => {
     return () => observer.disconnect();
   }, []);
 
-  const { data: chatterData, isLoading: chatterLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useRecentChatter(chatterVisible);
+  const { data: chatterData, isLoading: chatterLoading, isError: chatterError, fetchNextPage, hasNextPage, isFetchingNextPage } = useRecentChatter(chatterVisible);
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -202,6 +241,8 @@ const Dashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
             </div>
+          ) : modelsError ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
           ) : (
             <motion.div
               initial="hidden"
@@ -235,7 +276,9 @@ const Dashboard = () => {
             </div>
           </motion.div>
 
-          {!chatterVisible || chatterLoading ? (
+          {chatterError ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
+          ) : !chatterVisible || chatterLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 6 }).map((_, i) => <ChatterSkeleton key={i} />)}
             </div>
@@ -247,40 +290,9 @@ const Dashboard = () => {
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
               className="space-y-3"
             >
-              {(chatterData?.pages ?? []).flatMap((page) => page).map((post, i) => {
-                const s = SENTIMENT_STYLES[post.sentiment || "neutral"];
-                const src = formatSourceDisplay(post.source);
-                const modelData = post.models as { name: string; accent_color: string | null; slug: string } | null;
-                return (
-                  <motion.div
-                    key={post.id}
-                    variants={fadeUp}
-                    custom={i}
-                    className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3"
-                  >
-                    <div className="flex items-center gap-3 sm:w-28 shrink-0">
-                      <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border">
-                        {src.emoji} {src.label}
-                      </span>
-                    </div>
-                    <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">{post.content || post.title}</p>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {modelData && (
-                        <>
-                          <span className="h-2 w-2 rounded-full shrink-0" style={{ background: modelData.accent_color || "#888" }} />
-                          <span className="text-xs font-mono text-muted-foreground">{modelData.name}</span>
-                        </>
-                      )}
-                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
-                        {s.label}
-                      </Badge>
-                      {post.posted_at && (
-                        <span className="text-xs text-muted-foreground font-mono">{formatTimeAgo(post.posted_at)}</span>
-                      )}
-                    </div>
-                  </motion.div>
-                );
-              })}
+              {(chatterData?.pages ?? []).flatMap((page) => page).map((post, i) => (
+                <ChatterPost key={post.id} post={post as unknown as Record<string, unknown>} i={i} />
+              ))}
             </motion.div>
           )}
 
@@ -289,6 +301,7 @@ const Dashboard = () => {
               <button
                 onClick={() => fetchNextPage()}
                 disabled={isFetchingNextPage}
+                aria-label="Load more posts"
                 className="px-5 py-2 rounded-lg text-xs font-mono text-muted-foreground bg-secondary/50 border border-border hover:bg-secondary hover:text-foreground transition-colors disabled:opacity-50"
               >
                 {isFetchingNextPage ? "Loading..." : "Load more"}
