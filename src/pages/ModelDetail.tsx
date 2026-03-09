@@ -156,7 +156,7 @@ const ModelDetail = () => {
                   </p>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 0, left: 0 }}>
+                      <LineChart data={chartData} margin={{ top: 5, right: 50, bottom: 0, left: 0 }}>
                         <XAxis
                           dataKey="day"
                           tick={{ fill: "hsl(220 10% 50%)", fontSize: 10 }}
@@ -187,7 +187,6 @@ const ModelDetail = () => {
                           y={50}
                           stroke="hsl(220 10% 25%)"
                           strokeDasharray="4 4"
-                          label={{ value: "Neutral", fill: "hsl(220 10% 35%)", fontSize: 10, position: "right" }}
                         />
                         <Line
                           type="monotone"
