@@ -89,7 +89,16 @@ const Dashboard = () => {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-4xl font-bold font-mono text-foreground">{m.latestScore}</p>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-4xl font-bold font-mono text-foreground cursor-help">{m.latestScore}</p>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="text-xs font-mono">
+                                  0 = everyone's complaining, 100 = pure good vibes
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <p className="text-xs text-muted-foreground font-mono mt-0.5">/ 100</p>
                           </div>
                         </div>
