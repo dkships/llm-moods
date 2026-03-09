@@ -14,6 +14,7 @@ const MODEL_KEYWORDS: Record<string, string[]> = {
   deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
 };
 
+const BROAD_AI_KEYWORDS = ["llm", "large language model", "ai model", "copilot", "ai coding", "language model"];
 const AI_TAGS = ["ai", "ml", "llm", "machine-learning"];
 
 function matchModels(text: string): string[] {
@@ -29,6 +30,11 @@ function matchModels(text: string): string[] {
     }
   }
   return matched;
+}
+
+function hasAiContent(text: string): boolean {
+  const lower = text.toLowerCase();
+  return BROAD_AI_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
 async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
@@ -65,7 +71,7 @@ Deno.serve(async (req) => {
 
   try {
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
-    await logToErrorLog(supabase, "Lobsters scraper started", "health-check");
+    await logToErrorLog(supabase, "Lobsters scraper started (broadened)", "health-check");
 
     const { data: models } = await supabase.from("models").select("id, slug");
     const modelMap: Record<string, string> = {};
@@ -77,7 +83,14 @@ Deno.serve(async (req) => {
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, errors: [] as string[] };
 
-    const endpoints = ["https://lobste.rs/newest.json", "https://lobste.rs/hottest.json"];
+    const endpoints = [
+      "https://lobste.rs/newest.json",
+      "https://lobste.rs/hottest.json",
+      "https://lobste.rs/t/ai.json",
+      "https://lobste.rs/t/ml.json",
+    ];
+
+    const seenIds = new Set<string>();
 
     for (const endpoint of endpoints) {
       try {
@@ -90,9 +103,13 @@ Deno.serve(async (req) => {
         }
 
         const stories = await res.json();
+        if (!Array.isArray(stories)) continue;
         summary.fetched += stories.length;
 
         for (const story of stories) {
+          if (seenIds.has(story.short_id)) continue;
+          seenIds.add(story.short_id);
+
           const createdAt = new Date(story.created_at);
           if (createdAt < cutoff) continue;
 
@@ -101,14 +118,19 @@ Deno.serve(async (req) => {
           const hasAiTag = tags.some((t: string) => AI_TAGS.includes(t.toLowerCase()));
 
           const matchedSlugs = matchModels(text);
-          // Include if it matches a model OR has an AI-relevant tag with model mention in title
-          if (matchedSlugs.length === 0 && !hasAiTag) continue;
-          // If only AI tag matched but no specific model, try harder with tags text
+
+          // If no direct model match, check broad AI keywords or AI tags
           if (matchedSlugs.length === 0) {
+            if (!hasAiTag && !hasAiContent(text)) continue;
+            // Try matching model names in tags too
             const tagText = tags.join(" ");
             const tagMatches = matchModels(tagText);
-            if (tagMatches.length === 0) continue;
-            matchedSlugs.push(...tagMatches);
+            if (tagMatches.length > 0) {
+              matchedSlugs.push(...tagMatches);
+            } else {
+              // AI-related but no specific model — skip (we need a model to link to)
+              continue;
+            }
           }
           summary.filtered++;
 

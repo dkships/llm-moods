@@ -6,10 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SEARCH_TERMS = [
-  "Claude AI", "ChatGPT", "GPT-5", "Gemini AI", "Grok AI", "DeepSeek",
-  "Claude worse", "ChatGPT dumb",
-];
+const HASHTAGS = ["chatgpt", "claude", "gemini", "grok", "deepseek", "llm", "openai", "anthropic"];
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
   claude: ["claude", "sonnet", "opus", "anthropic"],
@@ -74,7 +71,7 @@ Deno.serve(async (req) => {
 
   try {
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
-    await logToErrorLog(supabase, "Mastodon scraper started", "health-check");
+    await logToErrorLog(supabase, "Mastodon scraper started (hashtag timelines)", "health-check");
 
     const { data: models } = await supabase.from("models").select("id, slug");
     const modelMap: Record<string, string> = {};
@@ -87,25 +84,28 @@ Deno.serve(async (req) => {
     const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, errors: [] as string[] };
     let reqIdx = 0;
 
-    for (const term of SEARCH_TERMS) {
+    for (const hashtag of HASHTAGS) {
       if (reqIdx > 0) await delay(1000);
       reqIdx++;
 
       try {
-        const url = `https://mastodon.social/api/v2/search?q=${encodeURIComponent(term)}&type=statuses&limit=40`;
+        const url = `https://mastodon.social/api/v1/timelines/tag/${hashtag}?limit=40`;
         const res = await fetch(url, { headers: { "Accept": "application/json" } });
 
         if (reqIdx <= 3) {
-          await logToErrorLog(supabase, `Mastodon "${term}" status=${res.status}`, "debug");
+          await logToErrorLog(supabase, `Hashtag #${hashtag} status=${res.status}`, "debug");
         }
 
         if (!res.ok) {
-          summary.errors.push(`"${term}": HTTP ${res.status}`);
+          summary.errors.push(`#${hashtag}: HTTP ${res.status}`);
           continue;
         }
 
-        const json = await res.json();
-        const statuses = json.statuses || [];
+        const statuses = await res.json();
+        if (!Array.isArray(statuses)) {
+          summary.errors.push(`#${hashtag}: response not an array`);
+          continue;
+        }
         summary.fetched += statuses.length;
 
         for (const status of statuses) {
@@ -143,7 +143,7 @@ Deno.serve(async (req) => {
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
-        summary.errors.push(`"${term}": ${msg}`);
+        summary.errors.push(`#${hashtag}: ${msg}`);
       }
     }
 
