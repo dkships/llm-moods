@@ -81,7 +81,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
           {m.sparkline.length > 1 && (
             <div className="mt-4 h-12" aria-hidden="true">
               <Suspense fallback={<div className="h-12 animate-pulse rounded bg-secondary/40" />}>
-                <LazySparkline data={m.sparkline} accent={accent} />
+                <LazySparkline data={m.sparkline} accent={vibe.color} />
               </Suspense>
             </div>
           )}
