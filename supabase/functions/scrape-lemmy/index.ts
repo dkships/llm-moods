@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const INSTANCES = ["https://lemmy.world", "https://lemmy.ml"];
-const SEARCH_TERMS = ["Claude", "ChatGPT", "GPT-5", "Gemini", "Grok", "DeepSeek", "LLM"];
+const SEARCH_TERMS = ["Claude", "ChatGPT", "GPT-5", "Gemini", "Grok", "DeepSeek", "LLM", "Perplexity"];
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
   claude: ["claude", "sonnet", "opus", "anthropic"],
