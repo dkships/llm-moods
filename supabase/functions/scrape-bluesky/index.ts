@@ -12,35 +12,45 @@ const SEARCH_TERMS = [
   "Perplexity AI", "Perplexity worse",
 ];
 
-const MODEL_KEYWORDS: Record<string, string[]> = {
-  claude: ["claude", "sonnet", "opus", "anthropic"],
-  chatgpt: ["chatgpt", "gpt-5", "gpt-4", "gpt-4o", "gpt", "openai"],
-  gemini: ["gemini", "gemini pro", "google ai"],
-  grok: ["grok", "grok 4", "xai"],
-  deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
-  perplexity: ["perplexity", "perplexity ai", "pplx"],
-};
+interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }
 
-function matchModels(text: string): string[] {
-  const lower = text.toLowerCase();
+async function loadKeywords(supabase: any): Promise<{ modelMap: Record<string, string>; keywords: KeywordEntry[] }> {
+  const { data: models } = await supabase.from("models").select("id, slug");
+  const modelMap: Record<string, string> = {};
+  const slugById: Record<string, string> = {};
+  for (const m of models || []) { modelMap[m.slug] = m.id; slugById[m.id] = m.slug; }
+  const { data: kws } = await supabase.from("model_keywords").select("keyword, tier, context_words, model_id");
+  const keywords: KeywordEntry[] = (kws || []).map((k: any) => ({
+    keyword: k.keyword, tier: k.tier, context_words: k.context_words, model_slug: slugById[k.model_id] || "",
+  }));
+  return { modelMap, keywords };
+}
+
+function matchModels(text: string, keywords: KeywordEntry[]): string[] {
   const matched: string[] = [];
-  for (const [slug, keywords] of Object.entries(MODEL_KEYWORDS)) {
-    for (const kw of keywords) {
-      const regex = new RegExp(`\\b${kw.replace("-", "[-\\s]?")}\\b`, "i");
-      if (regex.test(lower)) {
-        if (!matched.includes(slug)) matched.push(slug);
-        break;
-      }
-    }
+  const lower = text.toLowerCase();
+  const highKws = keywords.filter(k => k.tier === "high").sort((a, b) => b.keyword.length - a.keyword.length);
+  for (const k of highKws) {
+    if (matched.includes(k.model_slug)) continue;
+    const regex = new RegExp(`\\b${k.keyword.replace(/[-\.]/g, "[-\\s.]?")}\\b`, "i");
+    if (regex.test(lower)) matched.push(k.model_slug);
+  }
+  const ambigKws = keywords.filter(k => k.tier === "ambiguous");
+  for (const k of ambigKws) {
+    if (matched.includes(k.model_slug)) continue;
+    const regex = new RegExp(`\\b${k.keyword.replace(/[-\.]/g, "[-\\s.]?")}\\b`, "i");
+    if (!regex.test(lower)) continue;
+    if (!k.context_words) { matched.push(k.model_slug); continue; }
+    const contextList = k.context_words.split(",").map(w => w.trim().toLowerCase());
+    if (contextList.some(cw => lower.includes(cw))) matched.push(k.model_slug);
   }
   return matched;
 }
 
 function isEnglish(text: string): boolean {
-  const noWhitespace = text.replace(/\s/g, "");
-  if (noWhitespace.length < 5) return true;
-  const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
-  return latinCount / noWhitespace.length >= 0.6;
+  const nw = text.replace(/\s/g, "");
+  if (nw.length < 5) return true;
+  return ((nw.match(/[a-zA-Z]/g) || []).length / nw.length) >= 0.6;
 }
 
 function stripUrls(text: string): string {
@@ -48,17 +58,14 @@ function stripUrls(text: string): string {
 }
 
 function meetsMinLength(title: string, content: string): boolean {
-  const cleaned = stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim();
-  return cleaned.length >= 20;
+  return stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim().length >= 20;
 }
 
 async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
-  const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const since = new Date(Date.now() - 48 * 3600000).toISOString();
   const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
   const keys = new Set<string>();
-  for (const p of data || []) {
-    if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
-  }
+  for (const p of data || []) if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
   return keys;
 }
 
@@ -69,62 +76,58 @@ function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): bo
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const res = await fetch(url, { ...options, signal: controller.signal });
-    return res;
-  } finally {
-    clearTimeout(timer);
-  }
+  try { return await fetch(url, { ...options, signal: controller.signal }); } finally { clearTimeout(timer); }
 }
 
-async function classifyPost(
-  title: string, content: string, apiKey: string
-): Promise<{ sentiment: string; complaint_category: string | null }> {
-  const truncated = (content || "").slice(0, 500);
-  const prompt = `Classify this social media post about an AI model. Return ONLY valid JSON with two fields: sentiment (positive/negative/neutral) and complaint_category (lazy_responses/hallucinations/refusals/coding_quality/speed/general_drop or null if not negative). Classify as neutral ONLY if the post is purely factual news with zero opinion expressed. Most social media posts express some sentiment — when in doubt, choose positive or negative, not neutral. Posts with any emotional language, slang, sarcasm, or subjective judgment should NOT be neutral. Post: ${title} ${truncated}`;
+function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+
+async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
+  try { await supabase.from("error_log").insert({ function_name: "scrape-bluesky", error_message: msg, context: ctx || null }); } catch {}
+}
+
+const CLASSIFY_PROMPT = `You are analyzing a social media post to determine if it expresses an opinion about the quality or performance of an AI language model (like ChatGPT, Claude, Gemini, Grok, DeepSeek, or Perplexity).
+
+Step 1 — RELEVANCE: Is this post actually about the user's experience with an AI model's quality, performance, or behavior? Posts about AI news, company business decisions, stock prices, hiring, or general AI discussion WITHOUT a quality opinion are NOT relevant.
+
+Step 2 — If relevant, classify sentiment and complaint type.
+
+Return ONLY valid JSON:
+{"relevant": true/false, "sentiment": "positive"/"negative"/"neutral", "complaint_category": "lazy_responses"/"hallucinations"/"refusals"/"coding_quality"/"speed"/"general_drop"/null}
+
+If relevant is false, sentiment and complaint_category should be null.
+Classify as neutral ONLY if genuinely no opinion is expressed. Most posts that ARE relevant express clear sentiment. When in doubt between neutral and negative, lean negative. When in doubt between neutral and positive, lean positive.
+
+Post to classify: `;
+
+async function classifyPost(text: string, apiKey: string): Promise<{ relevant: boolean; sentiment: string | null; complaint_category: string | null }> {
   try {
     const res = await fetchWithTimeout("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages: [{ role: "user", content: prompt }] }),
+      body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages: [{ role: "user", content: CLASSIFY_PROMPT + text.slice(0, 600) }] }),
     });
-    if (!res.ok) { await res.text(); return { sentiment: "neutral", complaint_category: null }; }
+    if (!res.ok) { await res.text(); return { relevant: true, sentiment: "neutral", complaint_category: null }; }
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || "";
     const jsonMatch = raw.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      return { sentiment: parsed.sentiment || "neutral", complaint_category: parsed.complaint_category || null };
+      return { relevant: parsed.relevant !== false, sentiment: parsed.sentiment || null, complaint_category: parsed.complaint_category || null };
     }
-    return { sentiment: "neutral", complaint_category: null };
-  } catch {
-    return { sentiment: "neutral", complaint_category: null };
-  }
-}
-
-function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
-
-async function logToErrorLog(supabase: any, functionName: string, errorMessage: string, context?: string) {
-  try {
-    await supabase.from("error_log").insert({ function_name: functionName, error_message: errorMessage, context: context || null });
-  } catch (e) {
-    console.error("Failed to log to error_log:", e);
-  }
+    return { relevant: true, sentiment: "neutral", complaint_category: null };
+  } catch { return { relevant: true, sentiment: "neutral", complaint_category: null }; }
 }
 
 async function authenticateBluesky(handle: string, appPassword: string): Promise<string | null> {
   try {
     const res = await fetchWithTimeout("https://bsky.social/xrpc/com.atproto.server.createSession", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
+      method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identifier: handle, password: appPassword }),
     });
     if (!res.ok) return null;
     const data = await res.json();
     return data.accessJwt || null;
-  } catch {
-    return null;
-  }
+  } catch { return null; }
 }
 
 Deno.serve(async (req) => {
@@ -138,28 +141,25 @@ Deno.serve(async (req) => {
     const blueskyAppPassword = Deno.env.get("BLUESKY_APP_PASSWORD");
 
     if (!blueskyHandle || !blueskyAppPassword) {
-      await logToErrorLog(supabase, "scrape-bluesky", "Missing BLUESKY_HANDLE or BLUESKY_APP_PASSWORD secrets", "auth");
+      await logToErrorLog(supabase, "Missing BLUESKY credentials", "auth");
       return new Response(JSON.stringify({ error: "Missing Bluesky credentials" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const accessJwt = await authenticateBluesky(blueskyHandle, blueskyAppPassword);
     if (!accessJwt) {
-      await logToErrorLog(supabase, "scrape-bluesky", "Failed to authenticate with Bluesky", "auth");
+      await logToErrorLog(supabase, "Bluesky auth failed", "auth");
       return new Response(JSON.stringify({ error: "Bluesky authentication failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    await logToErrorLog(supabase, "scrape-bluesky", "Successfully authenticated with Bluesky", "health-check");
+    await logToErrorLog(supabase, "Bluesky scraper started (v2 - tiered matching)", "health-check");
 
-    const { data: models } = await supabase.from("models").select("id, slug");
-    const modelMap: Record<string, string> = {};
-    for (const m of models || []) modelMap[m.slug] = m.id;
-
+    const { modelMap, keywords } = await loadKeywords(supabase);
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "bluesky");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
-    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
+    const cutoff = new Date(Date.now() - 24 * 3600000);
+    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, irrelevant: 0, langSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
 
     for (let i = 0; i < SEARCH_TERMS.length; i++) {
       const term = SEARCH_TERMS[i];
@@ -167,15 +167,8 @@ Deno.serve(async (req) => {
 
       try {
         const url = `https://bsky.social/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(term)}&limit=25&sort=latest`;
-        const res = await fetchWithTimeout(url, {
-          headers: { "Authorization": `Bearer ${accessJwt}`, "Accept": "application/json" },
-        });
-
-        if (!res.ok) {
-          const errorText = await res.text();
-          summary.errors.push(`"${term}": HTTP ${res.status} - ${errorText.slice(0, 100)}`);
-          continue;
-        }
+        const res = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${accessJwt}`, Accept: "application/json" } });
+        if (!res.ok) { const t = await res.text(); summary.errors.push(`"${term}": HTTP ${res.status} - ${t.slice(0, 100)}`); continue; }
 
         const json = await res.json();
         const posts = json.posts || [];
@@ -191,7 +184,7 @@ Deno.serve(async (req) => {
           if (!isEnglish(text)) { summary.langSkipped++; continue; }
           if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
 
-          const matchedSlugs = matchModels(text);
+          const matchedSlugs = matchModels(text, keywords);
           if (matchedSlugs.length === 0) continue;
           summary.filtered++;
 
@@ -201,7 +194,6 @@ Deno.serve(async (req) => {
           const sourceUrl = `https://bsky.app/profile/${handle}/post/${rkey}`;
           if (existingUrls.has(sourceUrl)) continue;
 
-          // Cross-source dedup
           let allDuped = true;
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
@@ -209,8 +201,9 @@ Deno.serve(async (req) => {
           }
           if (allDuped) { summary.dedupSkipped++; continue; }
 
-          const classification = await classifyPost("", text, lovableApiKey);
+          const classification = await classifyPost(text, lovableApiKey);
           summary.classified++;
+          if (!classification.relevant) { summary.irrelevant++; continue; }
 
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
@@ -221,27 +214,21 @@ Deno.serve(async (req) => {
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               score: post.likeCount || 0, posted_at: createdAt.toISOString(),
             });
-            if (error) {
-              summary.errors.push(`Insert: ${error.message}`);
-            } else {
+            if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
               summary.inserted++;
               existingUrls.add(sourceUrl);
               titleKeys.add(`${modelId}:${text.slice(0, 80).toLowerCase()}`);
             }
           }
         }
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        summary.errors.push(`"${term}": ${msg}`);
-      }
+      } catch (e) { summary.errors.push(`"${term}": ${e instanceof Error ? e.message : String(e)}`); }
     }
 
-    await logToErrorLog(supabase, "scrape-bluesky", `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} dedupSkipped=${summary.dedupSkipped} contentSkipped=${summary.contentSkipped}`, "summary");
-
+    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted}`, "summary");
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown";
-    await logToErrorLog(supabase, "scrape-bluesky", msg, "top-level error");
+    await logToErrorLog(supabase, msg, "top-level error");
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
