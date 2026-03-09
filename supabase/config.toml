@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.scrape-devto]
 verify_jwt = false
+
+[functions.scrape-reddit-apify]
+verify_jwt = false
