@@ -18,11 +18,15 @@ import {
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
-
 // Lazy load the heavy chart component
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
 const TIME_RANGES = ["24h", "7d", "30d"] as const;
+const TIME_RANGE_LABELS: Record<string, string> = {
+  "24h": "Show last 24 hours",
+  "7d": "Show last 7 days",
+  "30d": "Show last 30 days",
+};
 
 const ModelDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -31,9 +35,9 @@ const ModelDetail = () => {
   const { data: model, isLoading: modelLoading } = useModelDetail(slug);
   const { data: allModels } = useModelsWithLatestVibes();
   const period = timeRange === "24h" ? "hourly" : "daily";
-  const { data: vibesHistory, isLoading: historyLoading } = useVibesHistory(model?.id, period, timeRange);
-  const { data: complaints, isLoading: complaintsLoading } = useComplaintBreakdown(model?.id);
-  const { data: sources, isLoading: sourcesLoading } = useSourceBreakdown(model?.id);
+  const { data: vibesHistory, isLoading: historyLoading, isError: historyError } = useVibesHistory(model?.id, period, timeRange);
+  const { data: complaints, isLoading: complaintsLoading, isError: complaintsError } = useComplaintBreakdown(model?.id);
+  const { data: sources, isLoading: sourcesLoading, isError: sourcesError } = useSourceBreakdown(model?.id);
 
   // Lazy load recent posts when user scrolls near
   const postsRef = useRef<HTMLDivElement>(null);
@@ -49,7 +53,7 @@ const ModelDetail = () => {
     return () => observer.disconnect();
   }, []);
 
-  const { data: recentPosts, isLoading: postsLoading } = useModelPosts(model?.id, 10, postsVisible);
+  const { data: recentPosts, isLoading: postsLoading, isError: postsError } = useModelPosts(model?.id, 25, postsVisible);
 
   const enriched = allModels?.find((m) => m.slug === slug);
   const latestScore = enriched?.latestScore ?? 50;
@@ -118,7 +122,7 @@ const ModelDetail = () => {
         {/* Model Header */}
         <section className="container pt-10 pb-8">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
+            <Link to="/dashboard" aria-label="Back to Dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
               <ArrowLeft className="h-4 w-4" />
               Back to Dashboard
             </Link>
@@ -161,7 +165,9 @@ const ModelDetail = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.45 }}
             >
-              {historyLoading ? (
+              {historyError ? (
+                <p className="text-sm text-muted-foreground py-8 text-center">Failed to load data</p>
+              ) : historyLoading ? (
                 <ChartSkeleton />
               ) : (
                 <>
@@ -179,6 +185,7 @@ const ModelDetail = () => {
                       <button
                         key={r}
                         onClick={() => setTimeRange(r)}
+                        aria-label={TIME_RANGE_LABELS[r]}
                         className={`px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
                           timeRange === r
                             ? "bg-secondary text-foreground"
@@ -202,7 +209,9 @@ const ModelDetail = () => {
                 transition={{ delay: 0.2, duration: 0.45 }}
               >
                 <h2 className="text-lg font-semibold text-foreground mb-4">Complaint Breakdown</h2>
-                {complaintsLoading ? (
+                {complaintsError ? (
+                  <p className="text-sm text-muted-foreground">Failed to load data</p>
+                ) : complaintsLoading ? (
                   <BarsSkeleton count={5} />
                 ) : complaints && complaints.length > 0 ? (
                   <div className="space-y-3">
@@ -233,7 +242,9 @@ const ModelDetail = () => {
                 transition={{ delay: 0.3, duration: 0.45 }}
               >
                 <h2 className="text-lg font-semibold text-foreground mb-4">Sources</h2>
-                {sourcesLoading ? (
+                {sourcesError ? (
+                  <p className="text-sm text-muted-foreground">Failed to load data</p>
+                ) : sourcesLoading ? (
                   <BarsSkeleton count={3} />
                 ) : sources && sources.filter((s) => s.pct > 0).length > 0 ? (
                   <div className="space-y-3">
@@ -256,8 +267,6 @@ const ModelDetail = () => {
                   <p className="text-sm text-muted-foreground">No source data yet</p>
                 )}
               </motion.div>
-
-
             </div>
           </div>
         </section>
@@ -274,7 +283,9 @@ const ModelDetail = () => {
             Recent Posts about {model.name}
           </motion.h2>
 
-          {!postsVisible || postsLoading ? (
+          {postsError ? (
+            <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
+          ) : !postsVisible || postsLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => <ChatterSkeleton key={i} />)}
             </div>
