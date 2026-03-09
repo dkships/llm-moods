@@ -171,6 +171,17 @@ Deno.serve(async (req) => {
           const createdAt = post.record?.createdAt ? new Date(post.record.createdAt) : null;
           if (!createdAt || createdAt < cutoff) continue;
 
+          // Language filter: check Bluesky langs field + Latin character ratio
+          const langs: string[] = post.record?.langs || [];
+          if (langs.length > 0 && !langs.some((l: string) => l.startsWith("en"))) {
+            summary.langSkipped++;
+            continue;
+          }
+          if (!isEnglish(text)) {
+            summary.langSkipped++;
+            continue;
+          }
+
           const matchedSlugs = matchModels(text);
           if (matchedSlugs.length === 0) continue;
           summary.filtered++;
