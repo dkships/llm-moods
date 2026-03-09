@@ -177,6 +177,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "devto", source_url: sourceUrl,
               title: title.slice(0, 120), content: description.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+              confidence: classification.confidence,
               score: article.positive_reactions_count || 0,
               posted_at: article.published_at || article.published_timestamp,
             });

@@ -165,6 +165,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "stackoverflow", source_url: sourceUrl,
               title: title.slice(0, 500), content: body.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+              confidence: classification.confidence,
               score: item.score || 0,
               posted_at: new Date(item.creation_date * 1000).toISOString(),
             });

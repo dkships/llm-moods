@@ -181,6 +181,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "mastodon", source_url: sourceUrl,
               title: content.slice(0, 120), content: content.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+              confidence: classification.confidence,
               score: (status.reblogs_count || 0) + (status.favourites_count || 0),
               posted_at: status.created_at,
             });
