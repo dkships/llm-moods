@@ -1,0 +1,1 @@
+ALTER TABLE public.scraped_posts ADD COLUMN IF NOT EXISTS content_type text DEFAULT 'title_and_body';

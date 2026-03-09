@@ -102,6 +102,7 @@ export type Database = {
           complaint_category: string | null
           confidence: number | null
           content: string | null
+          content_type: string | null
           created_at: string
           id: string
           model_id: string
@@ -116,6 +117,7 @@ export type Database = {
           complaint_category?: string | null
           confidence?: number | null
           content?: string | null
+          content_type?: string | null
           created_at?: string
           id?: string
           model_id: string
@@ -130,6 +132,7 @@ export type Database = {
           complaint_category?: string | null
           confidence?: number | null
           content?: string | null
+          content_type?: string | null
           created_at?: string
           id?: string
           model_id?: string
