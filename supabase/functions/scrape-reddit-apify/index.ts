@@ -15,6 +15,8 @@ const SUBREDDIT_MODEL_MAP: Record<string, string> = {
   "r/googlegemini": "gemini",
   "r/deepseek": "deepseek",
   "r/Deepseek": "deepseek",
+  "r/perplexity_ai": "perplexity",
+  "r/Perplexity_AI": "perplexity",
 };
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
