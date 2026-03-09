@@ -192,7 +192,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "medium", source_url: link,
               title: title.slice(0, 500), content: content.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-              confidence: classification.confidence,
+              confidence: classification.confidence, content_type: "title_and_body",
               score: 0,
               posted_at: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
             });

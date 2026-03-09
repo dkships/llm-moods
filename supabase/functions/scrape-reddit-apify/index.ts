@@ -241,7 +241,7 @@ Deno.serve(async (req) => {
           model_id: modelId, source: "reddit", source_url: sourceUrl,
           title: title.slice(0, 120), content: (body || title).slice(0, 2000),
           sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-          confidence: classification.confidence,
+          confidence: classification.confidence, content_type: body ? "title_and_body" : "title_only",
           score: post.upVotes || 0, posted_at: post.createdAt,
         });
         if (error) { summary.errors.push(`Insert: ${error.message}`); } else {

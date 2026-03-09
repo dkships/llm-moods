@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "lobsters", source_url: sourceUrl,
               title: (story.title || "").slice(0, 500), content: (story.description || "").slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-              confidence: classification.confidence,
+              confidence: classification.confidence, content_type: story.description ? "title_and_body" : "title_only",
               score: story.score || 0, posted_at: story.created_at,
             });
             if (error) { summary.errors.push(`Insert: ${error.message}`); } else {

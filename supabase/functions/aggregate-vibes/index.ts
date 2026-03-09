@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
       // --- Daily aggregation (last 24h) ---
       const { data: dailyPosts } = await supabase
         .from("scraped_posts")
-        .select("sentiment, complaint_category, confidence, score")
+        .select("sentiment, complaint_category, confidence, score, content_type")
         .eq("model_id", model.id)
         .gte("posted_at", since24h);
 
@@ -86,7 +86,7 @@ Deno.serve(async (req) => {
       // --- Hourly aggregation (last 1h) ---
       const { data: hourlyPosts } = await supabase
         .from("scraped_posts")
-        .select("sentiment, complaint_category, confidence, score")
+        .select("sentiment, complaint_category, confidence, score, content_type")
         .eq("model_id", model.id)
         .gte("posted_at", since1h);
 
@@ -136,13 +136,14 @@ interface ScoreResult {
   top_complaint: string | null;
 }
 
-function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null; score: number | null }[]): ScoreResult {
+function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null; score: number | null; content_type: string | null }[]): ScoreResult {
   let positiveW = 0, negativeW = 0, neutralW = 0;
   let positiveC = 0, negativeC = 0, neutralC = 0;
   const complaints: Record<string, number> = {};
 
   for (const p of posts) {
-    const conf = Math.max(0, Math.min(1, p.confidence ?? 0.5));
+    const contentMult = p.content_type === "title_only" ? 0.6 : 1.0;
+    const conf = Math.max(0, Math.min(1, p.confidence ?? 0.5)) * contentMult;
     const engagement = (p.score && p.score > 0) ? Math.log(p.score + 1) : 1.0;
     const w = conf * engagement;
     if (p.sentiment === "positive") { positiveW += w; positiveC++; }
