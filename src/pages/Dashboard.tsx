@@ -184,15 +184,12 @@ const Dashboard = () => {
         {/* Page Header */}
         <section className="container pt-10 pb-8">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
+              <DataFreshnessIndicator />
+            </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              <p className="text-sm text-muted-foreground font-mono">
-                {today} · Last updated: <LastUpdatedTimer lastUpdated={latestUpdated} />
-              </p>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-2.5 py-0.5 text-[10px] font-mono text-muted-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-pulse" />
-                Data updates every hour
-              </span>
+              <p className="text-sm text-muted-foreground font-mono">{today}</p>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">Real-time AI model sentiment from Reddit, Bluesky, Mastodon, Hacker News, and more.</p>
           </motion.div>
