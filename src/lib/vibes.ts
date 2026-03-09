@@ -7,6 +7,12 @@ export const COMPLAINT_LABELS: Record<string, string> = {
   coding_quality: "Coding quality",
   speed: "Speed",
   general_drop: "General drop",
+  pricing_value: "Pricing / value",
+  censorship: "Censorship",
+  context_window: "Context window",
+  api_reliability: "API reliability",
+  multimodal_quality: "Multimodal quality",
+  reasoning: "Reasoning",
 };
 
 export const SOURCE_LABELS: Record<string, string> = {
