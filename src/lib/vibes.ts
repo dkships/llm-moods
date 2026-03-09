@@ -36,9 +36,9 @@ export const SENTIMENT_STYLES: Record<string, { label: string; classes: string }
 };
 
 export function getVibeStatus(score: number) {
-  if (score <= 40) return { label: "Bad Vibes", icon: CloudLightning };
-  if (score <= 65) return { label: "Mixed Signals", icon: CloudSun };
-  return { label: "Good Vibes", icon: Sun };
+  if (score <= 40) return { label: "Bad Vibes", icon: CloudLightning, color: "#EF4444" };
+  if (score <= 65) return { label: "Mixed Signals", icon: CloudSun, color: "#F59E0B" };
+  return { label: "Good Vibes", icon: Sun, color: "#10B981" };
 }
 
 export function formatTimeAgo(dateStr: string): string {
