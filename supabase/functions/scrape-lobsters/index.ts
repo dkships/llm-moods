@@ -12,6 +12,7 @@ const MODEL_KEYWORDS: Record<string, string[]> = {
   gemini: ["gemini", "gemini pro", "google ai"],
   grok: ["grok", "grok 4", "xai"],
   deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
+  perplexity: ["perplexity", "perplexity ai", "pplx"],
 };
 
 const BROAD_AI_KEYWORDS = ["llm", "large language model", "ai model", "copilot", "ai coding", "language model"];

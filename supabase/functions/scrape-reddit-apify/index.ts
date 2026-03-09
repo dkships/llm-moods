@@ -106,6 +106,7 @@ Deno.serve(async (req) => {
         { url: "https://www.reddit.com/r/GoogleGemini/new/" },
         { url: "https://www.reddit.com/r/deepseek/new/" },
         { url: "https://www.reddit.com/r/artificial/new/" },
+        { url: "https://www.reddit.com/r/perplexity_ai/new/" },
       ],
       maxItems: 50,
       maxPostCount: 10,
