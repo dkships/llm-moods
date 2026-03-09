@@ -119,7 +119,19 @@ Deno.serve(async (req) => {
           const createdAt = new Date(status.created_at);
           if (createdAt < cutoff) continue;
 
+          // Language filter: check Mastodon language field + Latin character ratio
+          const lang = status.language;
+          if (lang && lang !== "en" && !lang.startsWith("en")) {
+            summary.langSkipped++;
+            continue;
+          }
+
           const content = stripHtml(status.content || "");
+          if (!isEnglish(content)) {
+            summary.langSkipped++;
+            continue;
+          }
+
           const matchedSlugs = matchModels(content);
           if (matchedSlugs.length === 0) continue;
           summary.filtered++;
