@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const HASHTAGS = ["chatgpt", "claude", "gemini", "grok", "deepseek", "llm", "openai", "anthropic"];
+const HASHTAGS = ["chatgpt", "claude", "gemini", "grok", "deepseek", "llm", "openai", "anthropic", "perplexity"];
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
   claude: ["claude", "sonnet", "opus", "anthropic"],
