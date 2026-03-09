@@ -26,6 +26,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   stackoverflow: "Stack Overflow",
   medium: "Medium",
   discourse: "Discourse",
+  github: "GitHub",
 };
 
 export const SENTIMENT_STYLES: Record<string, { label: string; classes: string }> = {
