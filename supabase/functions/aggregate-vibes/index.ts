@@ -35,7 +35,7 @@ Deno.serve(async (req) => {
       // --- Daily aggregation (last 24h) ---
       const { data: dailyPosts } = await supabase
         .from("scraped_posts")
-        .select("sentiment, complaint_category")
+        .select("sentiment, complaint_category, confidence")
         .eq("model_id", model.id)
         .gte("posted_at", since24h);
 
