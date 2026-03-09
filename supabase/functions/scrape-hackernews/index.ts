@@ -81,7 +81,7 @@ async function classifyPost(
   title: string, content: string, apiKey: string
 ): Promise<{ sentiment: string; complaint_category: string | null }> {
   const truncated = (content || "").slice(0, 500);
-  const prompt = `Classify this social media post about an AI model. Return ONLY valid JSON with two fields: sentiment (positive/negative/neutral) and complaint_category (lazy_responses/hallucinations/refusals/coding_quality/speed/general_drop or null if not negative). Post: ${title} ${truncated}`;
+  const prompt = `Classify this social media post about an AI model. Return ONLY valid JSON with two fields: sentiment (positive/negative/neutral) and complaint_category (lazy_responses/hallucinations/refusals/coding_quality/speed/general_drop or null if not negative). Classify as neutral ONLY if the post is purely factual news with zero opinion expressed. Most social media posts express some sentiment — when in doubt, choose positive or negative, not neutral. Posts with any emotional language, slang, sarcasm, or subjective judgment should NOT be neutral. Post: ${title} ${truncated}`;
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), 10000);

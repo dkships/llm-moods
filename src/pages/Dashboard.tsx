@@ -7,6 +7,7 @@ import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
 import Footer from "@/components/Footer";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useModelsWithLatestVibes, useRecentChatter } from "@/hooks/useVibesData";
 import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, SOURCE_LABELS } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
