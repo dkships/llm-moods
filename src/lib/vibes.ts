@@ -62,6 +62,7 @@ export function formatSourceDisplay(source: string): { emoji: string; label: str
   if (source === "stackoverflow") return { emoji: "📚", label: "Stack Overflow" };
   if (source === "medium") return { emoji: "✍️", label: "Medium" };
   if (source === "discourse") return { emoji: "💬", label: "Discourse" };
+  if (source === "github") return { emoji: "🐙", label: "GitHub" };
   return { emoji: "⚪", label: source };
 }
 
