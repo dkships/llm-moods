@@ -34,6 +34,13 @@ function matchModels(text: string): string[] {
   return matched;
 }
 
+function isEnglish(text: string): boolean {
+  const noWhitespace = text.replace(/\s/g, "");
+  if (noWhitespace.length < 5) return true;
+  const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
+  return latinCount / noWhitespace.length >= 0.6;
+}
+
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -132,7 +139,7 @@ Deno.serve(async (req) => {
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, errors: [] as string[] };
+    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, errors: [] as string[] };
 
     for (let i = 0; i < SEARCH_TERMS.length; i++) {
       const term = SEARCH_TERMS[i];
@@ -163,6 +170,17 @@ Deno.serve(async (req) => {
           const text = post.record?.text || "";
           const createdAt = post.record?.createdAt ? new Date(post.record.createdAt) : null;
           if (!createdAt || createdAt < cutoff) continue;
+
+          // Language filter: check Bluesky langs field + Latin character ratio
+          const langs: string[] = post.record?.langs || [];
+          if (langs.length > 0 && !langs.some((l: string) => l.startsWith("en"))) {
+            summary.langSkipped++;
+            continue;
+          }
+          if (!isEnglish(text)) {
+            summary.langSkipped++;
+            continue;
+          }
 
           const matchedSlugs = matchModels(text);
           if (matchedSlugs.length === 0) continue;
@@ -199,7 +217,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, "scrape-bluesky", `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted}`, "summary");
+    await logToErrorLog(supabase, "scrape-bluesky", `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped}`, "summary");
 
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

@@ -37,6 +37,13 @@ function stripHtml(html: string): string {
 
 function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
+function isEnglish(text: string): boolean {
+  const noWhitespace = text.replace(/\s/g, "");
+  if (noWhitespace.length < 5) return true;
+  const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
+  return latinCount / noWhitespace.length >= 0.6;
+}
+
 async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
   try {
     await supabase.from("error_log").insert({ function_name: "scrape-mastodon", error_message: msg, context: ctx || null });
@@ -81,7 +88,7 @@ Deno.serve(async (req) => {
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, errors: [] as string[] };
+    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, errors: [] as string[] };
     let reqIdx = 0;
 
     for (const hashtag of HASHTAGS) {
@@ -112,7 +119,19 @@ Deno.serve(async (req) => {
           const createdAt = new Date(status.created_at);
           if (createdAt < cutoff) continue;
 
+          // Language filter: check Mastodon language field + Latin character ratio
+          const lang = status.language;
+          if (lang && lang !== "en" && !lang.startsWith("en")) {
+            summary.langSkipped++;
+            continue;
+          }
+
           const content = stripHtml(status.content || "");
+          if (!isEnglish(content)) {
+            summary.langSkipped++;
+            continue;
+          }
+
           const matchedSlugs = matchModels(content);
           if (matchedSlugs.length === 0) continue;
           summary.filtered++;
@@ -147,7 +166,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} errors=${summary.errors.length}`, "summary");
+    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} errors=${summary.errors.length}`, "summary");
 
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

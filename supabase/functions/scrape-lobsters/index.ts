@@ -17,6 +17,13 @@ const MODEL_KEYWORDS: Record<string, string[]> = {
 const BROAD_AI_KEYWORDS = ["llm", "large language model", "ai model", "copilot", "ai coding", "language model"];
 const AI_TAGS = ["ai", "ml", "llm", "machine-learning"];
 
+function isEnglish(text: string): boolean {
+  const noWhitespace = text.replace(/\s/g, "");
+  if (noWhitespace.length < 5) return true;
+  const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
+  return latinCount / noWhitespace.length >= 0.6;
+}
+
 function matchModels(text: string): string[] {
   const lower = text.toLowerCase();
   const matched: string[] = [];
@@ -81,7 +88,7 @@ Deno.serve(async (req) => {
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, errors: [] as string[] };
+    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, errors: [] as string[] };
 
     const endpoints = [
       "https://lobste.rs/newest.json",
@@ -114,6 +121,13 @@ Deno.serve(async (req) => {
           if (createdAt < cutoff) continue;
 
           const text = `${story.title || ""} ${story.description || ""}`;
+
+          // Language filter
+          if (!isEnglish(text)) {
+            summary.langSkipped++;
+            continue;
+          }
+
           const tags: string[] = story.tags || [];
           const hasAiTag = tags.some((t: string) => AI_TAGS.includes(t.toLowerCase()));
 
@@ -163,7 +177,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} errors=${summary.errors.length}`, "summary");
+    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} errors=${summary.errors.length}`, "summary");
 
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

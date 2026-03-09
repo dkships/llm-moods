@@ -14,6 +14,13 @@ const MODEL_KEYWORDS: Record<string, string[]> = {
   deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
 };
 
+function isEnglish(text: string): boolean {
+  const noWhitespace = text.replace(/\s/g, "");
+  if (noWhitespace.length < 5) return true;
+  const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
+  return latinCount / noWhitespace.length >= 0.6;
+}
+
 const RELEVANT_DOMAINS = ["anthropic.com", "openai.com", "deepmind.google", "deepseek.com"];
 const HN_API = "https://hacker-news.firebaseio.com/v0";
 
@@ -147,13 +154,19 @@ Deno.serve(async (req) => {
       ...((bestIds || []) as number[]).slice(0, 100),
     ])];
 
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, errors: [] as string[] };
+    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, errors: [] as string[] };
 
     const items = await fetchInBatches(allIds, 10, 200, async (id) => fetchJson(`${HN_API}/item/${id}.json`));
     summary.fetched = items.filter(Boolean).length;
 
     for (const item of items) {
       if (!item || item.type !== "story" || !item.title) continue;
+
+      // Language filter
+      if (!isEnglish(item.title)) {
+        summary.langSkipped++;
+        continue;
+      }
 
       const matchedSlugs = matchModels(item.title, item.url);
       if (matchedSlugs.length === 0) continue;
@@ -198,7 +211,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, "scrape-hackernews", `Successfully scraped ${summary.inserted} posts from hackernews`, `fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified}`);
+    await logToErrorLog(supabase, "scrape-hackernews", `Successfully scraped ${summary.inserted} posts from hackernews (langSkipped=${summary.langSkipped})`, `fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified}`);
 
     return new Response(JSON.stringify(summary, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
