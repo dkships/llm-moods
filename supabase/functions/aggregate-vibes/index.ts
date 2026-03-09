@@ -136,21 +136,23 @@ interface ScoreResult {
   top_complaint: string | null;
 }
 
-function computeScore(posts: { sentiment: string | null; complaint_category: string | null }[]): ScoreResult {
-  let positive = 0, negative = 0, neutral = 0;
+function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null }[]): ScoreResult {
+  let positiveW = 0, negativeW = 0, neutralW = 0;
+  let positiveC = 0, negativeC = 0, neutralC = 0;
   const complaints: Record<string, number> = {};
 
   for (const p of posts) {
-    if (p.sentiment === "positive") positive++;
+    const w = Math.max(0, Math.min(1, p.confidence ?? 0.5));
+    if (p.sentiment === "positive") { positiveW += w; positiveC++; }
     else if (p.sentiment === "negative") {
-      negative++;
-      if (p.complaint_category) complaints[p.complaint_category] = (complaints[p.complaint_category] || 0) + 1;
-    } else neutral++;
+      negativeW += w; negativeC++;
+      if (p.complaint_category) complaints[p.complaint_category] = (complaints[p.complaint_category] || 0) + w;
+    } else { neutralW += w; neutralC++; }
   }
 
-  const total = posts.length;
-  const effectivePositive = positive + neutral * 0.5;
-  const score = Math.round((effectivePositive / total) * 100);
+  const totalW = positiveW + negativeW + neutralW;
+  const effectivePositive = positiveW + neutralW * 0.5;
+  const score = totalW > 0 ? Math.round((effectivePositive / totalW) * 100) : 50;
 
   let topComplaint: string | null = null;
   let maxCount = 0;
@@ -158,7 +160,7 @@ function computeScore(posts: { sentiment: string | null; complaint_category: str
     if (count > maxCount) { maxCount = count; topComplaint = cat; }
   }
 
-  return { score, positive_count: positive, negative_count: negative, neutral_count: neutral, total_posts: total, top_complaint: topComplaint };
+  return { score, positive_count: positiveC, negative_count: negativeC, neutral_count: neutralC, total_posts: posts.length, top_complaint: topComplaint };
 }
 
 async function upsertScore(supabase: any, modelId: string, period: string, periodStart: string, result: ScoreResult) {
