@@ -49,7 +49,7 @@ const Dashboard = () => {
                 Data updates every hour
               </span>
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">Real-time AI model sentiment from Bluesky, Mastodon, and Hacker News.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Real-time AI model sentiment from Reddit, Bluesky, Mastodon, Hacker News, and more.</p>
           </motion.div>
         </section>
 
@@ -57,7 +57,7 @@ const Dashboard = () => {
         <section className="container pb-12">
           {modelsLoading ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 5 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
+              {Array.from({ length: 6 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
             </div>
           ) : (
             <motion.div

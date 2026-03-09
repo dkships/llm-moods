@@ -15,6 +15,8 @@ const SUBREDDIT_MODEL_MAP: Record<string, string> = {
   "r/googlegemini": "gemini",
   "r/deepseek": "deepseek",
   "r/Deepseek": "deepseek",
+  "r/perplexity_ai": "perplexity",
+  "r/Perplexity_AI": "perplexity",
 };
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
@@ -23,6 +25,7 @@ const MODEL_KEYWORDS: Record<string, string[]> = {
   gemini: ["gemini", "gemini pro", "google ai"],
   grok: ["grok", "grok 4", "xai"],
   deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
+  perplexity: ["perplexity", "perplexity ai", "pplx"],
 };
 
 function matchModels(text: string, communityName?: string): string[] {
@@ -103,6 +106,7 @@ Deno.serve(async (req) => {
         { url: "https://www.reddit.com/r/GoogleGemini/new/" },
         { url: "https://www.reddit.com/r/deepseek/new/" },
         { url: "https://www.reddit.com/r/artificial/new/" },
+        { url: "https://www.reddit.com/r/perplexity_ai/new/" },
       ],
       maxItems: 50,
       maxPostCount: 10,

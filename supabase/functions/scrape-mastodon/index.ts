@@ -6,7 +6,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const HASHTAGS = ["chatgpt", "claude", "gemini", "grok", "deepseek", "llm", "openai", "anthropic"];
+const HASHTAGS = ["chatgpt", "claude", "gemini", "grok", "deepseek", "llm", "openai", "anthropic", "perplexity"];
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
   claude: ["claude", "sonnet", "opus", "anthropic"],
@@ -14,6 +14,7 @@ const MODEL_KEYWORDS: Record<string, string[]> = {
   gemini: ["gemini", "gemini pro", "google ai"],
   grok: ["grok", "grok 4", "xai"],
   deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
+  perplexity: ["perplexity", "perplexity ai", "pplx"],
 };
 
 function matchModels(text: string): string[] {
