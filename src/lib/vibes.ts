@@ -15,6 +15,8 @@ export const SOURCE_LABELS: Record<string, string> = {
   bluesky: "Bluesky",
   mastodon: "Mastodon",
   lobsters: "Lobsters",
+  lemmy: "Lemmy",
+  devto: "Dev.to",
 };
 
 export const SENTIMENT_STYLES: Record<string, { label: string; classes: string }> = {
