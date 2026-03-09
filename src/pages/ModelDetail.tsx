@@ -156,13 +156,14 @@ const ModelDetail = () => {
                   </p>
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartData}>
+                      <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 0, left: 0 }}>
                         <XAxis
                           dataKey="day"
                           tick={{ fill: "hsl(220 10% 50%)", fontSize: 10 }}
                           axisLine={false}
                           tickLine={false}
                           interval={timeRange === "30d" ? Math.max(Math.floor(chartData.length / 5) - 1, 0) : timeRange === "7d" ? 0 : Math.max(Math.floor(chartData.length / 5) - 1, 0)}
+                          padding={{ left: 10, right: 40 }}
                         />
                         <YAxis
                           domain={[20, 100]}
