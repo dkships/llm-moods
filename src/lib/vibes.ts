@@ -15,6 +15,8 @@ export const SOURCE_LABELS: Record<string, string> = {
   bluesky: "Bluesky",
   mastodon: "Mastodon",
   lobsters: "Lobsters",
+  lemmy: "Lemmy",
+  devto: "Dev.to",
 };
 
 export const SENTIMENT_STYLES: Record<string, { label: string; classes: string }> = {
@@ -45,6 +47,8 @@ export function formatSourceDisplay(source: string): { emoji: string; label: str
   if (source === "mastodon") return { emoji: "🟣", label: "Mastodon" };
   if (source === "lobsters") return { emoji: "🦞", label: "Lobsters" };
   if (source === "bluesky") return { emoji: "🔵", label: "Bluesky" };
+  if (source === "lemmy") return { emoji: "🟢", label: "Lemmy" };
+  if (source === "devto") return { emoji: "📝", label: "Dev.to" };
   return { emoji: "⚪", label: source };
 }
 
