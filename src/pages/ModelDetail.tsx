@@ -17,6 +17,7 @@ import {
   SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
+import UserReportForm from "@/components/UserReportForm";
 
 // Lazy load the heavy chart component
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
