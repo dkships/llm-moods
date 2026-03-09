@@ -9,7 +9,7 @@ import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
 import Footer from "@/components/Footer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail } from "@/hooks/useVibesData";
+import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, useDataFreshness } from "@/hooks/useVibesData";
 import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
