@@ -121,6 +121,13 @@ Deno.serve(async (req) => {
           if (createdAt < cutoff) continue;
 
           const text = `${story.title || ""} ${story.description || ""}`;
+
+          // Language filter
+          if (!isEnglish(text)) {
+            summary.langSkipped++;
+            continue;
+          }
+
           const tags: string[] = story.tags || [];
           const hasAiTag = tags.some((t: string) => AI_TAGS.includes(t.toLowerCase()));
 
