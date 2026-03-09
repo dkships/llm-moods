@@ -14,7 +14,7 @@ const HOW_IT_WORKS = [
   {
     icon: Monitor,
     title: "We Scrape",
-    description: "We scan Bluesky, Mastodon, Hacker News, Lobsters, and more for real-time chatter about AI models.",
+    description: "We automatically scan social platforms for real-time chatter about AI models.",
   },
   {
     icon: Brain,
