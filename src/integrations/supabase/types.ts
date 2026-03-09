@@ -213,41 +213,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_reports: {
-        Row: {
-          comment: string | null
-          complaint_category: string | null
-          created_at: string
-          id: string
-          model_id: string
-          sentiment: string
-        }
-        Insert: {
-          comment?: string | null
-          complaint_category?: string | null
-          created_at?: string
-          id?: string
-          model_id: string
-          sentiment: string
-        }
-        Update: {
-          comment?: string | null
-          complaint_category?: string | null
-          created_at?: string
-          id?: string
-          model_id?: string
-          sentiment?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "user_reports_model_id_fkey"
-            columns: ["model_id"]
-            isOneToOne: false
-            referencedRelation: "models"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       vibes_scores: {
         Row: {
           created_at: string
