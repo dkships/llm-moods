@@ -216,6 +216,11 @@ const Dashboard = () => {
           )}
         </section>
 
+        {/* Trending Complaints */}
+        <section className="container pb-12">
+          <TrendingComplaints />
+        </section>
+
         {/* Community Chatter — lazy loaded on scroll */}
         <section className="container pb-20" ref={chatterRef}>
           <motion.div
