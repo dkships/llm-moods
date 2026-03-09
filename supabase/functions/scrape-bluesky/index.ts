@@ -214,6 +214,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "bluesky", source_url: sourceUrl,
               title: text.slice(0, 120), content: text.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+              confidence: classification.confidence,
               score: post.likeCount || 0, posted_at: createdAt.toISOString(),
             });
             if (error) { summary.errors.push(`Insert: ${error.message}`); } else {

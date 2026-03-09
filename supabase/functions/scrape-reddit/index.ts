@@ -188,6 +188,7 @@ Deno.serve(async (req) => {
             model_id: modelId, source: "reddit", source_url: entry.link,
             title: entry.title.slice(0, 500), content: entry.content.slice(0, 2000),
             sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+            confidence: classification.confidence,
             score: 0, posted_at: entry.updated || new Date().toISOString(),
           });
 
