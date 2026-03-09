@@ -246,9 +246,9 @@ const ModelDetail = () => {
                 <h2 className="text-lg font-semibold text-foreground mb-4">Sources</h2>
                 {sourcesLoading ? (
                   <BarsSkeleton count={3} />
-                ) : sources && sources.length > 0 ? (
+                ) : sources && sources.filter((s) => s.pct > 0).length > 0 ? (
                   <div className="space-y-3">
-                    {sources.map((s) => (
+                    {sources.filter((s) => s.pct > 0).map((s) => (
                       <div key={s.source}>
                         <div className="flex justify-between text-xs font-mono mb-1">
                           <span className="text-muted-foreground">{SOURCE_LABELS[s.source] || s.source}</span>
@@ -303,7 +303,8 @@ const ModelDetail = () => {
                     key={post.id}
                     variants={fadeUp}
                     custom={i}
-                    className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+                    className={`glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${post.source_url ? "cursor-pointer hover:bg-secondary/30 transition-colors" : ""}`}
+                    onClick={() => post.source_url && window.open(post.source_url, "_blank", "noopener,noreferrer")}
                   >
                     <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border shrink-0">
                       {src.emoji} {src.label}

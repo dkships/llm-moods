@@ -52,7 +52,10 @@ const Index = () => {
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
           >
             <motion.div variants={fadeUp} custom={0} className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-mono text-primary">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse-glow" />
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+              </span>
               Tracking {models?.length ?? "..."} models live
             </motion.div>
             <motion.h1 variants={fadeUp} custom={1} className="text-4xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
@@ -108,8 +111,8 @@ const Index = () => {
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <TrendIcon trend={m.trend.direction} />
-                          <span className="text-xs font-mono text-muted-foreground">
-                            {(m.totalPosts || 0).toLocaleString()} posts analyzed
+                        <span className="text-xs font-mono text-muted-foreground">
+                            {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts analyzed` : "Tracking"}
                           </span>
                         </div>
                       </div>

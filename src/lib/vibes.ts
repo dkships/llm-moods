@@ -41,10 +41,11 @@ export function formatTimeAgo(dateStr: string): string {
 
 export function formatSourceDisplay(source: string): { emoji: string; label: string } {
   if (source === "reddit") return { emoji: "🟠", label: "Reddit" };
-  if (source === "hackernews") return { emoji: "🟡", label: "HN" };
+  if (source === "hackernews") return { emoji: "🟡", label: "Hacker News" };
   if (source === "mastodon") return { emoji: "🟣", label: "Mastodon" };
   if (source === "lobsters") return { emoji: "🦞", label: "Lobsters" };
-  return { emoji: "🔵", label: "Bluesky" };
+  if (source === "bluesky") return { emoji: "🔵", label: "Bluesky" };
+  return { emoji: "⚪", label: source };
 }
 
 export const fadeUp = {
