@@ -26,3 +26,12 @@ verify_jwt = false
 
 [functions.scrape-reddit-apify]
 verify_jwt = false
+
+[functions.scrape-stackoverflow]
+verify_jwt = false
+
+[functions.scrape-medium]
+verify_jwt = false
+
+[functions.scrape-discourse]
+verify_jwt = false
