@@ -9,7 +9,7 @@ import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
 import Footer from "@/components/Footer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail } from "@/hooks/useVibesData";
+import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, useDataFreshness } from "@/hooks/useVibesData";
 import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
@@ -110,6 +110,40 @@ const ModelCard = memo(({ m, i, onHover }: { m: any; i: number; onHover: (slug: 
 });
 ModelCard.displayName = "ModelCard";
 
+/** Data freshness indicator with color coding */
+const DataFreshnessIndicator = memo(() => {
+  const { data: lastScraped } = useDataFreshness();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!lastScraped) return;
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, [lastScraped]);
+
+  if (!lastScraped) return null;
+
+  const diffMs = Date.now() - new Date(lastScraped).getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  let colorClass = "text-muted-foreground";
+  let dotClass = "bg-primary/50";
+  if (diffHours > 6) {
+    colorClass = "text-destructive";
+    dotClass = "bg-destructive";
+  } else if (diffHours > 1) {
+    colorClass = "text-yellow-500";
+    dotClass = "bg-yellow-500";
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-mono ${colorClass}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dotClass} ${diffHours <= 1 ? "animate-pulse" : ""}`} />
+      Data updated {formatTimeAgo(lastScraped)}
+    </span>
+  );
+});
+DataFreshnessIndicator.displayName = "DataFreshnessIndicator";
+
 const Dashboard = () => {
   usePageTitle("Dashboard — LLM Vibes");
   const { data: models, isLoading: modelsLoading } = useModelsWithLatestVibes();
@@ -138,11 +172,6 @@ const Dashboard = () => {
     day: "numeric",
   });
 
-  const latestUpdated = models?.reduce((newest, m) => {
-    if (!m.lastUpdated) return newest;
-    return !newest || new Date(m.lastUpdated) > new Date(newest) ? m.lastUpdated : newest;
-  }, null as string | null) ?? null;
-
   const handleHover = useCallback((slug: string, id: string) => {
     prefetch(slug, id);
   }, [prefetch]);
@@ -155,15 +184,12 @@ const Dashboard = () => {
         {/* Page Header */}
         <section className="container pt-10 pb-8">
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+              <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
+              <DataFreshnessIndicator />
+            </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              <p className="text-sm text-muted-foreground font-mono">
-                {today} · Last updated: <LastUpdatedTimer lastUpdated={latestUpdated} />
-              </p>
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/50 px-2.5 py-0.5 text-[10px] font-mono text-muted-foreground">
-                <span className="h-1.5 w-1.5 rounded-full bg-primary/50 animate-pulse" />
-                Data updates every hour
-              </span>
+              <p className="text-sm text-muted-foreground font-mono">{today}</p>
             </div>
             <p className="mt-2 text-sm text-muted-foreground">Real-time AI model sentiment from Reddit, Bluesky, Mastodon, Hacker News, and more.</p>
           </motion.div>
