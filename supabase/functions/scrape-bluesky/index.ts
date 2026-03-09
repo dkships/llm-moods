@@ -9,6 +9,7 @@ const corsHeaders = {
 const SEARCH_TERMS = [
   "Claude AI", "ChatGPT", "GPT-5", "Gemini AI", "Grok AI", "DeepSeek",
   "Claude dumb", "ChatGPT worse", "DeepSeek",
+  "Perplexity AI", "Perplexity worse",
 ];
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
