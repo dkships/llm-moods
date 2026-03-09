@@ -37,6 +37,15 @@ function matchModels(text: string): string[] {
   return matched;
 }
 
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
+}
+
+function meetsMinLength(title: string, content: string): boolean {
+  const cleaned = stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim();
+  return cleaned.length >= 20;
+}
+
 async function classifyPost(
   title: string, content: string, apiKey: string
 ): Promise<{ sentiment: string; complaint_category: string | null }> {
@@ -88,6 +97,25 @@ const COMMENT_SEARCH_TERMS = [
   "Claude dumb", "ChatGPT worse", "GPT bad", "Gemini sucks", "Grok useless", "DeepSeek bad", "Perplexity worse",
 ];
 
+// Cross-source dedup: load recent titles (first 80 chars, lowercased) for each model
+async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase
+    .from("scraped_posts")
+    .select("title, model_id")
+    .gte("posted_at", since)
+    .not("title", "is", null);
+  const keys = new Set<string>();
+  for (const p of data || []) {
+    if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
+  }
+  return keys;
+}
+
+function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
+  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -103,9 +131,10 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "hackernews");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
+    const titleKeys = await loadRecentTitleKeys(supabase);
 
     const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
-    const summary = { stories: 0, comments: 0, classified: 0, inserted: 0, skipped: 0, errors: [] as string[] };
+    const summary = { stories: 0, comments: 0, classified: 0, inserted: 0, skipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
 
     // Search stories
     for (const term of STORY_SEARCH_TERMS) {
@@ -119,11 +148,20 @@ Deno.serve(async (req) => {
 
         for (const hit of hits) {
           if (!hit.title || !isEnglish(hit.title)) continue;
+          if (!meetsMinLength(hit.title, "")) { summary.contentSkipped++; continue; }
           const sourceUrl = `https://news.ycombinator.com/item?id=${hit.objectID}`;
           if (existingUrls.has(sourceUrl)) { summary.skipped++; continue; }
 
           const matchedSlugs = matchModels(hit.title + " " + (hit.url || ""));
           if (matchedSlugs.length === 0) continue;
+
+          // Cross-source dedup
+          let allDuped = true;
+          for (const slug of matchedSlugs) {
+            const modelId = modelMap[slug];
+            if (modelId && !isDuplicate(titleKeys, hit.title, modelId)) { allDuped = false; break; }
+          }
+          if (allDuped) { summary.dedupSkipped++; continue; }
 
           const classification = await classifyPost(hit.title, hit.title, lovableApiKey);
           summary.classified++;
@@ -131,6 +169,7 @@ Deno.serve(async (req) => {
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
             if (!modelId) continue;
+            if (isDuplicate(titleKeys, hit.title, modelId)) continue;
             const { error } = await supabase.from("scraped_posts").insert({
               model_id: modelId, source: "hackernews", source_url: sourceUrl,
               title: hit.title.slice(0, 500), content: hit.title.slice(0, 2000),
@@ -138,7 +177,11 @@ Deno.serve(async (req) => {
               score: hit.points || 0,
               posted_at: hit.created_at || new Date().toISOString(),
             });
-            if (error) { summary.errors.push(error.message); } else { summary.inserted++; existingUrls.add(sourceUrl); }
+            if (error) { summary.errors.push(error.message); } else {
+              summary.inserted++;
+              existingUrls.add(sourceUrl);
+              titleKeys.add(`${modelId}:${hit.title.slice(0, 80).toLowerCase()}`);
+            }
           }
         }
       } catch (e) {
@@ -160,6 +203,7 @@ Deno.serve(async (req) => {
         for (const hit of hits) {
           const text = (hit.comment_text || "").replace(/<[^>]*>/g, "");
           if (!text || !isEnglish(text)) continue;
+          if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
           const sourceUrl = hit.story_id
             ? `https://news.ycombinator.com/item?id=${hit.story_id}`
             : `https://news.ycombinator.com/item?id=${hit.objectID}`;
@@ -174,6 +218,7 @@ Deno.serve(async (req) => {
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
             if (!modelId) continue;
+            if (isDuplicate(titleKeys, text.slice(0, 200), modelId)) continue;
             const { error } = await supabase.from("scraped_posts").insert({
               model_id: modelId, source: "hackernews", source_url: sourceUrl,
               title: text.slice(0, 200), content: text.slice(0, 2000),
@@ -181,7 +226,11 @@ Deno.serve(async (req) => {
               score: hit.points || 0,
               posted_at: hit.created_at || new Date().toISOString(),
             });
-            if (error) { summary.errors.push(error.message); } else { summary.inserted++; existingUrls.add(sourceUrl); }
+            if (error) { summary.errors.push(error.message); } else {
+              summary.inserted++;
+              existingUrls.add(sourceUrl);
+              titleKeys.add(`${modelId}:${text.slice(0, 80).toLowerCase()}`);
+            }
           }
         }
       } catch (e) {
@@ -190,7 +239,7 @@ Deno.serve(async (req) => {
       await delay(1000);
     }
 
-    await logToErrorLog(supabase, "scrape-hackernews", `Algolia: inserted=${summary.inserted} stories=${summary.stories} comments=${summary.comments} classified=${summary.classified}`, `skipped=${summary.skipped} errors=${summary.errors.length}`);
+    await logToErrorLog(supabase, "scrape-hackernews", `Algolia: inserted=${summary.inserted} stories=${summary.stories} comments=${summary.comments} classified=${summary.classified} dedupSkipped=${summary.dedupSkipped} contentSkipped=${summary.contentSkipped}`, `skipped=${summary.skipped} errors=${summary.errors.length}`);
 
     return new Response(JSON.stringify(summary, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

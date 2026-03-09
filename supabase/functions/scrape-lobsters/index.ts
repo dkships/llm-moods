@@ -45,6 +45,29 @@ function hasAiContent(text: string): boolean {
   return BROAD_AI_KEYWORDS.some((kw) => lower.includes(kw));
 }
 
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
+}
+
+function meetsMinLength(title: string, content: string): boolean {
+  const cleaned = stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim();
+  return cleaned.length >= 20;
+}
+
+async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
+  const keys = new Set<string>();
+  for (const p of data || []) {
+    if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
+  }
+  return keys;
+}
+
+function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
+  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+}
+
 async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
   try {
     await supabase.from("error_log").insert({ function_name: "scrape-lobsters", error_message: msg, context: ctx || null });
@@ -87,9 +110,10 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "lobsters");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
+    const titleKeys = await loadRecentTitleKeys(supabase);
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, errors: [] as string[] };
+    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
 
     const endpoints = [
       "https://lobste.rs/newest.json",
@@ -103,12 +127,7 @@ Deno.serve(async (req) => {
     for (const endpoint of endpoints) {
       try {
         const res = await fetch(endpoint, { headers: { "Accept": "application/json" } });
-        await logToErrorLog(supabase, `${endpoint} status=${res.status}`, "debug");
-
-        if (!res.ok) {
-          summary.errors.push(`${endpoint}: HTTP ${res.status}`);
-          continue;
-        }
+        if (!res.ok) { summary.errors.push(`${endpoint}: HTTP ${res.status}`); continue; }
 
         const stories = await res.json();
         if (!Array.isArray(stories)) continue;
@@ -122,28 +141,20 @@ Deno.serve(async (req) => {
           if (createdAt < cutoff) continue;
 
           const text = `${story.title || ""} ${story.description || ""}`;
-
-          // Language filter
-          if (!isEnglish(text)) {
-            summary.langSkipped++;
-            continue;
-          }
+          if (!isEnglish(text)) { summary.langSkipped++; continue; }
+          if (!meetsMinLength(story.title || "", story.description || "")) { summary.contentSkipped++; continue; }
 
           const tags: string[] = story.tags || [];
           const hasAiTag = tags.some((t: string) => AI_TAGS.includes(t.toLowerCase()));
-
           const matchedSlugs = matchModels(text);
 
-          // If no direct model match, check broad AI keywords or AI tags
           if (matchedSlugs.length === 0) {
             if (!hasAiTag && !hasAiContent(text)) continue;
-            // Try matching model names in tags too
             const tagText = tags.join(" ");
             const tagMatches = matchModels(tagText);
             if (tagMatches.length > 0) {
               matchedSlugs.push(...tagMatches);
             } else {
-              // AI-related but no specific model — skip (we need a model to link to)
               continue;
             }
           }
@@ -152,23 +163,30 @@ Deno.serve(async (req) => {
           const sourceUrl = story.comments_url || "";
           if (!sourceUrl || existingUrls.has(sourceUrl)) continue;
 
+          // Cross-source dedup
+          let allDuped = true;
+          for (const slug of matchedSlugs) {
+            const modelId = modelMap[slug];
+            if (modelId && !isDuplicate(titleKeys, story.title || "", modelId)) { allDuped = false; break; }
+          }
+          if (allDuped) { summary.dedupSkipped++; continue; }
+
           const classification = await classifyPost(story.title || "", story.description || "", lovableApiKey);
           summary.classified++;
 
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
-            if (!modelId) continue;
+            if (!modelId || isDuplicate(titleKeys, story.title || "", modelId)) continue;
             const { error } = await supabase.from("scraped_posts").insert({
               model_id: modelId, source: "lobsters", source_url: sourceUrl,
               title: (story.title || "").slice(0, 500), content: (story.description || "").slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               score: story.score || 0, posted_at: story.created_at,
             });
-            if (error) {
-              summary.errors.push(`Insert: ${error.message}`);
-            } else {
+            if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
               summary.inserted++;
               existingUrls.add(sourceUrl);
+              titleKeys.add(`${modelId}:${(story.title || "").slice(0, 80).toLowerCase()}`);
             }
           }
         }
@@ -178,7 +196,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} errors=${summary.errors.length}`, "summary");
+    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} dedupSkipped=${summary.dedupSkipped} contentSkipped=${summary.contentSkipped} errors=${summary.errors.length}`, "summary");
 
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

@@ -46,6 +46,29 @@ function stripHtml(html: string): string {
   return (html || "").replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
+}
+
+function meetsMinLength(title: string, content: string): boolean {
+  const cleaned = stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim();
+  return cleaned.length >= 20;
+}
+
+async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
+  const keys = new Set<string>();
+  for (const p of data || []) {
+    if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
+  }
+  return keys;
+}
+
+function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
+  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+}
+
 async function classifyPost(title: string, content: string, apiKey: string) {
   const truncated = (content || "").slice(0, 500);
   const prompt = `Classify this social media post about an AI model. Return ONLY valid JSON with two fields: sentiment (positive/negative/neutral) and complaint_category (lazy_responses/hallucinations/refusals/coding_quality/speed/general_drop or null if not negative). Classify as neutral ONLY if the post is purely factual news with zero opinion expressed. Post: ${title} ${truncated}`;
@@ -84,9 +107,10 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "discourse");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
+    const titleKeys = await loadRecentTitleKeys(supabase);
 
     const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    const summary = { topics: 0, fetched: 0, inserted: 0, classified: 0, skipped: 0, errors: [] as string[] };
+    const summary = { topics: 0, fetched: 0, inserted: 0, classified: 0, skipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
 
     for (const forum of FORUMS) {
       try {
@@ -103,7 +127,6 @@ Deno.serve(async (req) => {
 
           summary.topics++;
 
-          // Check if title matches any model keywords, or use forum default
           let matchedSlugs = matchModels(topic.title);
           if (matchedSlugs.length === 0) matchedSlugs = [forum.defaultSlug];
 
@@ -125,12 +148,22 @@ Deno.serve(async (req) => {
             }
           } catch { /* use title only */ }
 
+          if (!meetsMinLength(topic.title, content)) { summary.contentSkipped++; continue; }
+
+          // Cross-source dedup
+          let allDuped = true;
+          for (const slug of matchedSlugs) {
+            const modelId = modelMap[slug];
+            if (modelId && !isDuplicate(titleKeys, topic.title, modelId)) { allDuped = false; break; }
+          }
+          if (allDuped) { summary.dedupSkipped++; continue; }
+
           const classification = await classifyPost(topic.title, content, lovableApiKey);
           summary.classified++;
 
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
-            if (!modelId) continue;
+            if (!modelId || isDuplicate(titleKeys, topic.title, modelId)) continue;
             const { error } = await supabase.from("scraped_posts").insert({
               model_id: modelId, source: "discourse", source_url: sourceUrl,
               title: topic.title.slice(0, 500), content: content.slice(0, 2000),
@@ -138,7 +171,11 @@ Deno.serve(async (req) => {
               score: topic.like_count || 0,
               posted_at: topic.created_at || new Date().toISOString(),
             });
-            if (error) { summary.errors.push(error.message); } else { summary.inserted++; existingUrls.add(sourceUrl); }
+            if (error) { summary.errors.push(error.message); } else {
+              summary.inserted++;
+              existingUrls.add(sourceUrl);
+              titleKeys.add(`${modelId}:${topic.title.slice(0, 80).toLowerCase()}`);
+            }
           }
         }
       } catch (e) {
@@ -149,7 +186,7 @@ Deno.serve(async (req) => {
 
     await supabase.from("error_log").insert({
       function_name: "scrape-discourse",
-      error_message: `Done: inserted=${summary.inserted} topics=${summary.topics} fetched=${summary.fetched} classified=${summary.classified}`,
+      error_message: `Done: inserted=${summary.inserted} topics=${summary.topics} fetched=${summary.fetched} classified=${summary.classified} dedupSkipped=${summary.dedupSkipped} contentSkipped=${summary.contentSkipped}`,
       context: `skipped=${summary.skipped} errors=${summary.errors.length}`,
     });
 

@@ -36,6 +36,29 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
 }
 
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
+}
+
+function meetsMinLength(title: string, content: string): boolean {
+  const cleaned = stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim();
+  return cleaned.length >= 20;
+}
+
+async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
+  const keys = new Set<string>();
+  for (const p of data || []) {
+    if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
+  }
+  return keys;
+}
+
+function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
+  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+}
+
 function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 function isEnglish(text: string): boolean {
@@ -87,9 +110,10 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "mastodon");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
+    const titleKeys = await loadRecentTitleKeys(supabase);
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, errors: [] as string[] };
+    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
     let reqIdx = 0;
 
     for (const hashtag of HASHTAGS) {
@@ -100,38 +124,22 @@ Deno.serve(async (req) => {
         const url = `https://mastodon.social/api/v1/timelines/tag/${hashtag}?limit=40`;
         const res = await fetch(url, { headers: { "Accept": "application/json" } });
 
-        if (reqIdx <= 3) {
-          await logToErrorLog(supabase, `Hashtag #${hashtag} status=${res.status}`, "debug");
-        }
-
-        if (!res.ok) {
-          summary.errors.push(`#${hashtag}: HTTP ${res.status}`);
-          continue;
-        }
+        if (!res.ok) { summary.errors.push(`#${hashtag}: HTTP ${res.status}`); continue; }
 
         const statuses = await res.json();
-        if (!Array.isArray(statuses)) {
-          summary.errors.push(`#${hashtag}: response not an array`);
-          continue;
-        }
+        if (!Array.isArray(statuses)) { summary.errors.push(`#${hashtag}: response not an array`); continue; }
         summary.fetched += statuses.length;
 
         for (const status of statuses) {
           const createdAt = new Date(status.created_at);
           if (createdAt < cutoff) continue;
 
-          // Language filter: check Mastodon language field + Latin character ratio
           const lang = status.language;
-          if (lang && lang !== "en" && !lang.startsWith("en")) {
-            summary.langSkipped++;
-            continue;
-          }
+          if (lang && lang !== "en" && !lang.startsWith("en")) { summary.langSkipped++; continue; }
 
           const content = stripHtml(status.content || "");
-          if (!isEnglish(content)) {
-            summary.langSkipped++;
-            continue;
-          }
+          if (!isEnglish(content)) { summary.langSkipped++; continue; }
+          if (!meetsMinLength(content, "")) { summary.contentSkipped++; continue; }
 
           const matchedSlugs = matchModels(content);
           if (matchedSlugs.length === 0) continue;
@@ -140,12 +148,20 @@ Deno.serve(async (req) => {
           const sourceUrl = status.url || "";
           if (!sourceUrl || existingUrls.has(sourceUrl)) continue;
 
+          // Cross-source dedup
+          let allDuped = true;
+          for (const slug of matchedSlugs) {
+            const modelId = modelMap[slug];
+            if (modelId && !isDuplicate(titleKeys, content.slice(0, 120), modelId)) { allDuped = false; break; }
+          }
+          if (allDuped) { summary.dedupSkipped++; continue; }
+
           const classification = await classifyPost(content, lovableApiKey);
           summary.classified++;
 
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
-            if (!modelId) continue;
+            if (!modelId || isDuplicate(titleKeys, content.slice(0, 120), modelId)) continue;
             const { error } = await supabase.from("scraped_posts").insert({
               model_id: modelId, source: "mastodon", source_url: sourceUrl,
               title: content.slice(0, 120), content: content.slice(0, 2000),
@@ -153,11 +169,10 @@ Deno.serve(async (req) => {
               score: (status.reblogs_count || 0) + (status.favourites_count || 0),
               posted_at: status.created_at,
             });
-            if (error) {
-              summary.errors.push(`Insert: ${error.message}`);
-            } else {
+            if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
               summary.inserted++;
               existingUrls.add(sourceUrl);
+              titleKeys.add(`${modelId}:${content.slice(0, 80).toLowerCase()}`);
             }
           }
         }
@@ -167,7 +182,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} errors=${summary.errors.length}`, "summary");
+    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} dedupSkipped=${summary.dedupSkipped} contentSkipped=${summary.contentSkipped} errors=${summary.errors.length}`, "summary");
 
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

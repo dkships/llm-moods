@@ -12,7 +12,6 @@ Deno.serve(async (req) => {
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    // Health check log
     await supabase.from("error_log").insert({ function_name: "aggregate-vibes", error_message: "Function started", context: "health-check" });
 
     const { data: models } = await supabase.from("models").select("id, name, slug");
@@ -40,10 +39,26 @@ Deno.serve(async (req) => {
         .eq("model_id", model.id)
         .gte("posted_at", since24h);
 
+      // Get previous daily score for exponential smoothing
+      const { data: prevDailyScore } = await supabase
+        .from("vibes_scores")
+        .select("score")
+        .eq("model_id", model.id)
+        .eq("period", "daily")
+        .order("period_start", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      const previousScore = prevDailyScore?.score ?? null;
+
       if (dailyPosts && dailyPosts.length > 0) {
         const result = computeScore(dailyPosts);
+        // Apply exponential smoothing: 70% new + 30% previous
+        if (previousScore !== null) {
+          result.score = Math.round(0.7 * result.score + 0.3 * previousScore);
+        }
         await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), result);
-        modelSummary.daily = { posts: dailyPosts.length, score: result.score };
+        modelSummary.daily = { posts: dailyPosts.length, score: result.score, smoothed: previousScore !== null };
       } else {
         // No posts — keep previous day's score
         const { data: prevScore } = await supabase
@@ -84,7 +99,6 @@ Deno.serve(async (req) => {
       summary[model.slug] = modelSummary;
     }
 
-    // Log success
     try {
       await supabase.from("error_log").insert({
         function_name: "aggregate-vibes",

@@ -40,6 +40,29 @@ function isEnglish(text: string): boolean {
   return latinCount / noWhitespace.length >= 0.6;
 }
 
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
+}
+
+function meetsMinLength(title: string, content: string): boolean {
+  const cleaned = stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim();
+  return cleaned.length >= 20;
+}
+
+async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
+  const keys = new Set<string>();
+  for (const p of data || []) {
+    if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
+  }
+  return keys;
+}
+
+function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
+  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+}
+
 function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
@@ -84,9 +107,10 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "lemmy");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
+    const titleKeys = await loadRecentTitleKeys(supabase);
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, errors: [] as string[] };
+    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
     let reqIdx = 0;
 
     for (const instance of INSTANCES) {
@@ -98,10 +122,7 @@ Deno.serve(async (req) => {
           const url = `${instance}/api/v3/search?q=${encodeURIComponent(term)}&type_=Posts&sort=New&limit=20`;
           const res = await fetch(url, { headers: { "Accept": "application/json" } });
 
-          if (!res.ok) {
-            summary.errors.push(`${instance} "${term}": HTTP ${res.status}`);
-            continue;
-          }
+          if (!res.ok) { summary.errors.push(`${instance} "${term}": HTTP ${res.status}`); continue; }
 
           const json = await res.json();
           const posts = json.posts || [];
@@ -119,10 +140,8 @@ Deno.serve(async (req) => {
             const body = post.body || "";
             const fullText = `${title} ${body}`;
 
-            if (!isEnglish(fullText)) {
-              summary.langSkipped++;
-              continue;
-            }
+            if (!isEnglish(fullText)) { summary.langSkipped++; continue; }
+            if (!meetsMinLength(title, body)) { summary.contentSkipped++; continue; }
 
             const matchedSlugs = matchModels(fullText);
             if (matchedSlugs.length === 0) continue;
@@ -131,12 +150,20 @@ Deno.serve(async (req) => {
             const sourceUrl = post.ap_id || "";
             if (!sourceUrl || existingUrls.has(sourceUrl)) continue;
 
+            // Cross-source dedup
+            let allDuped = true;
+            for (const slug of matchedSlugs) {
+              const modelId = modelMap[slug];
+              if (modelId && !isDuplicate(titleKeys, title, modelId)) { allDuped = false; break; }
+            }
+            if (allDuped) { summary.dedupSkipped++; continue; }
+
             const classification = await classifyPost(fullText, lovableApiKey);
             summary.classified++;
 
             for (const slug of matchedSlugs) {
               const modelId = modelMap[slug];
-              if (!modelId) continue;
+              if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
               const { error } = await supabase.from("scraped_posts").insert({
                 model_id: modelId, source: "lemmy", source_url: sourceUrl,
                 title: title.slice(0, 120), content: (body || title).slice(0, 2000),
@@ -144,11 +171,10 @@ Deno.serve(async (req) => {
                 score: counts?.score || 0,
                 posted_at: post.published,
               });
-              if (error) {
-                summary.errors.push(`Insert: ${error.message}`);
-              } else {
+              if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
                 summary.inserted++;
                 existingUrls.add(sourceUrl);
+                titleKeys.add(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
               }
             }
           }
@@ -159,7 +185,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} errors=${summary.errors.length}`, "summary");
+    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} dedupSkipped=${summary.dedupSkipped} contentSkipped=${summary.contentSkipped} errors=${summary.errors.length}`, "summary");
 
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

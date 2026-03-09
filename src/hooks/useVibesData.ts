@@ -5,6 +5,7 @@ export function useModelsWithLatestVibes() {
   return useQuery({
     queryKey: ["models-with-vibes"],
     refetchInterval: 60_000,
+    staleTime: 60_000,
     queryFn: async () => {
       const { data: models, error: mErr } = await supabase
         .from("models")
@@ -12,11 +13,13 @@ export function useModelsWithLatestVibes() {
         .order("name");
       if (mErr) throw mErr;
 
+      // Only fetch last 7 daily scores per model for sparklines
       const { data: scores, error: sErr } = await supabase
         .from("vibes_scores")
         .select("*")
         .eq("period", "daily")
-        .order("period_start", { ascending: false });
+        .order("period_start", { ascending: false })
+        .limit(50); // ~7 per model * 6 models = 42, cap at 50
       if (sErr) throw sErr;
 
       return (models || []).map((model) => {
@@ -41,9 +44,10 @@ export function useModelsWithLatestVibes() {
   });
 }
 
-export function useRecentChatter(limit = 8) {
+export function useRecentChatter(limit = 20) {
   return useQuery({
     queryKey: ["recent-chatter", limit],
+    staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("scraped_posts")
@@ -60,6 +64,7 @@ export function useModelDetail(slug: string | undefined) {
   return useQuery({
     queryKey: ["model-detail", slug],
     enabled: !!slug,
+    staleTime: 60_000,
     queryFn: async () => {
       const { data: model, error: mErr } = await supabase
         .from("models")
@@ -77,6 +82,7 @@ export function useVibesHistory(modelId: string | undefined, period: string, ran
   return useQuery({
     queryKey: ["vibes-history", modelId, period, range],
     enabled: !!modelId,
+    staleTime: 60_000,
     queryFn: async () => {
       const now = new Date();
       let since: Date;
@@ -105,6 +111,7 @@ export function useComplaintBreakdown(modelId: string | undefined) {
   return useQuery({
     queryKey: ["complaint-breakdown", modelId],
     enabled: !!modelId,
+    staleTime: 60_000,
     queryFn: async () => {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
@@ -135,6 +142,7 @@ export function useSourceBreakdown(modelId: string | undefined) {
   return useQuery({
     queryKey: ["source-breakdown", modelId],
     enabled: !!modelId,
+    staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("scraped_posts")
@@ -160,6 +168,7 @@ export function useModelPosts(modelId: string | undefined, limit = 5) {
   return useQuery({
     queryKey: ["model-posts", modelId, limit],
     enabled: !!modelId,
+    staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("scraped_posts")
