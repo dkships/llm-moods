@@ -118,12 +118,15 @@ async function logToErrorLog(supabase: any, functionName: string, errorMessage: 
   }
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+
+    // Health check log
+    await supabase.from("error_log").insert({ function_name: "scrape-hackernews", error_message: "Function started", context: "health-check" });
 
     const { data: models } = await supabase.from("models").select("id, slug");
     const modelMap: Record<string, string> = {};
