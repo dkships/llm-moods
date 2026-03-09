@@ -17,3 +17,9 @@ verify_jwt = false
 
 [functions.scrape-lobsters]
 verify_jwt = false
+
+[functions.scrape-lemmy]
+verify_jwt = false
+
+[functions.scrape-devto]
+verify_jwt = false
