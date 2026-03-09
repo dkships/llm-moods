@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.scrape-bluesky]
 verify_jwt = false
+
+[functions.scrape-mastodon]
+verify_jwt = false
+
+[functions.scrape-lobsters]
+verify_jwt = false
