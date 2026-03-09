@@ -154,7 +154,7 @@ Deno.serve(async (req) => {
       ...((bestIds || []) as number[]).slice(0, 100),
     ])];
 
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, errors: [] as string[] };
+    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, errors: [] as string[] };
 
     const items = await fetchInBatches(allIds, 10, 200, async (id) => fetchJson(`${HN_API}/item/${id}.json`));
     summary.fetched = items.filter(Boolean).length;
