@@ -100,6 +100,7 @@ export type Database = {
       scraped_posts: {
         Row: {
           complaint_category: string | null
+          confidence: number | null
           content: string | null
           created_at: string
           id: string
@@ -113,6 +114,7 @@ export type Database = {
         }
         Insert: {
           complaint_category?: string | null
+          confidence?: number | null
           content?: string | null
           created_at?: string
           id?: string
@@ -126,6 +128,7 @@ export type Database = {
         }
         Update: {
           complaint_category?: string | null
+          confidence?: number | null
           content?: string | null
           created_at?: string
           id?: string

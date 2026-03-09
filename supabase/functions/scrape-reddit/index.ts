@@ -51,25 +51,32 @@ async function logToErrorLog(supabase: any, fn: string, msg: string, ctx?: strin
   try { await supabase.from("error_log").insert({ function_name: fn, error_message: msg, context: ctx || null }); } catch {}
 }
 
-async function classifyPost(title: string, content: string, apiKey: string): Promise<{ sentiment: string; complaint_category: string | null }> {
+async function classifyPost(title: string, content: string, apiKey: string): Promise<{ sentiment: string; complaint_category: string | null; confidence: number }> {
   const truncated = (content || "").slice(0, 500);
-  const prompt = `Classify this social media post about an AI model. Return ONLY valid JSON with two fields: sentiment (positive/negative/neutral) and complaint_category (lazy_responses/hallucinations/refusals/coding_quality/speed/general_drop or null if not negative). Classify as neutral ONLY if the post is purely factual news with zero opinion expressed. Most social media posts express some sentiment — when in doubt, choose positive or negative, not neutral. Posts with any emotional language, slang, sarcasm, or subjective judgment should NOT be neutral. Post: ${title} ${truncated}`;
+  const prompt = `You are analyzing a social media post to determine if it expresses an opinion about the quality or performance of an AI language model.
+
+Classify sentiment and complaint type. Also return a "confidence" field between 0.0 and 1.0 indicating how confident you are in this classification. 1.0 = clearly about this model with clear sentiment. 0.5 = ambiguous or could go either way. 0.0 = random guess.
+
+Return ONLY valid JSON:
+{"sentiment": "positive"/"negative"/"neutral", "complaint_category": "lazy_responses"/"hallucinations"/"refusals"/"coding_quality"/"speed"/"general_drop"/null, "confidence": 0.0-1.0}
+
+Classify as neutral ONLY if the post is purely factual news with zero opinion expressed. Most social media posts express some sentiment — when in doubt, choose positive or negative, not neutral. Post: ${title} ${truncated}`;
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages: [{ role: "user", content: prompt }] }),
     });
-    if (!res.ok) return { sentiment: "neutral", complaint_category: null };
+    if (!res.ok) return { sentiment: "neutral", complaint_category: null, confidence: 0.5 };
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || "";
     const jsonMatch = raw.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      return { sentiment: parsed.sentiment || "neutral", complaint_category: parsed.complaint_category || null };
+      return { sentiment: parsed.sentiment || "neutral", complaint_category: parsed.complaint_category || null, confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.5 };
     }
-    return { sentiment: "neutral", complaint_category: null };
-  } catch { return { sentiment: "neutral", complaint_category: null }; }
+    return { sentiment: "neutral", complaint_category: null, confidence: 0.5 };
+  } catch { return { sentiment: "neutral", complaint_category: null, confidence: 0.5 }; }
 }
 
 interface RssEntry {
@@ -181,6 +188,7 @@ Deno.serve(async (req) => {
             model_id: modelId, source: "reddit", source_url: entry.link,
             title: entry.title.slice(0, 500), content: entry.content.slice(0, 2000),
             sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+            confidence: classification.confidence,
             score: 0, posted_at: entry.updated || new Date().toISOString(),
           });
 

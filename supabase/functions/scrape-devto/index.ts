@@ -81,31 +81,33 @@ Step 1 — RELEVANCE: Is this post actually about the user's experience with an 
 
 Step 2 — If relevant, classify sentiment and complaint type.
 
+Also return a "confidence" field between 0.0 and 1.0 indicating how confident you are in this classification. 1.0 = clearly about this model with clear sentiment. 0.5 = ambiguous or could go either way. 0.0 = random guess.
+
 Return ONLY valid JSON:
-{"relevant": true/false, "sentiment": "positive"/"negative"/"neutral", "complaint_category": "lazy_responses"/"hallucinations"/"refusals"/"coding_quality"/"speed"/"general_drop"/null}
+{"relevant": true/false, "sentiment": "positive"/"negative"/"neutral", "complaint_category": "lazy_responses"/"hallucinations"/"refusals"/"coding_quality"/"speed"/"general_drop"/null, "confidence": 0.0-1.0}
 
 If relevant is false, sentiment and complaint_category should be null.
 Classify as neutral ONLY if genuinely no opinion is expressed. When in doubt between neutral and negative, lean negative. When in doubt between neutral and positive, lean positive.
 
 Post to classify: `;
 
-async function classifyPost(text: string, apiKey: string): Promise<{ relevant: boolean; sentiment: string | null; complaint_category: string | null }> {
+async function classifyPost(text: string, apiKey: string): Promise<{ relevant: boolean; sentiment: string | null; complaint_category: string | null; confidence: number }> {
   try {
     const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages: [{ role: "user", content: CLASSIFY_PROMPT + text.slice(0, 600) }] }),
     });
-    if (!res.ok) return { relevant: true, sentiment: "neutral", complaint_category: null };
+    if (!res.ok) return { relevant: true, sentiment: "neutral", complaint_category: null, confidence: 0.5 };
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || "";
     const jsonMatch = raw.match(/\{[\s\S]*?\}/);
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0]);
-      return { relevant: parsed.relevant !== false, sentiment: parsed.sentiment || null, complaint_category: parsed.complaint_category || null };
+      return { relevant: parsed.relevant !== false, sentiment: parsed.sentiment || null, complaint_category: parsed.complaint_category || null, confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.5 };
     }
-    return { relevant: true, sentiment: "neutral", complaint_category: null };
-  } catch { return { relevant: true, sentiment: "neutral", complaint_category: null }; }
+    return { relevant: true, sentiment: "neutral", complaint_category: null, confidence: 0.5 };
+  } catch { return { relevant: true, sentiment: "neutral", complaint_category: null, confidence: 0.5 }; }
 }
 
 Deno.serve(async (req) => {
@@ -175,6 +177,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "devto", source_url: sourceUrl,
               title: title.slice(0, 120), content: description.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+              confidence: classification.confidence,
               score: article.positive_reactions_count || 0,
               posted_at: article.published_at || article.published_timestamp,
             });
