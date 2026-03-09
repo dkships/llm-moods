@@ -37,6 +37,13 @@ function stripHtml(html: string): string {
 
 function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
+function isEnglish(text: string): boolean {
+  const noWhitespace = text.replace(/\s/g, "");
+  if (noWhitespace.length < 5) return true;
+  const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
+  return latinCount / noWhitespace.length >= 0.6;
+}
+
 async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
   try {
     await supabase.from("error_log").insert({ function_name: "scrape-mastodon", error_message: msg, context: ctx || null });
