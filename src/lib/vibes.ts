@@ -17,6 +17,9 @@ export const SOURCE_LABELS: Record<string, string> = {
   lobsters: "Lobsters",
   lemmy: "Lemmy",
   devto: "Dev.to",
+  stackoverflow: "Stack Overflow",
+  medium: "Medium",
+  discourse: "Discourse",
 };
 
 export const SENTIMENT_STYLES: Record<string, { label: string; classes: string }> = {
