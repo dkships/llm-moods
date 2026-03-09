@@ -111,8 +111,8 @@ const Index = () => {
                         </div>
                         <div className="mt-3 flex items-center justify-between">
                           <TrendIcon trend={m.trend.direction} />
-                          <span className="text-xs font-mono text-muted-foreground">
-                            {(m.totalPosts || 0).toLocaleString()} posts analyzed
+                        <span className="text-xs font-mono text-muted-foreground">
+                            {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts analyzed` : "Tracking"}
                           </span>
                         </div>
                       </div>

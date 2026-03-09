@@ -303,7 +303,8 @@ const ModelDetail = () => {
                     key={post.id}
                     variants={fadeUp}
                     custom={i}
-                    className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+                    className={`glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${post.source_url ? "cursor-pointer hover:bg-secondary/30 transition-colors" : ""}`}
+                    onClick={() => post.source_url && window.open(post.source_url, "_blank", "noopener,noreferrer")}
                   >
                     <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border shrink-0">
                       {src.emoji} {src.label}

@@ -16,6 +16,9 @@ const Dashboard = () => {
   const { data: models, isLoading: modelsLoading } = useModelsWithLatestVibes();
   const { data: chatter, isLoading: chatterLoading } = useRecentChatter(8);
 
+  // Auto-refresh vibes data every 60 seconds
+  useModelsWithLatestVibes();
+
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
     year: "numeric",
