@@ -1,5 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useCallback } from "react";
 
 export function useModelsWithLatestVibes() {
   return useQuery({
@@ -7,47 +8,48 @@ export function useModelsWithLatestVibes() {
     refetchInterval: 60_000,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data: models, error: mErr } = await supabase
-        .from("models")
-        .select("*")
-        .order("name");
-      if (mErr) throw mErr;
+      // Single RPC call for landing/dashboard data
+      const { data: landing, error: lErr } = await supabase.rpc("get_landing_vibes");
+      if (lErr) throw lErr;
 
-      // Only fetch last 7 daily scores per model for sparklines
-      const { data: scores, error: sErr } = await supabase
-        .from("vibes_scores")
-        .select("*")
-        .eq("period", "daily")
-        .order("period_start", { ascending: false })
-        .limit(50); // ~7 per model * 6 models = 42, cap at 50
+      // Single RPC call for sparklines (7 scores per model)
+      const { data: sparklines, error: sErr } = await supabase.rpc("get_sparkline_scores");
       if (sErr) throw sErr;
 
-      return (models || []).map((model) => {
-        const modelScores = (scores || []).filter((s) => s.model_id === model.id);
-        const latest = modelScores[0];
-        const yesterday = modelScores[1];
-        const sparkline = modelScores.slice(0, 7).reverse();
-        const trendPts = latest && yesterday ? latest.score - yesterday.score : 0;
+      const sparkMap = new Map<string, number[]>();
+      (sparklines || []).forEach((s: { model_id: string; score: number }) => {
+        const arr = sparkMap.get(s.model_id) || [];
+        arr.push(s.score);
+        sparkMap.set(s.model_id, arr);
+      });
+
+      return (landing || []).map((m: any) => {
+        const sparkline = sparkMap.get(m.model_id) || [];
+        const trendPts = m.previous_score != null ? m.latest_score - m.previous_score : 0;
 
         return {
-          ...model,
-          latestScore: latest?.score ?? 50,
-          vibe: latest?.score ?? 50,
+          id: m.model_id,
+          name: m.model_name,
+          slug: m.model_slug,
+          accent_color: m.accent_color,
+          latestScore: m.latest_score ?? 50,
+          vibe: m.latest_score ?? 50,
           trend: { direction: trendPts >= 0 ? ("up" as const) : ("down" as const), pts: Math.abs(trendPts) },
-          sparkline: sparkline.map((s) => s.score),
-          topComplaint: latest?.top_complaint ?? null,
-          totalPosts: latest?.total_posts ?? 0,
-          lastUpdated: latest?.created_at ?? null,
+          sparkline,
+          topComplaint: m.top_complaint ?? null,
+          totalPosts: m.total_posts ?? 0,
+          lastUpdated: m.last_updated ?? null,
         };
       });
     },
   });
 }
 
-export function useRecentChatter(limit = 20) {
+export function useRecentChatter(limit = 12, enabled = true) {
   return useQuery({
     queryKey: ["recent-chatter", limit],
     staleTime: 60_000,
+    enabled,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("scraped_posts")
@@ -100,7 +102,8 @@ export function useVibesHistory(modelId: string | undefined, period: string, ran
         .eq("model_id", modelId!)
         .eq("period", period)
         .gte("period_start", since.toISOString())
-        .order("period_start", { ascending: true });
+        .order("period_start", { ascending: true })
+        .limit(200);
       if (error) throw error;
       return data || [];
     },
@@ -113,27 +116,15 @@ export function useComplaintBreakdown(modelId: string | undefined) {
     enabled: !!modelId,
     staleTime: 60_000,
     queryFn: async () => {
-      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
-        .from("scraped_posts")
-        .select("complaint_category")
-        .eq("model_id", modelId!)
-        .not("complaint_category", "is", null)
-        .gte("posted_at", since);
+      const { data, error } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId! });
       if (error) throw error;
 
-      const counts: Record<string, number> = {};
-      let total = 0;
-      (data || []).forEach((p) => {
-        if (p.complaint_category) {
-          counts[p.complaint_category] = (counts[p.complaint_category] || 0) + 1;
-          total++;
-        }
-      });
-
-      return Object.entries(counts)
-        .map(([cat, count]) => ({ category: cat, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 }))
-        .sort((a, b) => b.count - a.count);
+      const total = (data || []).reduce((sum: number, r: any) => sum + Number(r.count), 0);
+      return (data || []).map((r: any) => ({
+        category: r.category,
+        count: Number(r.count),
+        pct: total > 0 ? Math.round((Number(r.count) / total) * 100) : 0,
+      }));
     },
   });
 }
@@ -144,30 +135,23 @@ export function useSourceBreakdown(modelId: string | undefined) {
     enabled: !!modelId,
     staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("scraped_posts")
-        .select("source")
-        .eq("model_id", modelId!);
+      const { data, error } = await supabase.rpc("get_source_breakdown", { p_model_id: modelId! });
       if (error) throw error;
 
-      const counts: Record<string, number> = {};
-      let total = 0;
-      (data || []).forEach((p) => {
-        counts[p.source] = (counts[p.source] || 0) + 1;
-        total++;
-      });
-
-      return Object.entries(counts)
-        .map(([source, count]) => ({ source, count, pct: total > 0 ? Math.round((count / total) * 100) : 0 }))
-        .sort((a, b) => b.count - a.count);
+      const total = (data || []).reduce((sum: number, r: any) => sum + Number(r.count), 0);
+      return (data || []).map((r: any) => ({
+        source: r.source,
+        count: Number(r.count),
+        pct: total > 0 ? Math.round((Number(r.count) / total) * 100) : 0,
+      }));
     },
   });
 }
 
-export function useModelPosts(modelId: string | undefined, limit = 5) {
+export function useModelPosts(modelId: string | undefined, limit = 10, enabled = true) {
   return useQuery({
     queryKey: ["model-posts", modelId, limit],
-    enabled: !!modelId,
+    enabled: !!modelId && enabled,
     staleTime: 60_000,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -180,4 +164,44 @@ export function useModelPosts(modelId: string | undefined, limit = 5) {
       return data || [];
     },
   });
+}
+
+/** Prefetch model detail data on hover */
+export function usePrefetchModelDetail() {
+  const queryClient = useQueryClient();
+
+  return useCallback((slug: string, modelId: string) => {
+    // Prefetch vibes history
+    queryClient.prefetchQuery({
+      queryKey: ["vibes-history", modelId, "daily", "30d"],
+      staleTime: 60_000,
+      queryFn: async () => {
+        const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const { data } = await supabase
+          .from("vibes_scores")
+          .select("*")
+          .eq("model_id", modelId)
+          .eq("period", "daily")
+          .gte("period_start", since)
+          .order("period_start", { ascending: true })
+          .limit(200);
+        return data || [];
+      },
+    });
+
+    // Prefetch complaint breakdown
+    queryClient.prefetchQuery({
+      queryKey: ["complaint-breakdown", modelId],
+      staleTime: 60_000,
+      queryFn: async () => {
+        const { data } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId });
+        const total = (data || []).reduce((sum: number, r: any) => sum + Number(r.count), 0);
+        return (data || []).map((r: any) => ({
+          category: r.category,
+          count: Number(r.count),
+          pct: total > 0 ? Math.round((Number(r.count) / total) * 100) : 0,
+        }));
+      },
+    });
+  }, [queryClient]);
 }

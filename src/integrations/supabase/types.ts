@@ -237,7 +237,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_complaint_breakdown: {
+        Args: { p_model_id: string }
+        Returns: {
+          category: string
+          count: number
+        }[]
+      }
+      get_landing_vibes: {
+        Args: never
+        Returns: {
+          accent_color: string
+          last_updated: string
+          latest_score: number
+          model_id: string
+          model_name: string
+          model_slug: string
+          previous_score: number
+          top_complaint: string
+          total_posts: number
+        }[]
+      }
+      get_source_breakdown: {
+        Args: { p_model_id: string }
+        Returns: {
+          count: number
+          source: string
+        }[]
+      }
+      get_sparkline_scores: {
+        Args: never
+        Returns: {
+          model_id: string
+          period_start: string
+          score: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

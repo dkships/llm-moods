@@ -1,12 +1,13 @@
 import { TrendingUp, TrendingDown, Minus, Monitor, Brain, CheckCircle, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
+import { memo, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
 import Footer from "@/components/Footer";
-import { useModelsWithLatestVibes } from "@/hooks/useVibesData";
+import { useModelsWithLatestVibes, usePrefetchModelDetail } from "@/hooks/useVibesData";
 import { getVibeStatus, fadeUp } from "@/lib/vibes";
 import { CardSkeleton } from "@/components/Skeletons";
 
@@ -34,9 +35,46 @@ const TrendIcon = ({ trend }: { trend: string }) => {
   return <Minus className="h-4 w-4 text-muted-foreground" />;
 };
 
+const LandingModelCard = memo(({ m, i, onHover }: { m: any; i: number; onHover: (slug: string, id: string) => void }) => {
+  const vibe = getVibeStatus(m.latestScore);
+  const VibeIcon = vibe.icon;
+  const accent = m.accent_color || "#888";
+  return (
+    <Link to={`/model/${m.slug}`} onMouseEnter={() => onHover(m.slug, m.id)}>
+      <motion.div
+        variants={fadeUp}
+        custom={i}
+        className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer group hover:-translate-y-1 h-full"
+        whileHover={{ boxShadow: `0 0 20px ${accent}20, 0 8px 30px ${accent}10` }}
+      >
+        <div className="h-1" style={{ background: accent }} />
+        <div className="p-5">
+          <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
+          <div className="mt-3 flex items-center gap-2">
+            <VibeIcon className="h-5 w-5" style={{ color: accent }} />
+            <span className="font-mono text-sm text-foreground">{vibe.label}</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between">
+            <TrendIcon trend={m.trend.direction} />
+            <span className="text-xs font-mono text-muted-foreground">
+              {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts analyzed` : "Tracking"}
+            </span>
+          </div>
+        </div>
+      </motion.div>
+    </Link>
+  );
+});
+LandingModelCard.displayName = "LandingModelCard";
+
 const Index = () => {
   usePageTitle("LLM Vibes — Is Your AI Having a Bad Day?");
   const { data: models, isLoading } = useModelsWithLatestVibes();
+  const prefetch = usePrefetchModelDetail();
+
+  const handleHover = useCallback((slug: string, id: string) => {
+    prefetch(slug, id);
+  }, [prefetch]);
 
   return (
     <PageTransition>
@@ -90,36 +128,9 @@ const Index = () => {
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
               className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
             >
-              {(models || []).map((m, i) => {
-                const vibe = getVibeStatus(m.latestScore);
-                const VibeIcon = vibe.icon;
-                const accent = m.accent_color || "#888";
-                return (
-                  <Link key={m.id} to={`/model/${m.slug}`}>
-                    <motion.div
-                      variants={fadeUp}
-                      custom={i}
-                      className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer group hover:-translate-y-1 h-full"
-                      whileHover={{ boxShadow: `0 0 20px ${accent}20, 0 8px 30px ${accent}10` }}
-                    >
-                      <div className="h-1" style={{ background: accent }} />
-                      <div className="p-5">
-                        <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
-                        <div className="mt-3 flex items-center gap-2">
-                          <VibeIcon className="h-5 w-5" style={{ color: accent }} />
-                          <span className="font-mono text-sm text-foreground">{vibe.label}</span>
-                        </div>
-                        <div className="mt-3 flex items-center justify-between">
-                          <TrendIcon trend={m.trend.direction} />
-                        <span className="text-xs font-mono text-muted-foreground">
-                            {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts analyzed` : "Tracking"}
-                          </span>
-                        </div>
-                      </div>
-                    </motion.div>
-                  </Link>
-                );
-              })}
+              {(models || []).map((m, i) => (
+                <LandingModelCard key={m.id} m={m} i={i} onHover={handleHover} />
+              ))}
             </motion.div>
           )}
         </section>

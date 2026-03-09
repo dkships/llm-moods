@@ -1,10 +1,9 @@
 import { useParams, Link } from "react-router-dom";
 import { TrendingUp, TrendingDown, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
-import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, ReferenceLine } from "recharts";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { useState, useEffect, useRef, lazy, Suspense } from "react";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
@@ -19,6 +18,9 @@ import {
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
+// Lazy load the heavy chart component
+const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
+
 const TIME_RANGES = ["24h", "7d", "30d"] as const;
 
 const ModelDetail = () => {
@@ -31,9 +33,23 @@ const ModelDetail = () => {
   const { data: vibesHistory, isLoading: historyLoading } = useVibesHistory(model?.id, period, timeRange);
   const { data: complaints, isLoading: complaintsLoading } = useComplaintBreakdown(model?.id);
   const { data: sources, isLoading: sourcesLoading } = useSourceBreakdown(model?.id);
-  const { data: recentPosts, isLoading: postsLoading } = useModelPosts(model?.id, 5);
 
-  // Get enriched model data from the shared query
+  // Lazy load recent posts when user scrolls near
+  const postsRef = useRef<HTMLDivElement>(null);
+  const [postsVisible, setPostsVisible] = useState(false);
+  useEffect(() => {
+    const el = postsRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => { if (entry.isIntersecting) { setPostsVisible(true); observer.disconnect(); } },
+      { rootMargin: "300px" }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  const { data: recentPosts, isLoading: postsLoading } = useModelPosts(model?.id, 10, postsVisible);
+
   const enriched = allModels?.find((m) => m.slug === slug);
   const latestScore = enriched?.latestScore ?? 50;
   const trend = enriched?.trend ?? { direction: "up" as const, pts: 0 };
@@ -87,8 +103,6 @@ const ModelDetail = () => {
       const suffix = h >= 12 ? "pm" : "am";
       const h12 = h % 12 || 12;
       label = `${h12}${suffix}`;
-    } else if (timeRange === "7d") {
-      label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     } else {
       label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     }
@@ -155,49 +169,9 @@ const ModelDetail = () => {
                     {timeRange === "24h" ? "Hourly" : "Daily"} vibes score
                   </p>
                   <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={chartData} margin={{ top: 5, right: 50, bottom: 0, left: 0 }}>
-                        <XAxis
-                          dataKey="day"
-                          tick={{ fill: "hsl(220 10% 50%)", fontSize: 10 }}
-                          axisLine={false}
-                          tickLine={false}
-                          interval={timeRange === "30d" ? Math.max(Math.floor(chartData.length / 5) - 1, 0) : timeRange === "7d" ? 0 : Math.max(Math.floor(chartData.length / 5) - 1, 0)}
-                          padding={{ left: 10, right: 40 }}
-                        />
-                        <YAxis
-                          domain={[20, 100]}
-                          tick={{ fill: "hsl(220 10% 50%)", fontSize: 10 }}
-                          axisLine={false}
-                          tickLine={false}
-                          width={30}
-                        />
-                        <Tooltip
-                          contentStyle={{
-                            background: "hsl(220 18% 10%)",
-                            border: "1px solid hsl(220 14% 18%)",
-                            borderRadius: 8,
-                            fontSize: 12,
-                            fontFamily: "JetBrains Mono, monospace",
-                          }}
-                          labelStyle={{ color: "hsl(220 10% 50%)" }}
-                          itemStyle={{ color: accent }}
-                        />
-                        <ReferenceLine
-                          y={50}
-                          stroke="hsl(220 10% 25%)"
-                          strokeDasharray="4 4"
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="score"
-                          stroke={accent}
-                          strokeWidth={2.5}
-                          dot={false}
-                          activeDot={{ r: 4, fill: accent, strokeWidth: 0 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                    <Suspense fallback={<div className="h-64 animate-pulse rounded bg-secondary/40" />}>
+                      <LazyVibesChart chartData={chartData} accent={accent} timeRange={timeRange} />
+                    </Suspense>
                   </div>
                   <div className="mt-4 flex gap-2">
                     {TIME_RANGES.map((r) => (
@@ -285,8 +259,8 @@ const ModelDetail = () => {
           </div>
         </section>
 
-        {/* Recent Posts */}
-        <section className="container pb-20">
+        {/* Recent Posts — lazy loaded on scroll */}
+        <section className="container pb-20" ref={postsRef}>
           <motion.h2
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -297,7 +271,7 @@ const ModelDetail = () => {
             Recent Posts about {model.name}
           </motion.h2>
 
-          {postsLoading ? (
+          {!postsVisible || postsLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => <ChatterSkeleton key={i} />)}
             </div>
