@@ -257,7 +257,7 @@ const ModelDetail = () => {
                 )}
               </motion.div>
 
-              <UserReportForm modelId={model.id} modelName={model.name} accent={accent} />
+
             </div>
           </div>
         </section>
