@@ -6,22 +6,52 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SUBREDDITS = ["ClaudeAI", "ChatGPT", "LocalLLaMA", "GoogleGemini", "singularity", "artificial", "deepseek"];
+// Fallback defaults — overridden by scraper_config table at runtime
+const DEFAULT_SUBREDDITS = ["ClaudeAI", "ChatGPT", "LocalLLaMA", "GoogleGemini", "singularity", "artificial", "deepseek", "MachineLearning", "ChatGPTCoding", "bing", "perplexity_ai", "Bard"];
 
-const DEDICATED_SUB_SLUGS: Record<string, string> = {
+const DEFAULT_DEDICATED_SLUGS: Record<string, string> = {
   ClaudeAI: "claude",
   ChatGPT: "chatgpt",
   GoogleGemini: "gemini",
   deepseek: "deepseek",
+  ChatGPTCoding: "chatgpt",
+  bing: "chatgpt",
+  perplexity_ai: "perplexity",
+  Bard: "gemini",
 };
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
   claude: ["claude", "sonnet", "opus", "anthropic"],
-  chatgpt: ["chatgpt", "gpt-5", "gpt-4", "gpt-4o", "gpt", "openai"],
-  gemini: ["gemini", "gemini pro", "google ai"],
+  chatgpt: ["chatgpt", "gpt-5", "gpt-4", "gpt-4o", "gpt", "openai", "copilot"],
+  gemini: ["gemini", "gemini pro", "google ai", "bard"],
   grok: ["grok", "grok 4", "xai"],
   deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
+  perplexity: ["perplexity", "perplexity ai", "pplx"],
 };
+
+async function loadConfig(supabase: any): Promise<{ subreddits: string[]; dedicatedSlugs: Record<string, string> }> {
+  try {
+    const { data, error } = await supabase
+      .from("scraper_config")
+      .select("key, value")
+      .eq("scraper", "reddit");
+    if (error || !data || data.length === 0) {
+      return { subreddits: DEFAULT_SUBREDDITS, dedicatedSlugs: DEFAULT_DEDICATED_SLUGS };
+    }
+    const subreddits = data.filter((r: any) => r.key === "subreddit").map((r: any) => r.value);
+    const dedicatedSlugs: Record<string, string> = {};
+    for (const r of data.filter((r: any) => r.key === "dedicated_model")) {
+      const [sub, slug] = r.value.split(":");
+      if (sub && slug) dedicatedSlugs[sub] = slug;
+    }
+    return {
+      subreddits: subreddits.length > 0 ? subreddits : DEFAULT_SUBREDDITS,
+      dedicatedSlugs: Object.keys(dedicatedSlugs).length > 0 ? dedicatedSlugs : DEFAULT_DEDICATED_SLUGS,
+    };
+  } catch {
+    return { subreddits: DEFAULT_SUBREDDITS, dedicatedSlugs: DEFAULT_DEDICATED_SLUGS };
+  }
+}
 
 const USER_AGENT = "LLMVibes/1.0 (llmvibes.ai)";
 const DELAY_MS = 2000;
