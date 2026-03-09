@@ -163,7 +163,7 @@ const Dashboard = () => {
     return () => observer.disconnect();
   }, []);
 
-  const { data: chatter, isLoading: chatterLoading } = useRecentChatter(12, chatterVisible);
+  const { data: chatterData, isLoading: chatterLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useRecentChatter(chatterVisible);
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
@@ -241,7 +241,7 @@ const Dashboard = () => {
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
               className="space-y-3"
             >
-              {(chatter || []).map((post, i) => {
+              {(chatterData?.pages ?? []).flatMap((page) => page).map((post, i) => {
                 const s = SENTIMENT_STYLES[post.sentiment || "neutral"];
                 const src = formatSourceDisplay(post.source);
                 const modelData = post.models as { name: string; accent_color: string | null; slug: string } | null;
@@ -276,6 +276,18 @@ const Dashboard = () => {
                 );
               })}
             </motion.div>
+          )}
+
+          {hasNextPage && (
+            <div className="mt-6 flex justify-center">
+              <button
+                onClick={() => fetchNextPage()}
+                disabled={isFetchingNextPage}
+                className="px-5 py-2 rounded-lg text-xs font-mono text-muted-foreground bg-secondary/50 border border-border hover:bg-secondary hover:text-foreground transition-colors disabled:opacity-50"
+              >
+                {isFetchingNextPage ? "Loading..." : "Load more"}
+              </button>
+            </div>
           )}
         </section>
         <Footer />

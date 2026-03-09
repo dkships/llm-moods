@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCallback } from "react";
 
@@ -45,19 +45,31 @@ export function useModelsWithLatestVibes() {
   });
 }
 
-export function useRecentChatter(limit = 12, enabled = true) {
-  return useQuery({
-    queryKey: ["recent-chatter", limit],
+const CHATTER_PAGE_SIZE = 25;
+
+export function useRecentChatter(enabled = true) {
+  return useInfiniteQuery({
+    queryKey: ["recent-chatter"],
     staleTime: 60_000,
     enabled,
-    queryFn: async () => {
-      const { data, error } = await supabase
+    initialPageParam: null as string | null,
+    queryFn: async ({ pageParam }) => {
+      let query = supabase
         .from("scraped_posts")
         .select("*, models(name, accent_color, slug)")
         .order("posted_at", { ascending: false })
-        .limit(limit);
+        .limit(CHATTER_PAGE_SIZE);
+      if (pageParam) {
+        query = query.lt("posted_at", pageParam);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
+    },
+    getNextPageParam: (lastPage) => {
+      if (lastPage.length < CHATTER_PAGE_SIZE) return undefined;
+      const last = lastPage[lastPage.length - 1];
+      return last?.posted_at ?? undefined;
     },
   });
 }
