@@ -136,7 +136,7 @@ interface ScoreResult {
   top_complaint: string | null;
 }
 
-function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null; score: number | null }[]): ScoreResult {
+function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null; score: number | null; content_type: string | null }[]): ScoreResult {
   let positiveW = 0, negativeW = 0, neutralW = 0;
   let positiveC = 0, negativeC = 0, neutralC = 0;
   const complaints: Record<string, number> = {};
