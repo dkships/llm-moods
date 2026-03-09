@@ -162,7 +162,7 @@ const ModelDetail = () => {
                           tick={{ fill: "hsl(220 10% 50%)", fontSize: 10 }}
                           axisLine={false}
                           tickLine={false}
-                          interval={timeRange === "30d" ? 4 : timeRange === "7d" ? 0 : 3}
+                          interval={timeRange === "30d" ? Math.max(Math.floor(chartData.length / 5) - 1, 0) : timeRange === "7d" ? 0 : Math.max(Math.floor(chartData.length / 5) - 1, 0)}
                         />
                         <YAxis
                           domain={[20, 100]}
