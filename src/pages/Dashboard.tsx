@@ -163,7 +163,7 @@ const Dashboard = () => {
     return () => observer.disconnect();
   }, []);
 
-  const { data: chatter, isLoading: chatterLoading } = useRecentChatter(12, chatterVisible);
+  const { data: chatterData, isLoading: chatterLoading, fetchNextPage, hasNextPage, isFetchingNextPage } = useRecentChatter(chatterVisible);
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
