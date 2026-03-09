@@ -27,23 +27,16 @@ const MODEL_KEYWORDS: Record<string, string[]> = {
 
 function matchModels(text: string, communityName?: string): string[] {
   const matched: string[] = [];
-
-  // Auto-assign from dedicated subreddit
   if (communityName) {
     const subSlug = SUBREDDIT_MODEL_MAP[communityName];
     if (subSlug && !matched.includes(subSlug)) matched.push(subSlug);
   }
-
-  // Keyword matching
   const lower = text.toLowerCase();
   for (const [slug, keywords] of Object.entries(MODEL_KEYWORDS)) {
     if (matched.includes(slug)) continue;
     for (const kw of keywords) {
       const regex = new RegExp(`\\b${kw.replace("-", "[-\\s]?")}\\b`, "i");
-      if (regex.test(lower)) {
-        matched.push(slug);
-        break;
-      }
+      if (regex.test(lower)) { matched.push(slug); break; }
     }
   }
   return matched;
@@ -55,6 +48,8 @@ function isEnglish(text: string): boolean {
   const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
   return latinCount / noWhitespace.length >= 0.6;
 }
+
+function delay(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
   try {
@@ -96,10 +91,10 @@ Deno.serve(async (req) => {
     }
 
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
-    await logToErrorLog(supabase, "Reddit Apify scraper started", "health-check");
+    await logToErrorLog(supabase, "Reddit Apify scraper started (async mode)", "health-check");
 
-    // Call Apify Reddit Scraper Lite
-    const apifyUrl = `https://api.apify.com/v2/acts/trudax~reddit-scraper-lite/run-sync-get-dataset-items?token=${apifyToken}`;
+    // Step 1: Start the Apify run (async)
+    const startUrl = `https://api.apify.com/v2/acts/trudax~reddit-scraper-lite/runs?token=${apifyToken}`;
     const apifyInput = {
       startUrls: [
         { url: "https://www.reddit.com/r/ClaudeAI/new/" },
@@ -116,35 +111,58 @@ Deno.serve(async (req) => {
       proxy: { useApifyProxy: true },
     };
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120_000);
+    const startRes = await fetch(startUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(apifyInput),
+    });
 
-    let apifyResponse: Response;
-    try {
-      apifyResponse = await fetch(apifyUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(apifyInput),
-        signal: controller.signal,
-      });
-    } catch (e) {
-      clearTimeout(timeout);
-      const msg = e instanceof Error ? e.message : String(e);
-      await logToErrorLog(supabase, `Apify request failed: ${msg}`, "apify-error");
-      return new Response(JSON.stringify({ error: `Apify request failed: ${msg}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    clearTimeout(timeout);
-
-    if (!apifyResponse.ok) {
-      const errorText = await apifyResponse.text().catch(() => "unknown");
-      await logToErrorLog(supabase, `Apify HTTP ${apifyResponse.status}: ${errorText.slice(0, 500)}`, "apify-error");
-      return new Response(JSON.stringify({ error: `Apify returned ${apifyResponse.status}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (!startRes.ok) {
+      const errorText = await startRes.text().catch(() => "unknown");
+      await logToErrorLog(supabase, `Apify start failed HTTP ${startRes.status}: ${errorText.slice(0, 500)}`, "apify-error");
+      return new Response(JSON.stringify({ error: `Apify start returned ${startRes.status}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const items = await apifyResponse.json();
+    const runData = await startRes.json();
+    const runId = runData.data?.id;
+    const datasetId = runData.data?.defaultDatasetId;
+    if (!runId || !datasetId) {
+      await logToErrorLog(supabase, `No runId/datasetId in response: ${JSON.stringify(runData).slice(0, 500)}`, "apify-error");
+      return new Response(JSON.stringify({ error: "Missing runId from Apify" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    await logToErrorLog(supabase, `Run started: runId=${runId} datasetId=${datasetId}`, "debug");
+
+    // Step 2: Poll for completion (max ~4 minutes)
+    const maxPolls = 24;
+    const pollInterval = 10_000; // 10 seconds
+    let runStatus = "";
+
+    for (let i = 0; i < maxPolls; i++) {
+      await delay(pollInterval);
+      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+      if (!statusRes.ok) continue;
+      const statusData = await statusRes.json();
+      runStatus = statusData.data?.status || "";
+      if (runStatus === "SUCCEEDED" || runStatus === "FAILED" || runStatus === "ABORTED" || runStatus === "TIMED-OUT") break;
+    }
+
+    if (runStatus !== "SUCCEEDED") {
+      await logToErrorLog(supabase, `Apify run ended with status: ${runStatus || "TIMEOUT"}`, "apify-error");
+      return new Response(JSON.stringify({ error: `Apify run status: ${runStatus || "TIMEOUT"}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Step 3: Fetch dataset items
+    const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json`);
+    if (!datasetRes.ok) {
+      await logToErrorLog(supabase, `Dataset fetch failed: HTTP ${datasetRes.status}`, "apify-error");
+      return new Response(JSON.stringify({ error: "Failed to fetch dataset" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const items = await datasetRes.json();
     if (!Array.isArray(items)) {
-      await logToErrorLog(supabase, "Apify response is not an array", "apify-error");
-      return new Response(JSON.stringify({ error: "Invalid Apify response" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      await logToErrorLog(supabase, "Dataset response is not an array", "apify-error");
+      return new Response(JSON.stringify({ error: "Invalid dataset response" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const posts = items.filter((item: any) => item.dataType === "post");
@@ -168,20 +186,14 @@ Deno.serve(async (req) => {
       const body = post.body || "";
       const fullText = `${title} ${body}`;
 
-      if (!isEnglish(fullText)) {
-        summary.langSkipped++;
-        continue;
-      }
+      if (!isEnglish(fullText)) { summary.langSkipped++; continue; }
 
       const matchedSlugs = matchModels(fullText, post.communityName);
       if (matchedSlugs.length === 0) continue;
       summary.filtered++;
 
       const sourceUrl = post.url || "";
-      if (!sourceUrl || existingUrls.has(sourceUrl)) {
-        summary.duplicateSkipped++;
-        continue;
-      }
+      if (!sourceUrl || existingUrls.has(sourceUrl)) { summary.duplicateSkipped++; continue; }
 
       const classification = await classifyPost(fullText, lovableApiKey);
       summary.classified++;
