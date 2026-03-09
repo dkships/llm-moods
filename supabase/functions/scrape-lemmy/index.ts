@@ -80,12 +80,24 @@ const CLASSIFY_PROMPT = `You are analyzing a social media post to determine if i
 
 Step 1 — RELEVANCE: Is this post actually about the user's experience with an AI model's quality, performance, or behavior? Posts about AI news, company business decisions, stock prices, hiring, or general AI discussion WITHOUT a quality opinion are NOT relevant.
 
-Step 2 — If relevant, classify sentiment and complaint type.
+Step 2 — If relevant, classify sentiment and complaint type. Complaint categories:
+- lazy_responses: Short, low-effort, truncated, or incomplete answers
+- hallucinations: Making up facts, citations, or code that doesn't exist
+- refusals: Refusing reasonable requests, over-cautious safety filtering
+- coding_quality: Producing buggy, outdated, or non-working code
+- speed: Slow response times, high latency
+- general_drop: Vague "it got worse" without specifics
+- pricing_value: Complaints about cost, token pricing, plan limits, value for money
+- censorship: Over-filtering, nanny behavior, political bias, ideological slant in responses
+- context_window: Forgetting context, losing thread in long conversations, ignoring earlier instructions
+- api_reliability: API errors, timeouts, rate limits, downtime, 500 errors
+- multimodal_quality: Poor image generation/understanding, voice issues, file handling problems
+- reasoning: Logic errors, math mistakes, poor analysis (distinct from hallucinations — the model reasons badly rather than inventing facts)
 
 Also return a "confidence" field between 0.0 and 1.0 indicating how confident you are in this classification. 1.0 = clearly about this model with clear sentiment. 0.5 = ambiguous or could go either way. 0.0 = random guess.
 
 Return ONLY valid JSON:
-{"relevant": true/false, "sentiment": "positive"/"negative"/"neutral", "complaint_category": "lazy_responses"/"hallucinations"/"refusals"/"coding_quality"/"speed"/"general_drop"/null, "confidence": 0.0-1.0}
+{"relevant": true/false, "sentiment": "positive"/"negative"/"neutral", "complaint_category": "lazy_responses"/"hallucinations"/"refusals"/"coding_quality"/"speed"/"general_drop"/"pricing_value"/"censorship"/"context_window"/"api_reliability"/"multimodal_quality"/"reasoning"/null, "confidence": 0.0-1.0}
 
 If relevant is false, sentiment and complaint_category should be null.
 Classify as neutral ONLY if genuinely no opinion is expressed. When in doubt between neutral and negative, lean negative. When in doubt between neutral and positive, lean positive.

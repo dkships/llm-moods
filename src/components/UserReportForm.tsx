@@ -17,6 +17,12 @@ const CATEGORIES = [
   { value: "coding_quality", label: "Bad coding quality" },
   { value: "speed", label: "Slow responses" },
   { value: "general_drop", label: "General quality drop" },
+  { value: "pricing_value", label: "Pricing / value" },
+  { value: "censorship", label: "Censorship / over-filtering" },
+  { value: "context_window", label: "Forgetting context" },
+  { value: "api_reliability", label: "API errors / downtime" },
+  { value: "multimodal_quality", label: "Multimodal issues" },
+  { value: "reasoning", label: "Logic / reasoning errors" },
 ];
 
 interface Props {
