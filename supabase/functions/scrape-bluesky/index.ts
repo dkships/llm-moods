@@ -7,8 +7,8 @@ const corsHeaders = {
 };
 
 const SEARCH_TERMS = [
-  "Claude AI", "ChatGPT", "GPT-4", "Gemini AI", "Grok AI", "DeepSeek",
-  "Claude dumb", "ChatGPT worse", "Claude lazy", "DeepSeek dumb", "DeepSeek worse",
+  "Claude AI", "ChatGPT", "GPT-5", "Gemini AI", "Grok AI", "DeepSeek",
+  "Claude dumb", "ChatGPT worse", "DeepSeek",
 ];
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
@@ -34,7 +34,7 @@ function matchModels(text: string): string[] {
   return matched;
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 10000): Promise<Response> {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -80,15 +80,49 @@ async function logToErrorLog(supabase: any, functionName: string, errorMessage: 
   }
 }
 
+async function authenticateBluesky(handle: string, appPassword: string): Promise<string | null> {
+  try {
+    const res = await fetchWithTimeout("https://bsky.social/xrpc/com.atproto.server.createSession", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier: handle, password: appPassword }),
+    });
+    if (!res.ok) {
+      const errorText = await res.text();
+      console.error("Bluesky auth failed:", res.status, errorText);
+      return null;
+    }
+    const data = await res.json();
+    return data.accessJwt || null;
+  } catch (e) {
+    console.error("Bluesky auth error:", e);
+    return null;
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  try {
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
-    // Health check log
-    await supabase.from("error_log").insert({ function_name: "scrape-bluesky", error_message: "Function started", context: "health-check" });
+  try {
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+    const blueskyHandle = Deno.env.get("BLUESKY_HANDLE");
+    const blueskyAppPassword = Deno.env.get("BLUESKY_APP_PASSWORD");
+
+    if (!blueskyHandle || !blueskyAppPassword) {
+      await logToErrorLog(supabase, "scrape-bluesky", "Missing BLUESKY_HANDLE or BLUESKY_APP_PASSWORD secrets", "auth");
+      return new Response(JSON.stringify({ error: "Missing Bluesky credentials" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    // Authenticate with Bluesky
+    const accessJwt = await authenticateBluesky(blueskyHandle, blueskyAppPassword);
+    if (!accessJwt) {
+      await logToErrorLog(supabase, "scrape-bluesky", "Failed to authenticate with Bluesky", "auth");
+      return new Response(JSON.stringify({ error: "Bluesky authentication failed" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    await logToErrorLog(supabase, "scrape-bluesky", "Successfully authenticated with Bluesky", "health-check");
 
     const { data: models } = await supabase.from("models").select("id, slug");
     const modelMap: Record<string, string> = {};
@@ -102,13 +136,20 @@ Deno.serve(async (req) => {
 
     for (let i = 0; i < SEARCH_TERMS.length; i++) {
       const term = SEARCH_TERMS[i];
-      if (i > 0) await delay(1000);
+      if (i > 0) await delay(1000); // 1 second delay between requests
 
       try {
-        const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(term)}&limit=25&sort=latest`;
-        const res = await fetchWithTimeout(url, { headers: { "User-Agent": "llmvibes:v1.0", "Accept": "application/json" } });
+        const url = `https://bsky.social/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(term)}&limit=25&sort=latest`;
+        const res = await fetchWithTimeout(url, {
+          headers: {
+            "Authorization": `Bearer ${accessJwt}`,
+            "Accept": "application/json",
+          },
+        });
+
         if (!res.ok) {
-          const msg = `"${term}": HTTP ${res.status}`;
+          const errorText = await res.text();
+          const msg = `"${term}": HTTP ${res.status} - ${errorText.slice(0, 100)}`;
           summary.errors.push(msg);
           await logToErrorLog(supabase, "scrape-bluesky", `Bluesky search failed: ${msg}`, term);
           continue;
@@ -158,11 +199,10 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, "scrape-bluesky", `Successfully scraped ${summary.inserted} posts from bluesky`, `fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified}`);
+    await logToErrorLog(supabase, "scrape-bluesky", `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted}`, "summary");
 
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
     const msg = e instanceof Error ? e.message : "Unknown";
     await logToErrorLog(supabase, "scrape-bluesky", msg, "top-level error");
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
