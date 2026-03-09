@@ -17,6 +17,13 @@ const MODEL_KEYWORDS: Record<string, string[]> = {
 const BROAD_AI_KEYWORDS = ["llm", "large language model", "ai model", "copilot", "ai coding", "language model"];
 const AI_TAGS = ["ai", "ml", "llm", "machine-learning"];
 
+function isEnglish(text: string): boolean {
+  const noWhitespace = text.replace(/\s/g, "");
+  if (noWhitespace.length < 5) return true;
+  const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
+  return latinCount / noWhitespace.length >= 0.6;
+}
+
 function matchModels(text: string): string[] {
   const lower = text.toLowerCase();
   const matched: string[] = [];
