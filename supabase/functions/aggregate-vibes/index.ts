@@ -136,13 +136,15 @@ interface ScoreResult {
   top_complaint: string | null;
 }
 
-function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null }[]): ScoreResult {
+function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null; score: number | null }[]): ScoreResult {
   let positiveW = 0, negativeW = 0, neutralW = 0;
   let positiveC = 0, negativeC = 0, neutralC = 0;
   const complaints: Record<string, number> = {};
 
   for (const p of posts) {
-    const w = Math.max(0, Math.min(1, p.confidence ?? 0.5));
+    const conf = Math.max(0, Math.min(1, p.confidence ?? 0.5));
+    const engagement = (p.score && p.score > 0) ? Math.log(p.score + 1) : 1.0;
+    const w = conf * engagement;
     if (p.sentiment === "positive") { positiveW += w; positiveC++; }
     else if (p.sentiment === "negative") {
       negativeW += w; negativeC++;
