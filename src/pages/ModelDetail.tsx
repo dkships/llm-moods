@@ -76,10 +76,24 @@ const ModelDetail = () => {
     );
   }
 
-  const chartData = (vibesHistory || []).map((v, i) => ({
-    day: timeRange === "24h" ? `${i}h` : `Day ${i + 1}`,
-    score: v.score,
-  }));
+  const chartData = (vibesHistory || []).map((v, i, arr) => {
+    const isLast = i === arr.length - 1;
+    const date = new Date(v.period_start);
+    let label: string;
+    if (isLast) {
+      label = timeRange === "24h" ? "Now" : "Today";
+    } else if (timeRange === "24h") {
+      const h = date.getHours();
+      const suffix = h >= 12 ? "pm" : "am";
+      const h12 = h % 12 || 12;
+      label = `${h12}${suffix}`;
+    } else if (timeRange === "7d") {
+      label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    } else {
+      label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+    return { day: label, score: v.score };
+  });
 
   return (
     <PageTransition>
@@ -148,7 +162,7 @@ const ModelDetail = () => {
                           tick={{ fill: "hsl(220 10% 50%)", fontSize: 10 }}
                           axisLine={false}
                           tickLine={false}
-                          interval={timeRange === "30d" ? 4 : timeRange === "7d" ? 0 : 3}
+                          interval={timeRange === "30d" ? Math.max(Math.floor(chartData.length / 5) - 1, 0) : timeRange === "7d" ? 0 : Math.max(Math.floor(chartData.length / 5) - 1, 0)}
                         />
                         <YAxis
                           domain={[20, 100]}
