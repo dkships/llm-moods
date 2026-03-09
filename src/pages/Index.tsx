@@ -40,21 +40,24 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
   ({ m, i, onHover }, ref) => {
     const vibe = getVibeStatus(m.latestScore);
     const VibeIcon = vibe.icon;
-    const accent = m.accent_color || "#888";
+    const brandColor = m.accent_color || "#888";
     return (
       <Link ref={ref} to={`/model/${m.slug}`} onMouseEnter={() => onHover(m.slug, m.id)}>
         <motion.div
           variants={fadeUp}
           custom={i}
           className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer group hover:-translate-y-1 h-full"
-          whileHover={{ boxShadow: `0 0 20px ${accent}20, 0 8px 30px ${accent}10` }}
+          whileHover={{ boxShadow: `0 0 20px ${vibe.color}20, 0 8px 30px ${vibe.color}10` }}
         >
-          <div className="h-1" style={{ background: accent }} />
+          <div className="h-1" style={{ background: vibe.color }} />
           <div className="p-5">
-            <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: brandColor }} />
+              <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
+            </div>
             <div className="mt-3 flex items-center gap-2">
-              <VibeIcon className="h-5 w-5" style={{ color: accent }} />
-              <span className="font-mono text-sm text-foreground">{vibe.label}</span>
+              <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
+              <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
             </div>
             <div className="mt-3 flex items-center justify-between">
               <TrendIcon trend={m.trend.direction} />

@@ -35,7 +35,7 @@ LastUpdatedTimer.displayName = "LastUpdatedTimer";
 const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }) => {
   const vibe = getVibeStatus(m.latestScore);
   const VibeIcon = vibe.icon;
-  const accent = m.accent_color || "#888";
+  const brandColor = m.accent_color || "#888";
 
   return (
     <Link
@@ -47,16 +47,19 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
         variants={fadeUp}
         custom={i}
         className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer h-full hover:-translate-y-1"
-        whileHover={{ boxShadow: `0 0 24px ${accent}25, 0 8px 32px ${accent}15` }}
+        whileHover={{ boxShadow: `0 0 24px ${vibe.color}25, 0 8px 32px ${vibe.color}15` }}
       >
-        <div className="h-1" style={{ background: accent }} />
+        <div className="h-1" style={{ background: vibe.color }} />
         <div className="p-6">
           <div className="flex items-start justify-between">
             <div>
-              <p className="font-display text-base font-semibold text-foreground">{m.name}</p>
+              <div className="flex items-center gap-2">
+                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: brandColor }} />
+                <p className="font-display text-base font-semibold text-foreground">{m.name}</p>
+              </div>
               <div className="mt-2 flex items-center gap-2">
-                <VibeIcon className="h-5 w-5" style={{ color: accent }} />
-                <span className="font-mono text-sm text-foreground">{vibe.label}</span>
+                <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
+                <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
               </div>
             </div>
             <div className="text-right">
@@ -78,7 +81,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
           {m.sparkline.length > 1 && (
             <div className="mt-4 h-12" aria-hidden="true">
               <Suspense fallback={<div className="h-12 animate-pulse rounded bg-secondary/40" />}>
-                <LazySparkline data={m.sparkline} accent={accent} />
+                <LazySparkline data={m.sparkline} accent={vibe.color} />
               </Suspense>
             </div>
           )}
