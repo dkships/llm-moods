@@ -162,6 +162,12 @@ Deno.serve(async (req) => {
     for (const item of items) {
       if (!item || item.type !== "story" || !item.title) continue;
 
+      // Language filter
+      if (!isEnglish(item.title)) {
+        summary.langSkipped++;
+        continue;
+      }
+
       const matchedSlugs = matchModels(item.title, item.url);
       if (matchedSlugs.length === 0) continue;
       summary.filtered++;
