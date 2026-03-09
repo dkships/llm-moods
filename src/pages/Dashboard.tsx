@@ -7,6 +7,7 @@ import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
 import Footer from "@/components/Footer";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useModelsWithLatestVibes, useRecentChatter } from "@/hooks/useVibesData";
 import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, SOURCE_LABELS } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
@@ -48,6 +49,7 @@ const Dashboard = () => {
                 Data updates every hour
               </span>
             </div>
+            <p className="mt-2 text-sm text-muted-foreground">Real-time AI model sentiment from Bluesky, Mastodon, and Hacker News.</p>
           </motion.div>
         </section>
 
@@ -87,7 +89,16 @@ const Dashboard = () => {
                             </div>
                           </div>
                           <div className="text-right">
-                            <p className="text-4xl font-bold font-mono text-foreground">{m.latestScore}</p>
+                            <TooltipProvider>
+                              <Tooltip>
+                                <TooltipTrigger asChild>
+                                  <p className="text-4xl font-bold font-mono text-foreground cursor-help">{m.latestScore}</p>
+                                </TooltipTrigger>
+                                <TooltipContent side="left" className="text-xs font-mono">
+                                  0 = everyone's complaining, 100 = pure good vibes
+                                </TooltipContent>
+                              </Tooltip>
+                            </TooltipProvider>
                             <p className="text-xs text-muted-foreground font-mono mt-0.5">/ 100</p>
                           </div>
                         </div>

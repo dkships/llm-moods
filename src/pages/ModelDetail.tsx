@@ -117,7 +117,7 @@ const ModelDetail = () => {
               </div>
             </div>
             <p className="mt-2 text-sm text-muted-foreground font-mono">
-              Based on {totalPosts.toLocaleString()} posts in the last 24 hours
+              Sentiment based on {totalPosts.toLocaleString()} posts from the last 24 hours across Bluesky, Mastodon, and Hacker News.
             </p>
           </motion.div>
         </section>
