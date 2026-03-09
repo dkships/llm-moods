@@ -110,6 +110,40 @@ const ModelCard = memo(({ m, i, onHover }: { m: any; i: number; onHover: (slug: 
 });
 ModelCard.displayName = "ModelCard";
 
+/** Data freshness indicator with color coding */
+const DataFreshnessIndicator = memo(() => {
+  const { data: lastScraped } = useDataFreshness();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!lastScraped) return;
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, [lastScraped]);
+
+  if (!lastScraped) return null;
+
+  const diffMs = Date.now() - new Date(lastScraped).getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  let colorClass = "text-muted-foreground";
+  let dotClass = "bg-primary/50";
+  if (diffHours > 6) {
+    colorClass = "text-destructive";
+    dotClass = "bg-destructive";
+  } else if (diffHours > 1) {
+    colorClass = "text-yellow-500";
+    dotClass = "bg-yellow-500";
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-mono ${colorClass}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dotClass} ${diffHours <= 1 ? "animate-pulse" : ""}`} />
+      Data updated {formatTimeAgo(lastScraped)}
+    </span>
+  );
+});
+DataFreshnessIndicator.displayName = "DataFreshnessIndicator";
+
 const Dashboard = () => {
   usePageTitle("Dashboard — LLM Vibes");
   const { data: models, isLoading: modelsLoading } = useModelsWithLatestVibes();
@@ -137,11 +171,6 @@ const Dashboard = () => {
     month: "long",
     day: "numeric",
   });
-
-  const latestUpdated = models?.reduce((newest, m) => {
-    if (!m.lastUpdated) return newest;
-    return !newest || new Date(m.lastUpdated) > new Date(newest) ? m.lastUpdated : newest;
-  }, null as string | null) ?? null;
 
   const handleHover = useCallback((slug: string, id: string) => {
     prefetch(slug, id);
