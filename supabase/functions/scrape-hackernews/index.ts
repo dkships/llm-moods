@@ -211,7 +211,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, "scrape-hackernews", `Successfully scraped ${summary.inserted} posts from hackernews`, `fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified}`);
+    await logToErrorLog(supabase, "scrape-hackernews", `Successfully scraped ${summary.inserted} posts from hackernews (langSkipped=${summary.langSkipped})`, `fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified}`);
 
     return new Response(JSON.stringify(summary, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
