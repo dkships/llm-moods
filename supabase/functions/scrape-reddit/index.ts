@@ -6,7 +6,6 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// Dedicated subreddits: fetch all recent posts (no keyword needed)
 const DEDICATED_SUBS: Record<string, string> = {
   ClaudeAI: "claude",
   ChatGPT: "chatgpt",
@@ -14,7 +13,6 @@ const DEDICATED_SUBS: Record<string, string> = {
   deepseek: "deepseek",
 };
 
-// General subreddits: search per model keyword
 const GENERAL_SUBS = ["LocalLLaMA", "singularity", "artificial"];
 const GENERAL_SEARCH_TERMS = ["Claude", "ChatGPT", "Gemini", "Grok", "DeepSeek"];
 
@@ -26,7 +24,8 @@ const MODEL_KEYWORDS: Record<string, string[]> = {
   deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
 };
 
-const USER_AGENT = "llmvibes:v1.0 (contact: hello@llmvibes.ai)";
+const BROWSER_UA = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+const PULLPUSH_UA = "llmvibes:v1.0 (contact: hello@llmvibes.ai)";
 const DELAY_MS = 4000;
 
 function matchModels(text: string): string[] {
@@ -89,7 +88,7 @@ async function logToErrorLog(supabase: any, functionName: string, errorMessage: 
   }
 }
 
-interface PullPushPost {
+interface RedditPost {
   title?: string;
   selftext?: string;
   permalink?: string;
@@ -99,21 +98,106 @@ interface PullPushPost {
   subreddit?: string;
 }
 
-async function fetchPullPush(subreddit: string, query: string | null, afterEpoch: number): Promise<PullPushPost[]> {
-  let url = `https://api.pullpush.io/reddit/search/submission/?subreddit=${encodeURIComponent(subreddit)}&sort=desc&size=25&after=${afterEpoch}`;
-  if (query) {
-    url += `&q=${encodeURIComponent(query)}`;
+// Track how many PullPush calls we've made for debug logging
+let debugCallCount = 0;
+
+async function fetchPullPush(
+  supabase: any, subreddit: string, query: string | null, afterEpoch: number
+): Promise<RedditPost[]> {
+  const params = new URLSearchParams({
+    subreddit,
+    sort: "desc",
+    size: "25",
+    after: String(afterEpoch),
+  });
+  if (query) params.set("q", query);
+
+  const url = `https://api.pullpush.io/reddit/search/submission/?${params.toString()}`;
+
+  const shouldLog = debugCallCount < 3;
+  debugCallCount++;
+
+  if (shouldLog) {
+    await logToErrorLog(supabase, "scrape-reddit", `PullPush URL: ${url}`, "debug-url");
   }
-  const res = await fetchWithTimeout(url, { headers: { "User-Agent": USER_AGENT } });
+
+  const res = await fetchWithTimeout(url, { headers: { "User-Agent": PULLPUSH_UA } });
+  const bodyText = await res.text();
+
+  if (shouldLog) {
+    await logToErrorLog(supabase, "scrape-reddit", `PullPush status=${res.status} body=${bodyText.slice(0, 500)}`, "debug-response");
+  }
+
   if (!res.ok) {
     throw new Error(`PullPush HTTP ${res.status} for r/${subreddit}${query ? ` q=${query}` : ""}`);
   }
-  const json = await res.json();
+
+  const json = JSON.parse(bodyText);
   return json?.data || [];
+}
+
+async function fetchOldReddit(
+  supabase: any, subreddit: string, query: string | null
+): Promise<RedditPost[]> {
+  // For old.reddit.com fallback we fetch /new.json or /search.json
+  let url: string;
+  if (query) {
+    url = `https://old.reddit.com/r/${encodeURIComponent(subreddit)}/search.json?q=${encodeURIComponent(query)}&restrict_sr=on&sort=new&t=day&limit=25`;
+  } else {
+    url = `https://old.reddit.com/r/${encodeURIComponent(subreddit)}/new.json?limit=25`;
+  }
+
+  await logToErrorLog(supabase, "scrape-reddit", `Fallback URL: ${url}`, "debug-fallback");
+
+  const res = await fetchWithTimeout(url, { headers: { "User-Agent": BROWSER_UA } });
+  const bodyText = await res.text();
+
+  await logToErrorLog(supabase, "scrape-reddit", `Fallback status=${res.status} body=${bodyText.slice(0, 300)}`, "debug-fallback-response");
+
+  if (!res.ok) {
+    throw new Error(`old.reddit fallback HTTP ${res.status} for r/${subreddit}`);
+  }
+
+  const json = JSON.parse(bodyText);
+  const children = json?.data?.children || [];
+  return children.map((c: any) => ({
+    title: c.data?.title,
+    selftext: c.data?.selftext,
+    permalink: c.data?.permalink,
+    created_utc: c.data?.created_utc,
+    score: c.data?.score,
+    author: c.data?.author,
+    subreddit: c.data?.subreddit,
+  }));
+}
+
+async function fetchRedditPosts(
+  supabase: any, subreddit: string, query: string | null, afterEpoch: number
+): Promise<RedditPost[]> {
+  try {
+    const posts = await fetchPullPush(supabase, subreddit, query, afterEpoch);
+    if (posts.length > 0) return posts;
+    // PullPush returned 0 results — try fallback
+    await logToErrorLog(supabase, "scrape-reddit", `PullPush returned 0 for r/${subreddit}${query ? ` q=${query}` : ""}, trying old.reddit fallback`, "fallback");
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await logToErrorLog(supabase, "scrape-reddit", `PullPush failed: ${msg}, trying old.reddit fallback`, "fallback");
+  }
+
+  try {
+    return await fetchOldReddit(supabase, subreddit, query);
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    await logToErrorLog(supabase, "scrape-reddit", `Fallback also failed: ${msg}`, "fallback-error");
+    return [];
+  }
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // Reset debug counter each invocation
+  debugCallCount = 0;
 
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -129,13 +213,12 @@ Deno.serve(async (req) => {
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "reddit");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
-    const afterEpoch = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
+    const afterEpoch = Math.floor(Date.now() / 1000) - 86400; // Unix seconds, 24h ago
     const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, errors: [] as string[] };
     const seenPermalinks = new Set<string>();
     let requestCount = 0;
 
-    // Helper to process a batch of posts
-    async function processPosts(posts: PullPushPost[], defaultSlug?: string) {
+    async function processPosts(posts: RedditPost[], defaultSlug?: string) {
       for (const post of posts) {
         const permalink = post.permalink || "";
         if (!permalink || seenPermalinks.has(permalink)) continue;
@@ -143,11 +226,7 @@ Deno.serve(async (req) => {
 
         const text = `${post.title || ""} ${post.selftext || ""}`;
         let matchedSlugs = defaultSlug ? [defaultSlug] : matchModels(text);
-        if (!defaultSlug) {
-          // For general subs, also run model matching
-          if (matchedSlugs.length === 0) continue;
-        }
-        // For dedicated subs, also check if other models are mentioned
+        if (!defaultSlug && matchedSlugs.length === 0) continue;
         if (defaultSlug) {
           const additional = matchModels(text);
           for (const s of additional) {
@@ -185,35 +264,23 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 1. Dedicated subreddits — fetch all recent, no keyword filter
+    // 1. Dedicated subreddits
     for (const [sub, defaultSlug] of Object.entries(DEDICATED_SUBS)) {
       if (requestCount > 0) await delay(DELAY_MS);
-      try {
-        const posts = await fetchPullPush(sub, null, afterEpoch);
-        requestCount++;
-        summary.fetched += posts.length;
-        await processPosts(posts, defaultSlug);
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        summary.errors.push(msg);
-        await logToErrorLog(supabase, "scrape-reddit", msg, `dedicated r/${sub}`);
-      }
+      const posts = await fetchRedditPosts(supabase, sub, null, afterEpoch);
+      requestCount++;
+      summary.fetched += posts.length;
+      await processPosts(posts, defaultSlug);
     }
 
-    // 2. General subreddits — search per model term
+    // 2. General subreddits
     for (const sub of GENERAL_SUBS) {
       for (const term of GENERAL_SEARCH_TERMS) {
         if (requestCount > 0) await delay(DELAY_MS);
-        try {
-          const posts = await fetchPullPush(sub, term, afterEpoch);
-          requestCount++;
-          summary.fetched += posts.length;
-          await processPosts(posts);
-        } catch (e) {
-          const msg = e instanceof Error ? e.message : String(e);
-          summary.errors.push(msg);
-          await logToErrorLog(supabase, "scrape-reddit", msg, `general r/${sub} q=${term}`);
-        }
+        const posts = await fetchRedditPosts(supabase, sub, term, afterEpoch);
+        requestCount++;
+        summary.fetched += posts.length;
+        await processPosts(posts);
       }
     }
 
