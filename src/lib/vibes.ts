@@ -13,6 +13,8 @@ export const SOURCE_LABELS: Record<string, string> = {
   reddit: "Reddit",
   hackernews: "Hacker News",
   bluesky: "Bluesky",
+  mastodon: "Mastodon",
+  lobsters: "Lobsters",
 };
 
 export const SENTIMENT_STYLES: Record<string, { label: string; classes: string }> = {
