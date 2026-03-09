@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function useModelsWithLatestVibes() {
   return useQuery({
     queryKey: ["models-with-vibes"],
+    refetchInterval: 60_000,
     queryFn: async () => {
       const { data: models, error: mErr } = await supabase
         .from("models")
