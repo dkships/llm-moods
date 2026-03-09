@@ -1,0 +1,1 @@
+ALTER TABLE public.scraped_posts ADD COLUMN IF NOT EXISTS is_backfill boolean DEFAULT false;
