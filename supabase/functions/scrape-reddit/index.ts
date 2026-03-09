@@ -167,6 +167,9 @@ Deno.serve(async (req) => {
 
     await logToErrorLog(supabase, "scrape-reddit", "JSON API scraper started", "health-check");
 
+    // Load config from database
+    const { subreddits, dedicatedSlugs } = await loadConfig(supabase);
+
     const { data: models } = await supabase.from("models").select("id, slug");
     const modelMap: Record<string, string> = {};
     for (const m of models || []) modelMap[m.slug] = m.id;
@@ -178,7 +181,7 @@ Deno.serve(async (req) => {
     const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, comments_classified: 0, errors: [] as string[] };
     let reqIdx = 0;
 
-    for (const sub of SUBREDDITS) {
+    for (const sub of subreddits) {
       if (reqIdx > 0) await delay(DELAY_MS);
       reqIdx++;
 
