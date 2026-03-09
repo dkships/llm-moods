@@ -6,7 +6,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const HASHTAGS = ["chatgpt", "claude", "gemini", "grok", "deepseek", "llm", "openai", "anthropic", "perplexity"];
+const INSTANCES = ["mastodon.social", "mastodon.online", "techhub.social", "sigmoid.social"];
+const HASHTAGS = ["chatgpt", "claudeai", "gemini", "grok", "deepseek", "llm", "aitools"];
+
+const SEARCH_QUERIES = [
+  "Claude AI", "ChatGPT", "GPT dumber", "Claude worse", "Gemini bad", "AI getting worse",
+];
+const SEARCH_INSTANCE = "mastodon.social";
 
 interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }
 
@@ -57,20 +63,8 @@ function stripUrls(text: string): string {
   return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
 }
 
-function meetsMinLength(title: string, content: string): boolean {
-  return stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim().length >= 20;
-}
-
-async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
-  const since = new Date(Date.now() - 48 * 3600000).toISOString();
-  const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
-  const keys = new Set<string>();
-  for (const p of data || []) if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
-  return keys;
-}
-
-function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
-  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+function meetsMinLength(content: string): boolean {
+  return stripUrls(content).replace(/\s+/g, " ").trim().length >= 20;
 }
 
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
@@ -126,6 +120,28 @@ async function classifyPost(text: string, apiKey: string): Promise<{ relevant: b
   } catch { return { relevant: true, sentiment: "neutral", complaint_category: null, confidence: 0.5 }; }
 }
 
+async function fetchWithTimeout(url: string, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
+    return res;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+interface Status {
+  id: string;
+  content: string;
+  created_at: string;
+  url: string;
+  favourites_count: number;
+  reblogs_count: number;
+  language: string | null;
+  account?: { acct?: string };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -133,81 +149,98 @@ Deno.serve(async (req) => {
 
   try {
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
-    await logToErrorLog(supabase, "Mastodon scraper started (v2 - tiered matching)", "health-check");
+    await logToErrorLog(supabase, "Mastodon scraper started (v3 - multi-instance + search)", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "mastodon");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
-    const titleKeys = await loadRecentTitleKeys(supabase);
 
     const cutoff = new Date(Date.now() - 24 * 3600000);
     const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, irrelevant: 0, langSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
-    let reqIdx = 0;
 
-    for (const hashtag of HASHTAGS) {
-      if (reqIdx > 0) await delay(1000);
-      reqIdx++;
+    // Collect all statuses, deduped by URL
+    const allStatuses = new Map<string, Status>();
 
-      try {
-        const url = `https://mastodon.social/api/v1/timelines/tag/${hashtag}?limit=40`;
-        const res = await fetch(url, { headers: { Accept: "application/json" } });
-        if (!res.ok) { summary.errors.push(`#${hashtag}: HTTP ${res.status}`); continue; }
-
-        const statuses = await res.json();
-        if (!Array.isArray(statuses)) continue;
-        summary.fetched += statuses.length;
-
-        for (const status of statuses) {
-          const createdAt = new Date(status.created_at);
-          if (createdAt < cutoff) continue;
-
-          const lang = status.language;
-          if (lang && lang !== "en" && !lang.startsWith("en")) { summary.langSkipped++; continue; }
-
-          const content = stripHtml(status.content || "");
-          if (!isEnglish(content)) { summary.langSkipped++; continue; }
-          if (!meetsMinLength(content, "")) { summary.contentSkipped++; continue; }
-
-          const matchedSlugs = matchModels(content, keywords);
-          if (matchedSlugs.length === 0) continue;
-          summary.filtered++;
-
-          const sourceUrl = status.url || "";
-          if (!sourceUrl || existingUrls.has(sourceUrl)) continue;
-
-          let allDuped = true;
-          for (const slug of matchedSlugs) {
-            const modelId = modelMap[slug];
-            if (modelId && !isDuplicate(titleKeys, content.slice(0, 120), modelId)) { allDuped = false; break; }
+    // Phase 1: Hashtag timelines across all instances
+    for (const instance of INSTANCES) {
+      for (const hashtag of HASHTAGS) {
+        await delay(1000);
+        try {
+          const url = `https://${instance}/api/v1/timelines/tag/${hashtag}?limit=40`;
+          const res = await fetchWithTimeout(url);
+          if (!res.ok) { summary.errors.push(`${instance}/#${hashtag}: HTTP ${res.status}`); continue; }
+          const statuses: Status[] = await res.json();
+          if (!Array.isArray(statuses)) continue;
+          for (const s of statuses) {
+            if (s.url && !allStatuses.has(s.url)) allStatuses.set(s.url, s);
           }
-          if (allDuped) { summary.dedupSkipped++; continue; }
-
-          const classification = await classifyPost(content, lovableApiKey);
-          summary.classified++;
-          if (!classification.relevant) { summary.irrelevant++; continue; }
-
-          for (const slug of matchedSlugs) {
-            const modelId = modelMap[slug];
-            if (!modelId || isDuplicate(titleKeys, content.slice(0, 120), modelId)) continue;
-            const { error } = await supabase.from("scraped_posts").insert({
-              model_id: modelId, source: "mastodon", source_url: sourceUrl,
-              title: content.slice(0, 120), content: content.slice(0, 2000),
-              sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-              confidence: classification.confidence, content_type: "full_content",
-              score: (status.reblogs_count || 0) + (status.favourites_count || 0),
-              posted_at: status.created_at,
-            });
-            if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
-              summary.inserted++;
-              existingUrls.add(sourceUrl);
-              titleKeys.add(`${modelId}:${content.slice(0, 80).toLowerCase()}`);
-            }
-          }
+        } catch (e) {
+          summary.errors.push(`${instance}/#${hashtag}: ${e instanceof Error ? e.message : String(e)}`);
         }
-      } catch (e) { summary.errors.push(`#${hashtag}: ${e instanceof Error ? e.message : String(e)}`); }
+      }
     }
 
-    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted}`, "summary");
+    // Phase 2: Search queries on mastodon.social
+    for (const query of SEARCH_QUERIES) {
+      await delay(1000);
+      try {
+        const url = `https://${SEARCH_INSTANCE}/api/v2/search?q=${encodeURIComponent(query)}&type=statuses&limit=20`;
+        const res = await fetchWithTimeout(url);
+        if (!res.ok) { summary.errors.push(`search "${query}": HTTP ${res.status}`); continue; }
+        const result = await res.json();
+        const statuses: Status[] = result.statuses || [];
+        for (const s of statuses) {
+          if (s.url && !allStatuses.has(s.url)) allStatuses.set(s.url, s);
+        }
+      } catch (e) {
+        summary.errors.push(`search "${query}": ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    summary.fetched = allStatuses.size;
+
+    // Phase 3: Process all collected statuses
+    for (const [sourceUrl, status] of allStatuses) {
+      const createdAt = new Date(status.created_at);
+      if (createdAt < cutoff) continue;
+
+      const lang = status.language;
+      if (lang && lang !== "en" && !lang.startsWith("en")) { summary.langSkipped++; continue; }
+
+      const content = stripHtml(status.content || "");
+      if (!isEnglish(content)) { summary.langSkipped++; continue; }
+      if (!meetsMinLength(content)) { summary.contentSkipped++; continue; }
+
+      const matchedSlugs = matchModels(content, keywords);
+      if (matchedSlugs.length === 0) continue;
+      summary.filtered++;
+
+      if (existingUrls.has(sourceUrl)) { summary.dedupSkipped++; continue; }
+
+      const classification = await classifyPost(content, lovableApiKey);
+      summary.classified++;
+      if (!classification.relevant) { summary.irrelevant++; continue; }
+
+      const score = (status.favourites_count || 0) + (status.reblogs_count || 0);
+
+      for (const slug of matchedSlugs) {
+        const modelId = modelMap[slug];
+        if (!modelId) continue;
+        const { error } = await supabase.from("scraped_posts").insert({
+          model_id: modelId, source: "mastodon", source_url: sourceUrl,
+          title: content.slice(0, 120), content: content.slice(0, 2000),
+          sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+          confidence: classification.confidence, content_type: "full_content",
+          score, posted_at: status.created_at,
+        });
+        if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
+          summary.inserted++;
+          existingUrls.add(sourceUrl);
+        }
+      }
+    }
+
+    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} errors=${summary.errors.length}`, "summary");
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown";
