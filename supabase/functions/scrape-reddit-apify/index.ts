@@ -1,0 +1,216 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+};
+
+const SUBREDDIT_MODEL_MAP: Record<string, string> = {
+  "r/ClaudeAI": "claude",
+  "r/claudeai": "claude",
+  "r/ChatGPT": "chatgpt",
+  "r/chatgpt": "chatgpt",
+  "r/GoogleGemini": "gemini",
+  "r/googlegemini": "gemini",
+  "r/deepseek": "deepseek",
+  "r/Deepseek": "deepseek",
+};
+
+const MODEL_KEYWORDS: Record<string, string[]> = {
+  claude: ["claude", "sonnet", "opus", "anthropic"],
+  chatgpt: ["chatgpt", "gpt-5", "gpt-4", "gpt-4o", "gpt", "openai"],
+  gemini: ["gemini", "gemini pro", "google ai"],
+  grok: ["grok", "grok 4", "xai"],
+  deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
+};
+
+function matchModels(text: string, communityName?: string): string[] {
+  const matched: string[] = [];
+
+  // Auto-assign from dedicated subreddit
+  if (communityName) {
+    const subSlug = SUBREDDIT_MODEL_MAP[communityName];
+    if (subSlug && !matched.includes(subSlug)) matched.push(subSlug);
+  }
+
+  // Keyword matching
+  const lower = text.toLowerCase();
+  for (const [slug, keywords] of Object.entries(MODEL_KEYWORDS)) {
+    if (matched.includes(slug)) continue;
+    for (const kw of keywords) {
+      const regex = new RegExp(`\\b${kw.replace("-", "[-\\s]?")}\\b`, "i");
+      if (regex.test(lower)) {
+        matched.push(slug);
+        break;
+      }
+    }
+  }
+  return matched;
+}
+
+function isEnglish(text: string): boolean {
+  const noWhitespace = text.replace(/\s/g, "");
+  if (noWhitespace.length < 5) return true;
+  const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
+  return latinCount / noWhitespace.length >= 0.6;
+}
+
+async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
+  try {
+    await supabase.from("error_log").insert({ function_name: "scrape-reddit-apify", error_message: msg, context: ctx || null });
+  } catch {}
+}
+
+async function classifyPost(text: string, apiKey: string): Promise<{ sentiment: string; complaint_category: string | null }> {
+  const truncated = text.slice(0, 500);
+  const prompt = `Classify this social media post about an AI model. Return ONLY valid JSON with two fields: sentiment (positive/negative/neutral) and complaint_category (lazy_responses/hallucinations/refusals/coding_quality/speed/general_drop or null if not negative). Classify as neutral ONLY if the post is purely factual news with zero opinion expressed. Most social media posts express some sentiment — when in doubt, choose positive or negative, not neutral. Posts with any emotional language, slang, sarcasm, or subjective judgment should NOT be neutral. Post: ${truncated}`;
+  try {
+    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages: [{ role: "user", content: prompt }] }),
+    });
+    if (!res.ok) return { sentiment: "neutral", complaint_category: null };
+    const data = await res.json();
+    const raw = data.choices?.[0]?.message?.content || "";
+    const jsonMatch = raw.match(/\{[\s\S]*?\}/);
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0]);
+      return { sentiment: parsed.sentiment || "neutral", complaint_category: parsed.complaint_category || null };
+    }
+    return { sentiment: "neutral", complaint_category: null };
+  } catch { return { sentiment: "neutral", complaint_category: null }; }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+  try {
+    const apifyToken = Deno.env.get("APIFY_API_TOKEN");
+    if (!apifyToken) {
+      await logToErrorLog(supabase, "APIFY_API_TOKEN not configured", "config-error");
+      return new Response(JSON.stringify({ error: "APIFY_API_TOKEN not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+    await logToErrorLog(supabase, "Reddit Apify scraper started", "health-check");
+
+    // Call Apify Reddit Scraper Lite
+    const apifyUrl = `https://api.apify.com/v2/acts/trudax~reddit-scraper-lite/run-sync-get-dataset-items?token=${apifyToken}`;
+    const apifyInput = {
+      startUrls: [
+        { url: "https://www.reddit.com/r/ClaudeAI/new/" },
+        { url: "https://www.reddit.com/r/ChatGPT/new/" },
+        { url: "https://www.reddit.com/r/LocalLLaMA/new/" },
+        { url: "https://www.reddit.com/r/GoogleGemini/new/" },
+        { url: "https://www.reddit.com/r/deepseek/new/" },
+        { url: "https://www.reddit.com/r/artificial/new/" },
+      ],
+      maxItems: 50,
+      maxPostCount: 10,
+      maxComments: 0,
+      skipComments: true,
+      proxy: { useApifyProxy: true },
+    };
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 120_000);
+
+    let apifyResponse: Response;
+    try {
+      apifyResponse = await fetch(apifyUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(apifyInput),
+        signal: controller.signal,
+      });
+    } catch (e) {
+      clearTimeout(timeout);
+      const msg = e instanceof Error ? e.message : String(e);
+      await logToErrorLog(supabase, `Apify request failed: ${msg}`, "apify-error");
+      return new Response(JSON.stringify({ error: `Apify request failed: ${msg}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    clearTimeout(timeout);
+
+    if (!apifyResponse.ok) {
+      const errorText = await apifyResponse.text().catch(() => "unknown");
+      await logToErrorLog(supabase, `Apify HTTP ${apifyResponse.status}: ${errorText.slice(0, 500)}`, "apify-error");
+      return new Response(JSON.stringify({ error: `Apify returned ${apifyResponse.status}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const items = await apifyResponse.json();
+    if (!Array.isArray(items)) {
+      await logToErrorLog(supabase, "Apify response is not an array", "apify-error");
+      return new Response(JSON.stringify({ error: "Invalid Apify response" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const posts = items.filter((item: any) => item.dataType === "post");
+
+    // Load models and existing URLs
+    const { data: models } = await supabase.from("models").select("id, slug");
+    const modelMap: Record<string, string> = {};
+    for (const m of models || []) modelMap[m.slug] = m.id;
+
+    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "reddit");
+    const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
+
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+    const summary = { apifyItems: items.length, apifyPosts: posts.length, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, duplicateSkipped: 0, errors: [] as string[] };
+
+    for (const post of posts) {
+      const createdAt = new Date(post.createdAt);
+      if (createdAt < cutoff) continue;
+
+      const title = post.title || "";
+      const body = post.body || "";
+      const fullText = `${title} ${body}`;
+
+      if (!isEnglish(fullText)) {
+        summary.langSkipped++;
+        continue;
+      }
+
+      const matchedSlugs = matchModels(fullText, post.communityName);
+      if (matchedSlugs.length === 0) continue;
+      summary.filtered++;
+
+      const sourceUrl = post.url || "";
+      if (!sourceUrl || existingUrls.has(sourceUrl)) {
+        summary.duplicateSkipped++;
+        continue;
+      }
+
+      const classification = await classifyPost(fullText, lovableApiKey);
+      summary.classified++;
+
+      for (const slug of matchedSlugs) {
+        const modelId = modelMap[slug];
+        if (!modelId) continue;
+        const { error } = await supabase.from("scraped_posts").insert({
+          model_id: modelId, source: "reddit", source_url: sourceUrl,
+          title: title.slice(0, 120), content: (body || title).slice(0, 2000),
+          sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+          score: post.upVotes || 0,
+          posted_at: post.createdAt,
+        });
+        if (error) {
+          summary.errors.push(`Insert: ${error.message}`);
+        } else {
+          summary.inserted++;
+          existingUrls.add(sourceUrl);
+        }
+      }
+    }
+
+    await logToErrorLog(supabase, `Completed: apifyItems=${summary.apifyItems} apifyPosts=${summary.apifyPosts} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} dupes=${summary.duplicateSkipped} errors=${summary.errors.length}`, "summary");
+
+    return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : "Unknown";
+    await logToErrorLog(supabase, msg, "top-level error");
+    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+});
