@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
 
       try {
         const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(term)}&limit=25&sort=latest`;
-        const res = await fetchWithTimeout(url);
+        const res = await fetchWithTimeout(url, { headers: { "User-Agent": "llmvibes:v1.0", "Accept": "application/json" } });
         if (!res.ok) {
           const msg = `"${term}": HTTP ${res.status}`;
           summary.errors.push(msg);
