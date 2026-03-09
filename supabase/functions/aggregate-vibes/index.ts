@@ -142,7 +142,8 @@ function computeScore(posts: { sentiment: string | null; complaint_category: str
   const complaints: Record<string, number> = {};
 
   for (const p of posts) {
-    const conf = Math.max(0, Math.min(1, p.confidence ?? 0.5));
+    const contentMult = p.content_type === "title_only" ? 0.6 : 1.0;
+    const conf = Math.max(0, Math.min(1, p.confidence ?? 0.5)) * contentMult;
     const engagement = (p.score && p.score > 0) ? Math.log(p.score + 1) : 1.0;
     const w = conf * engagement;
     if (p.sentiment === "positive") { positiveW += w; positiveC++; }
