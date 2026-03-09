@@ -339,6 +339,19 @@ export type Database = {
           score: number
         }[]
       }
+      get_trending_complaints: {
+        Args: never
+        Returns: {
+          accent_color: string
+          category: string
+          last_week: number
+          model_id: string
+          model_name: string
+          model_slug: string
+          pct_change: number
+          this_week: number
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

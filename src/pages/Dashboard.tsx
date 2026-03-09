@@ -12,6 +12,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, useDataFreshness } from "@/hooks/useVibesData";
 import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
+import TrendingComplaints from "@/components/TrendingComplaints";
 
 // Lazy load recharts sparkline
 const LazySparkline = lazy(() => import("@/components/Sparkline"));
@@ -213,6 +214,11 @@ const Dashboard = () => {
               ))}
             </motion.div>
           )}
+        </section>
+
+        {/* Trending Complaints */}
+        <section className="container pb-12">
+          <TrendingComplaints />
         </section>
 
         {/* Community Chatter — lazy loaded on scroll */}
