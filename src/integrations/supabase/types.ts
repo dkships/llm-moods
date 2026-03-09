@@ -105,6 +105,7 @@ export type Database = {
           content_type: string | null
           created_at: string
           id: string
+          is_backfill: boolean | null
           model_id: string
           posted_at: string | null
           score: number | null
@@ -120,6 +121,7 @@ export type Database = {
           content_type?: string | null
           created_at?: string
           id?: string
+          is_backfill?: boolean | null
           model_id: string
           posted_at?: string | null
           score?: number | null
@@ -135,6 +137,7 @@ export type Database = {
           content_type?: string | null
           created_at?: string
           id?: string
+          is_backfill?: boolean | null
           model_id?: string
           posted_at?: string | null
           score?: number | null
