@@ -165,7 +165,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "hackernews", source_url: sourceUrl,
               title: hit.title.slice(0, 500), content: hit.title.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-              confidence: classification.confidence,
+              confidence: classification.confidence, content_type: "title_only",
               score: hit.points || 0, posted_at: hit.created_at || new Date().toISOString(),
             });
             if (error) { summary.errors.push(error.message); } else {
