@@ -246,9 +246,9 @@ const ModelDetail = () => {
                 <h2 className="text-lg font-semibold text-foreground mb-4">Sources</h2>
                 {sourcesLoading ? (
                   <BarsSkeleton count={3} />
-                ) : sources && sources.length > 0 ? (
+                ) : sources && sources.filter((s) => s.pct > 0).length > 0 ? (
                   <div className="space-y-3">
-                    {sources.map((s) => (
+                    {sources.filter((s) => s.pct > 0).map((s) => (
                       <div key={s.source}>
                         <div className="flex justify-between text-xs font-mono mb-1">
                           <span className="text-muted-foreground">{SOURCE_LABELS[s.source] || s.source}</span>
