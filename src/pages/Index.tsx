@@ -60,7 +60,7 @@ const Index = () => {
               a <span className="text-primary glow-text">bad day</span>?
             </motion.h1>
             <motion.p variants={fadeUp} custom={2} className="mt-5 text-lg sm:text-xl text-muted-foreground max-w-xl leading-relaxed">
-              We scan Reddit, Hacker News, and Bluesky so you don't have to. Know when the vibes are off.
+              We scan Bluesky, Mastodon, Hacker News, Lobsters, and more so you don't have to. Know when the vibes are off.
             </motion.p>
             <motion.div variants={fadeUp} custom={3}>
               <Link to="/dashboard">
