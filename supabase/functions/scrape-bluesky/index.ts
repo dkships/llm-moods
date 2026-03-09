@@ -34,6 +34,13 @@ function matchModels(text: string): string[] {
   return matched;
 }
 
+function isEnglish(text: string): boolean {
+  const noWhitespace = text.replace(/\s/g, "");
+  if (noWhitespace.length < 5) return true;
+  const latinCount = (noWhitespace.match(/[a-zA-Z]/g) || []).length;
+  return latinCount / noWhitespace.length >= 0.6;
+}
+
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
