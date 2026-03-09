@@ -50,6 +50,29 @@ function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 }
 
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
+}
+
+function meetsMinLength(title: string, content: string): boolean {
+  const cleaned = stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim();
+  return cleaned.length >= 20;
+}
+
+async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
+  const keys = new Set<string>();
+  for (const p of data || []) {
+    if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
+  }
+  return keys;
+}
+
+function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
+  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+}
+
 function extractTag(xml: string, tag: string): string {
   const regex = new RegExp(`<${tag}[^>]*><!\\[CDATA\\[([\\s\\S]*?)\\]\\]><\\/${tag}>|<${tag}[^>]*>([\\s\\S]*?)<\\/${tag}>`, "i");
   const match = xml.match(regex);
@@ -102,9 +125,10 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "medium");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
+    const titleKeys = await loadRecentTitleKeys(supabase);
 
     const twoDaysAgo = Date.now() - 48 * 60 * 60 * 1000;
-    const summary = { feeds: 0, items: 0, inserted: 0, classified: 0, skipped: 0, errors: [] as string[] };
+    const summary = { feeds: 0, items: 0, inserted: 0, classified: 0, skipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
 
     for (const feedUrl of FEED_URLS) {
       try {
@@ -126,17 +150,26 @@ Deno.serve(async (req) => {
           if (!title || !link) continue;
           if (pubDate && new Date(pubDate).getTime() < twoDaysAgo) continue;
           if (!isEnglish(title)) continue;
+          if (!meetsMinLength(title, content)) { summary.contentSkipped++; continue; }
           if (existingUrls.has(link)) { summary.skipped++; continue; }
 
           const matchedSlugs = matchModels(title + " " + content);
           if (matchedSlugs.length === 0) continue;
+
+          // Cross-source dedup
+          let allDuped = true;
+          for (const slug of matchedSlugs) {
+            const modelId = modelMap[slug];
+            if (modelId && !isDuplicate(titleKeys, title, modelId)) { allDuped = false; break; }
+          }
+          if (allDuped) { summary.dedupSkipped++; continue; }
 
           const classification = await classifyPost(title, content, lovableApiKey);
           summary.classified++;
 
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
-            if (!modelId) continue;
+            if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
             const { error } = await supabase.from("scraped_posts").insert({
               model_id: modelId, source: "medium", source_url: link,
               title: title.slice(0, 500), content: content.slice(0, 2000),
@@ -144,7 +177,11 @@ Deno.serve(async (req) => {
               score: 0,
               posted_at: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
             });
-            if (error) { summary.errors.push(error.message); } else { summary.inserted++; existingUrls.add(link); }
+            if (error) { summary.errors.push(error.message); } else {
+              summary.inserted++;
+              existingUrls.add(link);
+              titleKeys.add(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+            }
           }
         }
       } catch (e) {
@@ -155,7 +192,7 @@ Deno.serve(async (req) => {
 
     await supabase.from("error_log").insert({
       function_name: "scrape-medium",
-      error_message: `Done: inserted=${summary.inserted} feeds=${summary.feeds} items=${summary.items} classified=${summary.classified}`,
+      error_message: `Done: inserted=${summary.inserted} feeds=${summary.feeds} items=${summary.items} classified=${summary.classified} dedupSkipped=${summary.dedupSkipped} contentSkipped=${summary.contentSkipped}`,
       context: `skipped=${summary.skipped} errors=${summary.errors.length}`,
     });
 

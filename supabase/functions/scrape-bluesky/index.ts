@@ -43,6 +43,29 @@ function isEnglish(text: string): boolean {
   return latinCount / noWhitespace.length >= 0.6;
 }
 
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
+}
+
+function meetsMinLength(title: string, content: string): boolean {
+  const cleaned = stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim();
+  return cleaned.length >= 20;
+}
+
+async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
+  const keys = new Set<string>();
+  for (const p of data || []) {
+    if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
+  }
+  return keys;
+}
+
+function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
+  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+}
+
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 15000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -96,15 +119,10 @@ async function authenticateBluesky(handle: string, appPassword: string): Promise
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ identifier: handle, password: appPassword }),
     });
-    if (!res.ok) {
-      const errorText = await res.text();
-      console.error("Bluesky auth failed:", res.status, errorText);
-      return null;
-    }
+    if (!res.ok) return null;
     const data = await res.json();
     return data.accessJwt || null;
-  } catch (e) {
-    console.error("Bluesky auth error:", e);
+  } catch {
     return null;
   }
 }
@@ -124,7 +142,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Missing Bluesky credentials" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Authenticate with Bluesky
     const accessJwt = await authenticateBluesky(blueskyHandle, blueskyAppPassword);
     if (!accessJwt) {
       await logToErrorLog(supabase, "scrape-bluesky", "Failed to authenticate with Bluesky", "auth");
@@ -139,28 +156,24 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "bluesky");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
+    const titleKeys = await loadRecentTitleKeys(supabase);
 
     const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, errors: [] as string[] };
+    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, langSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
 
     for (let i = 0; i < SEARCH_TERMS.length; i++) {
       const term = SEARCH_TERMS[i];
-      if (i > 0) await delay(1000); // 1 second delay between requests
+      if (i > 0) await delay(1000);
 
       try {
         const url = `https://bsky.social/xrpc/app.bsky.feed.searchPosts?q=${encodeURIComponent(term)}&limit=25&sort=latest`;
         const res = await fetchWithTimeout(url, {
-          headers: {
-            "Authorization": `Bearer ${accessJwt}`,
-            "Accept": "application/json",
-          },
+          headers: { "Authorization": `Bearer ${accessJwt}`, "Accept": "application/json" },
         });
 
         if (!res.ok) {
           const errorText = await res.text();
-          const msg = `"${term}": HTTP ${res.status} - ${errorText.slice(0, 100)}`;
-          summary.errors.push(msg);
-          await logToErrorLog(supabase, "scrape-bluesky", `Bluesky search failed: ${msg}`, term);
+          summary.errors.push(`"${term}": HTTP ${res.status} - ${errorText.slice(0, 100)}`);
           continue;
         }
 
@@ -173,16 +186,10 @@ Deno.serve(async (req) => {
           const createdAt = post.record?.createdAt ? new Date(post.record.createdAt) : null;
           if (!createdAt || createdAt < cutoff) continue;
 
-          // Language filter: check Bluesky langs field + Latin character ratio
           const langs: string[] = post.record?.langs || [];
-          if (langs.length > 0 && !langs.some((l: string) => l.startsWith("en"))) {
-            summary.langSkipped++;
-            continue;
-          }
-          if (!isEnglish(text)) {
-            summary.langSkipped++;
-            continue;
-          }
+          if (langs.length > 0 && !langs.some((l: string) => l.startsWith("en"))) { summary.langSkipped++; continue; }
+          if (!isEnglish(text)) { summary.langSkipped++; continue; }
+          if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
 
           const matchedSlugs = matchModels(text);
           if (matchedSlugs.length === 0) continue;
@@ -194,12 +201,20 @@ Deno.serve(async (req) => {
           const sourceUrl = `https://bsky.app/profile/${handle}/post/${rkey}`;
           if (existingUrls.has(sourceUrl)) continue;
 
+          // Cross-source dedup
+          let allDuped = true;
+          for (const slug of matchedSlugs) {
+            const modelId = modelMap[slug];
+            if (modelId && !isDuplicate(titleKeys, text.slice(0, 120), modelId)) { allDuped = false; break; }
+          }
+          if (allDuped) { summary.dedupSkipped++; continue; }
+
           const classification = await classifyPost("", text, lovableApiKey);
           summary.classified++;
 
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
-            if (!modelId) continue;
+            if (!modelId || isDuplicate(titleKeys, text.slice(0, 120), modelId)) continue;
             const { error } = await supabase.from("scraped_posts").insert({
               model_id: modelId, source: "bluesky", source_url: sourceUrl,
               title: text.slice(0, 120), content: text.slice(0, 2000),
@@ -208,18 +223,20 @@ Deno.serve(async (req) => {
             });
             if (error) {
               summary.errors.push(`Insert: ${error.message}`);
-              await logToErrorLog(supabase, "scrape-bluesky", error.message, `insert for ${slug}`);
-            } else { summary.inserted++; existingUrls.add(sourceUrl); }
+            } else {
+              summary.inserted++;
+              existingUrls.add(sourceUrl);
+              titleKeys.add(`${modelId}:${text.slice(0, 80).toLowerCase()}`);
+            }
           }
         }
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         summary.errors.push(`"${term}": ${msg}`);
-        await logToErrorLog(supabase, "scrape-bluesky", msg, term);
       }
     }
 
-    await logToErrorLog(supabase, "scrape-bluesky", `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped}`, "summary");
+    await logToErrorLog(supabase, "scrape-bluesky", `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} inserted=${summary.inserted} langSkipped=${summary.langSkipped} dedupSkipped=${summary.dedupSkipped} contentSkipped=${summary.contentSkipped}`, "summary");
 
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {

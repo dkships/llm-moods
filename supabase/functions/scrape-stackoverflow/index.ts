@@ -39,6 +39,29 @@ function matchModels(text: string): string[] {
   return matched;
 }
 
+function stripUrls(text: string): string {
+  return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
+}
+
+function meetsMinLength(title: string, content: string): boolean {
+  const cleaned = stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim();
+  return cleaned.length >= 20;
+}
+
+async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
+  const since = new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString();
+  const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
+  const keys = new Set<string>();
+  for (const p of data || []) {
+    if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
+  }
+  return keys;
+}
+
+function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
+  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+}
+
 async function classifyPost(title: string, content: string, apiKey: string) {
   const truncated = (content || "").slice(0, 500);
   const prompt = `Classify this social media post about an AI model. Return ONLY valid JSON with two fields: sentiment (positive/negative/neutral) and complaint_category (lazy_responses/hallucinations/refusals/coding_quality/speed/general_drop or null if not negative). Classify as neutral ONLY if the post is purely factual news with zero opinion expressed. Post: ${title} ${truncated}`;
@@ -77,9 +100,10 @@ Deno.serve(async (req) => {
 
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "stackoverflow");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
+    const titleKeys = await loadRecentTitleKeys(supabase);
 
     const oneDayAgo = Math.floor((Date.now() - 24 * 60 * 60 * 1000) / 1000);
-    const summary = { fetched: 0, inserted: 0, classified: 0, skipped: 0, errors: [] as string[] };
+    const summary = { fetched: 0, inserted: 0, classified: 0, skipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
 
     for (const term of SEARCH_TERMS) {
       try {
@@ -92,12 +116,12 @@ Deno.serve(async (req) => {
         summary.fetched += items.length;
 
         for (const item of items) {
-          // Filter to last 24h
           if (item.creation_date < oneDayAgo) continue;
 
           const title = item.title || "";
           const body = (item.body || "").replace(/<[^>]*>/g, "").slice(0, 2000);
           if (!isEnglish(title)) continue;
+          if (!meetsMinLength(title, body)) { summary.contentSkipped++; continue; }
 
           const sourceUrl = item.link;
           if (!sourceUrl || existingUrls.has(sourceUrl)) { summary.skipped++; continue; }
@@ -105,12 +129,20 @@ Deno.serve(async (req) => {
           const matchedSlugs = matchModels(title + " " + body);
           if (matchedSlugs.length === 0) continue;
 
+          // Cross-source dedup
+          let allDuped = true;
+          for (const slug of matchedSlugs) {
+            const modelId = modelMap[slug];
+            if (modelId && !isDuplicate(titleKeys, title, modelId)) { allDuped = false; break; }
+          }
+          if (allDuped) { summary.dedupSkipped++; continue; }
+
           const classification = await classifyPost(title, body, lovableApiKey);
           summary.classified++;
 
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
-            if (!modelId) continue;
+            if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
             const { error } = await supabase.from("scraped_posts").insert({
               model_id: modelId, source: "stackoverflow", source_url: sourceUrl,
               title: title.slice(0, 500), content: body.slice(0, 2000),
@@ -118,7 +150,11 @@ Deno.serve(async (req) => {
               score: item.score || 0,
               posted_at: new Date(item.creation_date * 1000).toISOString(),
             });
-            if (error) { summary.errors.push(error.message); } else { summary.inserted++; existingUrls.add(sourceUrl); }
+            if (error) { summary.errors.push(error.message); } else {
+              summary.inserted++;
+              existingUrls.add(sourceUrl);
+              titleKeys.add(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+            }
           }
         }
       } catch (e) {
@@ -129,7 +165,7 @@ Deno.serve(async (req) => {
 
     await supabase.from("error_log").insert({
       function_name: "scrape-stackoverflow",
-      error_message: `Done: inserted=${summary.inserted} fetched=${summary.fetched} classified=${summary.classified}`,
+      error_message: `Done: inserted=${summary.inserted} fetched=${summary.fetched} classified=${summary.classified} dedupSkipped=${summary.dedupSkipped} contentSkipped=${summary.contentSkipped}`,
       context: `skipped=${summary.skipped} errors=${summary.errors.length}`,
     });
 

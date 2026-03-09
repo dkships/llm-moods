@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.scrape-discourse]
 verify_jwt = false
+
+[functions.cleanup-old-posts]
+verify_jwt = false
