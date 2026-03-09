@@ -38,6 +38,41 @@ export type Database = {
         }
         Relationships: []
       }
+      model_keywords: {
+        Row: {
+          context_words: string | null
+          created_at: string
+          id: string
+          keyword: string
+          model_id: string
+          tier: string
+        }
+        Insert: {
+          context_words?: string | null
+          created_at?: string
+          id?: string
+          keyword: string
+          model_id: string
+          tier?: string
+        }
+        Update: {
+          context_words?: string | null
+          created_at?: string
+          id?: string
+          keyword?: string
+          model_id?: string
+          tier?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "model_keywords_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       models: {
         Row: {
           accent_color: string | null
