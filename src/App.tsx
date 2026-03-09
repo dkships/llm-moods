@@ -9,6 +9,7 @@ import Index from "./pages/Index";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ModelDetail = lazy(() => import("./pages/ModelDetail"));
+const ScraperMonitor = lazy(() => import("./pages/ScraperMonitor"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
