@@ -49,7 +49,7 @@ const Dashboard = () => {
                 Data updates every hour
               </span>
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">Real-time AI model sentiment from Bluesky, Mastodon, and Hacker News.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Real-time AI model sentiment from Reddit, Bluesky, Mastodon, Hacker News, and more.</p>
           </motion.div>
         </section>
 
