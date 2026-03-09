@@ -187,7 +187,6 @@ const ModelDetail = () => {
                           y={50}
                           stroke="hsl(220 10% 25%)"
                           strokeDasharray="4 4"
-                          label={{ value: "Neutral", fill: "hsl(220 10% 35%)", fontSize: 10, position: "right" }}
                         />
                         <Line
                           type="monotone"
