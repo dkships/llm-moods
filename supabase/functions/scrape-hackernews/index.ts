@@ -135,14 +135,16 @@ Deno.serve(async (req) => {
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "hackernews");
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
-    const [topIds, newIds] = await Promise.all([
+    const [topIds, newIds, bestIds] = await Promise.all([
       fetchJson(`${HN_API}/topstories.json`),
       fetchJson(`${HN_API}/newstories.json`),
+      fetchJson(`${HN_API}/beststories.json`),
     ]);
 
     const allIds = [...new Set([
       ...((topIds || []) as number[]).slice(0, 100),
       ...((newIds || []) as number[]).slice(0, 100),
+      ...((bestIds || []) as number[]).slice(0, 100),
     ])];
 
     const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, errors: [] as string[] };
