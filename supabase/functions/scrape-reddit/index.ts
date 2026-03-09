@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
 
       const posts = listing?.data?.children || [];
       summary.fetched += posts.length;
-      const defaultSlug = DEDICATED_SUB_SLUGS[sub] || undefined;
+      const defaultSlug = dedicatedSlugs[sub] || undefined;
 
       for (const child of posts) {
         const post = child.data;
