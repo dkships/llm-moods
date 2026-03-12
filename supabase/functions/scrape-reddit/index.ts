@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
     const modelMap: Record<string, string> = {};
     for (const m of models || []) modelMap[m.slug] = m.id;
 
-    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "reddit");
+    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "reddit").limit(10000);
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
     const cutoff = Date.now() - 86400 * 1000;
@@ -236,13 +236,13 @@ Deno.serve(async (req) => {
           const modelId = modelMap[slug];
           if (!modelId) continue;
 
-          const { error: insertErr } = await supabase.from("scraped_posts").insert({
+          const { error: insertErr } = await supabase.from("scraped_posts").upsert({
             model_id: modelId, source: "reddit", source_url: postUrl,
             title, content: selftext.slice(0, 2000),
             sentiment: classification.sentiment, complaint_category: classification.complaint_category,
             confidence: classification.confidence, content_type: contentType,
             score: upvotes, posted_at: postedAt,
-          });
+          }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
 
           if (insertErr) {
             summary.errors.push(`Insert: ${insertErr.message}`);
@@ -284,14 +284,14 @@ Deno.serve(async (req) => {
                 const modelId = modelMap[slug];
                 if (!modelId) continue;
 
-                const { error: cInsertErr } = await supabase.from("scraped_posts").insert({
+                const { error: cInsertErr } = await supabase.from("scraped_posts").upsert({
                   model_id: modelId, source: "reddit", source_url: commentUrl,
                   title: `Comment on: ${title}`.slice(0, 500),
                   content: commentText,
                   sentiment: cClass.sentiment, complaint_category: cClass.complaint_category,
                   confidence: cClass.confidence, content_type: "full_content",
                   score: comment.score || 0, posted_at: new Date((comment.created_utc || 0) * 1000).toISOString(),
-                });
+                }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
 
                 if (cInsertErr) {
                   summary.errors.push(`Comment insert: ${cInsertErr.message}`);

@@ -134,7 +134,7 @@ Deno.serve(async (req) => {
     await logToErrorLog(supabase, "HN scraper started (v2 - tiered matching)", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
-    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "hackernews");
+    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "hackernews").limit(10000);
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
@@ -173,13 +173,13 @@ Deno.serve(async (req) => {
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, hit.title, modelId)) continue;
-            const { error } = await supabase.from("scraped_posts").insert({
+            const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "hackernews", source_url: sourceUrl,
               title: hit.title.slice(0, 500), content: hit.title.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               confidence: classification.confidence, content_type: "title_only",
               score: hit.points || 0, posted_at: hit.created_at || new Date().toISOString(),
-            });
+            }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {
               summary.inserted++;
               existingUrls.add(sourceUrl);
@@ -217,13 +217,13 @@ Deno.serve(async (req) => {
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, text.slice(0, 200), modelId)) continue;
-            const { error } = await supabase.from("scraped_posts").insert({
+            const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "hackernews", source_url: sourceUrl,
               title: text.slice(0, 200), content: text.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               confidence: classification.confidence, content_type: "full_content",
               score: hit.points || 0, posted_at: hit.created_at || new Date().toISOString(),
-            });
+            }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {
               summary.inserted++;
               existingUrls.add(sourceUrl);

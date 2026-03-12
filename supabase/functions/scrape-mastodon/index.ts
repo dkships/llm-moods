@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
     await logToErrorLog(supabase, "Mastodon scraper started (v3 - multi-instance + search)", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
-    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "mastodon");
+    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "mastodon").limit(10000);
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
     const cutoff = new Date(Date.now() - 24 * 3600000);
@@ -226,13 +226,13 @@ Deno.serve(async (req) => {
       for (const slug of matchedSlugs) {
         const modelId = modelMap[slug];
         if (!modelId) continue;
-        const { error } = await supabase.from("scraped_posts").insert({
+        const { error } = await supabase.from("scraped_posts").upsert({
           model_id: modelId, source: "mastodon", source_url: sourceUrl,
           title: content.slice(0, 120), content: content.slice(0, 2000),
           sentiment: classification.sentiment, complaint_category: classification.complaint_category,
           confidence: classification.confidence, content_type: "full_content",
           score, posted_at: status.created_at,
-        });
+        }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
         if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
           summary.inserted++;
           existingUrls.add(sourceUrl);

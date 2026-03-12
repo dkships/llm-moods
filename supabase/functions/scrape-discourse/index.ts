@@ -135,7 +135,7 @@ Deno.serve(async (req) => {
     await supabase.from("error_log").insert({ function_name: "scrape-discourse", error_message: "Function started (v2)", context: "health-check" });
 
     const { modelMap, keywords } = await loadKeywords(supabase);
-    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "discourse");
+    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "discourse").limit(10000);
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
@@ -191,14 +191,14 @@ Deno.serve(async (req) => {
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, topic.title, modelId)) continue;
-            const { error } = await supabase.from("scraped_posts").insert({
+            const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "discourse", source_url: sourceUrl,
               title: topic.title.slice(0, 500), content: content.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               confidence: classification.confidence, content_type: "title_and_body",
               score: topic.like_count || 0,
               posted_at: topic.created_at || new Date().toISOString(),
-            });
+            }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {
               summary.inserted++;
               existingUrls.add(sourceUrl);

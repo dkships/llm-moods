@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     await logToErrorLog(supabase, "GitHub scraper started", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
-    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "github");
+    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "github").limit(10000);
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
     const since = new Date(Date.now() - 24 * 3600000).toISOString();
@@ -183,13 +183,13 @@ Deno.serve(async (req) => {
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
             if (!modelId) continue;
-            const { error } = await supabase.from("scraped_posts").insert({
+            const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "github", source_url: htmlUrl,
               title, content: body.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               confidence: classification.confidence, content_type: contentType,
               score, posted_at: createdAt,
-            });
+            }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
               summary.inserted++;
               existingUrls.add(htmlUrl);
