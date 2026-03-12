@@ -132,6 +132,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "hackernews", source_url: sourceUrl,
               title: hit.title.slice(0, 500), content: hit.title.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+              praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: "title_only",
               score: hit.points || 0, posted_at: hit.created_at || new Date().toISOString(),
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
