@@ -108,6 +108,7 @@ export type Database = {
           is_backfill: boolean | null
           model_id: string
           posted_at: string | null
+          praise_category: string | null
           score: number | null
           sentiment: string | null
           source: string
@@ -124,6 +125,7 @@ export type Database = {
           is_backfill?: boolean | null
           model_id: string
           posted_at?: string | null
+          praise_category?: string | null
           score?: number | null
           sentiment?: string | null
           source: string
@@ -140,6 +142,7 @@ export type Database = {
           is_backfill?: boolean | null
           model_id?: string
           posted_at?: string | null
+          praise_category?: string | null
           score?: number | null
           sentiment?: string | null
           source?: string
