@@ -37,7 +37,8 @@ Deno.serve(async (req) => {
         .from("scraped_posts")
         .select("sentiment, complaint_category, confidence, score, content_type")
         .eq("model_id", model.id)
-        .gte("posted_at", since24h);
+        .gte("posted_at", since24h)
+        .limit(5000);
 
       // Get previous daily score for exponential smoothing
       const { data: prevDailyScore } = await supabase
