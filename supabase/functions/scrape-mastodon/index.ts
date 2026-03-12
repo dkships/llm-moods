@@ -152,7 +152,7 @@ Deno.serve(async (req) => {
     await logToErrorLog(supabase, "Mastodon scraper started (v3 - multi-instance + search)", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
-    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "mastodon");
+    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "mastodon").limit(10000);
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
     const cutoff = new Date(Date.now() - 24 * 3600000);
