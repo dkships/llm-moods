@@ -115,7 +115,7 @@ Deno.serve(async (req) => {
     await logToErrorLog(supabase, "GitHub scraper started", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
-    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "github");
+    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "github").limit(10000);
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
     const since = new Date(Date.now() - 24 * 3600000).toISOString();
