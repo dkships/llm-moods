@@ -148,14 +148,14 @@ Deno.serve(async (req) => {
             for (const slug of matchedSlugs) {
               const modelId = modelMap[slug];
               if (!modelId) continue;
-              const { error } = await supabase.from("scraped_posts").insert({
+              const { error } = await supabase.from("scraped_posts").upsert({
                 model_id: modelId, source: "hackernews", source_url: sourceUrl,
                 title: title.slice(0, 500), content: null,
                 sentiment: classification.sentiment, complaint_category: classification.complaint_category,
                 confidence: classification.confidence, content_type: "title_only",
                 score: hit.points || 0, posted_at: hit.created_at || new Date().toISOString(),
                 is_backfill: true,
-              });
+              }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
               if (!error) {
                 existingUrls.add(sourceUrl);
                 addTotal("hackernews", slug);
