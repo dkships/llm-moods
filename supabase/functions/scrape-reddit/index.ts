@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
     const modelMap: Record<string, string> = {};
     for (const m of models || []) modelMap[m.slug] = m.id;
 
-    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "reddit");
+    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "reddit").limit(10000);
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
 
     const cutoff = Date.now() - 86400 * 1000;
