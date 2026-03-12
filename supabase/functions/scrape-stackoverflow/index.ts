@@ -72,52 +72,6 @@ function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): bo
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
-const CLASSIFY_PROMPT = `You are analyzing a social media post to determine if it expresses an opinion about the quality or performance of an AI language model (like ChatGPT, Claude, Gemini, Grok, DeepSeek, or Perplexity).
-
-Step 1 — RELEVANCE: Is this post actually about the user's experience with an AI model's quality, performance, or behavior? Posts about AI news, company business decisions, stock prices, hiring, or general AI discussion WITHOUT a quality opinion are NOT relevant.
-
-Step 2 — If relevant, classify sentiment and complaint type. Complaint categories:
-- lazy_responses: Short, low-effort, truncated, or incomplete answers
-- hallucinations: Making up facts, citations, or code that doesn't exist
-- refusals: Refusing reasonable requests, over-cautious safety filtering
-- coding_quality: Producing buggy, outdated, or non-working code
-- speed: Slow response times, high latency
-- general_drop: Vague "it got worse" without specifics
-- pricing_value: Complaints about cost, token pricing, plan limits, value for money
-- censorship: Over-filtering, nanny behavior, political bias, ideological slant in responses
-- context_window: Forgetting context, losing thread in long conversations, ignoring earlier instructions
-- api_reliability: API errors, timeouts, rate limits, downtime, 500 errors
-- multimodal_quality: Poor image generation/understanding, voice issues, file handling problems
-- reasoning: Logic errors, math mistakes, poor analysis (distinct from hallucinations — the model reasons badly rather than inventing facts)
-
-Also return a "confidence" field between 0.0 and 1.0 indicating how confident you are in this classification. 1.0 = clearly about this model with clear sentiment. 0.5 = ambiguous or could go either way. 0.0 = random guess.
-
-Return ONLY valid JSON:
-{"relevant": true/false, "sentiment": "positive"/"negative"/"neutral", "complaint_category": "lazy_responses"/"hallucinations"/"refusals"/"coding_quality"/"speed"/"general_drop"/"pricing_value"/"censorship"/"context_window"/"api_reliability"/"multimodal_quality"/"reasoning"/null, "confidence": 0.0-1.0}
-
-If relevant is false, sentiment and complaint_category should be null.
-Classify as neutral ONLY if genuinely no opinion is expressed. When in doubt between neutral and negative, lean negative. When in doubt between neutral and positive, lean positive.
-
-Post to classify: `;
-
-async function classifyPost(text: string, apiKey: string): Promise<{ relevant: boolean; sentiment: string | null; complaint_category: string | null; confidence: number }> {
-  try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "google/gemini-2.5-flash-lite", messages: [{ role: "user", content: CLASSIFY_PROMPT + text.slice(0, 600) }] }),
-    });
-    if (!res.ok) return { relevant: true, sentiment: "neutral", complaint_category: null, confidence: 0.5 };
-    const data = await res.json();
-    const raw = data.choices?.[0]?.message?.content || "";
-    const jsonMatch = raw.match(/\{[\s\S]*?\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return { relevant: parsed.relevant !== false, sentiment: parsed.sentiment || null, complaint_category: parsed.complaint_category || null, confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.5 };
-    }
-    return { relevant: true, sentiment: "neutral", complaint_category: null, confidence: 0.5 };
-  } catch { return { relevant: true, sentiment: "neutral", complaint_category: null, confidence: 0.5 }; }
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
