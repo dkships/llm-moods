@@ -1,0 +1,1 @@
+ALTER TABLE scraped_posts ADD COLUMN praise_category TEXT;
