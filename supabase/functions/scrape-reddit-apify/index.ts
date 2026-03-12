@@ -210,7 +210,7 @@ Deno.serve(async (req) => {
     if (!Array.isArray(items)) return new Response(JSON.stringify({ error: "Invalid dataset response" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
     const posts = items.filter((item: any) => item.dataType === "post");
-    const { data: existingData } = await supabase.from("scraped_posts").select("source_url").eq("source", "reddit");
+    const { data: existingData } = await supabase.from("scraped_posts").select("source_url").eq("source", "reddit").limit(10000);
     const existingUrls = new Set((existingData || []).map((e: any) => e.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
