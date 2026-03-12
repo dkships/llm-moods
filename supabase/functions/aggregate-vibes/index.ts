@@ -89,7 +89,8 @@ Deno.serve(async (req) => {
         .from("scraped_posts")
         .select("sentiment, complaint_category, confidence, score, content_type")
         .eq("model_id", model.id)
-        .gte("posted_at", since1h);
+        .gte("posted_at", since1h)
+        .limit(5000);
 
       if (hourlyPosts && hourlyPosts.length > 0) {
         const result = computeScore(hourlyPosts);

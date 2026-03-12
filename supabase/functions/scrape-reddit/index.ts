@@ -284,14 +284,14 @@ Deno.serve(async (req) => {
                 const modelId = modelMap[slug];
                 if (!modelId) continue;
 
-                const { error: cInsertErr } = await supabase.from("scraped_posts").insert({
+                const { error: cInsertErr } = await supabase.from("scraped_posts").upsert({
                   model_id: modelId, source: "reddit", source_url: commentUrl,
                   title: `Comment on: ${title}`.slice(0, 500),
                   content: commentText,
                   sentiment: cClass.sentiment, complaint_category: cClass.complaint_category,
                   confidence: cClass.confidence, content_type: "full_content",
                   score: comment.score || 0, posted_at: new Date((comment.created_utc || 0) * 1000).toISOString(),
-                });
+                }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
 
                 if (cInsertErr) {
                   summary.errors.push(`Comment insert: ${cInsertErr.message}`);

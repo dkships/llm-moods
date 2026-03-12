@@ -196,13 +196,13 @@ Deno.serve(async (req) => {
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, story.title || "", modelId)) continue;
-            const { error } = await supabase.from("scraped_posts").insert({
+            const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "lobsters", source_url: sourceUrl,
               title: (story.title || "").slice(0, 500), content: (story.description || "").slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               confidence: classification.confidence, content_type: story.description ? "title_and_body" : "title_only",
               score: story.score || 0, posted_at: story.created_at,
-            });
+            }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
               summary.inserted++;
               existingUrls.add(sourceUrl);

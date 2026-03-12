@@ -185,14 +185,14 @@ Deno.serve(async (req) => {
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
-            const { error } = await supabase.from("scraped_posts").insert({
+            const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "devto", source_url: sourceUrl,
               title: title.slice(0, 120), content: description.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               confidence: classification.confidence, content_type: "title_and_body",
               score: article.positive_reactions_count || 0,
               posted_at: article.published_at || article.published_timestamp,
-            });
+            }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
               summary.inserted++;
               existingUrls.add(sourceUrl);

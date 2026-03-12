@@ -173,14 +173,14 @@ Deno.serve(async (req) => {
           for (const slug of matchedSlugs) {
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
-            const { error } = await supabase.from("scraped_posts").insert({
+            const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "stackoverflow", source_url: sourceUrl,
               title: title.slice(0, 500), content: body.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               confidence: classification.confidence, content_type: "title_and_body",
               score: item.score || 0,
               posted_at: new Date(item.creation_date * 1000).toISOString(),
-            });
+            }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {
               summary.inserted++;
               existingUrls.add(sourceUrl);

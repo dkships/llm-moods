@@ -262,14 +262,14 @@ Deno.serve(async (req) => {
             for (const slug of matchedSlugs) {
               const modelId = modelMap[slug];
               if (!modelId) continue;
-              const { error } = await supabase.from("scraped_posts").insert({
+              const { error } = await supabase.from("scraped_posts").upsert({
                 model_id: modelId, source: "reddit", source_url: postUrl,
                 title, content: selftext.slice(0, 2000),
                 sentiment: classification.sentiment, complaint_category: classification.complaint_category,
                 confidence: classification.confidence, content_type: contentType,
                 score: post.score || 0, posted_at: postedAt,
                 is_backfill: true,
-              });
+              }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
               if (!error) {
                 existingUrls.add(postUrl);
                 addTotal("reddit", slug);
