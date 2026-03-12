@@ -142,6 +142,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "github", source_url: htmlUrl,
               title, content: body.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+              praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: contentType,
               score, posted_at: createdAt,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });

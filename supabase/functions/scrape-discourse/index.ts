@@ -150,6 +150,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "discourse", source_url: sourceUrl,
               title: topic.title.slice(0, 500), content: content.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+              praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: "title_and_body",
               score: topic.like_count || 0,
               posted_at: topic.created_at || new Date().toISOString(),

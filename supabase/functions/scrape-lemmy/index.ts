@@ -150,6 +150,7 @@ Deno.serve(async (req) => {
                 model_id: modelId, source: "lemmy", source_url: sourceUrl,
                 title: title.slice(0, 120), content: (body || title).slice(0, 2000),
                 sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+                praise_category: classification.praise_category,
                 confidence: classification.confidence, content_type: body ? "title_and_body" : "title_only",
                 score: counts?.score || 0, posted_at: post.published,
               }, { onConflict: "source_url,model_id", ignoreDuplicates: true });

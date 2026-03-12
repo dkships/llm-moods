@@ -181,6 +181,7 @@ Deno.serve(async (req) => {
               model_id: modelId, source: "bluesky", source_url: sourceUrl,
               title: text.slice(0, 120), content: text.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+              praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: "full_content",
               score: post.likeCount || 0, posted_at: createdAt.toISOString(),
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });

@@ -235,6 +235,7 @@ Deno.serve(async (req) => {
                 model_id: modelId, source: "reddit", source_url: postUrl,
                 title, content: selftext.slice(0, 2000),
                 sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+                praise_category: classification.praise_category,
                 confidence: classification.confidence, content_type: contentType,
                 score: post.score || 0, posted_at: postedAt,
                 is_backfill: true,

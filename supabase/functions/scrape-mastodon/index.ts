@@ -185,6 +185,7 @@ Deno.serve(async (req) => {
           model_id: modelId, source: "mastodon", source_url: sourceUrl,
           title: content.slice(0, 120), content: content.slice(0, 2000),
           sentiment: classification.sentiment, complaint_category: classification.complaint_category,
+          praise_category: classification.praise_category,
           confidence: classification.confidence, content_type: "full_content",
           score, posted_at: status.created_at,
         }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
