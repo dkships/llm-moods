@@ -112,7 +112,7 @@ Deno.serve(async (req) => {
     for (const m of models || []) modelMap[m.slug] = m.id;
 
     // Load existing URLs for dedup
-    const { data: existingData } = await supabase.from("scraped_posts").select("source_url").not("source_url", "is", null);
+    const { data: existingData } = await supabase.from("scraped_posts").select("source_url").not("source_url", "is", null).limit(10000);
     const existingUrls = new Set((existingData || []).map((e: any) => e.source_url));
 
     const ninetyDaysAgo = Math.floor((Date.now() - 90 * 86400000) / 1000);
