@@ -136,7 +136,7 @@ Deno.serve(async (req) => {
     await logToErrorLog(supabase, "Lobsters scraper started (v2 - tiered matching)", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
-    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "lobsters");
+    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "lobsters").limit(10000);
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
