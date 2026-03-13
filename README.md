@@ -1,73 +1,71 @@
-# Welcome to your Lovable project
+# LLM Vibes 🌊
 
-## Project info
+Real-time community sentiment tracking for AI models. Is your AI having a bad day?
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+[llmvibes.ai](https://llmvibes.ai)
 
-## How can I edit this code?
+## What is this?
 
-There are several ways of editing your application.
+LLM Vibes automatically scrapes social platforms (Reddit, Bluesky, Mastodon, Hacker News, Lobsters, Dev.to, Stack Overflow, Medium, and Discourse forums) to track how people feel about major AI models — Claude, ChatGPT, Gemini, Grok, DeepSeek, and Perplexity.
 
-**Use Lovable**
+No surveys. No voting. Just real conversations, classified by AI.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+## Tech Stack
 
-Changes made via Lovable will be committed automatically to this repo.
+- **Frontend:** React + TypeScript + Tailwind CSS + Recharts
+- **Backend:** Supabase (Lovable Cloud) — database, edge functions, cron jobs
+- **Data Pipeline:** 11 scraper edge functions running on cron schedules
+- **Sentiment Analysis:** LLM-powered classification via Lovable AI
+- **Hosting:** Lovable Cloud
 
-**Use your preferred IDE**
+## Features
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+- Real-time vibes dashboard for 6 AI models
+- Per-model detail pages with 30-day historical charts
+- Complaint category breakdowns (lazy responses, hallucinations, refusals, coding quality, speed, general drop)
+- Source diversity tracking across 9+ platforms
+- Automated hourly data pipeline — no manual intervention needed
+- English language filtering for clean data
+- Two-tier keyword matching to reduce false positives
+- Relevance filtering via AI to skip off-topic posts
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## Data Sources
 
-Follow these steps:
+| Source | Method | Auth Required |
+|--------|--------|--------------|
+| Bluesky | AT Protocol search (authenticated) | App password |
+| Mastodon | Public hashtag timelines | None |
+| Hacker News | Algolia Search API + Firebase API | None |
+| Reddit | Apify scraper | API token |
+| Lobsters | Public JSON API | None |
+| Dev.to | Public API | None |
+| Stack Overflow | Public API | None |
+| Medium | RSS feeds | None |
+| Discourse | Public JSON (OpenAI + Anthropic forums) | None |
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+## Getting Started
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+1. Clone the repo
+2. Copy `.env.example` to `.env` and fill in your Supabase credentials
+3. `npm install`
+4. `npm run dev`
 
-# Step 3: Install the necessary dependencies.
-npm i
+Note: The scraping edge functions run on Supabase/Lovable Cloud and require their own setup with secrets for API keys (Bluesky, Apify).
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
+## Contributing
 
-**Edit a file directly in GitHub**
+Contributions welcome! Some ideas:
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+- Add new data sources
+- Improve sentiment classification accuracy
+- Add new models to track
+- UI/UX improvements
+- Performance optimizations
 
-**Use GitHub Codespaces**
+## License
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+MIT
 
-## What technologies are used for this project?
+## Author
 
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Built by [David Kelly](https://dmkthinks.org)
