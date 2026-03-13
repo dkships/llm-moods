@@ -1,0 +1,45 @@
+name: New Data Source
+description: Suggest a new platform to scrape for AI sentiment
+labels: ["data-source"]
+body:
+  - type: input
+    id: platform
+    attributes:
+      label: Platform Name
+      description: What platform should we add?
+      placeholder: e.g. Twitter/X, YouTube, etc.
+    validations:
+      required: true
+  - type: input
+    id: api-docs
+    attributes:
+      label: API Documentation URL
+      description: Link to the platform's API docs (if available)
+    validations:
+      required: false
+  - type: dropdown
+    id: auth
+    attributes:
+      label: Authentication Required
+      description: Does the API require authentication?
+      options:
+        - None (public API)
+        - API key
+        - OAuth
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: volume
+    attributes:
+      label: Estimated Volume
+      description: Roughly how many AI-related posts per day on this platform?
+    validations:
+      required: false
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional Notes
+      description: Any other context (rate limits, TOS considerations, etc.)
+    validations:
+      required: false

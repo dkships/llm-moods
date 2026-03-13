@@ -1,0 +1,53 @@
+name: Bug Report
+description: Report a bug with the LLM Vibes dashboard
+labels: ["bug"]
+body:
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What happened?
+      placeholder: A clear description of the bug
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this?
+      placeholder: |
+        1. Go to ...
+        2. Click on ...
+        3. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What did you expect to happen?
+    validations:
+      required: true
+  - type: dropdown
+    id: model
+    attributes:
+      label: Model Affected
+      description: Which model page is affected (if applicable)?
+      options:
+        - All models
+        - Claude
+        - ChatGPT
+        - Gemini
+        - Grok
+        - DeepSeek
+        - Perplexity
+        - N/A
+    validations:
+      required: false
+  - type: input
+    id: browser
+    attributes:
+      label: Browser / OS
+      description: e.g. Chrome 120 on macOS 14
+    validations:
+      required: false

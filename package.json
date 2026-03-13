@@ -1,7 +1,30 @@
 {
-  "name": "vite_react_shadcn_ts",
+  "name": "llm-moods",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1.0",
+  "description": "Real-time AI sentiment dashboard tracking community vibes for LLM models across 12+ social platforms",
+  "homepage": "https://llmvibes.ai",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dkships/llm-moods.git"
+  },
+  "author": {
+    "name": "David Kelly",
+    "url": "https://dmkthinks.org"
+  },
+  "license": "MIT",
+  "keywords": [
+    "ai",
+    "llm",
+    "sentiment-analysis",
+    "dashboard",
+    "supabase",
+    "react",
+    "typescript",
+    "claude",
+    "chatgpt",
+    "gemini"
+  ],
   "type": "module",
   "scripts": {
     "dev": "vite",
