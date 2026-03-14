@@ -137,7 +137,7 @@ const ModelDetail = () => {
               </div>
             </div>
             <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
-              <p className="text-6xl font-bold font-mono text-foreground">{latestScore}<span className="text-xl text-muted-foreground ml-1">/ 100</span></p>
+              <p className="text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-muted-foreground ml-1">/ 100</span></p>
               <div className="flex items-center gap-2 pb-2">
                 {trend.direction === "up" ? (
                   <TrendingUp className="h-4 w-4 text-primary" />
