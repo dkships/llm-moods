@@ -88,9 +88,10 @@ const Index = () => {
         <NavBar />
 
         {/* Hero */}
-        <section className="container py-24 sm:py-32">
+        <section className="container py-24 sm:py-32 relative">
+          <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.10)_0%,_transparent_70%)] pointer-events-none" />
           <motion.div
-            className="max-w-3xl"
+            className="max-w-3xl relative"
             initial="hidden"
             animate="visible"
             variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}

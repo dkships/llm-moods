@@ -154,11 +154,12 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
   const s = SENTIMENT_STYLES[sentiment];
   const src = formatSourceDisplay(post.source as string);
   const modelData = post.models as { name: string; accent_color: string | null; slug: string } | null;
+  const sentimentBorderColor = sentiment === "positive" ? "border-l-emerald-500" : sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30";
   return (
     <motion.div
       variants={fadeUp}
       custom={i}
-      className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3"
+      className={`glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderColor} transition-all duration-200 hover:brightness-125 hover:border-border/60`}
     >
       <div className="flex items-center gap-3 sm:w-28 shrink-0">
         <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border">

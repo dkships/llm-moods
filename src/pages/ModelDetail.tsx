@@ -305,7 +305,7 @@ const ModelDetail = () => {
                     key={post.id}
                     variants={fadeUp}
                     custom={i}
-                    className={`glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${post.source_url ? "cursor-pointer hover:bg-secondary/30 transition-colors" : ""}`}
+                    className={`glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${post.sentiment === "positive" ? "border-l-emerald-500" : post.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"} transition-all duration-200 ${post.source_url ? "cursor-pointer hover:brightness-125 hover:border-border/60" : ""}`}
                     onClick={() => post.source_url && window.open(post.source_url, "_blank", "noopener,noreferrer")}
                   >
                     <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border shrink-0">
