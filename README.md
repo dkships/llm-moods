@@ -8,9 +8,8 @@ Real-time AI sentiment dashboard. Is your AI having a bad day?
 [![Supabase](https://img.shields.io/badge/Supabase-Backend-3FCF8E?logo=supabase&logoColor=white)](https://supabase.com/)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-<!-- Replace with dashboard screenshot: save as docs/dashboard-screenshot.png -->
 <a href="https://llmvibes.ai">
-  <img src="https://llmvibes.ai/og-image.png" alt="LLM Vibes Dashboard" width="100%" />
+  <img src="docs/dashboard-screenshot.gif" alt="LLM Vibes Dashboard" width="100%" />
 </a>
 
 ## Why this exists
