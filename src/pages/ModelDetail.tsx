@@ -137,7 +137,7 @@ const ModelDetail = () => {
               </div>
             </div>
             <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
-              <p className="text-6xl font-bold font-mono text-foreground">{latestScore}<span className="text-xl text-muted-foreground ml-1">/ 100</span></p>
+              <p className="text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-muted-foreground ml-1">/ 100</span></p>
               <div className="flex items-center gap-2 pb-2">
                 {trend.direction === "up" ? (
                   <TrendingUp className="h-4 w-4 text-primary" />
@@ -305,7 +305,7 @@ const ModelDetail = () => {
                     key={post.id}
                     variants={fadeUp}
                     custom={i}
-                    className={`glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${post.source_url ? "cursor-pointer hover:bg-secondary/30 transition-colors" : ""}`}
+                    className={`glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${post.sentiment === "positive" ? "border-l-emerald-500" : post.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"} transition-all duration-200 ${post.source_url ? "cursor-pointer hover:brightness-125 hover:border-border/60" : ""}`}
                     onClick={() => post.source_url && window.open(post.source_url, "_blank", "noopener,noreferrer")}
                   >
                     <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border shrink-0">
