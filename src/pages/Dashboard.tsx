@@ -66,7 +66,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <p className="text-4xl font-bold font-mono text-foreground cursor-help">{m.latestScore}</p>
+                    <p className="text-5xl font-extrabold font-mono text-foreground cursor-help leading-none">{m.latestScore}</p>
                   </TooltipTrigger>
                   <TooltipContent side="left" className="text-xs font-mono">
                     0 = everyone's complaining, 100 = pure good vibes
