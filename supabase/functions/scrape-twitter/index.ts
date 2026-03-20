@@ -135,6 +135,11 @@ async function runApifyPath(
   if (!startRes.ok) {
     const errorText = await startRes.text().catch(() => "unknown");
     await logToErrorLog(supabase, `Apify start failed HTTP ${startRes.status}: ${errorText.slice(0, 500)}`, "apify-error");
+    // Treat quota/billing errors as a graceful skip so the orchestrator doesn't report a failure
+    if (startRes.status === 402 || startRes.status === 403) {
+      summary.errors.push(`Apify quota exceeded (HTTP ${startRes.status})`);
+      return summary;
+    }
     throw new Error(`Apify start returned ${startRes.status}`);
   }
 
