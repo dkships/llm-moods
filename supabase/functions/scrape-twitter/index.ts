@@ -112,19 +112,17 @@ async function runApifyPath(
 
   // Step 1 — Start actor run
   const startUrl = `https://api.apify.com/v2/acts/apidojo~tweet-scraper/runs?token=${apifyToken}`;
-  const yesterday = new Date(Date.now() - 24 * 3600000);
-  const today = new Date();
+  const yesterday = new Date(Date.now() - 24 * 3600000).toISOString().split("T")[0];
+  const today = new Date().toISOString().split("T")[0];
+  // Use Twitter search operators for date/language filtering inside searchTerms
+  const baseTerms = [
+    "Claude AI", "ChatGPT", "Gemini AI", "Grok AI",
+    "DeepSeek", "Perplexity AI", "GitHub Copilot", "Llama AI", "Mistral AI",
+  ];
   const apifyInput = {
-    searchTerms: [
-      "Claude AI", "ChatGPT", "Gemini AI", "Grok AI",
-      "DeepSeek", "Perplexity AI", "GitHub Copilot", "Llama AI", "Mistral AI",
-    ],
+    searchTerms: baseTerms.map(t => `${t} lang:en since:${yesterday} until:${today}`),
     maxItems: 200,
     sort: "Latest",
-    tweetLanguage: "en",
-    includeSearchTerms: true,
-    start: yesterday.toISOString().split("T")[0],
-    end: today.toISOString().split("T")[0],
   };
 
   const startRes = await fetch(startUrl, {
