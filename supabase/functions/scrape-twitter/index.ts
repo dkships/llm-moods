@@ -202,15 +202,9 @@ async function runApifyPath(
     if (matchedSlugs.length === 0) continue;
     summary.filtered++;
 
-    // Log first matched tweet's structure for debugging field names
-    if (summary.filtered === 1) {
-      await logToErrorLog(supabase, `Sample tweet keys: ${Object.keys(tweet).join(",")}`, "debug-keys");
-      await logToErrorLog(supabase, `Sample tweet id=${tweet.id} url=${tweet.url} screen_name=${tweet.user?.screen_name || tweet.screen_name || "NONE"} author=${tweet.author?.userName || "NONE"} created_at=${tweet.created_at} createdAt=${tweet.createdAt}`, "debug-fields");
-    }
-
-    // Build source URL (handle both actor output formats)
-    const screenName = tweet.user?.screen_name || tweet.screen_name || tweet.author?.userName || "";
-    const sourceUrl = tweet.url || (screenName
+    // Build source URL
+    const screenName = tweet.username || tweet.user?.screen_name || tweet.screen_name || tweet.author?.userName || "";
+    const sourceUrl = tweet.url || (screenName && tweet.id
       ? `https://x.com/${screenName}/status/${tweet.id}`
       : "");
     if (!sourceUrl || existingUrls.has(sourceUrl)) { summary.dedupSkipped++; continue; }
