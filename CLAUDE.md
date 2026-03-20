@@ -29,8 +29,8 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. W
 | State | TanStack React Query 5.83 |
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Edge Functions | 14 Deno functions (scrapers + aggregation) |
-| Sentiment AI | Gemini 2.5 Flash via Lovable AI gateway |
+| Edge Functions | 13 Deno functions (scrapers + aggregation) |
+| Sentiment AI | Gemini 2.5 Flash-Lite via Google AI API (batch classification, 10 posts/call) |
 
 ## Key Routes
 
@@ -55,9 +55,11 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. W
 
 ## Scrapers (Edge Functions)
 
-Reddit, Reddit (Apify), Hacker News, Bluesky, Mastodon, Lobsters, Lemmy, Dev.to, Stack Overflow, Medium, Discourse, GitHub. Orchestrated by `run-scrapers` (batches of 3, ~15min cron).
+Reddit (Apify), Hacker News, Bluesky, Twitter/X, Mastodon, Lobsters, Lemmy, Dev.to, Stack Overflow, Medium, Discourse. Orchestrated by `run-scrapers` (batches of 3, ~15min cron). GitHub scraper exists but is not in the orchestrator.
 
-Sentiment classified via `https://ai.gateway.lovable.dev/v1/chat/completions` using Gemini 2.5 Flash.
+Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-2.5-flash-lite`. All scrapers use batch classification (10 posts per API call) via `classifyBatch()` in `_shared/classifier.ts`. Designed to stay within the Gemini free tier (1,000 RPD).
+
+**Twitter/X scraper** uses `scrape.badger~twitter-tweets-scraper` Apify actor. Actor output uses snake_case fields (`created_at`, `username`, `favorite_count`). Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`).
 
 ## Environment Variables & Secrets
 
@@ -66,8 +68,10 @@ Sentiment classified via `https://ai.gateway.lovable.dev/v1/chat/completions` us
 - `.env` is gitignored; `.env.example` has placeholder structure for local overrides.
 
 **Edge Functions (Supabase secrets — never commit these):**
-- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `LOVABLE_API_KEY`
-- `APIFY_TOKEN`, `BSKY_USERNAME`, `BSKY_PASSWORD`
+- `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+- `GEMINI_API_KEY` — Google AI API key for sentiment classification (all scrapers)
+- `LOVABLE_API_KEY` — Lovable AI gateway key (no longer used by scrapers, kept for Lovable platform)
+- `APIFY_API_TOKEN`, `BSKY_HANDLE`, `BSKY_APP_PASSWORD`
 - `MASTODON_URL`, `MASTODON_TOKEN`, `LEMMY_INSTANCE_URL`
 - `MEDIUM_TOKEN`, `DISCOURSE_INSTANCE`, `DISCOURSE_API_KEY`, `GITHUB_TOKEN`
 
@@ -100,7 +104,7 @@ npm run test         # Vitest
 - TypeScript config is loose (`strictNullChecks: false`, `noImplicitAny: false`)
 - `/admin/scrapers` is public — no auth required
 - All Edge Functions have `verify_jwt = false`
-- Sentiment classification prompt is duplicated across scraper functions
+- Sentiment classification prompt is centralized in `_shared/classifier.ts` (batch + single)
 - Minimal test coverage (example test only)
 - Error handling in scrapers silently logs to `error_log` table
 
