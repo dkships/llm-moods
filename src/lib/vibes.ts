@@ -27,6 +27,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   medium: "Medium",
   discourse: "Discourse",
   github: "GitHub",
+  twitter: "𝕏",
 };
 
 export const SENTIMENT_STYLES: Record<string, { label: string; classes: string }> = {
@@ -63,6 +64,7 @@ export function formatSourceDisplay(source: string): { emoji: string; label: str
   if (source === "medium") return { emoji: "✍️", label: "Medium" };
   if (source === "discourse") return { emoji: "💬", label: "Discourse" };
   if (source === "github") return { emoji: "🐙", label: "GitHub" };
+  if (source === "twitter") return { emoji: "⚪", label: "𝕏" };
   return { emoji: "⚪", label: source };
 }
 

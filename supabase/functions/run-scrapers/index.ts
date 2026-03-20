@@ -9,6 +9,7 @@ const SCRAPERS = [
   "scrape-reddit-apify",
   "scrape-hackernews",
   "scrape-bluesky",
+  "scrape-twitter",
   "scrape-mastodon",
   "scrape-lobsters",
   "scrape-lemmy",
