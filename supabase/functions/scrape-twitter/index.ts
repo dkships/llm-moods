@@ -158,7 +158,7 @@ async function runApifyPath(
     if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(runStatus)) break;
   }
 
-  if (runStatus !== "SUCCEEDED") {
+  if (!["SUCCEEDED", "ABORTED"].includes(runStatus)) {
     await logToErrorLog(supabase, `Apify run status: ${runStatus || "TIMEOUT"}`, "apify-error");
     throw new Error(`Apify run status: ${runStatus || "TIMEOUT"}`);
   }
