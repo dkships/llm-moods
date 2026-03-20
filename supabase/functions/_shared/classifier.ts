@@ -54,7 +54,7 @@ export async function classifyPost(
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gemini-2.0-flash-lite",
+        model: "gemini-2.5-flash-lite",
         messages: [{ role: "user", content: CLASSIFY_PROMPT + text.slice(0, 600) }],
       }),
     });
