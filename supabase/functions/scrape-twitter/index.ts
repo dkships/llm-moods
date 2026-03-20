@@ -110,21 +110,20 @@ async function runApifyPath(
     backend: "apify" as const,
   };
 
-  // Step 1 — Start actor run
-  const startUrl = `https://api.apify.com/v2/acts/apidojo~tweet-scraper/runs?token=${apifyToken}`;
+  // Step 1 — Start actor run (scrape.badger/twitter-tweets-scraper)
+  const startUrl = `https://api.apify.com/v2/acts/scrape.badger~twitter-tweets-scraper/runs?token=${apifyToken}`;
   const yesterday = new Date(Date.now() - 24 * 3600000);
-  const today = new Date();
+  const sinceDate = yesterday.toISOString().split("T")[0];
+  const searchTerms = [
+    "Claude AI", "ChatGPT", "Gemini AI", "Grok AI",
+    "DeepSeek", "Perplexity AI", "GitHub Copilot", "Llama AI", "Mistral AI",
+  ];
+  const queryStr = searchTerms.map(t => `"${t}"`).join(" OR ") + ` since:${sinceDate} lang:en`;
   const apifyInput = {
-    searchTerms: [
-      "Claude AI", "ChatGPT", "Gemini AI", "Grok AI",
-      "DeepSeek", "Perplexity AI", "GitHub Copilot", "Llama AI", "Mistral AI",
-    ],
-    maxItems: 200,
-    sort: "Latest",
-    tweetLanguage: "en",
-    includeSearchTerms: true,
-    start: yesterday.toISOString().split("T")[0],
-    end: today.toISOString().split("T")[0],
+    mode: "Advanced Search",
+    query: queryStr,
+    query_type: "Latest",
+    max_results: 200,
   };
 
   const startRes = await fetch(startUrl, {
