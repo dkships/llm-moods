@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyPost } from "../_shared/classifier.ts";
+import { classifyBatch } from "../_shared/classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -182,6 +182,8 @@ async function runApifyPath(
   const cutoff = new Date(Date.now() - 24 * 3600000);
   summary.fetched = items.length;
 
+  // Pass 1: collect candidates
+  const candidates: { text: string; matchedSlugs: string[]; sourceUrl: string; title: string; createdAt: string; engagementScore: number }[] = [];
   for (const tweet of items) {
     // Skip retweets (handle both field naming conventions)
     if (tweet.isRetweet || tweet.is_retweet) continue;
@@ -217,26 +219,36 @@ async function runApifyPath(
     }
     if (allDuped) { summary.dedupSkipped++; continue; }
 
-    const classification = await classifyPost(text, lovableApiKey);
-    summary.classified++;
-    if (!classification.relevant) { summary.irrelevant++; continue; }
+    candidates.push({ text, matchedSlugs, sourceUrl, title, createdAt: createdAt.toISOString(), engagementScore: (tweet.favorite_count || tweet.likeCount || 0) + (tweet.retweet_count || tweet.retweetCount || 0) });
+  }
 
-    for (const slug of matchedSlugs) {
+  // Pass 2: batch classify
+  const classifications = await classifyBatch(candidates.map(c => c.text), lovableApiKey);
+  summary.classified = classifications.length;
+  summary.irrelevant = classifications.filter(c => !c.relevant).length;
+
+  // Pass 3: insert
+  for (let i = 0; i < candidates.length; i++) {
+    const classification = classifications[i];
+    if (!classification.relevant) continue;
+    const c = candidates[i];
+
+    for (const slug of c.matchedSlugs) {
       const modelId = modelMap[slug];
-      if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
+      if (!modelId || isDuplicate(titleKeys, c.title, modelId)) continue;
       const { error } = await supabase.from("scraped_posts").upsert({
-        model_id: modelId, source: "twitter", source_url: sourceUrl,
-        title: title.slice(0, 120), content: text.slice(0, 2000),
+        model_id: modelId, source: "twitter", source_url: c.sourceUrl,
+        title: c.title.slice(0, 120), content: c.text.slice(0, 2000),
         sentiment: classification.sentiment, complaint_category: classification.complaint_category,
         praise_category: classification.praise_category,
         confidence: classification.confidence, content_type: "title_only",
-        score: (tweet.favorite_count || tweet.likeCount || 0) + (tweet.retweet_count || tweet.retweetCount || 0),
-        posted_at: createdAt.toISOString(),
+        score: c.engagementScore,
+        posted_at: c.createdAt,
       }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
       if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
         summary.inserted++;
-        existingUrls.add(sourceUrl);
-        titleKeys.add(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+        existingUrls.add(c.sourceUrl);
+        titleKeys.add(`${modelId}:${c.title.slice(0, 80).toLowerCase()}`);
       }
     }
   }

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyPost } from "../_shared/classifier.ts";
+import { classifyBatch } from "../_shared/classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,6 +100,8 @@ Deno.serve(async (req) => {
         if (!Array.isArray(issues)) continue;
         summary.fetched += issues.length;
 
+        // Pass 1: collect candidates
+        const candidates: { text: string; matchedSlugs: string[]; htmlUrl: string; title: string; body: string; score: number; createdAt: string; contentType: string }[] = [];
         for (const issue of issues) {
           // Skip pull requests
           if (issue.pull_request) { summary.prSkipped++; continue; }
@@ -129,26 +131,35 @@ Deno.serve(async (req) => {
 
           if (existingUrls.has(htmlUrl)) continue;
 
-          const classification = await classifyPost(text, lovableApiKey);
-          summary.classified++;
-          if (!classification.relevant) { summary.irrelevant++; continue; }
-
           const contentType = body.trim() ? "title_and_body" : "title_only";
+          candidates.push({ text, matchedSlugs, htmlUrl, title, body, score, createdAt, contentType });
+        }
 
-          for (const slug of matchedSlugs) {
+        // Pass 2: batch classify
+        const classifications = await classifyBatch(candidates.map(c => c.text), lovableApiKey);
+        summary.classified += classifications.length;
+        summary.irrelevant += classifications.filter(c => !c.relevant).length;
+
+        // Pass 3: insert
+        for (let i = 0; i < candidates.length; i++) {
+          const classification = classifications[i];
+          if (!classification.relevant) continue;
+          const c = candidates[i];
+
+          for (const slug of c.matchedSlugs) {
             const modelId = modelMap[slug];
             if (!modelId) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
-              model_id: modelId, source: "github", source_url: htmlUrl,
-              title, content: body.slice(0, 2000),
+              model_id: modelId, source: "github", source_url: c.htmlUrl,
+              title: c.title, content: c.body.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               praise_category: classification.praise_category,
-              confidence: classification.confidence, content_type: contentType,
-              score, posted_at: createdAt,
+              confidence: classification.confidence, content_type: c.contentType,
+              score: c.score, posted_at: c.createdAt,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
               summary.inserted++;
-              existingUrls.add(htmlUrl);
+              existingUrls.add(c.htmlUrl);
             }
           }
         }

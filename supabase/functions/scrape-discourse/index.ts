@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyPost } from "../_shared/classifier.ts";
+import { classifyBatch } from "../_shared/classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -104,6 +104,8 @@ Deno.serve(async (req) => {
         const data = await res.json();
         const topics = data?.topic_list?.topics || [];
 
+        // Pass 1: collect candidates (including topic detail fetches)
+        const candidates: { classifyText: string; matchedSlugs: string[]; sourceUrl: string; title: string; content: string; score: number; postedAt: string }[] = [];
         for (const topic of topics) {
           if (!topic.title || !topic.id || !topic.slug) continue;
           const createdAt = new Date(topic.created_at).getTime();
@@ -139,26 +141,36 @@ Deno.serve(async (req) => {
           }
           if (allDuped) { summary.dedupSkipped++; continue; }
 
-          const classification = await classifyPost(`${topic.title} ${content}`, lovableApiKey);
-          summary.classified++;
-          if (!classification.relevant) { summary.irrelevant++; continue; }
+          candidates.push({ classifyText: `${topic.title} ${content}`, matchedSlugs, sourceUrl, title: topic.title, content, score: topic.like_count || 0, postedAt: topic.created_at || new Date().toISOString() });
+        }
 
-          for (const slug of matchedSlugs) {
+        // Pass 2: batch classify
+        const classifications = await classifyBatch(candidates.map(c => c.classifyText), lovableApiKey);
+        summary.classified += classifications.length;
+        summary.irrelevant += classifications.filter(c => !c.relevant).length;
+
+        // Pass 3: insert
+        for (let i = 0; i < candidates.length; i++) {
+          const classification = classifications[i];
+          if (!classification.relevant) continue;
+          const c = candidates[i];
+
+          for (const slug of c.matchedSlugs) {
             const modelId = modelMap[slug];
-            if (!modelId || isDuplicate(titleKeys, topic.title, modelId)) continue;
+            if (!modelId || isDuplicate(titleKeys, c.title, modelId)) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
-              model_id: modelId, source: "discourse", source_url: sourceUrl,
-              title: topic.title.slice(0, 500), content: content.slice(0, 2000),
+              model_id: modelId, source: "discourse", source_url: c.sourceUrl,
+              title: c.title.slice(0, 500), content: c.content.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: "title_and_body",
-              score: topic.like_count || 0,
-              posted_at: topic.created_at || new Date().toISOString(),
+              score: c.score,
+              posted_at: c.postedAt,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {
               summary.inserted++;
-              existingUrls.add(sourceUrl);
-              titleKeys.add(`${modelId}:${topic.title.slice(0, 80).toLowerCase()}`);
+              existingUrls.add(c.sourceUrl);
+              titleKeys.add(`${modelId}:${c.title.slice(0, 80).toLowerCase()}`);
             }
           }
         }

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyPost } from "../_shared/classifier.ts";
+import { classifyBatch } from "../_shared/classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -149,6 +149,8 @@ Deno.serve(async (req) => {
       summary.fetched += posts.length;
       const defaultSlug = dedicatedSlugs[sub] || undefined;
 
+      // Pass 1: collect post candidates
+      const postCandidates: { text: string; matchedSlugs: string[]; postUrl: string; title: string; selftext: string; upvotes: number; postedAt: string; contentType: string; postId: string; numComments: number }[] = [];
       for (const child of posts) {
         const post = child.data;
         if (!post) continue;
@@ -176,40 +178,48 @@ Deno.serve(async (req) => {
 
         if (existingUrls.has(postUrl)) continue;
 
-        // Classify the post
-        const classification = await classifyPost(text, lovableApiKey);
-        summary.classified++;
+        postCandidates.push({ text, matchedSlugs, postUrl, title, selftext, upvotes, postedAt, contentType, postId: post.id, numComments });
+      }
 
+      // Pass 2: batch classify posts
+      const postClassifications = await classifyBatch(postCandidates.map(c => c.text), lovableApiKey);
+      summary.classified += postClassifications.length;
+
+      // Pass 3: insert posts and collect comments for high-engagement posts
+      const commentCandidates: { commentText: string; commentModels: string[]; commentUrl: string; title: string; commentScore: number; commentPostedAt: string }[] = [];
+      for (let i = 0; i < postCandidates.length; i++) {
+        const classification = postClassifications[i];
         if (!classification.relevant) continue;
+        const c = postCandidates[i];
 
-        for (const slug of matchedSlugs) {
+        for (const slug of c.matchedSlugs) {
           const modelId = modelMap[slug];
           if (!modelId) continue;
 
           const { error: insertErr } = await supabase.from("scraped_posts").upsert({
-            model_id: modelId, source: "reddit", source_url: postUrl,
-            title, content: selftext.slice(0, 2000),
+            model_id: modelId, source: "reddit", source_url: c.postUrl,
+            title: c.title, content: c.selftext.slice(0, 2000),
             sentiment: classification.sentiment, complaint_category: classification.complaint_category,
             praise_category: classification.praise_category,
-            confidence: classification.confidence, content_type: contentType,
-            score: upvotes, posted_at: postedAt,
+            confidence: classification.confidence, content_type: c.contentType,
+            score: c.upvotes, posted_at: c.postedAt,
           }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
 
           if (insertErr) {
             summary.errors.push(`Insert: ${insertErr.message}`);
           } else {
             summary.inserted++;
-            existingUrls.add(postUrl);
+            existingUrls.add(c.postUrl);
           }
         }
 
-        // Fetch and classify top comments for high-engagement posts
-        if (numComments >= COMMENT_SCORE_THRESHOLD) {
+        // Fetch comments for high-engagement posts
+        if (c.numComments >= COMMENT_SCORE_THRESHOLD) {
           await delay(DELAY_MS);
           reqIdx++;
           try {
             const commentsJson = await fetchJson(
-              `https://www.reddit.com/r/${sub}/comments/${post.id}.json?sort=top&limit=${MAX_TOP_COMMENTS}&raw_json=1`
+              `https://www.reddit.com/r/${sub}/comments/${c.postId}.json?sort=top&limit=${MAX_TOP_COMMENTS}&raw_json=1`
             );
             const commentListing = commentsJson?.[1]?.data?.children || [];
 
@@ -226,36 +236,46 @@ Deno.serve(async (req) => {
               if (commentModels.length === 0 && defaultSlug) commentModels.push(defaultSlug);
               if (commentModels.length === 0) continue;
 
-              const cClass = await classifyPost(commentText, lovableApiKey);
-              summary.comments_classified++;
-
-              if (!cClass.relevant) continue;
-
-              for (const slug of commentModels) {
-                const modelId = modelMap[slug];
-                if (!modelId) continue;
-
-                const { error: cInsertErr } = await supabase.from("scraped_posts").upsert({
-                  model_id: modelId, source: "reddit", source_url: commentUrl,
-                  title: `Comment on: ${title}`.slice(0, 500),
-                  content: commentText,
-                  sentiment: cClass.sentiment, complaint_category: cClass.complaint_category,
-                  praise_category: cClass.praise_category,
-                  confidence: cClass.confidence, content_type: "full_content",
-                  score: comment.score || 0, posted_at: new Date((comment.created_utc || 0) * 1000).toISOString(),
-                }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
-
-                if (cInsertErr) {
-                  summary.errors.push(`Comment insert: ${cInsertErr.message}`);
-                } else {
-                  summary.inserted++;
-                  existingUrls.add(commentUrl);
-                }
-              }
+              commentCandidates.push({ commentText, commentModels, commentUrl, title: c.title, commentScore: comment.score || 0, commentPostedAt: new Date((comment.created_utc || 0) * 1000).toISOString() });
             }
           } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);
-            summary.errors.push(`Comments ${post.id}: ${msg}`);
+            summary.errors.push(`Comments ${c.postId}: ${msg}`);
+          }
+        }
+      }
+
+      // Pass 4: batch classify comments
+      if (commentCandidates.length > 0) {
+        const commentClassifications = await classifyBatch(commentCandidates.map(c => c.commentText), lovableApiKey);
+        summary.comments_classified += commentClassifications.length;
+
+        // Pass 5: insert comments
+        for (let i = 0; i < commentCandidates.length; i++) {
+          const cClass = commentClassifications[i];
+          if (!cClass.relevant) continue;
+          const cc = commentCandidates[i];
+
+          for (const slug of cc.commentModels) {
+            const modelId = modelMap[slug];
+            if (!modelId) continue;
+
+            const { error: cInsertErr } = await supabase.from("scraped_posts").upsert({
+              model_id: modelId, source: "reddit", source_url: cc.commentUrl,
+              title: `Comment on: ${cc.title}`.slice(0, 500),
+              content: cc.commentText,
+              sentiment: cClass.sentiment, complaint_category: cClass.complaint_category,
+              praise_category: cClass.praise_category,
+              confidence: cClass.confidence, content_type: "full_content",
+              score: cc.commentScore, posted_at: cc.commentPostedAt,
+            }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
+
+            if (cInsertErr) {
+              summary.errors.push(`Comment insert: ${cInsertErr.message}`);
+            } else {
+              summary.inserted++;
+              existingUrls.add(cc.commentUrl);
+            }
           }
         }
       }

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyPost } from "../_shared/classifier.ts";
+import { classifyBatch } from "../_shared/classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -125,6 +125,8 @@ Deno.serve(async (req) => {
         const items = extractItems(xml);
         summary.items += items.length;
 
+        // Pass 1: collect candidates
+        const candidates: { classifyText: string; matchedSlugs: string[]; link: string; title: string; content: string; postedAt: string }[] = [];
         for (const itemXml of items) {
           const title = stripHtml(extractTag(itemXml, "title"));
           const link = extractTag(itemXml, "link");
@@ -148,26 +150,36 @@ Deno.serve(async (req) => {
           }
           if (allDuped) { summary.dedupSkipped++; continue; }
 
-          const classification = await classifyPost(`${title} ${content}`, lovableApiKey);
-          summary.classified++;
-          if (!classification.relevant) { summary.irrelevant++; continue; }
+          candidates.push({ classifyText: `${title} ${content}`, matchedSlugs, link, title, content, postedAt: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString() });
+        }
 
-          for (const slug of matchedSlugs) {
+        // Pass 2: batch classify
+        const classifications = await classifyBatch(candidates.map(c => c.classifyText), lovableApiKey);
+        summary.classified += classifications.length;
+        summary.irrelevant += classifications.filter(c => !c.relevant).length;
+
+        // Pass 3: insert
+        for (let i = 0; i < candidates.length; i++) {
+          const classification = classifications[i];
+          if (!classification.relevant) continue;
+          const c = candidates[i];
+
+          for (const slug of c.matchedSlugs) {
             const modelId = modelMap[slug];
-            if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
+            if (!modelId || isDuplicate(titleKeys, c.title, modelId)) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
-              model_id: modelId, source: "medium", source_url: link,
-              title: title.slice(0, 500), content: content.slice(0, 2000),
+              model_id: modelId, source: "medium", source_url: c.link,
+              title: c.title.slice(0, 500), content: c.content.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: "title_and_body",
               score: 0,
-              posted_at: pubDate ? new Date(pubDate).toISOString() : new Date().toISOString(),
+              posted_at: c.postedAt,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {
               summary.inserted++;
-              existingUrls.add(link);
-              titleKeys.add(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+              existingUrls.add(c.link);
+              titleKeys.add(`${modelId}:${c.title.slice(0, 80).toLowerCase()}`);
             }
           }
         }

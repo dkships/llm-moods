@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyPost } from "../_shared/classifier.ts";
+import { classifyBatch } from "../_shared/classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -154,7 +154,8 @@ Deno.serve(async (req) => {
 
     summary.fetched = allStatuses.size;
 
-    // Phase 3: Process all collected statuses
+    // Phase 3: Collect candidates from all statuses
+    const candidates: { content: string; matchedSlugs: string[]; sourceUrl: string; score: number; postedAt: string }[] = [];
     for (const [sourceUrl, status] of allStatuses) {
       const createdAt = new Date(status.created_at);
       if (createdAt < cutoff) continue;
@@ -172,26 +173,35 @@ Deno.serve(async (req) => {
 
       if (existingUrls.has(sourceUrl)) { summary.dedupSkipped++; continue; }
 
-      const classification = await classifyPost(content, lovableApiKey);
-      summary.classified++;
-      if (!classification.relevant) { summary.irrelevant++; continue; }
-
       const score = (status.favourites_count || 0) + (status.reblogs_count || 0);
+      candidates.push({ content, matchedSlugs, sourceUrl, score, postedAt: status.created_at });
+    }
 
-      for (const slug of matchedSlugs) {
+    // Pass 2: batch classify
+    const classifications = await classifyBatch(candidates.map(c => c.content), lovableApiKey);
+    summary.classified = classifications.length;
+    summary.irrelevant = classifications.filter(c => !c.relevant).length;
+
+    // Pass 3: insert
+    for (let i = 0; i < candidates.length; i++) {
+      const classification = classifications[i];
+      if (!classification.relevant) continue;
+      const c = candidates[i];
+
+      for (const slug of c.matchedSlugs) {
         const modelId = modelMap[slug];
         if (!modelId) continue;
         const { error } = await supabase.from("scraped_posts").upsert({
-          model_id: modelId, source: "mastodon", source_url: sourceUrl,
-          title: content.slice(0, 120), content: content.slice(0, 2000),
+          model_id: modelId, source: "mastodon", source_url: c.sourceUrl,
+          title: c.content.slice(0, 120), content: c.content.slice(0, 2000),
           sentiment: classification.sentiment, complaint_category: classification.complaint_category,
           praise_category: classification.praise_category,
           confidence: classification.confidence, content_type: "full_content",
-          score, posted_at: status.created_at,
+          score: c.score, posted_at: c.postedAt,
         }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
         if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
           summary.inserted++;
-          existingUrls.add(sourceUrl);
+          existingUrls.add(c.sourceUrl);
         }
       }
     }

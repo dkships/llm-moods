@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyPost } from "../_shared/classifier.ts";
+import { classifyBatch } from "../_shared/classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -100,6 +100,8 @@ Deno.serve(async (req) => {
           const hits = data.hits || [];
           if (hits.length === 0) break;
 
+          // Pass 1: collect candidates
+          const hnCandidates: { text: string; matchedSlugs: string[]; sourceUrl: string; title: string; score: number; postedAt: string }[] = [];
           for (const hit of hits) {
             const sourceUrl = hit.url || `https://news.ycombinator.com/item?id=${hit.objectID}`;
             if (existingUrls.has(sourceUrl)) continue;
@@ -109,23 +111,32 @@ Deno.serve(async (req) => {
             const matchedSlugs = matchModels(text);
             if (matchedSlugs.length === 0) continue;
 
-            const classification = await classifyPost(text, apiKey);
-            if (!classification.relevant) continue;
+            hnCandidates.push({ text, matchedSlugs, sourceUrl, title, score: hit.points || 0, postedAt: hit.created_at || new Date().toISOString() });
+          }
 
-            for (const slug of matchedSlugs) {
+          // Pass 2: batch classify
+          const hnClassifications = await classifyBatch(hnCandidates.map(c => c.text), apiKey);
+
+          // Pass 3: insert
+          for (let j = 0; j < hnCandidates.length; j++) {
+            const classification = hnClassifications[j];
+            if (!classification.relevant) continue;
+            const c = hnCandidates[j];
+
+            for (const slug of c.matchedSlugs) {
               const modelId = modelMap[slug];
               if (!modelId) continue;
               const { error } = await supabase.from("scraped_posts").upsert({
-                model_id: modelId, source: "hackernews", source_url: sourceUrl,
-                title: title.slice(0, 500), content: null,
+                model_id: modelId, source: "hackernews", source_url: c.sourceUrl,
+                title: c.title.slice(0, 500), content: null,
                 sentiment: classification.sentiment, complaint_category: classification.complaint_category,
                 praise_category: classification.praise_category,
                 confidence: classification.confidence, content_type: "title_only",
-                score: hit.points || 0, posted_at: hit.created_at || new Date().toISOString(),
+                score: c.score, posted_at: c.postedAt,
                 is_backfill: true,
               }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
               if (!error) {
-                existingUrls.add(sourceUrl);
+                existingUrls.add(c.sourceUrl);
                 addTotal("hackernews", slug);
               }
             }
@@ -155,6 +166,8 @@ Deno.serve(async (req) => {
 
           if (posts.length === 0) break;
 
+          // Pass 1: collect candidates
+          const bskyCandidates: { text: string; matchedSlugs: string[]; sourceUrl: string; score: number; createdAt: string }[] = [];
           for (const post of posts) {
             const text = post.record?.text || "";
             const sourceUrl = `https://bsky.app/profile/${post.author?.handle || "unknown"}/post/${post.uri?.split("/").pop() || ""}`;
@@ -167,25 +180,33 @@ Deno.serve(async (req) => {
             const matchedSlugs = matchModels(text);
             if (matchedSlugs.length === 0) continue;
 
-            const classification = await classifyPost(text, apiKey);
-            if (!classification.relevant) continue;
-
             const score = (post.likeCount || 0) + (post.repostCount || 0);
+            bskyCandidates.push({ text, matchedSlugs, sourceUrl, score, createdAt: createdAt || new Date().toISOString() });
+          }
 
-            for (const slug of matchedSlugs) {
+          // Pass 2: batch classify
+          const bskyClassifications = await classifyBatch(bskyCandidates.map(c => c.text), apiKey);
+
+          // Pass 3: insert
+          for (let j = 0; j < bskyCandidates.length; j++) {
+            const classification = bskyClassifications[j];
+            if (!classification.relevant) continue;
+            const c = bskyCandidates[j];
+
+            for (const slug of c.matchedSlugs) {
               const modelId = modelMap[slug];
               if (!modelId) continue;
               const { error } = await supabase.from("scraped_posts").upsert({
-                model_id: modelId, source: "bluesky", source_url: sourceUrl,
-                title: text.slice(0, 120), content: text.slice(0, 2000),
+                model_id: modelId, source: "bluesky", source_url: c.sourceUrl,
+                title: c.text.slice(0, 120), content: c.text.slice(0, 2000),
                 sentiment: classification.sentiment, complaint_category: classification.complaint_category,
                 praise_category: classification.praise_category,
                 confidence: classification.confidence, content_type: "full_content",
-                score, posted_at: createdAt || new Date().toISOString(),
+                score: c.score, posted_at: c.createdAt,
                 is_backfill: true,
               }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
               if (!error) {
-                existingUrls.add(sourceUrl);
+                existingUrls.add(c.sourceUrl);
                 addTotal("bluesky", slug);
               }
             }
@@ -212,6 +233,8 @@ Deno.serve(async (req) => {
 
           if (submissions.length === 0) continue;
 
+          // Pass 1: collect candidates
+          const redditCandidates: { text: string; matchedSlugs: string[]; postUrl: string; title: string; selftext: string; score: number; postedAt: string; contentType: string }[] = [];
           for (const post of submissions) {
             const postUrl = `https://www.reddit.com${post.permalink || `/r/${sub}/comments/${post.id}`}`;
             if (existingUrls.has(postUrl)) continue;
@@ -222,26 +245,34 @@ Deno.serve(async (req) => {
             const matchedSlugs = matchModels(text);
             if (matchedSlugs.length === 0) continue;
 
-            const classification = await classifyPost(text, apiKey);
-            if (!classification.relevant) continue;
-
             const contentType = selftext.trim() ? "title_and_body" : "title_only";
             const postedAt = post.created_utc ? new Date(post.created_utc * 1000).toISOString() : new Date().toISOString();
+            redditCandidates.push({ text, matchedSlugs, postUrl, title, selftext, score: post.score || 0, postedAt, contentType });
+          }
 
-            for (const slug of matchedSlugs) {
+          // Pass 2: batch classify
+          const redditClassifications = await classifyBatch(redditCandidates.map(c => c.text), apiKey);
+
+          // Pass 3: insert
+          for (let j = 0; j < redditCandidates.length; j++) {
+            const classification = redditClassifications[j];
+            if (!classification.relevant) continue;
+            const c = redditCandidates[j];
+
+            for (const slug of c.matchedSlugs) {
               const modelId = modelMap[slug];
               if (!modelId) continue;
               const { error } = await supabase.from("scraped_posts").upsert({
-                model_id: modelId, source: "reddit", source_url: postUrl,
-                title, content: selftext.slice(0, 2000),
+                model_id: modelId, source: "reddit", source_url: c.postUrl,
+                title: c.title, content: c.selftext.slice(0, 2000),
                 sentiment: classification.sentiment, complaint_category: classification.complaint_category,
                 praise_category: classification.praise_category,
-                confidence: classification.confidence, content_type: contentType,
-                score: post.score || 0, posted_at: postedAt,
+                confidence: classification.confidence, content_type: c.contentType,
+                score: c.score, posted_at: c.postedAt,
                 is_backfill: true,
               }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
               if (!error) {
-                existingUrls.add(postUrl);
+                existingUrls.add(c.postUrl);
                 addTotal("reddit", slug);
               }
             }

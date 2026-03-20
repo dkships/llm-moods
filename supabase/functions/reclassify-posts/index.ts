@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyPost } from "../_shared/classifier.ts";
+import { classifyBatch } from "../_shared/classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -38,14 +38,24 @@ Deno.serve(async (req) => {
 
     let classified = 0, irrelevant = 0, errors = 0;
 
+    // Pass 1: collect candidates
+    const candidates: { id: string; text: string }[] = [];
     for (const post of posts) {
       const text = `${post.title || ""} ${post.content || ""}`.trim();
       if (!text) { errors++; continue; }
+      candidates.push({ id: post.id, text });
+    }
 
-      const result = await classifyPost(text, apiKey, logError);
+    // Pass 2: batch classify
+    const classifications = await classifyBatch(candidates.map(c => c.text), apiKey, undefined, logError);
+
+    // Pass 3: update/delete
+    for (let i = 0; i < candidates.length; i++) {
+      const result = classifications[i];
+      const c = candidates[i];
 
       if (!result.relevant) {
-        await supabase.from("scraped_posts").delete().eq("id", post.id);
+        await supabase.from("scraped_posts").delete().eq("id", c.id);
         irrelevant++;
       } else {
         await supabase.from("scraped_posts").update({
@@ -53,11 +63,9 @@ Deno.serve(async (req) => {
           complaint_category: result.complaint_category,
           praise_category: result.praise_category,
           confidence: result.confidence,
-        }).eq("id", post.id);
+        }).eq("id", c.id);
         classified++;
       }
-
-      await delay(100);
     }
 
     const { count } = await supabase

@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyPost } from "../_shared/classifier.ts";
+import { classifyBatch } from "../_shared/classifier.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -105,6 +105,8 @@ Deno.serve(async (req) => {
         const hits = data.hits || [];
         summary.stories += hits.length;
 
+        // Pass 1: collect story candidates
+        const storyCandidates: { text: string; matchedSlugs: string[]; sourceUrl: string; title: string; score: number; postedAt: string }[] = [];
         for (const hit of hits) {
           if (!hit.title || !isEnglish(hit.title)) continue;
           if (!meetsMinLength(hit.title, "")) { summary.contentSkipped++; continue; }
@@ -121,25 +123,35 @@ Deno.serve(async (req) => {
           }
           if (allDuped) { summary.dedupSkipped++; continue; }
 
-          const classification = await classifyPost(hit.title, lovableApiKey);
-          summary.classified++;
-          if (!classification.relevant) { summary.irrelevant++; continue; }
+          storyCandidates.push({ text: hit.title, matchedSlugs, sourceUrl, title: hit.title, score: hit.points || 0, postedAt: hit.created_at || new Date().toISOString() });
+        }
 
-          for (const slug of matchedSlugs) {
+        // Pass 2: batch classify stories
+        const storyClassifications = await classifyBatch(storyCandidates.map(c => c.text), lovableApiKey);
+        summary.classified += storyClassifications.length;
+        summary.irrelevant += storyClassifications.filter(c => !c.relevant).length;
+
+        // Pass 3: insert stories
+        for (let i = 0; i < storyCandidates.length; i++) {
+          const classification = storyClassifications[i];
+          if (!classification.relevant) continue;
+          const c = storyCandidates[i];
+
+          for (const slug of c.matchedSlugs) {
             const modelId = modelMap[slug];
-            if (!modelId || isDuplicate(titleKeys, hit.title, modelId)) continue;
+            if (!modelId || isDuplicate(titleKeys, c.title, modelId)) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
-              model_id: modelId, source: "hackernews", source_url: sourceUrl,
-              title: hit.title.slice(0, 500), content: hit.title.slice(0, 2000),
+              model_id: modelId, source: "hackernews", source_url: c.sourceUrl,
+              title: c.title.slice(0, 500), content: c.title.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: "title_only",
-              score: hit.points || 0, posted_at: hit.created_at || new Date().toISOString(),
+              score: c.score, posted_at: c.postedAt,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {
               summary.inserted++;
-              existingUrls.add(sourceUrl);
-              titleKeys.add(`${modelId}:${hit.title.slice(0, 80).toLowerCase()}`);
+              existingUrls.add(c.sourceUrl);
+              titleKeys.add(`${modelId}:${c.title.slice(0, 80).toLowerCase()}`);
             }
           }
         }
@@ -156,6 +168,8 @@ Deno.serve(async (req) => {
         const hits = data.hits || [];
         summary.comments += hits.length;
 
+        // Pass 1: collect comment candidates
+        const commentCandidates: { text: string; matchedSlugs: string[]; sourceUrl: string; score: number; postedAt: string }[] = [];
         for (const hit of hits) {
           const text = (hit.comment_text || "").replace(/<[^>]*>/g, "");
           if (!text || !isEnglish(text)) continue;
@@ -166,25 +180,35 @@ Deno.serve(async (req) => {
           const matchedSlugs = matchModels(text, keywords);
           if (matchedSlugs.length === 0) continue;
 
-          const classification = await classifyPost(text, lovableApiKey);
-          summary.classified++;
-          if (!classification.relevant) { summary.irrelevant++; continue; }
+          commentCandidates.push({ text, matchedSlugs, sourceUrl, score: hit.points || 0, postedAt: hit.created_at || new Date().toISOString() });
+        }
 
-          for (const slug of matchedSlugs) {
+        // Pass 2: batch classify comments
+        const commentClassifications = await classifyBatch(commentCandidates.map(c => c.text), lovableApiKey);
+        summary.classified += commentClassifications.length;
+        summary.irrelevant += commentClassifications.filter(c => !c.relevant).length;
+
+        // Pass 3: insert comments
+        for (let i = 0; i < commentCandidates.length; i++) {
+          const classification = commentClassifications[i];
+          if (!classification.relevant) continue;
+          const c = commentCandidates[i];
+
+          for (const slug of c.matchedSlugs) {
             const modelId = modelMap[slug];
-            if (!modelId || isDuplicate(titleKeys, text.slice(0, 200), modelId)) continue;
+            if (!modelId || isDuplicate(titleKeys, c.text.slice(0, 200), modelId)) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
-              model_id: modelId, source: "hackernews", source_url: sourceUrl,
-              title: text.slice(0, 200), content: text.slice(0, 2000),
+              model_id: modelId, source: "hackernews", source_url: c.sourceUrl,
+              title: c.text.slice(0, 200), content: c.text.slice(0, 2000),
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: "full_content",
-              score: hit.points || 0, posted_at: hit.created_at || new Date().toISOString(),
+              score: c.score, posted_at: c.postedAt,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {
               summary.inserted++;
-              existingUrls.add(sourceUrl);
-              titleKeys.add(`${modelId}:${text.slice(0, 80).toLowerCase()}`);
+              existingUrls.add(c.sourceUrl);
+              titleKeys.add(`${modelId}:${c.text.slice(0, 80).toLowerCase()}`);
             }
           }
         }
