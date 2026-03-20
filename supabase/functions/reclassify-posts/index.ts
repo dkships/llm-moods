@@ -13,7 +13,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const apiKey = Deno.env.get("LOVABLE_API_KEY")!;
+  const apiKey = Deno.env.get("GEMINI_API_KEY")!;
 
   const logError = async (msg: string, ctx?: string) => {
     try { await supabase.from("error_log").insert({ function_name: "reclassify-posts", error_message: msg, context: ctx || null }); } catch {}

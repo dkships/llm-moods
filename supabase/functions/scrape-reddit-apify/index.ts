@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "APIFY_API_TOKEN not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+    const lovableApiKey = Deno.env.get("GEMINI_API_KEY")!;
     await logToErrorLog(supabase, "Reddit Apify scraper started (v2 - tiered matching)", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);

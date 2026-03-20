@@ -71,7 +71,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   try {
-    const apiKey = Deno.env.get("LOVABLE_API_KEY")!;
+    const apiKey = Deno.env.get("GEMINI_API_KEY")!;
     await log(supabase, "Backfill started", "health-check");
 
     const { data: models } = await supabase.from("models").select("id, slug");

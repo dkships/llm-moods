@@ -50,11 +50,11 @@ export async function classifyPost(
   logError?: (msg: string, ctx?: string) => Promise<void>,
 ): Promise<ClassifyResult> {
   try {
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const res = await fetch("https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "google/gemini-2.5-flash-lite",
+        model: "gemini-2.0-flash-lite",
         messages: [{ role: "user", content: CLASSIFY_PROMPT + text.slice(0, 600) }],
       }),
     });

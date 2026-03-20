@@ -84,7 +84,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   try {
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+    const lovableApiKey = Deno.env.get("GEMINI_API_KEY")!;
     await logToErrorLog(supabase, "Lemmy scraper started (v2 - tiered matching)", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);

@@ -113,7 +113,7 @@ Deno.serve(async (req) => {
 
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+    const lovableApiKey = Deno.env.get("GEMINI_API_KEY")!;
 
     await logToErrorLog(supabase, "scrape-reddit", "JSON API scraper started", "health-check");
 

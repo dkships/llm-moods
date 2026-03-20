@@ -396,11 +396,11 @@ Deno.serve(async (req) => {
       );
     }
 
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    const lovableApiKey = Deno.env.get("GEMINI_API_KEY");
     if (apifyToken && !lovableApiKey) {
-      await logToErrorLog(supabase, "LOVABLE_API_KEY not set — required for Apify path sentiment classification", "config-error");
+      await logToErrorLog(supabase, "GEMINI_API_KEY not set — required for Apify path sentiment classification", "config-error");
       return new Response(
-        JSON.stringify({ error: "LOVABLE_API_KEY not configured (required for Apify path)" }),
+        JSON.stringify({ error: "GEMINI_API_KEY not configured (required for Apify path)" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
