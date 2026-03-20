@@ -45,5 +45,8 @@ verify_jwt = false
 [functions.scrape-github]
 verify_jwt = false
 
+[functions.scrape-twitter]
+verify_jwt = false
+
 [functions.backfill-historical]
 verify_jwt = false
