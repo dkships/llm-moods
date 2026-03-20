@@ -110,19 +110,20 @@ async function runApifyPath(
     backend: "apify" as const,
   };
 
-  // Step 1 — Start actor run
-  const startUrl = `https://api.apify.com/v2/acts/apidojo~tweet-scraper/runs?token=${apifyToken}`;
-  const yesterday = new Date(Date.now() - 24 * 3600000).toISOString().split("T")[0];
-  const today = new Date().toISOString().split("T")[0];
-  // Use Twitter search operators for date/language filtering inside searchTerms
-  const baseTerms = [
+  // Step 1 — Start actor run (scrape.badger/twitter-tweets-scraper)
+  const startUrl = `https://api.apify.com/v2/acts/scrape.badger~twitter-tweets-scraper/runs?token=${apifyToken}`;
+  const yesterday = new Date(Date.now() - 24 * 3600000);
+  const sinceDate = yesterday.toISOString().split("T")[0];
+  const searchTerms = [
     "Claude AI", "ChatGPT", "Gemini AI", "Grok AI",
     "DeepSeek", "Perplexity AI", "GitHub Copilot", "Llama AI", "Mistral AI",
   ];
+  const queryStr = searchTerms.map(t => `"${t}"`).join(" OR ") + ` since:${sinceDate} lang:en`;
   const apifyInput = {
-    searchTerms: baseTerms.map(t => `${t} lang:en since:${yesterday} until:${today}`),
-    maxItems: 200,
-    sort: "Latest",
+    mode: "Advanced Search",
+    query: queryStr,
+    query_type: "Latest",
+    max_results: 200,
   };
 
   const startRes = await fetch(startUrl, {
@@ -169,22 +170,19 @@ async function runApifyPath(
   const rawItems = await datasetRes.json();
   if (!Array.isArray(rawItems)) throw new Error("Invalid dataset response");
 
-  // Filter out noResults placeholders and non-tweet items
-  const items = rawItems.filter((item: any) => item.type === "tweet" || (item.text && !item.noResults));
+  // Filter out non-tweet items
+  const items = rawItems.filter((item: any) => item.id && item.text);
   await logToErrorLog(supabase, `Apify raw=${rawItems.length} tweets=${items.length}`, "apify-debug");
 
   const cutoff = new Date(Date.now() - 24 * 3600000);
   summary.fetched = items.length;
 
   for (const tweet of items) {
-    // Skip retweets
-    if (tweet.isRetweet) continue;
-
-    // Parse tweet date — Apify format: "Fri Nov 24 17:49:36 +0000 2023" or ISO
-    const createdAt = new Date(tweet.createdAt);
+    // Parse tweet date — scrape.badger format: ISO "2025-05-15T12:00:00+00:00"
+    const createdAt = new Date(tweet.created_at);
     if (isNaN(createdAt.getTime()) || createdAt < cutoff) continue;
 
-    const text = (tweet.text || tweet.full_text || "").slice(0, 2000);
+    const text = (tweet.text || "").slice(0, 2000);
     if (!text) continue;
 
     // Check lang field if available, otherwise use heuristic
@@ -197,9 +195,10 @@ async function runApifyPath(
     summary.filtered++;
 
     // Build source URL
-    const sourceUrl = tweet.url || (tweet.author?.userName
-      ? `https://x.com/${tweet.author.userName}/status/${tweet.id}`
-      : "");
+    const screenName = tweet.user?.screen_name || tweet.screen_name || "";
+    const sourceUrl = screenName
+      ? `https://x.com/${screenName}/status/${tweet.id}`
+      : "";
     if (!sourceUrl || existingUrls.has(sourceUrl)) { summary.dedupSkipped++; continue; }
 
     let allDuped = true;
@@ -223,7 +222,7 @@ async function runApifyPath(
         sentiment: classification.sentiment, complaint_category: classification.complaint_category,
         praise_category: classification.praise_category,
         confidence: classification.confidence, content_type: "title_only",
-        score: (tweet.likeCount || 0) + (tweet.retweetCount || 0),
+        score: (tweet.favorite_count || 0) + (tweet.retweet_count || 0),
         posted_at: createdAt.toISOString(),
       }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
       if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
