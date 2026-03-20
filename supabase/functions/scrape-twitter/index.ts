@@ -71,7 +71,7 @@ function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): bo
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
 async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
-  try { await supabase.from("error_log").insert({ function_name: "scrape-twitter", error_message: msg, context: ctx || null }); } catch {}
+  try { await supabase.from("error_log").insert({ function_name: "scrape-twitter", error_message: msg, context: ctx || null }); } catch (e) { console.error("logToErrorLog failed:", msg, e); }
 }
 
 const GROK_SEARCH_PROMPT = `Search X/Twitter for recent posts (last 24 hours) about these AI models: Claude, ChatGPT, GPT-4, GPT-4o, Gemini, Grok, DeepSeek, Perplexity, GitHub Copilot, Llama, Mistral.
@@ -147,8 +147,8 @@ async function runApifyPath(
     throw new Error("Missing runId from Apify");
   }
 
-  // Step 2 — Poll status (10s intervals, max 24 polls = 4 min)
-  const maxPolls = 24;
+  // Step 2 — Poll status (10s intervals, max 12 polls = 2 min to stay within Edge Function wall-clock limits)
+  const maxPolls = 12;
   let runStatus = "";
   for (let i = 0; i < maxPolls; i++) {
     await delay(10000);
@@ -239,6 +239,18 @@ async function runApifyPath(
   return summary;
 }
 
+const VALID_SENTIMENTS = new Set(["positive", "negative", "neutral"]);
+const VALID_COMPLAINTS = new Set([
+  "lazy_responses", "hallucinations", "refusals", "coding_quality", "speed",
+  "general_drop", "pricing_value", "censorship", "context_window",
+  "api_reliability", "multimodal_quality", "reasoning",
+]);
+const VALID_PRAISES = new Set([
+  "output_quality", "coding_quality", "speed", "reasoning", "creativity",
+  "value", "reliability", "context_handling", "multimodal_quality",
+  "general_improvement",
+]);
+
 // ─── Grok path (fallback) ─────────────────────────────────────────────────────
 
 async function runGrokPath(
@@ -326,10 +338,15 @@ async function runGrokPath(
     }
     if (allDuped) { summary.dedupSkipped++; continue; }
 
-    // Grok already classified — skip Gemini
-    if (!post.sentiment) { summary.irrelevant++; continue; }
+    // Grok already classified — validate against allowed values before inserting
+    const sentiment = VALID_SENTIMENTS.has(post.sentiment) ? post.sentiment : null;
+    if (!sentiment) { summary.irrelevant++; continue; }
     summary.classified++;
 
+    const complaint = VALID_COMPLAINTS.has(post.complaint_category) ? post.complaint_category : null;
+    const praise = VALID_PRAISES.has(post.praise_category) ? post.praise_category : null;
+    const confidence = typeof post.confidence === "number" && post.confidence >= 0 && post.confidence <= 1
+      ? post.confidence : 0.5;
     const postedAt = post.posted_at ? new Date(post.posted_at).toISOString() : new Date().toISOString();
 
     for (const slug of matchedSlugs) {
@@ -338,9 +355,9 @@ async function runGrokPath(
       const { error } = await supabase.from("scraped_posts").upsert({
         model_id: modelId, source: "twitter", source_url: sourceUrl,
         title: title.slice(0, 120), content: text.slice(0, 2000),
-        sentiment: post.sentiment, complaint_category: post.complaint_category || null,
-        praise_category: post.praise_category || null,
-        confidence: typeof post.confidence === "number" ? post.confidence : 0.5,
+        sentiment, complaint_category: complaint,
+        praise_category: praise,
+        confidence,
         content_type: "title_only",
         score: 0, // Grok doesn't provide engagement metrics
         posted_at: postedAt,
@@ -364,17 +381,25 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   try {
-    const apifyToken = Deno.env.get("APIFY_TOKEN") || Deno.env.get("APIFY_API_TOKEN");
+    const apifyToken = Deno.env.get("APIFY_API_TOKEN");
     const xaiApiKey = Deno.env.get("XAI_API_KEY");
 
     if (!apifyToken && !xaiApiKey) {
       return new Response(
-        JSON.stringify({ skipped: true, reason: "No X credentials (set APIFY_TOKEN or XAI_API_KEY)" }),
+        JSON.stringify({ skipped: true, reason: "No X credentials (set APIFY_API_TOKEN or XAI_API_KEY)" }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
+    const lovableApiKey = Deno.env.get("LOVABLE_API_KEY");
+    if (apifyToken && !lovableApiKey) {
+      await logToErrorLog(supabase, "LOVABLE_API_KEY not set — required for Apify path sentiment classification", "config-error");
+      return new Response(
+        JSON.stringify({ error: "LOVABLE_API_KEY not configured (required for Apify path)" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
     await logToErrorLog(supabase, "Twitter scraper started", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
@@ -386,7 +411,7 @@ Deno.serve(async (req) => {
 
     let summary;
     if (apifyToken) {
-      summary = await runApifyPath(supabase, apifyToken, modelMap, keywords, existingUrls, titleKeys, lovableApiKey);
+      summary = await runApifyPath(supabase, apifyToken, modelMap, keywords, existingUrls, titleKeys, lovableApiKey!);
     } else {
       summary = await runGrokPath(supabase, xaiApiKey!, modelMap, keywords, existingUrls, titleKeys);
     }
