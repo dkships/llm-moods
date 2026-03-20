@@ -3,7 +3,7 @@ import { TrendingUp, TrendingDown, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useState, useEffect, useRef, lazy, Suspense } from "react";
+import { useState, lazy, Suspense } from "react";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import usePageTitle from "@/hooks/usePageTitle";
@@ -39,21 +39,7 @@ const ModelDetail = () => {
   const { data: complaints, isLoading: complaintsLoading, isError: complaintsError } = useComplaintBreakdown(model?.id);
   const { data: sources, isLoading: sourcesLoading, isError: sourcesError } = useSourceBreakdown(model?.id);
 
-  // Lazy load recent posts when user scrolls near
-  const postsRef = useRef<HTMLDivElement>(null);
-  const [postsVisible, setPostsVisible] = useState(false);
-  useEffect(() => {
-    const el = postsRef.current;
-    if (!el) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => { if (entry.isIntersecting) { setPostsVisible(true); observer.disconnect(); } },
-      { rootMargin: "300px" }
-    );
-    observer.observe(el);
-    return () => observer.disconnect();
-  }, []);
-
-  const { data: recentPosts, isLoading: postsLoading, isError: postsError } = useModelPosts(model?.id, 25, postsVisible);
+  const { data: recentPosts, isLoading: postsLoading, isError: postsError } = useModelPosts(model?.id, 25);
 
   const enriched = allModels?.find((m) => m.slug === slug);
   const latestScore = enriched?.latestScore ?? 50;
@@ -150,7 +136,7 @@ const ModelDetail = () => {
               </div>
             </div>
             <p className="mt-2 text-sm text-muted-foreground font-mono">
-              Sentiment based on {totalPosts.toLocaleString()} posts from the last 24 hours across Bluesky, Mastodon, and Hacker News.
+              Sentiment based on {totalPosts.toLocaleString()} posts over the last 7 days across Bluesky, Mastodon, and Hacker News.
             </p>
           </motion.div>
         </section>
@@ -272,7 +258,7 @@ const ModelDetail = () => {
         </section>
 
         {/* Recent Posts — lazy loaded on scroll */}
-        <section className="container pb-20" ref={postsRef}>
+        <section className="container pb-20">
           <motion.h2
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -285,7 +271,7 @@ const ModelDetail = () => {
 
           {postsError ? (
             <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
-          ) : !postsVisible || postsLoading ? (
+          ) : postsLoading ? (
             <div className="space-y-3">
               {Array.from({ length: 5 }).map((_, i) => <ChatterSkeleton key={i} />)}
             </div>

@@ -97,7 +97,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
                 {m.trend.direction === "up" ? "up" : "down"} {m.trend.pts} pts from yesterday
               </span>
             </div>
-            <span className="text-muted-foreground">Based on {(m.totalPosts || 0).toLocaleString()} posts</span>
+            <span className="text-muted-foreground">Based on {(m.totalPosts || 0).toLocaleString()} posts (7d)</span>
           </div>
 
           {m.topComplaint && (

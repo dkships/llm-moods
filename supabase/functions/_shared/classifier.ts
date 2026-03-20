@@ -4,9 +4,11 @@ const MODEL = "gemini-2.5-flash-lite";
 export const CLASSIFY_PROMPT = `You are classifying a social media post about AI language models (ChatGPT, Claude, Gemini, Grok, DeepSeek, Perplexity, etc).
 
 STEP 1 — RELEVANCE
-Is this post about a user's direct experience with an AI model's quality, output, or behavior?
-- RELEVANT: "Claude keeps refusing my coding requests", "GPT-4 just hallucinated my entire bibliography", "Gemini is incredible at math now"
-- NOT RELEVANT: "OpenAI raised $6B", "Sam Altman tweeted about AGI", "AI will replace jobs", "Here's a tutorial on using the ChatGPT API"
+Is this post expressing an opinion about an AI model's quality, behavior, or usefulness?
+- RELEVANT: direct experience, quality complaints/praise, model comparisons, switching decisions, trend observations
+  Examples: "Claude keeps refusing my coding requests", "GPT-4 just hallucinated my bibliography", "Claude is way better than GPT for coding", "has anyone noticed Gemini getting worse?", "I switched from ChatGPT to Claude"
+- NOT RELEVANT: pure news/funding, job market opinions, tutorials with no quality opinion, company strategy/business moves
+  Examples: "OpenAI raised $6B", "Here's a tutorial on using the ChatGPT API", "AI will replace jobs", "Sam Altman tweeted about AGI"
 
 If not relevant, return {"relevant": false, "sentiment": null, "complaint_category": null, "praise_category": null, "confidence": 0.0}
 
@@ -35,9 +37,11 @@ const BATCH_CLASSIFY_PROMPT = `You are classifying social media posts about AI l
 
 For EACH post, determine:
 
-RELEVANCE: Is this about a user's direct experience with an AI model's quality, output, or behavior?
-- RELEVANT: complaints, praise, comparisons of output quality
-- NOT RELEVANT: news, funding, tutorials, general AI opinions
+RELEVANCE: Is this post expressing an opinion about an AI model's quality, behavior, or usefulness?
+- RELEVANT: direct experience, quality complaints/praise, model comparisons, switching decisions, trend observations
+  Examples: "Claude keeps refusing my coding requests", "GPT-4 just hallucinated my bibliography", "Claude is way better than GPT for coding", "has anyone noticed Gemini getting worse?", "I switched from ChatGPT to Claude"
+- NOT RELEVANT: pure news/funding, job market opinions, tutorials with no quality opinion, company strategy/business moves
+  Examples: "OpenAI raised $6B", "Here's a tutorial on using the ChatGPT API", "AI will replace jobs"
 
 SENTIMENT (if relevant):
 - "positive": praising, impressed, satisfied

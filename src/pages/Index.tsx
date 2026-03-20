@@ -62,7 +62,7 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
             <div className="mt-3 flex items-center justify-between">
               <TrendIcon trend={m.trend.direction} />
               <span className="text-xs font-mono text-muted-foreground">
-                {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts analyzed` : "Tracking"}
+                {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts (7d)` : "Tracking"}
               </span>
             </div>
           </div>
