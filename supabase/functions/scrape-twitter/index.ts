@@ -175,19 +175,19 @@ async function runApifyPath(
   const rawItems = await datasetRes.json();
   if (!Array.isArray(rawItems)) throw new Error("Invalid dataset response");
 
-  // Filter out noResults placeholders and non-tweet items
-  const items = rawItems.filter((item: any) => item.type === "tweet" || (item.text && !item.noResults));
+  // Filter items that have text content (handles both actor output formats)
+  const items = rawItems.filter((item: any) => item.text || item.full_text);
   await logToErrorLog(supabase, `Apify raw=${rawItems.length} tweets=${items.length}`, "apify-debug");
 
   const cutoff = new Date(Date.now() - 24 * 3600000);
   summary.fetched = items.length;
 
   for (const tweet of items) {
-    // Skip retweets
-    if (tweet.isRetweet) continue;
+    // Skip retweets (handle both field naming conventions)
+    if (tweet.isRetweet || tweet.is_retweet) continue;
 
-    // Parse tweet date — Apify format: "Fri Nov 24 17:49:36 +0000 2023" or ISO
-    const createdAt = new Date(tweet.createdAt);
+    // Parse tweet date (handle both camelCase and snake_case actor formats)
+    const createdAt = new Date(tweet.created_at || tweet.createdAt);
     if (isNaN(createdAt.getTime()) || createdAt < cutoff) continue;
 
     const text = (tweet.text || tweet.full_text || "").slice(0, 2000);
@@ -202,9 +202,10 @@ async function runApifyPath(
     if (matchedSlugs.length === 0) continue;
     summary.filtered++;
 
-    // Build source URL
-    const sourceUrl = tweet.url || (tweet.author?.userName
-      ? `https://x.com/${tweet.author.userName}/status/${tweet.id}`
+    // Build source URL (handle both actor output formats)
+    const screenName = tweet.user?.screen_name || tweet.screen_name || tweet.author?.userName || "";
+    const sourceUrl = tweet.url || (screenName
+      ? `https://x.com/${screenName}/status/${tweet.id}`
       : "");
     if (!sourceUrl || existingUrls.has(sourceUrl)) { summary.dedupSkipped++; continue; }
 
@@ -229,7 +230,7 @@ async function runApifyPath(
         sentiment: classification.sentiment, complaint_category: classification.complaint_category,
         praise_category: classification.praise_category,
         confidence: classification.confidence, content_type: "title_only",
-        score: (tweet.likeCount || 0) + (tweet.retweetCount || 0),
+        score: (tweet.favorite_count || tweet.likeCount || 0) + (tweet.retweet_count || tweet.retweetCount || 0),
         posted_at: createdAt.toISOString(),
       }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
       if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
