@@ -92,16 +92,23 @@ export async function classifyPost(
   logError?: (msg: string, ctx?: string) => Promise<void>,
 ): Promise<ClassifyResult> {
   try {
-    const res = await fetch(API_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: "user", content: CLASSIFY_PROMPT + text.slice(0, 600) }],
-      }),
-    });
-    if (!res.ok) {
-      if (logError) await logError(`AI gateway HTTP ${res.status}`, "classify-error");
+    let res: Response | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      res = await fetch(API_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: MODEL,
+          messages: [{ role: "user", content: CLASSIFY_PROMPT + text.slice(0, 600) }],
+        }),
+      });
+      if (res.status !== 429) break;
+      const retryAfter = parseInt(res.headers.get("retry-after") || "", 10);
+      const waitMs = retryAfter > 0 ? retryAfter * 1000 : (attempt + 1) * 5000;
+      await new Promise(r => setTimeout(r, waitMs));
+    }
+    if (!res || !res.ok) {
+      if (logError) await logError(`AI gateway HTTP ${res?.status ?? "no-response"}`, "classify-error");
       return SKIP_RESULT;
     }
     const data = await res.json();
@@ -132,16 +139,24 @@ export async function classifyBatch(
     const batch = texts.slice(i, i + batchSize);
     const numbered = batch.map((t, j) => `Post ${j + 1}: "${t.slice(0, 600)}"`).join("\n\n");
     try {
-      const res = await fetch(API_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [{ role: "user", content: BATCH_CLASSIFY_PROMPT + numbered }],
-        }),
-      });
-      if (!res.ok) {
-        if (logError) await logError(`Batch classify HTTP ${res.status}`, "batch-classify-error");
+      let res: Response | null = null;
+      for (let attempt = 0; attempt < 3; attempt++) {
+        res = await fetch(API_URL, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model: MODEL,
+            messages: [{ role: "user", content: BATCH_CLASSIFY_PROMPT + numbered }],
+          }),
+        });
+        if (res.status !== 429) break;
+        const retryAfter = parseInt(res.headers.get("retry-after") || "", 10);
+        const waitMs = retryAfter > 0 ? retryAfter * 1000 : (attempt + 1) * 5000;
+        if (logError) await logError(`Batch classify 429, retrying in ${waitMs}ms (attempt ${attempt + 1}/3)`, "batch-classify-retry");
+        await new Promise(r => setTimeout(r, waitMs));
+      }
+      if (!res || !res.ok) {
+        if (logError) await logError(`Batch classify HTTP ${res?.status ?? "no-response"}`, "batch-classify-error");
         allResults.push(...batch.map(() => SKIP_RESULT));
         continue;
       }
@@ -160,6 +175,10 @@ export async function classifyBatch(
       }
       for (let j = 0; j < batch.length; j++) {
         allResults.push(j < parsed.length ? parseResult(parsed[j]) : SKIP_RESULT);
+      }
+      // Small delay between batches to avoid per-minute rate limits
+      if (i + batchSize < texts.length) {
+        await new Promise(r => setTimeout(r, 2000));
       }
     } catch (e) {
       if (logError) await logError(`Batch classify exception: ${e instanceof Error ? e.message : String(e)}`, "batch-classify-exception");

@@ -119,7 +119,7 @@ async function runApifyPath(
       "Claude AI", "ChatGPT", "Gemini AI", "Grok AI",
       "DeepSeek", "Perplexity AI", "GitHub Copilot", "Llama AI", "Mistral AI",
     ],
-    maxItems: 200,
+    maxItems: 100,
     sort: "Latest",
     tweetLanguage: "en",
     includeSearchTerms: true,
@@ -152,8 +152,8 @@ async function runApifyPath(
     throw new Error("Missing runId from Apify");
   }
 
-  // Step 2 — Poll status (10s intervals, max 12 polls = 2 min to stay within Edge Function wall-clock limits)
-  const maxPolls = 12;
+  // Step 2 — Poll status (10s intervals, max 18 polls = 3 min)
+  const maxPolls = 18;
   let runStatus = "";
   for (let i = 0; i < maxPolls; i++) {
     await delay(10000);
@@ -224,7 +224,10 @@ async function runApifyPath(
   }
 
   // Pass 2: batch classify
-  const classifications = await classifyBatch(candidates.map(c => c.text), lovableApiKey);
+  const twitterLogError = async (msg: string, ctx?: string) => {
+    await logToErrorLog(supabase, msg, ctx || "classify");
+  };
+  const classifications = await classifyBatch(candidates.map(c => c.text), lovableApiKey, 25, twitterLogError);
   summary.classified = classifications.length;
   summary.irrelevant = classifications.filter(c => !c.relevant).length;
 
