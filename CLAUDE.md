@@ -10,8 +10,10 @@ Real-time AI sentiment dashboard tracking community vibes for LLM models (Claude
 
 ## Lovable Project
 
-This is a Lovable-generated app synced bi-directionally with GitHub on `main`. When editing locally:
-- Push to `main` → Lovable auto-syncs (other branches don't sync)
+This is a Lovable-generated app synced bi-directionally with GitHub on `main`. The Supabase instance is created and managed entirely through Lovable — there is no independent Supabase account. When editing locally:
+- Push to `main` → Lovable auto-syncs frontend (other branches don't sync)
+- **Edge Function deploys require a Lovable-side trigger** — pushing to `main` syncs the code but may not redeploy edge functions automatically. Give the user a Lovable chat prompt to trigger redeployment.
+- Never suggest `supabase` CLI commands or Supabase dashboard steps — the user has no direct Supabase access
 - Avoid restructuring directories or renaming files that Lovable manages
 - Don't edit auto-generated files: `src/integrations/supabase/types.ts`, Lovable OAuth bridge files
 - `lovable-tagger` dev dependency is required for Lovable's visual editor — don't remove
@@ -30,7 +32,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. W
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
 | Edge Functions | 13 Deno functions (scrapers + aggregation) |
-| Sentiment AI | Gemini 2.5 Flash-Lite via Google AI API (batch classification, 10 posts/call) |
+| Sentiment AI | Gemini 3.1 Flash-Lite via Google AI API (batch classification, 25 posts/call) |
 
 ## Key Routes
 
@@ -55,13 +57,13 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. W
 
 ## Scrapers (Edge Functions)
 
-Reddit (Apify), Hacker News, Bluesky, Twitter/X, Mastodon, Lobsters, Lemmy, Dev.to, Stack Overflow, Medium, Discourse. Orchestrated by `run-scrapers` (batches of 3, ~15min cron). GitHub scraper exists but is not in the orchestrator.
+Reddit (Apify), Hacker News, Bluesky, Twitter/X, Mastodon, Lobsters, Lemmy, Dev.to, Stack Overflow, Medium, Discourse. Orchestrated by `run-scrapers` (batches of 3, cron `0 6,14,22 * * *` — 3x/day at 6AM, 2PM, 10PM UTC). GitHub scraper exists but is not in the orchestrator.
 
-Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-2.5-flash-lite`. All scrapers use batch classification (25 posts per API call) via `classifyBatch()` in `_shared/classifier.ts`. Gemini free tier is 1,000 RPD (resets midnight Pacific Time). At 25 posts/batch with hourly scraping, usage is ~625 calls/day. Do not reduce batch size below 20 without a paid Gemini key.
+Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-3.1-flash-lite-preview`. All scrapers use batch classification (25 posts per API call) via `classifyBatch()` in `_shared/classifier.ts`. Classifier has 429 retry logic (3 attempts with exponential backoff) and 2s inter-batch delay. Gemini free tier is ~1,000 RPD (resets midnight Pacific Time). At 3x/day with ~21 calls/run, usage is ~63 calls/day — well within limits.
 
 **Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input. Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Do NOT change the actor — `scrape.badger~twitter-tweets-scraper` was tried and returns 400.
 
-**Edge Function deployment:** Pushing to `main` triggers Lovable auto-sync, which deploys Edge Functions automatically. No manual Supabase CLI or dashboard deploy needed.
+**Edge Function deployment:** Pushing to `main` triggers Lovable auto-sync for frontend. Edge Functions require a Lovable-side redeploy — prompt Lovable to sync from GitHub and redeploy the affected functions. Do not use `supabase` CLI (no independent Supabase account exists).
 
 ## Environment Variables & Secrets
 
