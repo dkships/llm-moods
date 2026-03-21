@@ -61,7 +61,7 @@ Reddit (free JSON API), Hacker News, Bluesky, Twitter/X (Apify), Mastodon, Lobst
 
 Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-3.1-flash-lite-preview`. All scrapers use batch classification (25 posts per API call) via `classifyBatch()` in `_shared/classifier.ts`. Classifier has 429 retry logic (3 attempts with exponential backoff) and 2s inter-batch delay. Gemini free tier is ~1,000 RPD (resets midnight Pacific Time). At 3x/day with ~21 calls/run, usage is ~63 calls/day — well within limits.
 
-**Reddit scraper** uses Reddit's free public JSON API (`reddit.com/r/{sub}/new.json`). No Apify or auth needed. Fetches from 5 subreddits (ClaudeAI, ChatGPT, LocalLLaMA, GoogleGemini, artificial). Requires `User-Agent` header.
+**Reddit scraper** uses `trudax~reddit-scraper-lite` Apify actor. Fetches from 5 subreddits (ClaudeAI, ChatGPT, LocalLLaMA, GoogleGemini, artificial), maxItems 40. Reddit's free JSON API was tried but returns 403 from edge function IPs.
 
 **Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input (4 terms, maxItems 50). Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Apify budget: $29/month, used only for Twitter now.
 

@@ -16,8 +16,6 @@ const SUBREDDIT_MODEL_MAP: Record<string, string> = {
   "r/googlegemini": "gemini",
 };
 
-const SUBREDDITS = ["ClaudeAI", "ChatGPT", "LocalLLaMA", "GoogleGemini", "artificial"];
-
 interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }
 
 async function loadKeywords(supabase: any): Promise<{ modelMap: Record<string, string>; keywords: KeywordEntry[] }> {
@@ -89,18 +87,6 @@ async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
   try { await supabase.from("error_log").insert({ function_name: "scrape-reddit-apify", error_message: msg, context: ctx || null }); } catch {}
 }
 
-async function fetchSubreddit(sub: string): Promise<any[]> {
-  const url = `https://www.reddit.com/r/${sub}/new.json?limit=25`;
-  const res = await fetch(url, {
-    headers: {
-      "User-Agent": "LLMVibes/1.0 (llmvibes.ai)",
-      "Accept": "application/json",
-    },
-  });
-  if (!res.ok) throw new Error(`Reddit r/${sub} HTTP ${res.status}`);
-  const data = await res.json();
-  return (data?.data?.children || []).map((c: any) => c.data);
-}
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -108,55 +94,106 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   try {
+    const apifyToken = Deno.env.get("APIFY_API_TOKEN");
+    if (!apifyToken) {
+      await logToErrorLog(supabase, "APIFY_API_TOKEN not configured", "config-error");
+      return new Response(JSON.stringify({ error: "APIFY_API_TOKEN not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY")!;
-    await logToErrorLog(supabase, "Reddit scraper started (v3 - free JSON API)", "health-check");
+    await logToErrorLog(supabase, "Reddit Apify scraper started (v3 - reduced subreddits)", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
 
+    const startUrl = `https://api.apify.com/v2/acts/trudax~reddit-scraper-lite/runs?token=${apifyToken}`;
+    const apifyInput = {
+      startUrls: [
+        { url: "https://www.reddit.com/r/ClaudeAI/" },
+        { url: "https://www.reddit.com/r/ChatGPT/" },
+        { url: "https://www.reddit.com/r/LocalLLaMA/" },
+        { url: "https://www.reddit.com/r/GoogleGemini/" },
+        { url: "https://www.reddit.com/r/artificial/" },
+      ],
+      maxItems: 40,
+      skipComments: true,
+      searchPosts: true,
+      sort: "new",
+    };
+
+    const startRes = await fetch(startUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(apifyInput) });
+    if (!startRes.ok) {
+      const errorText = await startRes.text().catch(() => "unknown");
+      await logToErrorLog(supabase, `Apify start failed HTTP ${startRes.status}: ${errorText.slice(0, 500)}`, "apify-error");
+      if (startRes.status === 402 || startRes.status === 403) {
+        return new Response(JSON.stringify({ error: `Apify quota/auth error (HTTP ${startRes.status})`, skipped: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: `Apify start returned ${startRes.status}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const runData = await startRes.json();
+    const runId = runData.data?.id;
+    const datasetId = runData.data?.defaultDatasetId;
+    if (!runId || !datasetId) {
+      await logToErrorLog(supabase, `No runId/datasetId`, "apify-error");
+      return new Response(JSON.stringify({ error: "Missing runId from Apify" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const maxPolls = 24;
+    let runStatus = "";
+    for (let i = 0; i < maxPolls; i++) {
+      await delay(10000);
+      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+      if (!statusRes.ok) continue;
+      const statusData = await statusRes.json();
+      runStatus = statusData.data?.status || "";
+      if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(runStatus)) break;
+    }
+
+    if (runStatus !== "SUCCEEDED") {
+      let errorDetail = "";
+      try {
+        const detailRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+        if (detailRes.ok) {
+          const detailData = await detailRes.json();
+          errorDetail = detailData.data?.statusMessage || detailData.data?.exitCode || "";
+        }
+      } catch {}
+      await logToErrorLog(supabase, `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
+      return new Response(JSON.stringify({ error: `Apify run status: ${runStatus || "TIMEOUT"}`, detail: errorDetail }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json`);
+    if (!datasetRes.ok) return new Response(JSON.stringify({ error: "Failed to fetch dataset" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const items = await datasetRes.json();
+    if (!Array.isArray(items)) return new Response(JSON.stringify({ error: "Invalid dataset response" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+    const posts = items.filter((item: any) => item.dataType === "post");
     const { data: existingData } = await supabase.from("scraped_posts").select("source_url").eq("source", "reddit").limit(10000);
     const existingUrls = new Set((existingData || []).map((e: any) => e.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
     const cutoff = new Date(Date.now() - 24 * 3600000);
-    const summary = { subreddits_fetched: 0, subreddits_failed: 0, posts_found: 0, filtered: 0, classified: 0, inserted: 0, irrelevant: 0, langSkipped: 0, duplicateSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
-
-    // Fetch posts from each subreddit via Reddit's free JSON API
-    const allPosts: { sub: string; post: any }[] = [];
-    for (const sub of SUBREDDITS) {
-      try {
-        const posts = await fetchSubreddit(sub);
-        summary.subreddits_fetched++;
-        for (const post of posts) allPosts.push({ sub, post });
-        await delay(1000); // respect Reddit rate limits
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        summary.subreddits_failed++;
-        summary.errors.push(`r/${sub}: ${msg}`);
-        await logToErrorLog(supabase, `r/${sub} fetch failed: ${msg}`, "fetch-error");
-      }
-    }
-
-    summary.posts_found = allPosts.length;
+    const summary = { apifyItems: items.length, apifyPosts: posts.length, filtered: 0, classified: 0, inserted: 0, irrelevant: 0, langSkipped: 0, duplicateSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
 
     // Pass 1: collect candidates
     const candidates: { fullText: string; matchedSlugs: string[]; sourceUrl: string; title: string; body: string; score: number; createdAt: string }[] = [];
-    for (const { sub, post } of allPosts) {
-      const createdAt = new Date(post.created_utc * 1000);
+    for (const post of posts) {
+      const createdAt = new Date(post.createdAt);
       if (createdAt < cutoff) continue;
 
       const title = post.title || "";
-      const body = post.selftext || "";
+      const body = post.body || "";
       const fullText = `${title} ${body}`;
 
       if (!isEnglish(fullText)) { summary.langSkipped++; continue; }
       if (!meetsMinLength(title, body)) { summary.contentSkipped++; continue; }
 
-      const communityName = `r/${sub}`;
-      const matchedSlugs = matchModels(fullText, keywords, communityName);
+      const matchedSlugs = matchModels(fullText, keywords, post.communityName);
       if (matchedSlugs.length === 0) continue;
       summary.filtered++;
 
-      const sourceUrl = post.permalink ? `https://www.reddit.com${post.permalink}` : "";
+      const sourceUrl = post.url || "";
       if (!sourceUrl || existingUrls.has(sourceUrl)) { summary.duplicateSkipped++; continue; }
 
       let allDuped = true;
@@ -166,7 +203,7 @@ Deno.serve(async (req) => {
       }
       if (allDuped) { summary.dedupSkipped++; continue; }
 
-      candidates.push({ fullText, matchedSlugs, sourceUrl, title, body, score: post.score || 0, createdAt: createdAt.toISOString() });
+      candidates.push({ fullText, matchedSlugs, sourceUrl, title, body, score: post.upVotes || 0, createdAt: post.createdAt });
     }
 
     // Pass 2: batch classify
@@ -202,7 +239,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, `Completed: subs=${summary.subreddits_fetched}/${SUBREDDITS.length} posts=${summary.posts_found} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted}`, "summary");
+    await logToErrorLog(supabase, `Completed: posts=${summary.apifyPosts} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} dedupSkipped=${summary.dedupSkipped}`, "summary");
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown";
