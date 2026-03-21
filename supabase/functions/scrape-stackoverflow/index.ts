@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
-    const oneDayAgo = Math.floor((Date.now() - 24 * 3600000) / 1000);
+    const sevenDaysAgo = Math.floor((Date.now() - 7 * 24 * 3600000) / 1000);
     const summary = { fetched: 0, inserted: 0, classified: 0, irrelevant: 0, skipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
 
     for (const term of SEARCH_TERMS) {
@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
         // Pass 1: collect candidates
         const candidates: { classifyText: string; matchedSlugs: string[]; sourceUrl: string; title: string; body: string; score: number; postedAt: string }[] = [];
         for (const item of items) {
-          if ((item.last_activity_date || item.creation_date) < oneDayAgo) continue;
+          if ((item.last_activity_date || item.creation_date) < sevenDaysAgo) continue;
 
           const title = item.title || "";
           const body = (item.body || "").replace(/<[^>]*>/g, "").slice(0, 2000);
