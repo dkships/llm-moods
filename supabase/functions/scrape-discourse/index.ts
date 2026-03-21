@@ -145,7 +145,10 @@ Deno.serve(async (req) => {
         }
 
         // Pass 2: batch classify
-        const classifications = await classifyBatch(candidates.map(c => c.classifyText), lovableApiKey);
+        const discourseLogError = async (msg: string, ctx?: string) => {
+          try { await supabase.from("error_log").insert({ function_name: "scrape-discourse", error_message: msg, context: ctx || "classify" }); } catch {}
+        };
+        const classifications = await classifyBatch(candidates.map(c => c.classifyText), lovableApiKey, 25, discourseLogError);
         summary.classified += classifications.length;
         summary.irrelevant += classifications.filter(c => !c.relevant).length;
 

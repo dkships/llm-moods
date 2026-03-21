@@ -178,7 +178,10 @@ Deno.serve(async (req) => {
     }
 
     // Pass 2: batch classify
-    const classifications = await classifyBatch(candidates.map(c => c.content), lovableApiKey);
+    const mastodonLogError = async (msg: string, ctx?: string) => {
+      await logToErrorLog(supabase, msg, ctx || "classify");
+    };
+    const classifications = await classifyBatch(candidates.map(c => c.content), lovableApiKey, 25, mastodonLogError);
     summary.classified = classifications.length;
     summary.irrelevant = classifications.filter(c => !c.relevant).length;
 

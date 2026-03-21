@@ -213,7 +213,10 @@ Deno.serve(async (req) => {
     }
 
     // Pass 2: batch classify
-    const classifications = await classifyBatch(candidates.map(c => c.fullText), lovableApiKey);
+    const redditLogError = async (msg: string, ctx?: string) => {
+      await logToErrorLog(supabase, msg, ctx || "classify");
+    };
+    const classifications = await classifyBatch(candidates.map(c => c.fullText), lovableApiKey, 25, redditLogError);
     summary.classified = classifications.length;
     summary.irrelevant = classifications.filter(c => !c.relevant).length;
 

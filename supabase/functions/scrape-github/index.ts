@@ -136,7 +136,10 @@ Deno.serve(async (req) => {
         }
 
         // Pass 2: batch classify
-        const classifications = await classifyBatch(candidates.map(c => c.text), lovableApiKey);
+        const githubLogError = async (msg: string, ctx?: string) => {
+          await logToErrorLog(supabase, msg, ctx || "classify");
+        };
+        const classifications = await classifyBatch(candidates.map(c => c.text), lovableApiKey, 25, githubLogError);
         summary.classified += classifications.length;
         summary.irrelevant += classifications.filter(c => !c.relevant).length;
 

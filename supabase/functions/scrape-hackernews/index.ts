@@ -127,7 +127,10 @@ Deno.serve(async (req) => {
         }
 
         // Pass 2: batch classify stories
-        const storyClassifications = await classifyBatch(storyCandidates.map(c => c.text), lovableApiKey);
+        const hnLogError = async (msg: string, ctx?: string) => {
+          await logToErrorLog(supabase, msg, ctx || "classify");
+        };
+        const storyClassifications = await classifyBatch(storyCandidates.map(c => c.text), lovableApiKey, 25, hnLogError);
         summary.classified += storyClassifications.length;
         summary.irrelevant += storyClassifications.filter(c => !c.relevant).length;
 
@@ -184,7 +187,10 @@ Deno.serve(async (req) => {
         }
 
         // Pass 2: batch classify comments
-        const commentClassifications = await classifyBatch(commentCandidates.map(c => c.text), lovableApiKey);
+        const hnCommentLogError = async (msg: string, ctx?: string) => {
+          await logToErrorLog(supabase, msg, ctx || "classify");
+        };
+        const commentClassifications = await classifyBatch(commentCandidates.map(c => c.text), lovableApiKey, 25, hnCommentLogError);
         summary.classified += commentClassifications.length;
         summary.irrelevant += commentClassifications.filter(c => !c.relevant).length;
 
