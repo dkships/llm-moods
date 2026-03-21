@@ -103,7 +103,7 @@ Deno.serve(async (req) => {
         // Pass 1: collect candidates
         const candidates: { classifyText: string; matchedSlugs: string[]; sourceUrl: string; title: string; body: string; score: number; postedAt: string }[] = [];
         for (const item of items) {
-          if (item.creation_date < oneDayAgo) continue;
+          if ((item.last_activity_date || item.creation_date) < oneDayAgo) continue;
 
           const title = item.title || "";
           const body = (item.body || "").replace(/<[^>]*>/g, "").slice(0, 2000);

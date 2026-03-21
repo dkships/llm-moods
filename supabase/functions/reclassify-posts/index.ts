@@ -55,8 +55,8 @@ Deno.serve(async (req) => {
       const c = candidates[i];
 
       if (!result.relevant) {
-        await supabase.from("scraped_posts").delete().eq("id", c.id);
         irrelevant++;
+        continue;
       } else {
         await supabase.from("scraped_posts").update({
           sentiment: result.sentiment,

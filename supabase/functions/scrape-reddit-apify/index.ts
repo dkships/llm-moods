@@ -114,16 +114,18 @@ Deno.serve(async (req) => {
     const startUrl = `https://api.apify.com/v2/acts/trudax~reddit-scraper-lite/runs?token=${apifyToken}`;
     const apifyInput = {
       startUrls: [
-        { url: "https://www.reddit.com/r/ClaudeAI/new/" },
-        { url: "https://www.reddit.com/r/ChatGPT/new/" },
-        { url: "https://www.reddit.com/r/LocalLLaMA/new/" },
-        { url: "https://www.reddit.com/r/GoogleGemini/new/" },
-        { url: "https://www.reddit.com/r/deepseek/new/" },
-        { url: "https://www.reddit.com/r/artificial/new/" },
-        { url: "https://www.reddit.com/r/perplexity_ai/new/" },
+        { url: "https://www.reddit.com/r/ClaudeAI/" },
+        { url: "https://www.reddit.com/r/ChatGPT/" },
+        { url: "https://www.reddit.com/r/LocalLLaMA/" },
+        { url: "https://www.reddit.com/r/GoogleGemini/" },
+        { url: "https://www.reddit.com/r/deepseek/" },
+        { url: "https://www.reddit.com/r/artificial/" },
+        { url: "https://www.reddit.com/r/perplexity_ai/" },
       ],
-      maxItems: 50, maxPostCount: 10, maxComments: 0, skipComments: true,
-      proxy: { useApifyProxy: true },
+      maxItems: 50,
+      skipComments: true,
+      searchPosts: true,
+      sort: "new",
     };
 
     const startRes = await fetch(startUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(apifyInput) });
@@ -153,8 +155,17 @@ Deno.serve(async (req) => {
     }
 
     if (runStatus !== "SUCCEEDED") {
-      await logToErrorLog(supabase, `Apify run status: ${runStatus || "TIMEOUT"}`, "apify-error");
-      return new Response(JSON.stringify({ error: `Apify run status: ${runStatus || "TIMEOUT"}` }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // Fetch run details to get the actual error message
+      let errorDetail = "";
+      try {
+        const detailRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+        if (detailRes.ok) {
+          const detailData = await detailRes.json();
+          errorDetail = detailData.data?.statusMessage || detailData.data?.exitCode || "";
+        }
+      } catch {}
+      await logToErrorLog(supabase, `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
+      return new Response(JSON.stringify({ error: `Apify run status: ${runStatus || "TIMEOUT"}`, detail: errorDetail }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json`);
