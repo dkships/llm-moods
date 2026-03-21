@@ -8,8 +8,8 @@ const corsHeaders = {
 };
 
 const ALGOLIA_BASE = "https://hn.algolia.com/api/v1/search_by_date";
-const STORY_SEARCH_TERMS = ["Claude", "ChatGPT", "GPT-5", "Gemini", "Grok", "DeepSeek", "Perplexity", "OpenAI", "Anthropic"];
-const COMMENT_SEARCH_TERMS = ["Claude dumb", "ChatGPT worse", "GPT bad", "Gemini sucks", "Grok useless", "DeepSeek bad", "Perplexity worse"];
+const STORY_SEARCH_TERMS = ["Claude", "ChatGPT", "GPT-5", "Gemini", "Grok", "OpenAI", "Anthropic"];
+const COMMENT_SEARCH_TERMS = ["Claude dumb", "ChatGPT worse", "GPT bad", "Gemini sucks", "Grok useless"];
 
 interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }
 

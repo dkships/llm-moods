@@ -74,7 +74,7 @@ async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
   try { await supabase.from("error_log").insert({ function_name: "scrape-twitter", error_message: msg, context: ctx || null }); } catch (e) { console.error("logToErrorLog failed:", msg, e); }
 }
 
-const GROK_SEARCH_PROMPT = `Search X/Twitter for recent posts (last 24 hours) about these AI models: Claude, ChatGPT, GPT-4, GPT-4o, Gemini, Grok, DeepSeek, Perplexity, GitHub Copilot, Llama, Mistral.
+const GROK_SEARCH_PROMPT = `Search X/Twitter for recent posts (last 24 hours) about these AI models: Claude, ChatGPT, GPT-4, GPT-4o, Gemini, Grok.
 
 Find posts where users share their direct experience with these models — complaints, praise, comparisons of output quality, etc.
 
@@ -82,7 +82,7 @@ For EACH relevant post found, classify it and return a JSON array. Each element:
 {
   "text": "the tweet text",
   "tweet_url": "https://x.com/user/status/123",
-  "model": "claude|chatgpt|gemini|grok|deepseek|perplexity|copilot|llama|mistral",
+  "model": "claude|chatgpt|gemini|grok",
   "sentiment": "positive|negative|neutral",
   "complaint_category": "lazy_responses|hallucinations|refusals|coding_quality|speed|general_drop|pricing_value|censorship|context_window|api_reliability|multimodal_quality|reasoning" or null,
   "praise_category": "output_quality|coding_quality|speed|reasoning|creativity|value|reliability|context_handling|multimodal_quality|general_improvement" or null,
@@ -117,9 +117,8 @@ async function runApifyPath(
   const apifyInput = {
     searchTerms: [
       "Claude AI", "ChatGPT", "Gemini AI", "Grok AI",
-      "DeepSeek", "Perplexity AI", "GitHub Copilot", "Llama AI", "Mistral AI",
     ],
-    maxItems: 100,
+    maxItems: 50,
     sort: "Latest",
     tweetLanguage: "en",
     includeSearchTerms: true,
@@ -165,8 +164,18 @@ async function runApifyPath(
   }
 
   if (!["SUCCEEDED", "ABORTED"].includes(runStatus)) {
-    await logToErrorLog(supabase, `Apify run status: ${runStatus || "TIMEOUT"}`, "apify-error");
-    throw new Error(`Apify run status: ${runStatus || "TIMEOUT"}`);
+    // Fetch run details to get the actual error message
+    let errorDetail = "";
+    try {
+      const detailRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+      if (detailRes.ok) {
+        const detailData = await detailRes.json();
+        errorDetail = detailData.data?.statusMessage || detailData.data?.exitCode || "";
+      }
+    } catch {}
+    await logToErrorLog(supabase, `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
+    summary.errors.push(`Apify run ${runStatus || "TIMEOUT"}: ${errorDetail}`);
+    return summary;
   }
 
   // Step 3 — Fetch dataset items

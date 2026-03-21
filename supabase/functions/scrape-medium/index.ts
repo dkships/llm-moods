@@ -13,7 +13,6 @@ const FEED_URLS = [
   "https://medium.com/feed/tag/llm",
   "https://medium.com/feed/tag/artificial-intelligence",
   "https://medium.com/feed/tag/openai",
-  "https://medium.com/feed/tag/deepseek",
 ];
 
 interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }

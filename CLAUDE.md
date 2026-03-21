@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-Real-time AI sentiment dashboard tracking community vibes for LLM models (Claude, ChatGPT, Gemini, Grok, DeepSeek, Perplexity, etc.) across 12+ social platforms. Scores models 0-100 daily based on scraped post sentiment.
+Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 12+ social platforms. Scores models 0-100 daily based on scraped post sentiment.
 
 **Live at:** llmvibes.ai (Lovable-hosted)
 
@@ -57,11 +57,15 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 
 ## Scrapers (Edge Functions)
 
-Reddit (Apify), Hacker News, Bluesky, Twitter/X, Mastodon, Lobsters, Lemmy, Dev.to, Stack Overflow, Medium, Discourse. Orchestrated by `run-scrapers` (batches of 3, cron `0 6,14,22 * * *` — 3x/day at 6AM, 2PM, 10PM UTC). GitHub scraper exists but is not in the orchestrator.
+Reddit (free JSON API), Hacker News, Bluesky, Twitter/X (Apify), Mastodon, Lobsters, Lemmy, Dev.to, Stack Overflow, Medium, Discourse. Orchestrated by `run-scrapers` (batches of 3, cron `0 6,14,22 * * *` — 3x/day at 6AM, 2PM, 10PM UTC). GitHub scraper exists but is not in the orchestrator.
 
 Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-3.1-flash-lite-preview`. All scrapers use batch classification (25 posts per API call) via `classifyBatch()` in `_shared/classifier.ts`. Classifier has 429 retry logic (3 attempts with exponential backoff) and 2s inter-batch delay. Gemini free tier is ~1,000 RPD (resets midnight Pacific Time). At 3x/day with ~21 calls/run, usage is ~63 calls/day — well within limits.
 
-**Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input. Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Do NOT change the actor — `scrape.badger~twitter-tweets-scraper` was tried and returns 400.
+**Reddit scraper** uses Reddit's free public JSON API (`reddit.com/r/{sub}/new.json`). No Apify or auth needed. Fetches from 5 subreddits (ClaudeAI, ChatGPT, LocalLLaMA, GoogleGemini, artificial). Requires `User-Agent` header.
+
+**Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input (4 terms, maxItems 50). Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Apify budget: $29/month, used only for Twitter now.
+
+**Tracked models:** Claude, ChatGPT, Gemini, Grok (DeepSeek and Perplexity were removed 2026-03-21).
 
 **Edge Function deployment:** Pushing to `main` triggers Lovable auto-sync for frontend. Edge Functions require a Lovable-side redeploy — prompt Lovable to sync from GitHub and redeploy the affected functions. Do not use `supabase` CLI (no independent Supabase account exists).
 

@@ -8,9 +8,8 @@ const corsHeaders = {
 };
 
 const SEARCH_TERMS = [
-  "Claude AI", "ChatGPT", "GPT-5", "Gemini AI", "Grok AI", "DeepSeek",
-  "Claude dumb", "ChatGPT worse", "DeepSeek",
-  "Perplexity AI", "Perplexity worse",
+  "Claude AI", "ChatGPT", "GPT-5", "Gemini AI", "Grok AI",
+  "Claude dumb", "ChatGPT worse",
 ];
 
 interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }

@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const INSTANCES = ["mastodon.social", "mastodon.online", "techhub.social", "sigmoid.social"];
-const HASHTAGS = ["chatgpt", "claudeai", "gemini", "grok", "deepseek", "llm", "aitools"];
+const HASHTAGS = ["chatgpt", "claudeai", "gemini", "grok", "llm", "aitools"];
 
 const SEARCH_QUERIES = [
   "Claude AI", "ChatGPT", "GPT dumber", "Claude worse", "Gemini bad", "AI getting worse",

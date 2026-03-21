@@ -108,7 +108,7 @@ const Index = () => {
               a <span className="text-primary glow-text">bad day</span>?
             </motion.h1>
             <motion.p variants={fadeUp} custom={2} className="mt-5 text-lg sm:text-xl text-muted-foreground max-w-xl leading-relaxed">
-              Real-time community sentiment for Claude, ChatGPT, Gemini, Grok, DeepSeek, and more. Know when the vibes are off.
+              Real-time community sentiment for Claude, ChatGPT, Gemini, Grok, and more. Know when the vibes are off.
             </motion.p>
             <motion.div variants={fadeUp} custom={3}>
               <Link to="/dashboard">

@@ -8,7 +8,7 @@ const corsHeaders = {
 };
 
 const INSTANCES = ["https://lemmy.world", "https://lemmy.ml"];
-const SEARCH_TERMS = ["Claude", "ChatGPT", "GPT-5", "Gemini", "Grok", "DeepSeek", "LLM", "Perplexity"];
+const SEARCH_TERMS = ["Claude", "ChatGPT", "GPT-5", "Gemini", "Grok", "LLM"];
 
 interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }
 

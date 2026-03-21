@@ -7,7 +7,7 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const SEARCH_TERMS = ["ChatGPT", "Claude AI", "Gemini AI", "GPT-5", "DeepSeek", "Perplexity"];
+const SEARCH_TERMS = ["ChatGPT", "Claude AI", "Gemini AI", "GPT-5"];
 
 interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }
 

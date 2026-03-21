@@ -12,7 +12,6 @@ const REPOS: { owner: string; repo: string; defaultSlug: string | null }[] = [
   { owner: "anthropics", repo: "courses", defaultSlug: "claude" },
   { owner: "openai", repo: "openai-python", defaultSlug: "chatgpt" },
   { owner: "google-gemini", repo: "generative-ai-python", defaultSlug: "gemini" },
-  { owner: "deepseek-ai", repo: "DeepSeek-V3", defaultSlug: "deepseek" },
   { owner: "ollama", repo: "ollama", defaultSlug: null },
   { owner: "ggerganov", repo: "llama.cpp", defaultSlug: null },
 ];

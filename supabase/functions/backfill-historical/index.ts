@@ -7,19 +7,17 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-const HN_KEYWORDS = ["ChatGPT", "Claude AI", "Gemini AI", "GPT-4", "GPT-5", "Grok", "DeepSeek", "LLM"];
-const BLUESKY_KEYWORDS = ["ChatGPT", "Claude", "Gemini", "Grok", "DeepSeek", "Perplexity", "LLM", "OpenAI", "Anthropic"];
+const HN_KEYWORDS = ["ChatGPT", "Claude AI", "Gemini AI", "GPT-4", "GPT-5", "Grok", "LLM"];
+const BLUESKY_KEYWORDS = ["ChatGPT", "Claude", "Gemini", "Grok", "LLM", "OpenAI", "Anthropic"];
 
-const REDDIT_KEYWORDS = ["ChatGPT", "Claude", "Gemini", "Grok", "DeepSeek"];
-const REDDIT_SUBREDDITS = ["ClaudeAI", "ChatGPT", "LocalLLaMA", "GoogleGemini", "singularity", "artificial", "deepseek", "MachineLearning"];
+const REDDIT_KEYWORDS = ["ChatGPT", "Claude", "Gemini", "Grok"];
+const REDDIT_SUBREDDITS = ["ClaudeAI", "ChatGPT", "LocalLLaMA", "GoogleGemini", "singularity", "artificial", "MachineLearning"];
 
 const MODEL_KEYWORDS: Record<string, string[]> = {
   claude: ["claude", "sonnet", "opus", "anthropic"],
   chatgpt: ["chatgpt", "gpt-5", "gpt-4", "gpt-4o", "gpt", "openai", "copilot"],
   gemini: ["gemini", "gemini pro", "google ai", "bard"],
   grok: ["grok", "grok 4", "xai"],
-  deepseek: ["deepseek", "deepseek r1", "deepseek v3"],
-  perplexity: ["perplexity", "perplexity ai", "pplx"],
 };
 
 function matchModels(text: string): string[] {
