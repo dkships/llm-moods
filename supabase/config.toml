@@ -50,3 +50,9 @@ verify_jwt = false
 
 [functions.backfill-historical]
 verify_jwt = false
+
+[functions.reclassify-posts]
+verify_jwt = false
+
+[functions.reaggregate-vibes]
+verify_jwt = false

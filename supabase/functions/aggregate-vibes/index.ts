@@ -52,36 +52,24 @@ Deno.serve(async (req) => {
 
       const previousScore = prevDailyScore?.score ?? null;
 
+      const MIN_POSTS = 5;
+
       if (dailyPosts && dailyPosts.length > 0) {
         const result = computeScore(dailyPosts);
-        // Apply exponential smoothing: 70% new + 30% previous
+        // Apply smoothing: heavier toward previous when data is thin
         if (previousScore !== null) {
-          result.score = Math.round(0.7 * result.score + 0.3 * previousScore);
+          if (dailyPosts.length < MIN_POSTS) {
+            // Thin data: lean more on previous score to dampen noise
+            result.score = Math.round(0.4 * result.score + 0.6 * previousScore);
+          } else {
+            result.score = Math.round(0.7 * result.score + 0.3 * previousScore);
+          }
         }
         await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), result);
-        modelSummary.daily = { posts: dailyPosts.length, score: result.score, smoothed: previousScore !== null };
+        modelSummary.daily = { posts: dailyPosts.length, score: result.score, smoothed: previousScore !== null, thin_data: dailyPosts.length < MIN_POSTS };
       } else {
-        // No posts — keep previous day's score
-        const { data: prevScore } = await supabase
-          .from("vibes_scores")
-          .select("*")
-          .eq("model_id", model.id)
-          .eq("period", "daily")
-          .order("period_start", { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (prevScore) {
-          await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), {
-            score: prevScore.score,
-            positive_count: prevScore.positive_count || 0,
-            negative_count: prevScore.negative_count || 0,
-            neutral_count: prevScore.neutral_count || 0,
-            total_posts: prevScore.total_posts || 0,
-            top_complaint: prevScore.top_complaint,
-          });
-          modelSummary.daily = { posts: 0, score: prevScore.score, carried_forward: true };
-        }
+        // No posts — skip instead of carrying forward a stale score
+        modelSummary.daily = { posts: 0, skipped: true };
       }
 
       // --- Hourly aggregation (last 1h) ---
