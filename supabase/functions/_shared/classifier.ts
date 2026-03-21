@@ -121,7 +121,7 @@ export async function classifyPost(
 export async function classifyBatch(
   texts: string[],
   apiKey: string,
-  batchSize = 10,
+  batchSize = 25,
   logError?: (msg: string, ctx?: string) => Promise<void>,
 ): Promise<ClassifyResult[]> {
   if (texts.length === 0) return [];
