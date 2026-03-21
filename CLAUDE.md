@@ -57,9 +57,11 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. W
 
 Reddit (Apify), Hacker News, Bluesky, Twitter/X, Mastodon, Lobsters, Lemmy, Dev.to, Stack Overflow, Medium, Discourse. Orchestrated by `run-scrapers` (batches of 3, ~15min cron). GitHub scraper exists but is not in the orchestrator.
 
-Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-2.5-flash-lite`. All scrapers use batch classification (10 posts per API call) via `classifyBatch()` in `_shared/classifier.ts`. Designed to stay within the Gemini free tier (1,000 RPD).
+Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-2.5-flash-lite`. All scrapers use batch classification (25 posts per API call) via `classifyBatch()` in `_shared/classifier.ts`. Gemini free tier is 1,000 RPD (resets midnight Pacific Time). At 25 posts/batch with hourly scraping, usage is ~625 calls/day. Do not reduce batch size below 20 without a paid Gemini key.
 
-**Twitter/X scraper** uses `scrape.badger~twitter-tweets-scraper` Apify actor. Actor output uses snake_case fields (`created_at`, `username`, `favorite_count`). Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`).
+**Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input. Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Do NOT change the actor — `scrape.badger~twitter-tweets-scraper` was tried and returns 400.
+
+**Edge Function deployment:** Pushing to `main` triggers Lovable auto-sync, which deploys Edge Functions automatically. No manual Supabase CLI or dashboard deploy needed.
 
 ## Environment Variables & Secrets
 
