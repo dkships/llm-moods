@@ -46,7 +46,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 | Table | Purpose |
 |-------|---------|
 | `models` | Tracked LLM models (slug, name, accent_color) |
-| `scraped_posts` | Raw posts with sentiment + complaint classification |
+| `scraped_posts` | Raw posts with sentiment + complaint classification + translation |
 | `vibes_scores` | Aggregated daily/hourly scores (0-100) |
 | `model_keywords` | Keyword → model matching for scrapers |
 | `scraper_config` | Runtime scraper settings (subreddits, etc.) |
@@ -59,7 +59,11 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 
 Reddit (free JSON API), Hacker News, Bluesky, Twitter/X (Apify), Mastodon, Lobsters, Lemmy, Dev.to, Stack Overflow, Medium, Discourse. Orchestrated by `run-scrapers` (batches of 3, cron `0 6,14,22 * * *` — 3x/day at 6AM, 2PM, 10PM UTC). GitHub scraper exists but is not in the orchestrator.
 
-Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-3.1-flash-lite-preview`. All scrapers use batch classification (25 posts per API call) via `classifyBatch()` in `_shared/classifier.ts`. Classifier has 429 retry logic (3 attempts with exponential backoff) and 2s inter-batch delay. Gemini free tier is ~1,000 RPD (resets midnight Pacific Time). At 3x/day with ~21 calls/run, usage is ~63 calls/day — well within limits.
+Shared utilities (keyword matching, dedup, error logging) are in `_shared/utils.ts` — scrapers import from there instead of duplicating code.
+
+Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-3.1-flash-lite-preview`. Single-model posts use `classifyBatch()` (25 posts/call). Multi-model posts (mentioning 2+ models) use `classifyBatchTargeted()` for per-model sentiment — e.g., "DeepSeek fixed Gemini's mess" is negative for Gemini, positive for DeepSeek. Both functions are in `_shared/classifier.ts`. Classifier has 429 retry logic (3 attempts with exponential backoff) and 2s inter-batch delay. Non-English posts are translated to English by the classifier prompt (no extra API calls); original text stored in `content`, translation in `translated_content`, language code in `original_language`. Known limitation: Gemini classifies posts about itself (potential self-bias). Gemini free tier is ~1,000 RPD (resets midnight Pacific Time). At 3x/day with ~24 calls/run (~72 calls/day including targeted batches) — well within limits.
+
+`reclassify-posts` edge function supports `?mode=multi_model` to find and fix historical multi-model posts with identical sentiment. Run `reaggregate-vibes` after to recalculate scores.
 
 **Reddit scraper** uses `trudax~reddit-scraper-lite` Apify actor. Fetches from 5 subreddits (ClaudeAI, ChatGPT, LocalLLaMA, GoogleGemini, artificial), maxItems 40. Reddit's free JSON API was tried but returns 403 from edge function IPs.
 
