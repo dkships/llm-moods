@@ -107,6 +107,7 @@ export type Database = {
           id: string
           is_backfill: boolean | null
           model_id: string
+          original_language: string | null
           posted_at: string | null
           praise_category: string | null
           score: number | null
@@ -114,6 +115,7 @@ export type Database = {
           source: string
           source_url: string | null
           title: string | null
+          translated_content: string | null
         }
         Insert: {
           complaint_category?: string | null
@@ -124,6 +126,7 @@ export type Database = {
           id?: string
           is_backfill?: boolean | null
           model_id: string
+          original_language?: string | null
           posted_at?: string | null
           praise_category?: string | null
           score?: number | null
@@ -131,6 +134,7 @@ export type Database = {
           source: string
           source_url?: string | null
           title?: string | null
+          translated_content?: string | null
         }
         Update: {
           complaint_category?: string | null
@@ -141,6 +145,7 @@ export type Database = {
           id?: string
           is_backfill?: boolean | null
           model_id?: string
+          original_language?: string | null
           posted_at?: string | null
           praise_category?: string | null
           score?: number | null
@@ -148,6 +153,7 @@ export type Database = {
           source?: string
           source_url?: string | null
           title?: string | null
+          translated_content?: string | null
         }
         Relationships: [
           {
