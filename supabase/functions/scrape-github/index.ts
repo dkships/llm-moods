@@ -1,11 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch } from "../_shared/classifier.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { corsHeaders, loadKeywords, matchModels, logToErrorLog } from "../_shared/utils.ts";
 
 const REPOS: { owner: string; repo: string; defaultSlug: string | null }[] = [
   { owner: "anthropics", repo: "anthropic-sdk-python", defaultSlug: "claude" },
@@ -19,45 +14,7 @@ const REPOS: { owner: string; repo: string; defaultSlug: string | null }[] = [
 const DELAY_MS = 2000;
 const USER_AGENT = "llmvibes:v1.0";
 
-interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }
-
-async function loadKeywords(supabase: any): Promise<{ modelMap: Record<string, string>; keywords: KeywordEntry[] }> {
-  const { data: models } = await supabase.from("models").select("id, slug");
-  const modelMap: Record<string, string> = {};
-  const slugById: Record<string, string> = {};
-  for (const m of models || []) { modelMap[m.slug] = m.id; slugById[m.id] = m.slug; }
-  const { data: kws } = await supabase.from("model_keywords").select("keyword, tier, context_words, model_id");
-  const keywords: KeywordEntry[] = (kws || []).map((k: any) => ({
-    keyword: k.keyword, tier: k.tier, context_words: k.context_words, model_slug: slugById[k.model_id] || "",
-  }));
-  return { modelMap, keywords };
-}
-
-function matchModels(text: string, keywords: KeywordEntry[]): string[] {
-  const matched: string[] = [];
-  const lower = text.toLowerCase();
-  for (const k of keywords.filter(k => k.tier === "high").sort((a, b) => b.keyword.length - a.keyword.length)) {
-    if (matched.includes(k.model_slug)) continue;
-    const regex = new RegExp(`\\b${k.keyword.replace(/[-\.]/g, "[-\\s.]?")}\\b`, "i");
-    if (regex.test(lower)) matched.push(k.model_slug);
-  }
-  for (const k of keywords.filter(k => k.tier === "ambiguous")) {
-    if (matched.includes(k.model_slug)) continue;
-    const regex = new RegExp(`\\b${k.keyword.replace(/[-\.]/g, "[-\\s.]?")}\\b`, "i");
-    if (!regex.test(lower)) continue;
-    if (!k.context_words) { matched.push(k.model_slug); continue; }
-    const contextList = k.context_words.split(",").map(w => w.trim().toLowerCase());
-    if (contextList.some(cw => lower.includes(cw))) matched.push(k.model_slug);
-  }
-  return matched;
-}
-
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
-
-async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
-  try { await supabase.from("error_log").insert({ function_name: "scrape-github", error_message: msg, context: ctx || null }); } catch {}
-}
-
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -66,7 +23,7 @@ Deno.serve(async (req) => {
 
   try {
     const lovableApiKey = Deno.env.get("GEMINI_API_KEY")!;
-    await logToErrorLog(supabase, "GitHub scraper started", "health-check");
+    await logToErrorLog(supabase, "scrape-github", "GitHub scraper started", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
     const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "github").limit(10000);
@@ -136,7 +93,7 @@ Deno.serve(async (req) => {
 
         // Pass 2: batch classify
         const githubLogError = async (msg: string, ctx?: string) => {
-          await logToErrorLog(supabase, msg, ctx || "classify");
+          await logToErrorLog(supabase, "scrape-github", msg, ctx || "classify");
         };
         const classifications = await classifyBatch(candidates.map(c => c.text), lovableApiKey, 25, githubLogError);
         summary.classified += classifications.length;
@@ -170,11 +127,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} prSkipped=${summary.prSkipped}`, "summary");
+    await logToErrorLog(supabase, "scrape-github", `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} prSkipped=${summary.prSkipped}`, "summary");
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown";
-    await logToErrorLog(supabase, msg, "top-level error");
+    await logToErrorLog(supabase, "scrape-github", msg, "top-level error");
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });

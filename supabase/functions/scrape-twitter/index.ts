@@ -1,78 +1,8 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch } from "../_shared/classifier.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
-
-interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }
-
-async function loadKeywords(supabase: any): Promise<{ modelMap: Record<string, string>; keywords: KeywordEntry[] }> {
-  const { data: models } = await supabase.from("models").select("id, slug");
-  const modelMap: Record<string, string> = {};
-  const slugById: Record<string, string> = {};
-  for (const m of models || []) { modelMap[m.slug] = m.id; slugById[m.id] = m.slug; }
-  const { data: kws } = await supabase.from("model_keywords").select("keyword, tier, context_words, model_id");
-  const keywords: KeywordEntry[] = (kws || []).map((k: any) => ({
-    keyword: k.keyword, tier: k.tier, context_words: k.context_words, model_slug: slugById[k.model_id] || "",
-  }));
-  return { modelMap, keywords };
-}
-
-function matchModels(text: string, keywords: KeywordEntry[]): string[] {
-  const matched: string[] = [];
-  const lower = text.toLowerCase();
-  const highKws = keywords.filter(k => k.tier === "high").sort((a, b) => b.keyword.length - a.keyword.length);
-  for (const k of highKws) {
-    if (matched.includes(k.model_slug)) continue;
-    const regex = new RegExp(`\\b${k.keyword.replace(/[-\.]/g, "[-\\s.]?")}\\b`, "i");
-    if (regex.test(lower)) matched.push(k.model_slug);
-  }
-  const ambigKws = keywords.filter(k => k.tier === "ambiguous");
-  for (const k of ambigKws) {
-    if (matched.includes(k.model_slug)) continue;
-    const regex = new RegExp(`\\b${k.keyword.replace(/[-\.]/g, "[-\\s.]?")}\\b`, "i");
-    if (!regex.test(lower)) continue;
-    if (!k.context_words) { matched.push(k.model_slug); continue; }
-    const contextList = k.context_words.split(",").map(w => w.trim().toLowerCase());
-    if (contextList.some(cw => lower.includes(cw))) matched.push(k.model_slug);
-  }
-  return matched;
-}
-
-function isEnglish(text: string): boolean {
-  const nw = text.replace(/\s/g, "");
-  if (nw.length < 5) return true;
-  return ((nw.match(/[a-zA-Z]/g) || []).length / nw.length) >= 0.6;
-}
-
-function stripUrls(text: string): string {
-  return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
-}
-
-function meetsMinLength(title: string, content: string): boolean {
-  return stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim().length >= 20;
-}
-
-async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
-  const since = new Date(Date.now() - 48 * 3600000).toISOString();
-  const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
-  const keys = new Set<string>();
-  for (const p of data || []) if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
-  return keys;
-}
-
-function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
-  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
-}
+import { corsHeaders, KeywordEntry, loadKeywords, matchModels, isEnglish, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
 
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
-
-async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
-  try { await supabase.from("error_log").insert({ function_name: "scrape-twitter", error_message: msg, context: ctx || null }); } catch (e) { console.error("logToErrorLog failed:", msg, e); }
-}
 
 const GROK_SEARCH_PROMPT = `Search X/Twitter for recent posts (last 24 hours) about these AI models: Claude, ChatGPT, GPT-4, GPT-4o, Gemini, Grok.
 
@@ -134,7 +64,7 @@ async function runApifyPath(
 
   if (!startRes.ok) {
     const errorText = await startRes.text().catch(() => "unknown");
-    await logToErrorLog(supabase, `Apify start failed HTTP ${startRes.status}: ${errorText.slice(0, 500)}`, "apify-error");
+    await logToErrorLog(supabase, "scrape-twitter", `Apify start failed HTTP ${startRes.status}: ${errorText.slice(0, 500)}`, "apify-error");
     // Treat quota/billing errors as a graceful skip so the orchestrator doesn't report a failure
     if (startRes.status === 402 || startRes.status === 403) {
       summary.errors.push(`Apify quota exceeded (HTTP ${startRes.status})`);
@@ -147,7 +77,7 @@ async function runApifyPath(
   const runId = runData.data?.id;
   const datasetId = runData.data?.defaultDatasetId;
   if (!runId || !datasetId) {
-    await logToErrorLog(supabase, "No runId/datasetId from Apify", "apify-error");
+    await logToErrorLog(supabase, "scrape-twitter", "No runId/datasetId from Apify", "apify-error");
     throw new Error("Missing runId from Apify");
   }
 
@@ -173,7 +103,7 @@ async function runApifyPath(
         errorDetail = detailData.data?.statusMessage || detailData.data?.exitCode || "";
       }
     } catch {}
-    await logToErrorLog(supabase, `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
+    await logToErrorLog(supabase, "scrape-twitter", `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
     summary.errors.push(`Apify run ${runStatus || "TIMEOUT"}: ${errorDetail}`);
     return summary;
   }
@@ -187,7 +117,7 @@ async function runApifyPath(
 
   // Filter items that have text content (handles both actor output formats)
   const items = rawItems.filter((item: any) => item.text || item.full_text);
-  await logToErrorLog(supabase, `Apify raw=${rawItems.length} tweets=${items.length}`, "apify-debug");
+  await logToErrorLog(supabase, "scrape-twitter", `Apify raw=${rawItems.length} tweets=${items.length}`, "apify-debug");
 
   const cutoff = new Date(Date.now() - 24 * 3600000);
   summary.fetched = items.length;
@@ -234,7 +164,7 @@ async function runApifyPath(
 
   // Pass 2: batch classify
   const twitterLogError = async (msg: string, ctx?: string) => {
-    await logToErrorLog(supabase, msg, ctx || "classify");
+    await logToErrorLog(supabase, "scrape-twitter", msg, ctx || "classify");
   };
   const classifications = await classifyBatch(candidates.map(c => c.text), lovableApiKey, 25, twitterLogError);
   summary.classified = classifications.length;
@@ -319,7 +249,7 @@ async function runGrokPath(
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => "unknown");
-    await logToErrorLog(supabase, `Grok API HTTP ${res.status}: ${errorText.slice(0, 500)}`, "grok-error");
+    await logToErrorLog(supabase, "scrape-twitter", `Grok API HTTP ${res.status}: ${errorText.slice(0, 500)}`, "grok-error");
     throw new Error(`Grok API returned ${res.status}`);
   }
 
@@ -423,14 +353,14 @@ Deno.serve(async (req) => {
 
     const lovableApiKey = Deno.env.get("GEMINI_API_KEY");
     if (apifyToken && !lovableApiKey) {
-      await logToErrorLog(supabase, "GEMINI_API_KEY not set — required for Apify path sentiment classification", "config-error");
+      await logToErrorLog(supabase, "scrape-twitter", "GEMINI_API_KEY not set — required for Apify path sentiment classification", "config-error");
       return new Response(
         JSON.stringify({ error: "GEMINI_API_KEY not configured (required for Apify path)" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
-    await logToErrorLog(supabase, "Twitter scraper started", "health-check");
+    await logToErrorLog(supabase, "scrape-twitter", "Twitter scraper started", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
 
@@ -448,6 +378,7 @@ Deno.serve(async (req) => {
 
     await logToErrorLog(
       supabase,
+      "scrape-twitter",
       `Completed (${summary.backend}): fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} dedupSkipped=${summary.dedupSkipped}`,
       "summary",
     );
@@ -457,7 +388,7 @@ Deno.serve(async (req) => {
     });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown";
-    await logToErrorLog(supabase, msg, "top-level error");
+    await logToErrorLog(supabase, "scrape-twitter", msg, "top-level error");
     return new Response(JSON.stringify({ error: msg }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

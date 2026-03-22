@@ -1,11 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch } from "../_shared/classifier.ts";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { corsHeaders, loadKeywords, matchModels, isEnglish, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
 
 const SUBREDDIT_MODEL_MAP: Record<string, string> = {
   "r/ClaudeAI": "claude",
@@ -16,76 +11,7 @@ const SUBREDDIT_MODEL_MAP: Record<string, string> = {
   "r/googlegemini": "gemini",
 };
 
-interface KeywordEntry { keyword: string; tier: string; context_words: string | null; model_slug: string; }
-
-async function loadKeywords(supabase: any): Promise<{ modelMap: Record<string, string>; keywords: KeywordEntry[] }> {
-  const { data: models } = await supabase.from("models").select("id, slug");
-  const modelMap: Record<string, string> = {};
-  const slugById: Record<string, string> = {};
-  for (const m of models || []) { modelMap[m.slug] = m.id; slugById[m.id] = m.slug; }
-  const { data: kws } = await supabase.from("model_keywords").select("keyword, tier, context_words, model_id");
-  const keywords: KeywordEntry[] = (kws || []).map((k: any) => ({
-    keyword: k.keyword, tier: k.tier, context_words: k.context_words, model_slug: slugById[k.model_id] || "",
-  }));
-  return { modelMap, keywords };
-}
-
-function matchModels(text: string, keywords: KeywordEntry[], communityName?: string): string[] {
-  const matched: string[] = [];
-  if (communityName) {
-    const subSlug = SUBREDDIT_MODEL_MAP[communityName];
-    if (subSlug && !matched.includes(subSlug)) matched.push(subSlug);
-  }
-  const lower = text.toLowerCase();
-  const highKws = keywords.filter(k => k.tier === "high").sort((a, b) => b.keyword.length - a.keyword.length);
-  for (const k of highKws) {
-    if (matched.includes(k.model_slug)) continue;
-    const regex = new RegExp(`\\b${k.keyword.replace(/[-\.]/g, "[-\\s.]?")}\\b`, "i");
-    if (regex.test(lower)) matched.push(k.model_slug);
-  }
-  const ambigKws = keywords.filter(k => k.tier === "ambiguous");
-  for (const k of ambigKws) {
-    if (matched.includes(k.model_slug)) continue;
-    const regex = new RegExp(`\\b${k.keyword.replace(/[-\.]/g, "[-\\s.]?")}\\b`, "i");
-    if (!regex.test(lower)) continue;
-    if (!k.context_words) { matched.push(k.model_slug); continue; }
-    const contextList = k.context_words.split(",").map(w => w.trim().toLowerCase());
-    if (contextList.some(cw => lower.includes(cw))) matched.push(k.model_slug);
-  }
-  return matched;
-}
-
-function isEnglish(text: string): boolean {
-  const nw = text.replace(/\s/g, "");
-  if (nw.length < 5) return true;
-  return ((nw.match(/[a-zA-Z]/g) || []).length / nw.length) >= 0.6;
-}
-
-function stripUrls(text: string): string {
-  return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
-}
-
-function meetsMinLength(title: string, content: string): boolean {
-  return stripUrls(`${title} ${content}`).replace(/\s+/g, " ").trim().length >= 20;
-}
-
-async function loadRecentTitleKeys(supabase: any): Promise<Set<string>> {
-  const since = new Date(Date.now() - 48 * 3600000).toISOString();
-  const { data } = await supabase.from("scraped_posts").select("title, model_id").gte("posted_at", since).not("title", "is", null);
-  const keys = new Set<string>();
-  for (const p of data || []) if (p.title) keys.add(`${p.model_id}:${p.title.slice(0, 80).toLowerCase()}`);
-  return keys;
-}
-
-function isDuplicate(titleKeys: Set<string>, title: string, modelId: string): boolean {
-  return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
-}
-
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
-
-async function logToErrorLog(supabase: any, msg: string, ctx?: string) {
-  try { await supabase.from("error_log").insert({ function_name: "scrape-reddit-apify", error_message: msg, context: ctx || null }); } catch {}
-}
 
 
 Deno.serve(async (req) => {
@@ -96,12 +22,12 @@ Deno.serve(async (req) => {
   try {
     const apifyToken = Deno.env.get("APIFY_API_TOKEN");
     if (!apifyToken) {
-      await logToErrorLog(supabase, "APIFY_API_TOKEN not configured", "config-error");
+      await logToErrorLog(supabase, "scrape-reddit-apify", "APIFY_API_TOKEN not configured", "config-error");
       return new Response(JSON.stringify({ error: "APIFY_API_TOKEN not configured" }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const geminiApiKey = Deno.env.get("GEMINI_API_KEY")!;
-    await logToErrorLog(supabase, "Reddit Apify scraper started (v3 - reduced subreddits)", "health-check");
+    await logToErrorLog(supabase, "scrape-reddit-apify", "Reddit Apify scraper started (v3 - reduced subreddits)", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
 
@@ -123,7 +49,7 @@ Deno.serve(async (req) => {
     const startRes = await fetch(startUrl, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(apifyInput) });
     if (!startRes.ok) {
       const errorText = await startRes.text().catch(() => "unknown");
-      await logToErrorLog(supabase, `Apify start failed HTTP ${startRes.status}: ${errorText.slice(0, 500)}`, "apify-error");
+      await logToErrorLog(supabase, "scrape-reddit-apify", `Apify start failed HTTP ${startRes.status}: ${errorText.slice(0, 500)}`, "apify-error");
       if (startRes.status === 402 || startRes.status === 403) {
         return new Response(JSON.stringify({ error: `Apify quota/auth error (HTTP ${startRes.status})`, skipped: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -134,7 +60,7 @@ Deno.serve(async (req) => {
     const runId = runData.data?.id;
     const datasetId = runData.data?.defaultDatasetId;
     if (!runId || !datasetId) {
-      await logToErrorLog(supabase, `No runId/datasetId`, "apify-error");
+      await logToErrorLog(supabase, "scrape-reddit-apify", `No runId/datasetId`, "apify-error");
       return new Response(JSON.stringify({ error: "Missing runId from Apify" }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -158,7 +84,7 @@ Deno.serve(async (req) => {
           errorDetail = detailData.data?.statusMessage || detailData.data?.exitCode || "";
         }
       } catch {}
-      await logToErrorLog(supabase, `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
+      await logToErrorLog(supabase, "scrape-reddit-apify", `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
       return new Response(JSON.stringify({ error: `Apify run status: ${runStatus || "TIMEOUT"}`, detail: errorDetail }), { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
@@ -189,7 +115,7 @@ Deno.serve(async (req) => {
       if (!isEnglish(fullText)) { summary.langSkipped++; continue; }
       if (!meetsMinLength(title, body)) { summary.contentSkipped++; continue; }
 
-      const matchedSlugs = matchModels(fullText, keywords, post.communityName);
+      const matchedSlugs = matchModels(fullText, keywords, SUBREDDIT_MODEL_MAP, post.communityName);
       if (matchedSlugs.length === 0) continue;
       summary.filtered++;
 
@@ -208,7 +134,7 @@ Deno.serve(async (req) => {
 
     // Pass 2: batch classify
     const redditLogError = async (msg: string, ctx?: string) => {
-      await logToErrorLog(supabase, msg, ctx || "classify");
+      await logToErrorLog(supabase, "scrape-reddit-apify", msg, ctx || "classify");
     };
     const classifications = await classifyBatch(candidates.map(c => c.fullText), geminiApiKey, 25, redditLogError);
     summary.classified = classifications.length;
@@ -239,11 +165,11 @@ Deno.serve(async (req) => {
       }
     }
 
-    await logToErrorLog(supabase, `Completed: posts=${summary.apifyPosts} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} dedupSkipped=${summary.dedupSkipped}`, "summary");
+    await logToErrorLog(supabase, "scrape-reddit-apify", `Completed: posts=${summary.apifyPosts} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} dedupSkipped=${summary.dedupSkipped}`, "summary");
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown";
-    await logToErrorLog(supabase, msg, "top-level error");
+    await logToErrorLog(supabase, "scrape-reddit-apify", msg, "top-level error");
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
