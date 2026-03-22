@@ -116,6 +116,15 @@ npm run test         # Vitest
 - Minimal test coverage (example test only)
 - Error handling in scrapers silently logs to `error_log` table
 
+## Accuracy Guardrails
+
+- If uncertain about a scraper API, Supabase schema, or edge function behavior, say "I don't know" rather than guessing
+- Read the relevant source file before making claims about scraper logic, classifier behavior, or database schema
+- Verify that Supabase tables, RPC functions, and edge functions exist before referencing them
+- Do not suggest Deno/Supabase features without verifying they are available in this project's edge function runtime
+- When referencing scraper configurations or API integrations, verify against `supabase/functions/` source files
+- Cite specific file paths when making recommendations
+
 ## Working Here with Claude Code
 
 Focus areas for local edits:
