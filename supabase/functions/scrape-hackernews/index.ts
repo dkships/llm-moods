@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyBatch } from "../_shared/classifier.ts";
-import { corsHeaders, loadKeywords, matchModels, isEnglish, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
+import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { corsHeaders, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
 
 const ALGOLIA_BASE = "https://hn.algolia.com/api/v1/search_by_date";
 const STORY_SEARCH_TERMS = ["Claude", "ChatGPT", "GPT-5", "Gemini", "Grok", "OpenAI", "Anthropic"];
@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
         // Pass 1: collect story candidates
         const storyCandidates: { text: string; matchedSlugs: string[]; sourceUrl: string; title: string; score: number; postedAt: string }[] = [];
         for (const hit of hits) {
-          if (!hit.title || !isEnglish(hit.title)) continue;
+          if (!hit.title) continue;
           if (!meetsMinLength(hit.title, "")) { summary.contentSkipped++; continue; }
           const sourceUrl = `https://news.ycombinator.com/item?id=${hit.objectID}`;
           if (existingUrls.has(sourceUrl)) { summary.skipped++; continue; }
@@ -64,13 +64,34 @@ Deno.serve(async (req) => {
         summary.classified += storyClassifications.length;
         summary.irrelevant += storyClassifications.filter(c => !c.relevant).length;
 
+        // Pass 2b: Re-classify multi-model posts with targeted sentiment
+        const storyMultiModelItems: { idx: number; slug: string }[] = [];
+        for (let i = 0; i < storyCandidates.length; i++) {
+          if (storyCandidates[i].matchedSlugs.length > 1 && storyClassifications[i].relevant) {
+            for (const slug of storyCandidates[i].matchedSlugs) {
+              storyMultiModelItems.push({ idx: i, slug });
+            }
+          }
+        }
+        const storyTargetedResults = storyMultiModelItems.length > 0
+          ? await classifyBatchTargeted(
+              storyMultiModelItems.map(m => ({ text: storyCandidates[m.idx].text, targetModel: m.slug })),
+              lovableApiKey, 25, hnLogError
+            )
+          : [];
+        const storyTargetedMap = new Map<string, typeof storyClassifications[0]>();
+        storyMultiModelItems.forEach((m, j) => storyTargetedMap.set(`${m.idx}:${m.slug}`, storyTargetedResults[j]));
+
         // Pass 3: insert stories
         for (let i = 0; i < storyCandidates.length; i++) {
-          const classification = storyClassifications[i];
-          if (!classification.relevant) continue;
+          const baseClassification = storyClassifications[i];
+          if (!baseClassification.relevant) continue;
           const c = storyCandidates[i];
 
           for (const slug of c.matchedSlugs) {
+            const classification = c.matchedSlugs.length > 1
+              ? (storyTargetedMap.get(`${i}:${slug}`) || storyClassifications[i])
+              : storyClassifications[i];
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, c.title, modelId)) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
@@ -79,6 +100,8 @@ Deno.serve(async (req) => {
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: "title_only",
+              original_language: classification.language || null,
+              translated_content: classification.english_translation || null,
               score: c.score, posted_at: c.postedAt,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {
@@ -105,7 +128,7 @@ Deno.serve(async (req) => {
         const commentCandidates: { text: string; matchedSlugs: string[]; sourceUrl: string; score: number; postedAt: string }[] = [];
         for (const hit of hits) {
           const text = (hit.comment_text || "").replace(/<[^>]*>/g, "");
-          if (!text || !isEnglish(text)) continue;
+          if (!text) continue;
           if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
           const sourceUrl = hit.story_id ? `https://news.ycombinator.com/item?id=${hit.story_id}` : `https://news.ycombinator.com/item?id=${hit.objectID}`;
           if (existingUrls.has(sourceUrl)) { summary.skipped++; continue; }
@@ -124,13 +147,34 @@ Deno.serve(async (req) => {
         summary.classified += commentClassifications.length;
         summary.irrelevant += commentClassifications.filter(c => !c.relevant).length;
 
+        // Pass 2b: Re-classify multi-model comments with targeted sentiment
+        const commentMultiModelItems: { idx: number; slug: string }[] = [];
+        for (let i = 0; i < commentCandidates.length; i++) {
+          if (commentCandidates[i].matchedSlugs.length > 1 && commentClassifications[i].relevant) {
+            for (const slug of commentCandidates[i].matchedSlugs) {
+              commentMultiModelItems.push({ idx: i, slug });
+            }
+          }
+        }
+        const commentTargetedResults = commentMultiModelItems.length > 0
+          ? await classifyBatchTargeted(
+              commentMultiModelItems.map(m => ({ text: commentCandidates[m.idx].text, targetModel: m.slug })),
+              lovableApiKey, 25, hnCommentLogError
+            )
+          : [];
+        const commentTargetedMap = new Map<string, typeof commentClassifications[0]>();
+        commentMultiModelItems.forEach((m, j) => commentTargetedMap.set(`${m.idx}:${m.slug}`, commentTargetedResults[j]));
+
         // Pass 3: insert comments
         for (let i = 0; i < commentCandidates.length; i++) {
-          const classification = commentClassifications[i];
-          if (!classification.relevant) continue;
+          const baseClassification = commentClassifications[i];
+          if (!baseClassification.relevant) continue;
           const c = commentCandidates[i];
 
           for (const slug of c.matchedSlugs) {
+            const classification = c.matchedSlugs.length > 1
+              ? (commentTargetedMap.get(`${i}:${slug}`) || commentClassifications[i])
+              : commentClassifications[i];
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, c.text.slice(0, 200), modelId)) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
@@ -139,6 +183,8 @@ Deno.serve(async (req) => {
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: "full_content",
+              original_language: classification.language || null,
+              translated_content: classification.english_translation || null,
               score: c.score, posted_at: c.postedAt,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {

@@ -167,7 +167,19 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
         </span>
       </div>
       <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">
-        {(post.content as string) || (post.title as string)}
+        {(post.translated_content as string) || (post.content as string) || (post.title as string)}
+        {(post.original_language as string) && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-muted-foreground/60 bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
+                Translated from {(post.original_language as string).toUpperCase()}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-sm">
+              <p className="text-xs">{(post.content as string)?.slice(0, 300)}</p>
+            </TooltipContent>
+          </Tooltip>
+        )}
       </p>
       <div className="flex items-center gap-2 shrink-0">
         {modelData && (

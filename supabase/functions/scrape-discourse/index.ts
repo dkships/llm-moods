@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyBatch } from "../_shared/classifier.ts";
-import { corsHeaders, loadKeywords, matchModels, isEnglish, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
+import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { corsHeaders, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
 
 const FORUMS = [
   { baseUrl: "https://community.openai.com", defaultSlug: "chatgpt" },
@@ -44,8 +44,6 @@ Deno.serve(async (req) => {
           if (!topic.title || !topic.id || !topic.slug) continue;
           const createdAt = new Date(topic.created_at).getTime();
           if (createdAt < oneDayAgo) continue;
-          if (!isEnglish(topic.title)) continue;
-
           summary.topics++;
 
           let matchedSlugs = matchModels(topic.title, keywords);
@@ -86,6 +84,24 @@ Deno.serve(async (req) => {
         summary.classified += classifications.length;
         summary.irrelevant += classifications.filter(c => !c.relevant).length;
 
+        // Pass 2.5: targeted classification for multi-model posts
+        const multiModelItems: { idx: number; slug: string }[] = [];
+        for (let i = 0; i < candidates.length; i++) {
+          if (candidates[i].matchedSlugs.length > 1 && classifications[i].relevant) {
+            for (const slug of candidates[i].matchedSlugs) {
+              multiModelItems.push({ idx: i, slug });
+            }
+          }
+        }
+        const targetedResults = multiModelItems.length > 0
+          ? await classifyBatchTargeted(
+              multiModelItems.map(m => ({ text: candidates[m.idx].classifyText, targetModel: m.slug })),
+              lovableApiKey, 25, discourseLogError
+            )
+          : [];
+        const targetedMap = new Map<string, typeof classifications[0]>();
+        multiModelItems.forEach((m, j) => targetedMap.set(`${m.idx}:${m.slug}`, targetedResults[j]));
+
         // Pass 3: insert
         for (let i = 0; i < candidates.length; i++) {
           const classification = classifications[i];
@@ -93,16 +109,21 @@ Deno.serve(async (req) => {
           const c = candidates[i];
 
           for (const slug of c.matchedSlugs) {
+            const cls = c.matchedSlugs.length > 1
+              ? (targetedMap.get(`${i}:${slug}`) || classification)
+              : classification;
+            if (!cls.relevant) continue;
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, c.title, modelId)) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "discourse", source_url: c.sourceUrl,
               title: c.title.slice(0, 500), content: c.content.slice(0, 2000),
-              sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-              praise_category: classification.praise_category,
-              confidence: classification.confidence, content_type: "title_and_body",
+              sentiment: cls.sentiment, complaint_category: cls.complaint_category,
+              praise_category: cls.praise_category,
+              confidence: cls.confidence, content_type: "title_and_body",
               score: c.score,
               posted_at: c.postedAt,
+              original_language: cls.language || null, translated_content: cls.english_translation || null,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(error.message); } else {
               summary.inserted++;

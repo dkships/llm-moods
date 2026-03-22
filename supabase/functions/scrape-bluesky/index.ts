@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyBatch } from "../_shared/classifier.ts";
-import { corsHeaders, loadKeywords, matchModels, isEnglish, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
+import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { corsHeaders, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
 
 const SEARCH_TERMS = [
   "Claude AI", "ChatGPT", "GPT-5", "Gemini AI", "Grok AI",
@@ -79,9 +79,6 @@ Deno.serve(async (req) => {
           const createdAt = post.record?.createdAt ? new Date(post.record.createdAt) : null;
           if (!createdAt || createdAt < cutoff) continue;
 
-          const langs: string[] = post.record?.langs || [];
-          if (langs.length > 0 && !langs.some((l: string) => l.startsWith("en"))) { summary.langSkipped++; continue; }
-          if (!isEnglish(text)) { summary.langSkipped++; continue; }
           if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
 
           const matchedSlugs = matchModels(text, keywords);
@@ -112,13 +109,34 @@ Deno.serve(async (req) => {
         summary.classified += classifications.length;
         summary.irrelevant += classifications.filter(c => !c.relevant).length;
 
+        // Pass 2b: Re-classify multi-model posts with targeted sentiment
+        const multiModelItems: { idx: number; slug: string }[] = [];
+        for (let i = 0; i < candidates.length; i++) {
+          if (candidates[i].matchedSlugs.length > 1 && classifications[i].relevant) {
+            for (const slug of candidates[i].matchedSlugs) {
+              multiModelItems.push({ idx: i, slug });
+            }
+          }
+        }
+        const targetedResults = multiModelItems.length > 0
+          ? await classifyBatchTargeted(
+              multiModelItems.map(m => ({ text: candidates[m.idx].text, targetModel: m.slug })),
+              lovableApiKey, 25, bskyLogError
+            )
+          : [];
+        const targetedMap = new Map<string, typeof classifications[0]>();
+        multiModelItems.forEach((m, j) => targetedMap.set(`${m.idx}:${m.slug}`, targetedResults[j]));
+
         // Pass 3: insert
         for (let i = 0; i < candidates.length; i++) {
-          const classification = classifications[i];
-          if (!classification.relevant) continue;
+          const baseClassification = classifications[i];
+          if (!baseClassification.relevant) continue;
           const c = candidates[i];
 
           for (const slug of c.matchedSlugs) {
+            const classification = c.matchedSlugs.length > 1
+              ? (targetedMap.get(`${i}:${slug}`) || classifications[i])
+              : classifications[i];
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, c.text.slice(0, 120), modelId)) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
@@ -127,6 +145,8 @@ Deno.serve(async (req) => {
               sentiment: classification.sentiment, complaint_category: classification.complaint_category,
               praise_category: classification.praise_category,
               confidence: classification.confidence, content_type: "full_content",
+              original_language: classification.language || null,
+              translated_content: classification.english_translation || null,
               score: c.score, posted_at: c.createdAt,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(`Insert: ${error.message}`); } else {

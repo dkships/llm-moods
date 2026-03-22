@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyBatch } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
 import { corsHeaders, loadKeywords, matchModels, logToErrorLog } from "../_shared/utils.ts";
 
 const REPOS: { owner: string; repo: string; defaultSlug: string | null }[] = [
@@ -99,6 +99,24 @@ Deno.serve(async (req) => {
         summary.classified += classifications.length;
         summary.irrelevant += classifications.filter(c => !c.relevant).length;
 
+        // Pass 2.5: targeted classification for multi-model posts
+        const multiModelItems: { idx: number; slug: string }[] = [];
+        for (let i = 0; i < candidates.length; i++) {
+          if (candidates[i].matchedSlugs.length > 1 && classifications[i].relevant) {
+            for (const slug of candidates[i].matchedSlugs) {
+              multiModelItems.push({ idx: i, slug });
+            }
+          }
+        }
+        const targetedResults = multiModelItems.length > 0
+          ? await classifyBatchTargeted(
+              multiModelItems.map(m => ({ text: candidates[m.idx].text, targetModel: m.slug })),
+              lovableApiKey, 25, githubLogError
+            )
+          : [];
+        const targetedMap = new Map<string, typeof classifications[0]>();
+        multiModelItems.forEach((m, j) => targetedMap.set(`${m.idx}:${m.slug}`, targetedResults[j]));
+
         // Pass 3: insert
         for (let i = 0; i < candidates.length; i++) {
           const classification = classifications[i];
@@ -106,15 +124,20 @@ Deno.serve(async (req) => {
           const c = candidates[i];
 
           for (const slug of c.matchedSlugs) {
+            const cls = c.matchedSlugs.length > 1
+              ? (targetedMap.get(`${i}:${slug}`) || classification)
+              : classification;
+            if (!cls.relevant) continue;
             const modelId = modelMap[slug];
             if (!modelId) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "github", source_url: c.htmlUrl,
               title: c.title, content: c.body.slice(0, 2000),
-              sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-              praise_category: classification.praise_category,
-              confidence: classification.confidence, content_type: c.contentType,
+              sentiment: cls.sentiment, complaint_category: cls.complaint_category,
+              praise_category: cls.praise_category,
+              confidence: cls.confidence, content_type: c.contentType,
               score: c.score, posted_at: c.createdAt,
+              original_language: cls.language || null, translated_content: cls.english_translation || null,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
               summary.inserted++;

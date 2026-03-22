@@ -3,6 +3,7 @@ import { TrendingUp, TrendingDown, ArrowLeft } from "lucide-react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState, lazy, Suspense } from "react";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
@@ -297,7 +298,21 @@ const ModelDetail = () => {
                     <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border shrink-0">
                       {src.emoji} {src.label}
                     </span>
-                    <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">{post.content || post.title}</p>
+                    <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">
+                      {(post as any).translated_content || post.content || post.title}
+                      {(post as any).original_language && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-muted-foreground/60 bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
+                              Translated from {((post as any).original_language as string).toUpperCase()}
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-sm">
+                            <p className="text-xs">{post.content?.slice(0, 300)}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </p>
                     <div className="flex items-center gap-2 shrink-0">
                       <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
                         {s.label}

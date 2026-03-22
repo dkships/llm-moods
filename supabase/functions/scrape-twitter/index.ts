@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyBatch } from "../_shared/classifier.ts";
-import { corsHeaders, KeywordEntry, loadKeywords, matchModels, isEnglish, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
+import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { corsHeaders, KeywordEntry, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
 
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -135,9 +135,6 @@ async function runApifyPath(
     const text = (tweet.text || tweet.full_text || "").slice(0, 2000);
     if (!text) continue;
 
-    // Check lang field if available, otherwise use heuristic
-    if (tweet.lang && tweet.lang !== "en" && tweet.lang !== "und") { summary.langSkipped++; continue; }
-    if (!isEnglish(text)) { summary.langSkipped++; continue; }
     if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
 
     const matchedSlugs = matchModels(text, keywords);
@@ -170,6 +167,24 @@ async function runApifyPath(
   summary.classified = classifications.length;
   summary.irrelevant = classifications.filter(c => !c.relevant).length;
 
+  // Pass 2.5: targeted classification for multi-model posts
+  const multiModelItems: { idx: number; slug: string }[] = [];
+  for (let i = 0; i < candidates.length; i++) {
+    if (candidates[i].matchedSlugs.length > 1 && classifications[i].relevant) {
+      for (const slug of candidates[i].matchedSlugs) {
+        multiModelItems.push({ idx: i, slug });
+      }
+    }
+  }
+  const targetedResults = multiModelItems.length > 0
+    ? await classifyBatchTargeted(
+        multiModelItems.map(m => ({ text: candidates[m.idx].text, targetModel: m.slug })),
+        lovableApiKey, 25, twitterLogError
+      )
+    : [];
+  const targetedMap = new Map<string, typeof classifications[0]>();
+  multiModelItems.forEach((m, j) => targetedMap.set(`${m.idx}:${m.slug}`, targetedResults[j]));
+
   // Pass 3: insert
   for (let i = 0; i < candidates.length; i++) {
     const classification = classifications[i];
@@ -177,16 +192,21 @@ async function runApifyPath(
     const c = candidates[i];
 
     for (const slug of c.matchedSlugs) {
+      const cls = c.matchedSlugs.length > 1
+        ? (targetedMap.get(`${i}:${slug}`) || classification)
+        : classification;
+      if (!cls.relevant) continue;
       const modelId = modelMap[slug];
       if (!modelId || isDuplicate(titleKeys, c.title, modelId)) continue;
       const { error } = await supabase.from("scraped_posts").upsert({
         model_id: modelId, source: "twitter", source_url: c.sourceUrl,
         title: c.title.slice(0, 120), content: c.text.slice(0, 2000),
-        sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-        praise_category: classification.praise_category,
-        confidence: classification.confidence, content_type: "title_only",
+        sentiment: cls.sentiment, complaint_category: cls.complaint_category,
+        praise_category: cls.praise_category,
+        confidence: cls.confidence, content_type: "title_only",
         score: c.engagementScore,
         posted_at: c.createdAt,
+        original_language: cls.language || null, translated_content: cls.english_translation || null,
       }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
       if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
         summary.inserted++;
@@ -309,6 +329,7 @@ async function runGrokPath(
       ? post.confidence : 0.5;
     const postedAt = post.posted_at ? new Date(post.posted_at).toISOString() : new Date().toISOString();
 
+    // TODO: Add targeted classification for multi-model posts when Grok path is activated
     for (const slug of matchedSlugs) {
       const modelId = modelMap[slug];
       if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
@@ -321,6 +342,7 @@ async function runGrokPath(
         content_type: "title_only",
         score: 0, // Grok doesn't provide engagement metrics
         posted_at: postedAt,
+        original_language: null, translated_content: null,
       }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
       if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
         summary.inserted++;
