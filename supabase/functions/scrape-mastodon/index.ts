@@ -11,7 +11,11 @@ const SEARCH_QUERIES = [
 const SEARCH_INSTANCE = "mastodon.social";
 
 function stripHtml(html: string): string {
-  return html.replace(/<[^>]*>/g, "").replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+  return html.replace(/<[^>]*>/g, "")
+    .replace(/&#(\d+);/g, (_: string, n: string) => String.fromCharCode(Number(n)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_: string, h: string) => String.fromCharCode(parseInt(h, 16)))
+    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
 }
 
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }

@@ -127,7 +127,11 @@ Deno.serve(async (req) => {
         // Pass 1: collect comment candidates
         const commentCandidates: { text: string; matchedSlugs: string[]; sourceUrl: string; score: number; postedAt: string }[] = [];
         for (const hit of hits) {
-          const text = (hit.comment_text || "").replace(/<[^>]*>/g, "");
+          const text = (hit.comment_text || "").replace(/<[^>]*>/g, "")
+            .replace(/&#(\d+);/g, (_: string, n: string) => String.fromCharCode(Number(n)))
+            .replace(/&#x([0-9a-fA-F]+);/g, (_: string, h: string) => String.fromCharCode(parseInt(h, 16)))
+            .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
           if (!text) continue;
           if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
           const sourceUrl = hit.story_id ? `https://news.ycombinator.com/item?id=${hit.story_id}` : `https://news.ycombinator.com/item?id=${hit.objectID}`;

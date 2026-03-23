@@ -15,7 +15,7 @@ import {
 } from "@/hooks/useVibesData";
 import {
   getVibeStatus, fadeUp, COMPLAINT_LABELS, SOURCE_LABELS,
-  SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay,
+  SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
@@ -299,7 +299,7 @@ const ModelDetail = () => {
                       {src.emoji} {src.label}
                     </span>
                     <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">
-                      {(post as any).translated_content || post.content || post.title}
+                      {decodeHTMLEntities((post as any).translated_content || post.content || post.title)}
                       {(post as any).original_language && (
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -308,7 +308,7 @@ const ModelDetail = () => {
                             </span>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-sm">
-                            <p className="text-xs">{post.content?.slice(0, 300)}</p>
+                            <p className="text-xs">{decodeHTMLEntities(post.content?.slice(0, 300) || "")}</p>
                           </TooltipContent>
                         </Tooltip>
                       )}

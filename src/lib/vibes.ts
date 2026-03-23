@@ -68,6 +68,24 @@ export function formatSourceDisplay(source: string): { emoji: string; label: str
   return { emoji: "⚪", label: source };
 }
 
+/** Decode common HTML entities found in scraped content */
+export function decodeHTMLEntities(text: string): string {
+  if (!text || !text.includes("&")) return text;
+  const entities: Record<string, string> = {
+    "&amp;": "&", "&lt;": "<", "&gt;": ">", "&quot;": '"',
+    "&apos;": "'", "&#x27;": "'", "&#x2F;": "/", "&#39;": "'",
+    "&nbsp;": " ",
+  };
+  let result = text;
+  for (const [entity, char] of Object.entries(entities)) {
+    result = result.split(entity).join(char);
+  }
+  // Handle numeric entities: &#NNN; and &#xHH;
+  result = result.replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)));
+  result = result.replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
+  return result;
+}
+
 export const fadeUp = {
   hidden: { opacity: 0, y: 20 },
   visible: (i: number) => ({

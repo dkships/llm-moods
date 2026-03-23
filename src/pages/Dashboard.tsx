@@ -10,7 +10,7 @@ import usePageTitle from "@/hooks/usePageTitle";
 import Footer from "@/components/Footer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, useDataFreshness, type ModelWithVibes } from "@/hooks/useVibesData";
-import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
+import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
 
@@ -167,7 +167,7 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
         </span>
       </div>
       <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">
-        {(post.translated_content as string) || (post.content as string) || (post.title as string)}
+        {decodeHTMLEntities((post.translated_content as string) || (post.content as string) || (post.title as string))}
         {(post.original_language as string) && (
           <Tooltip>
             <TooltipTrigger asChild>
