@@ -4,7 +4,7 @@ const Shimmer = ({ className = "" }: { className?: string }) => (
 
 export const CardSkeleton = () => (
   <div className="glass rounded-xl overflow-hidden">
-    <Shimmer className="h-1 rounded-none" />
+    <Shimmer className="h-1.5 rounded-none" />
     <div className="p-5 space-y-3">
       <Shimmer className="h-4 w-20" />
       <Shimmer className="h-5 w-32" />
@@ -18,7 +18,7 @@ export const CardSkeleton = () => (
 
 export const DashboardCardSkeleton = () => (
   <div className="glass rounded-xl overflow-hidden">
-    <Shimmer className="h-1 rounded-none" />
+    <Shimmer className="h-1.5 rounded-none" />
     <div className="p-6 space-y-4">
       <div className="flex justify-between">
         <div className="space-y-2">

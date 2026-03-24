@@ -6,7 +6,7 @@ import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
-import usePageTitle from "@/hooks/usePageTitle";
+import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, useDataFreshness, type ModelWithVibes } from "@/hooks/useVibesData";
@@ -49,7 +49,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
         className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer h-full hover:-translate-y-1"
         whileHover={{ boxShadow: `0 0 24px ${vibe.color}25, 0 8px 32px ${vibe.color}15` }}
       >
-        <div className="h-1" style={{ background: vibe.color }} />
+        <div className="h-1.5" style={{ background: vibe.color }} />
         <div className="p-6">
           <div className="flex items-start justify-between">
             <div>
@@ -201,7 +201,11 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
 ChatterPost.displayName = "ChatterPost";
 
 const Dashboard = () => {
-  usePageTitle("Dashboard — LLM Vibes");
+  useHead({
+    title: "Dashboard — LLM Vibes",
+    description: "Live sentiment scores, trends, and community chatter for Claude, ChatGPT, Gemini, and Grok.",
+    url: "/dashboard",
+  });
   const { data: models, isLoading: modelsLoading, isError: modelsError } = useModelsWithLatestVibes();
   const prefetch = usePrefetchModelDetail();
 
@@ -254,8 +258,8 @@ const Dashboard = () => {
         {/* Model Cards */}
         <section className="container pb-12">
           {modelsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
             </div>
           ) : modelsError ? (
             <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
@@ -264,7 +268,7 @@ const Dashboard = () => {
               initial="hidden"
               animate="visible"
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+              className="grid grid-cols-1 md:grid-cols-2 gap-4"
             >
               {(models || []).map((m, i) => (
                 <ModelCard key={m.id} m={m} i={i} onHover={handleHover} />
@@ -279,7 +283,7 @@ const Dashboard = () => {
         </section>
 
         {/* Community Chatter — lazy loaded on scroll */}
-        <section className="container pb-20" ref={chatterRef}>
+        <section className="container pb-12" ref={chatterRef}>
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}

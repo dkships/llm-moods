@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import { formatTimeAgo } from "@/lib/vibes";
-import usePageTitle from "@/hooks/usePageTitle";
+import useHead from "@/hooks/useHead";
 import type { Tables } from "@/integrations/supabase/types";
 
 type ScraperRun = Tables<"scraper_runs">;
@@ -15,7 +15,11 @@ function statusBadge(status: string) {
 }
 
 const ScraperMonitor = () => {
-  usePageTitle("Scraper Monitor — LLM Vibes");
+  useHead({
+    title: "Scraper Monitor — LLM Vibes",
+    description: "Monitor scraper run status and health for LLM Vibes data collection.",
+    url: "/admin/scrapers",
+  });
 
   const { data: runs, isLoading, isError } = useQuery({
     queryKey: ["scraper-runs"],

@@ -7,7 +7,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useState, lazy, Suspense } from "react";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
-import usePageTitle from "@/hooks/usePageTitle";
+import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import {
   useModelDetail, useVibesHistory, useComplaintBreakdown,
@@ -50,7 +50,13 @@ const ModelDetail = () => {
   const VibeIcon = vibe.icon;
   const accent = model?.accent_color || "#888";
 
-  usePageTitle(model ? `${model.name} Vibes — LLM Vibes` : "Loading — LLM Vibes");
+  useHead({
+    title: model ? `${model.name} Vibes — LLM Vibes` : "Loading — LLM Vibes",
+    description: model
+      ? `Real-time community sentiment and complaint trends for ${model.name}.`
+      : undefined,
+    url: slug ? `/model/${slug}` : undefined,
+  });
 
   if (modelLoading) {
     return (
@@ -259,7 +265,7 @@ const ModelDetail = () => {
         </section>
 
         {/* Recent Posts — lazy loaded on scroll */}
-        <section className="container pb-20">
+        <section className="container pb-12">
           <motion.h2
             initial={{ opacity: 0, y: 12 }}
             whileInView={{ opacity: 1, y: 0 }}

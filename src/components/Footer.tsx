@@ -1,10 +1,10 @@
 const Footer = () => (
   <footer className="border-t border-border">
-    <div className="container grid grid-cols-1 sm:grid-cols-3 items-center gap-4 py-8">
-      <p className="text-sm text-muted-foreground font-mono text-center sm:text-left">
+    <div className="container flex flex-col sm:flex-row items-center justify-between gap-4 py-8">
+      <p className="text-sm text-muted-foreground font-mono">
         Built for the AI-obsessed. LLM Vibes 2026.
       </p>
-      <p className="text-sm text-muted-foreground font-mono text-center">
+      <p className="text-sm text-muted-foreground font-mono">
         Made with ❤️ by{" "}
         <a
           href="https://dmkthinks.org"
@@ -15,7 +15,6 @@ const Footer = () => (
           David Kelly
         </a>
       </p>
-      <div />
     </div>
   </footer>
 );

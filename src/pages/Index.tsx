@@ -5,7 +5,7 @@ import { memo, useCallback, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
-import usePageTitle from "@/hooks/usePageTitle";
+import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import { useModelsWithLatestVibes, usePrefetchModelDetail, type ModelWithVibes } from "@/hooks/useVibesData";
 import { getVibeStatus, fadeUp } from "@/lib/vibes";
@@ -49,7 +49,7 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
           className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer group hover:-translate-y-1 h-full"
           whileHover={{ boxShadow: `0 0 20px ${vibe.color}20, 0 8px 30px ${vibe.color}10` }}
         >
-          <div className="h-1" style={{ background: vibe.color }} />
+          <div className="h-1.5" style={{ background: vibe.color }} />
           <div className="p-5">
             <div className="flex items-center gap-2">
               <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: brandColor }} />
@@ -74,7 +74,7 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
 LandingModelCard.displayName = "LandingModelCard";
 
 const Index = () => {
-  usePageTitle("LLM Vibes — Is Your AI Having a Bad Day?");
+  useHead({ title: "LLM Vibes — Is Your AI Having a Bad Day?", url: "/" });
   const { data: models, isLoading, isError } = useModelsWithLatestVibes();
   const prefetch = usePrefetchModelDetail();
 
@@ -88,7 +88,7 @@ const Index = () => {
         <NavBar />
 
         {/* Hero */}
-        <section className="container py-24 sm:py-32 relative">
+        <section className="container pt-24 sm:pt-32 pb-16 relative">
           <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.10)_0%,_transparent_70%)] pointer-events-none" />
           <motion.div
             className="max-w-3xl relative"
@@ -124,8 +124,8 @@ const Index = () => {
         {/* Live Vibes Preview */}
         <section className="container pb-24">
           {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 6 }).map((_, i) => <CardSkeleton key={i} />)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
             </div>
           ) : isError ? (
             <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
@@ -135,7 +135,7 @@ const Index = () => {
               whileInView="visible"
               viewport={{ once: true, margin: "-80px" }}
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4"
+              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
             >
               {(models || []).map((m, i) => (
                 <LandingModelCard key={m.id} m={m} i={i} onHover={handleHover} />
