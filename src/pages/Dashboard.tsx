@@ -305,8 +305,7 @@ const Dashboard = () => {
           ) : (
             <motion.div
               initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-40px" }}
+              animate="visible"
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
               className="space-y-3"
             >

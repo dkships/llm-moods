@@ -153,7 +153,7 @@ const ModelDetail = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column — Chart */}
             <motion.div
-              className="lg:col-span-2 glass rounded-xl p-6"
+              className="lg:col-span-2 glass rounded-xl p-6 self-start"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.45 }}
@@ -285,8 +285,7 @@ const ModelDetail = () => {
           ) : (
             <motion.div
               initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-40px" }}
+              animate="visible"
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
               className="space-y-3"
             >
