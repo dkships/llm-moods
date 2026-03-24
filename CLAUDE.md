@@ -110,6 +110,8 @@ npm run test         # Vitest
 - **React Query:** 60s stale time for most queries, 30s for scraper monitor
 - **Infinite scroll:** Chatter posts (25/page cursor-based on `posted_at`)
 - **Sentiment scale:** 0-40 bad (red), 41-65 mixed (amber), 66-100 good (green)
+- **Head management:** `useHead` hook (`src/hooks/useHead.ts`) sets per-route title, description, OG tags, and canonical URL by mutating existing `<head>` tags in `index.html`
+- **Sitemap:** `public/sitemap.xml` is static — update manually when adding/removing tracked models
 
 ## Known Limitations
 
