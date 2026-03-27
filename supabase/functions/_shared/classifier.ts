@@ -21,6 +21,8 @@ STEP 2 — SENTIMENT
 - "negative": Complaining about quality, frustrated with output, unfavorably comparing, expressing disappointment
 - "neutral": Genuinely mixed or purely factual comparison with no opinion. This should be RARE — most relevant posts express clear sentiment. When ambiguous, lean toward the expressed emotion.
 
+IMPORTANT: If the post describes switching away from, leaving, or replacing this model, that is NEGATIVE sentiment — even if the overall tone is positive. "I'm happily moving to X, done with Y" is negative for Y. Conversely, if someone is switching TO this model, that is POSITIVE for it.
+
 STEP 3 — CATEGORY
 If negative, set complaint_category to one of: lazy_responses, hallucinations, refusals, coding_quality, speed, general_drop, pricing_value, censorship, context_window, api_reliability, multimodal_quality, reasoning
 If positive, set praise_category to one of: output_quality, coding_quality, speed, reasoning, creativity, value, reliability, context_handling, multimodal_quality, general_improvement
@@ -54,6 +56,8 @@ SENTIMENT (if relevant):
 - "negative": complaining, frustrated, disappointed
 - "neutral": genuinely mixed or purely factual (should be RARE)
 
+IMPORTANT: If the post describes switching away from, leaving, or replacing the model being discussed, that is NEGATIVE sentiment — even if the overall tone is positive. "I'm happily moving to X, done with Y" is negative for Y. Conversely, if someone is switching TO the model, that is POSITIVE.
+
 CATEGORY (if relevant):
 If negative: lazy_responses, hallucinations, refusals, coding_quality, speed, general_drop, pricing_value, censorship, context_window, api_reliability, multimodal_quality, reasoning
 If positive: output_quality, coding_quality, speed, reasoning, creativity, value, reliability, context_handling, multimodal_quality, general_improvement
@@ -71,6 +75,9 @@ const BATCH_CLASSIFY_TARGETED_PROMPT = `You are classifying social media posts a
 IMPORTANT: A post may mention multiple AI models. Focus ONLY on what it says about the TARGET model. For example:
 - "DeepSeek just debugged a massive Stripe mess that Gemini made" → [TARGET: Gemini] = NEGATIVE (Gemini made a mess), [TARGET: DeepSeek] = POSITIVE (DeepSeek fixed it)
 - "I switched from ChatGPT to Claude and it's so much better" → [TARGET: Claude] = POSITIVE, [TARGET: ChatGPT] = NEGATIVE
+- "I'm settling into Mistral comfortably, with the desire to let go of ChatGPT" → [TARGET: ChatGPT] = NEGATIVE (wants to leave), [TARGET: Mistral] = POSITIVE (settling in happily)
+
+CRITICAL: The overall TONE of a sentence may differ from sentiment toward the TARGET model. Always ask: is the author expressing satisfaction or frustration with the TARGET specifically? Switching away from / leaving / replacing the target = NEGATIVE. Switching to / adopting / praising the target = POSITIVE.
 
 For EACH post, determine:
 

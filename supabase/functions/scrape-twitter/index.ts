@@ -124,6 +124,7 @@ async function runApifyPath(
 
   // Pass 1: collect candidates
   const candidates: { text: string; matchedSlugs: string[]; sourceUrl: string; title: string; createdAt: string; engagementScore: number }[] = [];
+  const unmatchedSamples: string[] = [];
   for (const tweet of items) {
     // Skip retweets (handle both field naming conventions)
     if (tweet.isRetweet || tweet.is_retweet) continue;
@@ -138,7 +139,10 @@ async function runApifyPath(
     if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
 
     const matchedSlugs = matchModels(text, keywords);
-    if (matchedSlugs.length === 0) continue;
+    if (matchedSlugs.length === 0) {
+      if (unmatchedSamples.length < 5) unmatchedSamples.push(text.slice(0, 120));
+      continue;
+    }
     summary.filtered++;
 
     // Build source URL
@@ -157,6 +161,11 @@ async function runApifyPath(
     if (allDuped) { summary.dedupSkipped++; continue; }
 
     candidates.push({ text, matchedSlugs, sourceUrl, title, createdAt: createdAt.toISOString(), engagementScore: (tweet.favorite_count || tweet.likeCount || 0) + (tweet.retweet_count || tweet.retweetCount || 0) });
+  }
+
+  // Diagnostic: log unmatched tweets so we can see what's failing keyword match
+  if (unmatchedSamples.length > 0) {
+    await logToErrorLog(supabase, "scrape-twitter", `Unmatched tweets (${unmatchedSamples.length} samples): ${unmatchedSamples.join(" | ")}`, "match-debug");
   }
 
   // Pass 2: batch classify
@@ -385,6 +394,11 @@ Deno.serve(async (req) => {
     await logToErrorLog(supabase, "scrape-twitter", "Twitter scraper started", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
+
+    // Diagnostic: log keyword coverage per model
+    const kwBySlug: Record<string, number> = {};
+    for (const k of keywords) { kwBySlug[k.model_slug] = (kwBySlug[k.model_slug] || 0) + 1; }
+    await logToErrorLog(supabase, "scrape-twitter", `Keywords loaded: ${keywords.length} total, by model: ${JSON.stringify(kwBySlug)}`, "keyword-debug");
 
     const { data: existingData } = await supabase
       .from("scraped_posts").select("source_url").eq("source", "twitter").limit(10000);
