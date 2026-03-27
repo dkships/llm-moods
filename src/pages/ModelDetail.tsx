@@ -159,8 +159,8 @@ const ModelDetail = () => {
                 <h1 className="text-3xl sm:text-4xl font-bold text-foreground">{model.name}</h1>
               </div>
               <div className="flex items-center gap-2">
-                <VibeIcon className="h-5 w-5" style={{ color: accent }} />
-                <span className="font-mono text-sm text-foreground">{vibe.label}</span>
+                <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
+                <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
               </div>
             </div>
             <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
