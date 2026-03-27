@@ -178,7 +178,7 @@ const ModelDetail = () => {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
               <p className="text-sm text-muted-foreground font-mono">
-                Sentiment based on {totalPosts.toLocaleString()} posts over the last 7 days across Bluesky, Mastodon, and Hacker News.
+                Sentiment based on {totalPosts.toLocaleString()} posts over the last 7 days across Reddit, Bluesky, X, Hacker News, and more.
               </p>
               <DataFreshnessIndicator />
             </div>
