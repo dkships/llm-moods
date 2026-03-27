@@ -4,14 +4,14 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useState, lazy, Suspense } from "react";
+import { useState, useEffect, lazy, Suspense, memo } from "react";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import {
   useModelDetail, useVibesHistory, useComplaintBreakdown,
-  useSourceBreakdown, useModelPosts, useModelsWithLatestVibes,
+  useSourceBreakdown, useModelPosts, useModelsWithLatestVibes, useDataFreshness,
 } from "@/hooks/useVibesData";
 import {
   getVibeStatus, fadeUp, COMPLAINT_LABELS, SOURCE_LABELS,
@@ -21,6 +21,40 @@ import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skele
 
 // Lazy load the heavy chart component
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
+
+/** Data freshness indicator — mirrors Dashboard version */
+const DataFreshnessIndicator = memo(() => {
+  const { data: lastScraped } = useDataFreshness();
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!lastScraped) return;
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, [lastScraped]);
+
+  if (!lastScraped) return null;
+
+  const diffMs = Date.now() - new Date(lastScraped).getTime();
+  const diffHours = diffMs / (1000 * 60 * 60);
+
+  let colorClass = "text-muted-foreground";
+  let dotClass = "bg-primary/50";
+  if (diffHours > 6) {
+    colorClass = "text-destructive";
+    dotClass = "bg-destructive";
+  } else if (diffHours > 1) {
+    colorClass = "text-yellow-500";
+    dotClass = "bg-yellow-500";
+  }
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-[11px] font-mono ${colorClass}`}>
+      <span className={`h-1.5 w-1.5 rounded-full ${dotClass} ${diffHours <= 1 ? "animate-pulse" : ""}`} />
+      Data updated {formatTimeAgo(lastScraped)}
+    </span>
+  );
+});
+DataFreshnessIndicator.displayName = "DataFreshnessIndicator";
 
 const TIME_RANGES = ["24h", "7d", "30d"] as const;
 const TIME_RANGE_LABELS: Record<string, string> = {
@@ -142,9 +176,12 @@ const ModelDetail = () => {
                 </span>
               </div>
             </div>
-            <p className="mt-2 text-sm text-muted-foreground font-mono">
-              Sentiment based on {totalPosts.toLocaleString()} posts over the last 7 days across Bluesky, Mastodon, and Hacker News.
-            </p>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <p className="text-sm text-muted-foreground font-mono">
+                Sentiment based on {totalPosts.toLocaleString()} posts over the last 7 days across Bluesky, Mastodon, and Hacker News.
+              </p>
+              <DataFreshnessIndicator />
+            </div>
           </motion.div>
         </section>
 
