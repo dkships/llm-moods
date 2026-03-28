@@ -1,6 +1,6 @@
 # LLM Moods (LLM Vibes)
 
-@../AGENTS.md
+@AGENTS.md
 
 ## Project Overview
 
