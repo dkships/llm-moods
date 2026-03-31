@@ -124,22 +124,51 @@ const ModelDetail = () => {
     );
   }
 
-  const chartData = (vibesHistory || []).map((v, i, arr) => {
-    const isLast = i === arr.length - 1;
-    const date = new Date(v.period_start);
-    let label: string;
-    if (isLast) {
-      label = timeRange === "24h" ? "Now" : "Today";
-    } else if (timeRange === "24h") {
-      const h = date.getHours();
-      const suffix = h >= 12 ? "pm" : "am";
-      const h12 = h % 12 || 12;
-      label = `${h12}${suffix}`;
-    } else {
-      label = date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  const chartData = (() => {
+    const history = vibesHistory || [];
+    if (history.length === 0) return [];
+
+    if (timeRange === "24h") {
+      return history.map((v, i, arr) => {
+        const date = new Date(v.period_start);
+        const now = new Date();
+        const isLast = i === arr.length - 1;
+        const isRecent = isLast && (now.getTime() - date.getTime()) < 2 * 60 * 60 * 1000;
+        let label: string;
+        if (isRecent) {
+          label = "Now";
+        } else {
+          const h = date.getHours();
+          const suffix = h >= 12 ? "pm" : "am";
+          const h12 = h % 12 || 12;
+          label = `${h12}${suffix}`;
+        }
+        return { day: label, score: v.score };
+      });
     }
-    return { day: label, score: v.score };
-  });
+
+    // For 7d/30d: build a complete date range so gaps are visible
+    const scoresByDate = new Map<string, number>();
+    for (const v of history) {
+      const key = new Date(v.period_start).toISOString().slice(0, 10);
+      scoresByDate.set(key, v.score);
+    }
+
+    const days = timeRange === "7d" ? 7 : 30;
+    const now = new Date();
+    const result: { day: string; score: number | null }[] = [];
+    for (let i = days - 1; i >= 0; i--) {
+      const d = new Date(now);
+      d.setDate(d.getDate() - i);
+      const key = d.toISOString().slice(0, 10);
+      const today = now.toISOString().slice(0, 10);
+      const label = key === today
+        ? "Today"
+        : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      result.push({ day: label, score: scoresByDate.get(key) ?? null });
+    }
+    return result;
+  })();
 
   return (
     <PageTransition>

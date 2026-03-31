@@ -2,7 +2,7 @@ import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, ReferenceL
 import { memo } from "react";
 
 interface VibesChartProps {
-  chartData: { day: string; score: number }[];
+  chartData: { day: string; score: number | null }[];
   accent: string;
   timeRange: string;
 }
@@ -44,6 +44,7 @@ const VibesChart = memo(({ chartData, accent, timeRange }: VibesChartProps) => (
         strokeWidth={2.5}
         dot={false}
         activeDot={{ r: 4, fill: accent, strokeWidth: 0 }}
+        connectNulls={false}
       />
     </LineChart>
   </ResponsiveContainer>
