@@ -148,6 +148,7 @@ const ModelDetail = () => {
     }
 
     // For 7d/30d: build a complete date range so gaps are visible
+    // Use UTC dates to match period_start (stored as UTC midnight)
     const scoresByDate = new Map<string, number>();
     for (const v of history) {
       const key = new Date(v.period_start).toISOString().slice(0, 10);
@@ -156,15 +157,14 @@ const ModelDetail = () => {
 
     const days = timeRange === "7d" ? 7 : 30;
     const now = new Date();
+    const todayUTC = now.toISOString().slice(0, 10);
     const result: { day: string; score: number | null }[] = [];
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(now);
-      d.setDate(d.getDate() - i);
+      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
       const key = d.toISOString().slice(0, 10);
-      const today = now.toISOString().slice(0, 10);
-      const label = key === today
+      const label = key === todayUTC
         ? "Today"
-        : d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
       result.push({ day: label, score: scoresByDate.get(key) ?? null });
     }
     return result;
