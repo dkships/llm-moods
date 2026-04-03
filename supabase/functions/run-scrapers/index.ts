@@ -12,10 +12,6 @@ const SCRAPERS = [
   "scrape-twitter",
   "scrape-mastodon",
   "scrape-lobsters",
-  "scrape-lemmy",
-  "scrape-devto",
-  "scrape-stackoverflow",
-  "scrape-medium",
   "scrape-discourse",
 ];
 

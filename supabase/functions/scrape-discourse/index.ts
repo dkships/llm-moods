@@ -13,6 +13,12 @@ function stripHtml(html: string): string {
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
+async function fetchWithTimeout(url: string, timeoutMs = 15000): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try { return await fetch(url, { signal: controller.signal }); } finally { clearTimeout(timer); }
+}
+
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -33,8 +39,8 @@ Deno.serve(async (req) => {
 
     for (const forum of FORUMS) {
       try {
-        const res = await fetch(`${forum.baseUrl}/latest.json`);
-        if (!res.ok) { summary.errors.push(`${forum.baseUrl}: ${res.status}`); await delay(2000); continue; }
+        const res = await fetchWithTimeout(`${forum.baseUrl}/latest.json`);
+        if (!res.ok) { summary.errors.push(`${forum.baseUrl}: HTTP ${res.status}`); await delay(2000); continue; }
         const data = await res.json();
         const topics = data?.topic_list?.topics || [];
 
@@ -55,7 +61,7 @@ Deno.serve(async (req) => {
           let content = topic.title;
           try {
             await delay(2000);
-            const topicRes = await fetch(`${forum.baseUrl}/t/${topic.slug}/${topic.id}.json`);
+            const topicRes = await fetchWithTimeout(`${forum.baseUrl}/t/${topic.slug}/${topic.id}.json`);
             if (topicRes.ok) {
               const topicData = await topicRes.json();
               const firstPost = topicData?.post_stream?.posts?.[0];
@@ -136,7 +142,7 @@ Deno.serve(async (req) => {
       await delay(2000);
     }
 
-    await logToErrorLog(supabase, "scrape-discourse", `Done: inserted=${summary.inserted} topics=${summary.topics} fetched=${summary.fetched} classified=${summary.classified} irrelevant=${summary.irrelevant}`, `skipped=${summary.skipped} errors=${summary.errors.length}`);
+    await logToErrorLog(supabase, "scrape-discourse", `Completed: posts=${summary.fetched} classified=${summary.inserted} errors=${summary.errors.length}`, "summary");
 
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
