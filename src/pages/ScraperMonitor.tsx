@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
+import PageTransition from "@/components/PageTransition";
 import { formatTimeAgo } from "@/lib/vibes";
 import useHead from "@/hooks/useHead";
 import type { Tables } from "@/integrations/supabase/types";
@@ -125,9 +126,10 @@ const ScraperMonitor = () => {
   const failedCount = allRuns.filter((r) => r.status === "failed").length;
 
   return (
+    <PageTransition>
     <div className="min-h-screen bg-background">
       <NavBar />
-      <main className="max-w-5xl mx-auto px-4 py-12">
+      <main className="container py-12">
         <h1 className="text-2xl font-bold text-foreground mb-2">Scraper Monitor</h1>
         <p className="text-sm text-muted-foreground font-mono mb-8">
           Latest runs from automated scrapers. Refreshes every 30s.
@@ -151,15 +153,15 @@ const ScraperMonitor = () => {
 
           {/* Latest per source */}
           <h2 className="text-lg font-semibold text-foreground mb-3">Latest by Source</h2>
-          <div className="glass rounded-xl overflow-hidden mb-8">
-            <table className="w-full text-sm">
+          <div className="glass rounded-xl overflow-x-auto">
+            <table className="w-full text-sm min-w-[600px]">
               <thead>
                 <tr className="border-b border-border text-muted-foreground font-mono text-xs">
-                  <th className="text-left px-4 py-3">Source</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-right px-4 py-3">Found</th>
-                  <th className="text-right px-4 py-3">Classified</th>
-                  <th className="text-right px-4 py-3">When</th>
+                  <th className="text-left px-4 py-3 whitespace-nowrap">Source</th>
+                  <th className="text-left px-4 py-3 whitespace-nowrap">Status</th>
+                  <th className="text-right px-4 py-3 whitespace-nowrap">Found</th>
+                  <th className="text-right px-4 py-3 whitespace-nowrap">Classified</th>
+                  <th className="text-right px-4 py-3 whitespace-nowrap">When</th>
                 </tr>
               </thead>
               <tbody>
@@ -188,16 +190,16 @@ const ScraperMonitor = () => {
 
           {/* Full run history */}
           <h2 className="text-lg font-semibold text-foreground mb-3">Run History</h2>
-          <div className="glass rounded-xl overflow-hidden">
-            <table className="w-full text-sm">
+          <div className="glass rounded-xl overflow-x-auto">
+            <table className="w-full text-sm min-w-[700px]">
               <thead>
                 <tr className="border-b border-border text-muted-foreground font-mono text-xs">
-                  <th className="text-left px-4 py-3">Source</th>
-                  <th className="text-left px-4 py-3">Status</th>
-                  <th className="text-right px-4 py-3">Found</th>
-                  <th className="text-right px-4 py-3">Classified</th>
-                  <th className="text-left px-4 py-3">Errors</th>
-                  <th className="text-right px-4 py-3">Started</th>
+                  <th className="text-left px-4 py-3 whitespace-nowrap">Source</th>
+                  <th className="text-left px-4 py-3 whitespace-nowrap">Status</th>
+                  <th className="text-right px-4 py-3 whitespace-nowrap">Found</th>
+                  <th className="text-right px-4 py-3 whitespace-nowrap">Classified</th>
+                  <th className="text-left px-4 py-3 whitespace-nowrap">Errors</th>
+                  <th className="text-right px-4 py-3 whitespace-nowrap">Started</th>
                 </tr>
               </thead>
               <tbody>
@@ -232,6 +234,7 @@ const ScraperMonitor = () => {
       </main>
       <Footer />
     </div>
+    </PageTransition>
   );
 };
 

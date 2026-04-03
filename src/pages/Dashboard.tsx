@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, MessageSquare, Zap } from "lucide-react";
+import { TrendingUp, TrendingDown, MessageSquare, Zap, ExternalLink } from "lucide-react";
 import { memo, useState, useEffect, useRef, useCallback } from "react";
 import { motion } from "framer-motion";
 import { lazy, Suspense } from "react";
@@ -9,7 +9,8 @@ import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, useDataFreshness, type ModelWithVibes } from "@/hooks/useVibesData";
+import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, type ModelWithVibes } from "@/hooks/useVibesData";
+import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
@@ -114,40 +115,6 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
 });
 ModelCard.displayName = "ModelCard";
 
-/** Data freshness indicator with color coding */
-const DataFreshnessIndicator = memo(() => {
-  const { data: lastScraped } = useDataFreshness();
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!lastScraped) return;
-    const id = setInterval(() => setTick((t) => t + 1), 30_000);
-    return () => clearInterval(id);
-  }, [lastScraped]);
-
-  if (!lastScraped) return null;
-
-  const diffMs = Date.now() - new Date(lastScraped).getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-
-  let colorClass = "text-muted-foreground";
-  let dotClass = "bg-primary/50";
-  if (diffHours > 6) {
-    colorClass = "text-destructive";
-    dotClass = "bg-destructive";
-  } else if (diffHours > 1) {
-    colorClass = "text-yellow-500";
-    dotClass = "bg-yellow-500";
-  }
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-mono ${colorClass}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${dotClass} ${diffHours <= 1 ? "animate-pulse" : ""}`} />
-      Data updated {formatTimeAgo(lastScraped)}
-    </span>
-  );
-});
-DataFreshnessIndicator.displayName = "DataFreshnessIndicator";
-
 /** Memoized chatter post */
 const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: number }) => {
   const sentiment = (post.sentiment as string) || "neutral";
@@ -163,7 +130,7 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
       className={`glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderColor} transition-all duration-200 hover:brightness-125 hover:border-border/60 ${sourceUrl ? "cursor-pointer" : ""}`}
       onClick={() => sourceUrl && window.open(sourceUrl, "_blank", "noopener,noreferrer")}
     >
-      <div className="flex items-center gap-3 sm:w-28 shrink-0">
+      <div className="flex items-center gap-3 shrink-0">
         <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border">
           {src.emoji} {src.label}
         </span>
@@ -183,7 +150,7 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
           </Tooltip>
         )}
       </p>
-      <div className="flex items-center gap-2 shrink-0">
+      <div className="flex items-center gap-2 shrink-0 flex-wrap">
         {modelData && (
           <>
             <span className="h-2 w-2 rounded-full shrink-0" style={{ background: modelData.accent_color || "#888" }} />
@@ -196,6 +163,7 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
         {post.posted_at && (
           <span className="text-xs text-muted-foreground font-mono">{formatTimeAgo(post.posted_at as string)}</span>
         )}
+        {sourceUrl && <ExternalLink className="h-3 w-3 text-muted-foreground/50 shrink-0" />}
       </div>
     </motion.div>
   );
@@ -253,7 +221,7 @@ const Dashboard = () => {
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
               <p className="text-sm text-muted-foreground font-mono">{today}</p>
             </div>
-            <p className="mt-2 text-sm text-muted-foreground">Real-time AI model sentiment from Reddit, Bluesky, Mastodon, Hacker News, and more.</p>
+            <p className="mt-2 text-sm text-muted-foreground">Real-time AI model sentiment from Reddit, Bluesky, Mastodon, X, and more.</p>
           </motion.div>
         </section>
 

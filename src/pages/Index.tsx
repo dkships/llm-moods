@@ -15,7 +15,7 @@ const HOW_IT_WORKS = [
   {
     icon: Monitor,
     title: "We Scrape",
-    description: "We automatically scan Reddit, Bluesky, Mastodon, Hacker News, and more for real-time chatter about AI models.",
+    description: "We automatically scan Reddit, Bluesky, Mastodon, X, and more for real-time chatter about AI models.",
   },
   {
     icon: Brain,
@@ -50,14 +50,19 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
           whileHover={{ boxShadow: `0 0 20px ${vibe.color}20, 0 8px 30px ${vibe.color}10` }}
         >
           <div className="h-1.5" style={{ background: vibe.color }} />
-          <div className="p-5">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: brandColor }} />
-              <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
-            </div>
-            <div className="mt-3 flex items-center gap-2">
-              <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
-              <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
+          <div className="p-6">
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: brandColor }} />
+                  <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
+                </div>
+                <div className="mt-2 flex items-center gap-2">
+                  <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
+                  <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
+                </div>
+              </div>
+              <p className="text-3xl font-extrabold font-mono text-foreground leading-none">{m.latestScore}</p>
             </div>
             <div className="mt-3 flex items-center justify-between">
               <TrendIcon trend={m.trend.direction} />
@@ -108,7 +113,7 @@ const Index = () => {
               a <span className="text-primary glow-text">bad day</span>?
             </motion.h1>
             <motion.p variants={fadeUp} custom={2} className="mt-5 text-lg sm:text-xl text-muted-foreground max-w-xl leading-relaxed">
-              Real-time community sentiment for Claude, ChatGPT, Gemini, Grok, and more. Know when the vibes are off.
+              Real-time community sentiment for Claude, ChatGPT, Gemini, and Grok. Know when the vibes are off.
             </motion.p>
             <motion.div variants={fadeUp} custom={3}>
               <Link to="/dashboard">
@@ -145,7 +150,7 @@ const Index = () => {
         </section>
 
         {/* How It Works */}
-        <section className="border-y border-border bg-card/30">
+        <section className="border-y border-border bg-card/40">
           <div className="container py-24">
             <motion.h2
               initial={{ opacity: 0, y: 16 }}
@@ -158,8 +163,7 @@ const Index = () => {
             </motion.h2>
             <motion.div
               initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-60px" }}
+              animate="visible"
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
               className="grid grid-cols-1 sm:grid-cols-3 gap-8"
             >

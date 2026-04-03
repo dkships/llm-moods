@@ -1,6 +1,14 @@
 import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, ReferenceLine } from "recharts";
 import { memo } from "react";
 
+// Theme colors — mapped from CSS variables (Recharts needs raw strings)
+const CHART_COLORS = {
+  mutedForeground: "hsl(220 10% 50%)",  // --muted-foreground
+  card: "hsl(220 18% 10%)",             // --card
+  border: "hsl(220 14% 18%)",           // --border
+  referenceLine: "hsl(220 10% 25%)",    // between --border and --muted-foreground
+} as const;
+
 interface VibesChartProps {
   chartData: { day: string; score: number | null }[];
   accent: string;
@@ -12,7 +20,7 @@ const VibesChart = memo(({ chartData, accent, timeRange }: VibesChartProps) => (
     <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 0, left: 0 }}>
       <XAxis
         dataKey="day"
-        tick={{ fill: "hsl(220 10% 50%)", fontSize: 10 }}
+        tick={{ fill: CHART_COLORS.mutedForeground, fontSize: 10 }}
         axisLine={false}
         tickLine={false}
         interval={timeRange === "30d" ? Math.max(Math.floor(chartData.length / 5) - 1, 0) : timeRange === "7d" ? 0 : Math.max(Math.floor(chartData.length / 5) - 1, 0)}
@@ -20,23 +28,23 @@ const VibesChart = memo(({ chartData, accent, timeRange }: VibesChartProps) => (
       />
       <YAxis
         domain={[20, 100]}
-        tick={{ fill: "hsl(220 10% 50%)", fontSize: 10 }}
+        tick={{ fill: CHART_COLORS.mutedForeground, fontSize: 10 }}
         axisLine={false}
         tickLine={false}
         width={30}
       />
       <Tooltip
         contentStyle={{
-          background: "hsl(220 18% 10%)",
-          border: "1px solid hsl(220 14% 18%)",
+          background: CHART_COLORS.card,
+          border: `1px solid ${CHART_COLORS.border}`,
           borderRadius: 8,
           fontSize: 12,
           fontFamily: "JetBrains Mono, monospace",
         }}
-        labelStyle={{ color: "hsl(220 10% 50%)" }}
+        labelStyle={{ color: CHART_COLORS.mutedForeground }}
         itemStyle={{ color: accent }}
       />
-      <ReferenceLine y={50} stroke="hsl(220 10% 25%)" strokeDasharray="4 4" />
+      <ReferenceLine y={50} stroke={CHART_COLORS.referenceLine} strokeDasharray="4 4" />
       <Line
         type="monotone"
         dataKey="score"

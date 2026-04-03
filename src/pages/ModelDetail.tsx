@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { TrendingUp, TrendingDown, ArrowLeft } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowLeft, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -11,8 +11,9 @@ import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import {
   useModelDetail, useVibesHistory, useComplaintBreakdown,
-  useSourceBreakdown, useModelPosts, useModelsWithLatestVibes, useDataFreshness,
+  useSourceBreakdown, useModelPosts, useModelsWithLatestVibes,
 } from "@/hooks/useVibesData";
+import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import {
   getVibeStatus, fadeUp, COMPLAINT_LABELS, SOURCE_LABELS,
   SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
@@ -21,40 +22,6 @@ import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skele
 
 // Lazy load the heavy chart component
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
-
-/** Data freshness indicator — mirrors Dashboard version */
-const DataFreshnessIndicator = memo(() => {
-  const { data: lastScraped } = useDataFreshness();
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!lastScraped) return;
-    const id = setInterval(() => setTick((t) => t + 1), 30_000);
-    return () => clearInterval(id);
-  }, [lastScraped]);
-
-  if (!lastScraped) return null;
-
-  const diffMs = Date.now() - new Date(lastScraped).getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
-
-  let colorClass = "text-muted-foreground";
-  let dotClass = "bg-primary/50";
-  if (diffHours > 6) {
-    colorClass = "text-destructive";
-    dotClass = "bg-destructive";
-  } else if (diffHours > 1) {
-    colorClass = "text-yellow-500";
-    dotClass = "bg-yellow-500";
-  }
-
-  return (
-    <span className={`inline-flex items-center gap-1.5 text-[11px] font-mono ${colorClass}`}>
-      <span className={`h-1.5 w-1.5 rounded-full ${dotClass} ${diffHours <= 1 ? "animate-pulse" : ""}`} />
-      Data updated {formatTimeAgo(lastScraped)}
-    </span>
-  );
-});
-DataFreshnessIndicator.displayName = "DataFreshnessIndicator";
 
 const TIME_RANGES = ["24h", "7d", "30d"] as const;
 const TIME_RANGE_LABELS: Record<string, string> = {
@@ -193,7 +160,7 @@ const ModelDetail = () => {
               </div>
             </div>
             <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
-              <p className="text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-muted-foreground ml-1">/ 100</span></p>
+              <p className="text-5xl sm:text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-muted-foreground ml-1">/ 100</span></p>
               <div className="flex items-center gap-2 pb-2">
                 {trend.direction === "up" ? (
                   <TrendingUp className="h-4 w-4 text-primary" />
@@ -207,7 +174,7 @@ const ModelDetail = () => {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
               <p className="text-sm text-muted-foreground font-mono">
-                Sentiment based on {totalPosts.toLocaleString()} posts over the last 7 days across Reddit, Bluesky, X, Hacker News, and more.
+                Sentiment based on {totalPosts.toLocaleString()} posts over the last 7 days across Reddit, Bluesky, X, Mastodon, and more.
               </p>
               <DataFreshnessIndicator />
             </div>
@@ -247,7 +214,7 @@ const ModelDetail = () => {
                         aria-label={TIME_RANGE_LABELS[r]}
                         className={`px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
                           timeRange === r
-                            ? "bg-secondary text-foreground"
+                            ? "bg-primary/15 text-primary border border-primary/30"
                             : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
                         }`}
                       >
@@ -384,13 +351,14 @@ const ModelDetail = () => {
                         </Tooltip>
                       )}
                     </p>
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
                       <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
                         {s.label}
                       </Badge>
                       {post.posted_at && (
                         <span className="text-xs text-muted-foreground font-mono">{formatTimeAgo(post.posted_at)}</span>
                       )}
+                      {post.source_url && <ExternalLink className="h-3 w-3 text-muted-foreground/50 shrink-0" />}
                     </div>
                   </motion.div>
                 );
