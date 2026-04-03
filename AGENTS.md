@@ -1,13 +1,13 @@
 # LLM Moods (LLM Vibes) — Agent Instructions
 
 ## What This Is
-Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 12+ social platforms. Scores models 0-100 daily. Live at llmvibes.ai.
+Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 7 social platforms. Scores models 0-100 daily. Live at llmvibes.ai.
 
 ## Tech Stack
 - React 18 + TypeScript + Vite (SWC) + shadcn/ui + Tailwind + Recharts
-- Supabase (PostgreSQL + 13 Edge Functions)
+- Supabase (PostgreSQL + Edge Functions)
 - Sentiment: Gemini 3.1 Flash-Lite via Google AI API (batch classification)
-- Scrapers: Reddit (Apify), HN, Bluesky, Twitter/X (Apify), Mastodon, Lobsters, Lemmy, Dev.to, Stack Overflow, Medium, Discourse
+- Scrapers (7 active): Reddit (Apify), HN, Bluesky, Twitter/X (Apify), Mastodon, Lobsters, Discourse
 
 ## Scope And Boundaries
 - Lovable-generated app synced bi-directionally with GitHub on `main`
@@ -29,4 +29,4 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 
 ## Maintenance
 - Owner: David Kelly
-- Last Updated: 2026-03-28
+- Last Updated: 2026-04-02

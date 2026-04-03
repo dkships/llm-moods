@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 12+ social platforms. Scores models 0-100 daily based on scraped post sentiment.
+Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 7 social platforms. Scores models 0-100 daily based on scraped post sentiment.
 
 **Live at:** llmvibes.ai (Lovable-hosted)
 
@@ -31,7 +31,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 | State | TanStack React Query 5.83 |
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Edge Functions | 13 Deno functions (scrapers + aggregation) |
+| Edge Functions | 18 Deno functions (7 active scrapers + utilities; dormant scraper dirs kept for Lovable) |
 | Sentiment AI | Gemini 3.1 Flash-Lite via Google AI API (batch classification, 25 posts/call) |
 
 ## Key Routes
@@ -57,7 +57,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 
 ## Scrapers (Edge Functions)
 
-Reddit (free JSON API), Hacker News, Bluesky, Twitter/X (Apify), Mastodon, Lobsters, Lemmy, Dev.to, Stack Overflow, Medium, Discourse. Orchestrated by `run-scrapers` (batches of 3, cron `0 6,14,22 * * *` — 3x/day at 6AM, 2PM, 10PM UTC). GitHub scraper exists but is not in the orchestrator.
+Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 4 instances), Lobsters (public API), Discourse (community.openai.com + community.anthropic.com). Orchestrated by `run-scrapers` (batches of 3, cron `0 6,14,22 * * *` — 3x/day at 6AM, 2PM, 10PM UTC). Dormant scraper directories (Lemmy, Dev.to, Stack Overflow, Medium, GitHub) still exist but are not in the orchestrator — kept for Lovable file structure compatibility.
 
 Shared utilities (keyword matching, dedup, error logging) are in `_shared/utils.ts` — scrapers import from there instead of duplicating code.
 
@@ -65,9 +65,9 @@ Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`)
 
 `reclassify-posts` edge function supports `?mode=multi_model` to find and fix historical multi-model posts with identical sentiment. Run `reaggregate-vibes` after to recalculate scores.
 
-**Reddit scraper** uses `trudax~reddit-scraper-lite` Apify actor. Fetches from 5 subreddits (ClaudeAI, ChatGPT, LocalLLaMA, GoogleGemini, artificial), maxItems 40. Reddit's free JSON API was tried but returns 403 from edge function IPs.
+**Reddit scraper** uses `trudax~reddit-scraper-lite` Apify actor. Fetches from 5 subreddits (ClaudeAI, ChatGPT, LocalLLaMA, GoogleGemini, artificial), maxItems 40.
 
-**Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input (4 terms, maxItems 50). Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Apify budget: $29/month, used only for Twitter now.
+**Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input (4 terms, maxItems 50). Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Apify budget: $29/month, used for Reddit and Twitter.
 
 **Tracked models:** Claude, ChatGPT, Gemini, Grok (DeepSeek and Perplexity were removed 2026-03-21).
 
@@ -84,8 +84,9 @@ Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`)
 - `GEMINI_API_KEY` — Google AI API key for sentiment classification (all scrapers)
 - `LOVABLE_API_KEY` — Lovable AI gateway key (no longer used by scrapers, kept for Lovable platform)
 - `APIFY_API_TOKEN`, `BSKY_HANDLE`, `BSKY_APP_PASSWORD`
-- `MASTODON_URL`, `MASTODON_TOKEN`, `LEMMY_INSTANCE_URL`
-- `MEDIUM_TOKEN`, `DISCOURSE_INSTANCE`, `DISCOURSE_API_KEY`, `GITHUB_TOKEN`
+- `MASTODON_URL`, `MASTODON_TOKEN`
+- `DISCOURSE_INSTANCE`, `DISCOURSE_API_KEY`, `GITHUB_TOKEN`
+- Dormant (for removed scrapers): `LEMMY_INSTANCE_URL`, `MEDIUM_TOKEN`
 
 **Security notes:**
 - Repo is **public** on GitHub — never commit service role keys, API tokens, or passwords
