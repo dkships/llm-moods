@@ -8,7 +8,7 @@ import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, type ModelWithVibes } from "@/hooks/useVibesData";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
@@ -64,16 +64,14 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
               </div>
             </div>
             <div className="text-right">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <p className="text-5xl font-extrabold font-mono text-foreground cursor-help leading-none">{m.latestScore}</p>
-                  </TooltipTrigger>
-                  <TooltipContent side="left" className="text-xs font-mono">
-                    0 = everyone's complaining, 100 = pure good vibes
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <p className="text-5xl font-extrabold font-mono text-foreground cursor-help leading-none">{m.latestScore}</p>
+                </TooltipTrigger>
+                <TooltipContent side="left" className="text-xs font-mono">
+                  0 = everyone's complaining, 100 = pure good vibes
+                </TooltipContent>
+              </Tooltip>
               <p className="text-xs text-muted-foreground font-mono mt-0.5">/ 100</p>
             </div>
           </div>

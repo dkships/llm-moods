@@ -43,12 +43,6 @@ export function matchModels(text: string, keywords: KeywordEntry[], communitySlu
   return matched;
 }
 
-export function isEnglish(text: string): boolean {
-  const nw = text.replace(/\s/g, "");
-  if (nw.length < 5) return true;
-  return ((nw.match(/[a-zA-Z]/g) || []).length / nw.length) >= 0.6;
-}
-
 export function stripUrls(text: string): string {
   return text.replace(/https?:\/\/\S+/g, "").replace(/<[^>]*>/g, "").trim();
 }
