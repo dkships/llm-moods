@@ -16,33 +16,28 @@ Real-time AI sentiment dashboard. Is your AI having a bad day?
 
 Every day, thousands of developers share their real experiences with AI models across Reddit, Hacker News, Bluesky, Mastodon, and more. But there's no easy way to see the big picture: which models are loved, which are frustrating people, and what's trending.
 
-**LLM Vibes** scrapes 12+ social platforms, classifies sentiment with AI, and scores each model 0-100 daily. No surveys, no voting — just real conversations from real developers.
+**LLM Vibes** scrapes 6 social platforms, classifies sentiment with AI, and scores each model 0-100 daily. No surveys, no voting — just real conversations from real developers.
 
 ## Features
 
-- 📊 **Real-time vibes dashboard** for 6+ AI models (Claude, ChatGPT, Gemini, Grok, DeepSeek, Perplexity)
+- 📊 **Real-time vibes dashboard** for 4 AI models (Claude, ChatGPT, Gemini, Grok)
 - 📈 **30-day historical charts** with per-model detail pages
-- 🏷️ **Complaint breakdowns** — lazy responses, hallucinations, refusals, coding quality, speed, general drop
-- 🌐 **Source diversity tracking** across 12+ platforms
-- ⚡ **Automated hourly pipeline** — no manual intervention needed
-- 🔍 **Two-tier keyword matching** + AI relevance filtering to reduce noise
-- 🌍 **English language filtering** for clean data
+- 🏷️ **Complaint breakdowns** — lazy responses, hallucinations, refusals, coding quality, speed, general drop, pricing/value, censorship, context window, API reliability, multimodal quality, reasoning
+- 🌐 **Source diversity tracking** across 6 platforms
+- ⚡ **Automated pipeline** running 3x daily — no manual intervention needed
+- 🔍 **Keyword matching** + AI relevance filtering to reduce noise
+- 🌍 **Auto-translation** of non-English posts for global coverage
 
 ## Data Sources
 
 | Source | Method | Auth Required |
 |--------|--------|--------------|
 | Reddit | Apify scraper | API token |
-| Hacker News | Algolia Search + Firebase API | None |
+| Hacker News | Algolia Search API | None |
+| Twitter/X | Apify scraper | API token |
 | Bluesky | AT Protocol search | App password |
-| Mastodon | Public hashtag timelines | None |
-| Lobsters | Public JSON API | None |
-| Lemmy | Public API | None |
-| Dev.to | Public API | None |
-| Stack Overflow | Public API | None |
-| Medium | RSS feeds | None |
-| Discourse | Public JSON (OpenAI + Anthropic forums) | None |
-| GitHub | Public API | Token (optional) |
+| Mastodon | Public hashtag timelines (5 instances) | None |
+| Lemmy | Public API (2 instances) | None |
 
 ## Tech Stack
 
@@ -56,7 +51,7 @@ Every day, thousands of developers share their real experiences with AI models a
 | State | TanStack React Query 5 |
 | Animations | Framer Motion 12 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Sentiment AI | Gemini 2.5 Flash via Lovable AI gateway |
+| Sentiment AI | Gemini 3.1 Flash-Lite via Google AI API |
 
 ## Getting Started
 
@@ -88,7 +83,7 @@ src/
 └── integrations/   # Supabase client config (auto-generated types)
 
 supabase/
-├── functions/      # 14 Deno edge functions (scrapers + aggregation)
+├── functions/      # 19 Deno edge functions (6 active scrapers + utilities)
 └── migrations/     # Database schema migrations
 ```
 
