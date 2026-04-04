@@ -33,7 +33,7 @@ Deno.serve(async (req) => {
       // --- Daily aggregation (last 24h) ---
       const { data: dailyPosts } = await supabase
         .from("scraped_posts")
-        .select("sentiment, complaint_category, confidence, score, content_type")
+        .select("sentiment, complaint_category, confidence, score, content_type, source")
         .eq("model_id", model.id)
         .gte("posted_at", since24h)
         .limit(5000);
@@ -110,7 +110,7 @@ Deno.serve(async (req) => {
 
         const { data: hPosts } = await supabase
           .from("scraped_posts")
-          .select("sentiment, complaint_category, confidence, score, content_type")
+          .select("sentiment, complaint_category, confidence, score, content_type, source")
           .eq("model_id", model.id)
           .gte("posted_at", hStart.toISOString())
           .lt("posted_at", hEnd.toISOString())
@@ -166,25 +166,53 @@ interface ScoreResult {
   top_complaint: string | null;
 }
 
-function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null; score: number | null; content_type: string | null }[]): ScoreResult {
+function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null; score: number | null; content_type: string | null; source?: string | null }[]): ScoreResult {
+  const MIN_CONFIDENCE = 0.65;
+  const MAX_SOURCE_SHARE = 0.5;
+
+  // First pass: compute per-source total weights to detect dominance
+  const sourceRawWeights: Record<string, number> = {};
+  const eligible: { w: number; sentiment: string | null; complaint_category: string | null; source: string }[] = [];
+
+  for (const p of posts) {
+    const rawConf = p.confidence ?? 0.5;
+    if (rawConf < MIN_CONFIDENCE) continue; // Skip low-confidence posts
+
+    const contentMult = p.content_type === "title_only" ? 0.6 : 1.0;
+    const conf = Math.max(0, Math.min(1, rawConf)) * contentMult;
+    const engagement = (p.score && p.score > 0) ? Math.log(p.score + 1) : 1.0;
+    const w = conf * engagement;
+    const src = p.source || "unknown";
+    sourceRawWeights[src] = (sourceRawWeights[src] || 0) + w;
+    eligible.push({ w, sentiment: p.sentiment, complaint_category: p.complaint_category, source: src });
+  }
+
+  // Compute per-source scale factors to cap dominant sources
+  const totalRaw = Object.values(sourceRawWeights).reduce((a, b) => a + b, 0);
+  const sourceScale: Record<string, number> = {};
+  if (totalRaw > 0) {
+    const maxAllowed = totalRaw * MAX_SOURCE_SHARE;
+    for (const [src, srcW] of Object.entries(sourceRawWeights)) {
+      sourceScale[src] = srcW > maxAllowed ? maxAllowed / srcW : 1.0;
+    }
+  }
+
+  // Second pass: accumulate with source caps applied
   let positiveW = 0, negativeW = 0, neutralW = 0;
   let positiveC = 0, negativeC = 0, neutralC = 0;
   const complaints: Record<string, number> = {};
 
-  for (const p of posts) {
-    const contentMult = p.content_type === "title_only" ? 0.6 : 1.0;
-    const conf = Math.max(0, Math.min(1, p.confidence ?? 0.5)) * contentMult;
-    const engagement = (p.score && p.score > 0) ? Math.log(p.score + 1) : 1.0;
-    const w = conf * engagement;
-    if (p.sentiment === "positive") { positiveW += w; positiveC++; }
-    else if (p.sentiment === "negative") {
+  for (const e of eligible) {
+    const w = e.w * (sourceScale[e.source] ?? 1.0);
+    if (e.sentiment === "positive") { positiveW += w; positiveC++; }
+    else if (e.sentiment === "negative") {
       negativeW += w; negativeC++;
-      if (p.complaint_category) complaints[p.complaint_category] = (complaints[p.complaint_category] || 0) + w;
+      if (e.complaint_category) complaints[e.complaint_category] = (complaints[e.complaint_category] || 0) + w;
     } else { neutralW += w; neutralC++; }
   }
 
   const totalW = positiveW + negativeW + neutralW;
-  const effectivePositive = positiveW + neutralW * 0.5;
+  const effectivePositive = positiveW + neutralW * 0.3;
   const score = totalW > 0 ? Math.round((effectivePositive / totalW) * 100) : 50;
 
   let topComplaint: string | null = null;

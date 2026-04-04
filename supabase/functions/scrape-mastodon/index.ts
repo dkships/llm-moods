@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
-import { corsHeaders, loadKeywords, matchModels, meetsMinLength, logToErrorLog } from "../_shared/utils.ts";
+import { corsHeaders, loadKeywords, matchModels, meetsMinLength, isLikelyNewsShare, logToErrorLog } from "../_shared/utils.ts";
 
 const MAIN_INSTANCE = "mastodon.social";
 const MAIN_HASHTAGS = ["chatgpt", "claudeai", "grok", "llm"];
@@ -134,6 +134,7 @@ Deno.serve(async (req) => {
       const content = stripHtml(status.content || "");
       if (!meetsMinLength("", content)) { summary.contentSkipped++; continue; }
       if (isAstrologyPost(content)) { summary.contentSkipped++; continue; }
+      if (isLikelyNewsShare("", content)) { summary.contentSkipped++; continue; }
 
       const matchedSlugs = matchModels(content, keywords);
       if (matchedSlugs.length === 0) continue;

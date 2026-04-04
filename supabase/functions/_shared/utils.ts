@@ -63,6 +63,19 @@ export function isDuplicate(titleKeys: Set<string>, title: string, modelId: stri
   return titleKeys.has(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
 }
 
+export function isLikelyNewsShare(title: string, content: string): boolean {
+  const text = `${title} ${content}`.trim();
+  // Pattern: "Source Name: headline text... URL" — common on Mastodon
+  if (/^[A-Z][\w\s&'-]+:\s.{20,}https?:\/\//.test(text)) return true;
+  // Mostly a URL with minimal commentary (under 40 chars of non-URL text)
+  const stripped = stripUrls(text).replace(/\s+/g, " ").trim();
+  const urls = text.match(/https?:\/\/\S+/g) || [];
+  if (urls.length > 0 && stripped.length < 40) return true;
+  // Emoji-prefixed news headlines (📰, 🔗, etc.)
+  if (/^[\u{1F4F0}\u{1F517}\u{1F4E2}\u{2757}]\s*[A-Z][\w\s]+:/u.test(text)) return true;
+  return false;
+}
+
 export async function logToErrorLog(supabase: any, functionName: string, msg: string, ctx?: string) {
   try { await supabase.from("error_log").insert({ function_name: functionName, error_message: msg, context: ctx || null }); } catch (e) { console.error("logToErrorLog failed:", msg, e); }
 }

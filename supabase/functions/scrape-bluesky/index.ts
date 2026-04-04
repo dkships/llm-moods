@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
-import { corsHeaders, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
+import { corsHeaders, loadKeywords, matchModels, meetsMinLength, isLikelyNewsShare, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
 
 const SEARCH_TERMS = [
   "Claude AI", "ChatGPT", "GPT-5", "Gemini AI", "Grok AI",
@@ -80,6 +80,7 @@ Deno.serve(async (req) => {
           if (!createdAt || createdAt < cutoff) continue;
 
           if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
+          if (isLikelyNewsShare(text, "")) { summary.contentSkipped++; continue; }
 
           const matchedSlugs = matchModels(text, keywords);
           if (matchedSlugs.length === 0) continue;

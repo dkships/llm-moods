@@ -4,11 +4,20 @@ const MODEL = "gemini-3.1-flash-lite-preview";
 export const CLASSIFY_PROMPT = `You are classifying a social media post about AI language models (ChatGPT, Claude, Gemini, Grok, DeepSeek, Perplexity, etc).
 
 STEP 1 — RELEVANCE
-Is this post expressing an opinion about an AI model's quality, behavior, or usefulness?
-- RELEVANT: direct experience, quality complaints/praise, model comparisons, switching decisions, trend observations
+Is this post expressing a PERSONAL opinion about an AI model's quality, behavior, or usefulness based on direct or reported experience?
+- RELEVANT: direct experience, quality complaints/praise, model comparisons, switching decisions, user-reported quality trends
   Examples: "Claude keeps refusing my coding requests", "GPT-4 just hallucinated my bibliography", "Claude is way better than GPT for coding", "has anyone noticed Gemini getting worse?", "I switched from ChatGPT to Claude"
-- NOT RELEVANT: pure news/funding, job market opinions, tutorials with no quality opinion, company strategy/business moves
-  Examples: "OpenAI raised $6B", "Here's a tutorial on using the ChatGPT API", "AI will replace jobs", "Sam Altman tweeted about AGI"
+- NOT RELEVANT:
+  - News articles or research reporting: "PsyPost: ChatGPT acts as a cognitive crutch", "MIT Tech Review: 2025 is the year of AI hype correction", "ChatGPT Global Outage: OpenAI's Critical Disclosure"
+  - Societal/behavioral commentary about AI in general: "In 10 years will anyone know how to code?", "People are becoming dependent on AI", "A person spending 300 hours with ChatGPT going deranged"
+  - Third-party business decisions that mention a model: "DeviantArt added a Grok video generator", "Company X is using ChatGPT for interviews"
+  - Benchmark/spec reporting without personal opinion: "Gemini 3 Flash: 218 tokens/sec vs GPT-4.5: 125 t/s"
+  - Pricing observations without quality judgment: "ChatGPT costs the same as a Starbucks drink"
+  - Pure news/funding/company strategy: "OpenAI raised $6B", "Sam Altman tweeted about AGI"
+  - Tutorials with no quality opinion: "Here's a tutorial on using the ChatGPT API"
+  - Posts where the model is mentioned but the opinion is about something else entirely (a platform, a person, society)
+
+KEY TEST: Ask yourself "Is this person expressing satisfaction or frustration with the MODEL ITSELF based on using it?" If no → not relevant.
 
 If not relevant, return {"relevant": false, "sentiment": null, "complaint_category": null, "praise_category": null, "confidence": 0.0, "language": null, "english_translation": null}
 
@@ -23,13 +32,22 @@ STEP 2 — SENTIMENT
 
 IMPORTANT: If the post describes switching away from, leaving, or replacing this model, that is NEGATIVE sentiment — even if the overall tone is positive. "I'm happily moving to X, done with Y" is negative for Y. Conversely, if someone is switching TO this model, that is POSITIVE for it.
 
+IMPORTANT: Watch for sarcasm and irony. If the surface tone seems positive but the underlying meaning is critical or mocking, classify based on the TRUE intent. Example: "At least ChatGPT would be sycophants who read books" is NEGATIVE (calling the model sycophantic), not positive.
+
 STEP 3 — CATEGORY
 If negative, set complaint_category to one of: lazy_responses, hallucinations, refusals, coding_quality, speed, general_drop, pricing_value, censorship, context_window, api_reliability, multimodal_quality, reasoning
 If positive, set praise_category to one of: output_quality, coding_quality, speed, reasoning, creativity, value, reliability, context_handling, multimodal_quality, general_improvement
 If neutral, both should be null.
 
+Category guidance:
+- hallucinations: The model generated factually incorrect information. NOT someone using the model to generate content.
+- censorship: The model refused content due to safety filters. NOT copyright concerns about AI-generated content.
+- general_drop: Quality declined compared to before. NOT societal concerns about AI dependency.
+- lazy_responses: Short, generic, or low-effort text responses. NOT image/video generation artifacts (use multimodal_quality).
+- multimodal_quality: Issues with image, video, or audio generation quality.
+
 STEP 4 — CONFIDENCE (0.0-1.0)
-- 0.9-1.0: Explicitly names a model AND has clear sentiment ("Claude 3.5 is amazing at code")
+- 0.9-1.0: Explicitly names a model AND has clear sentiment from direct experience ("Claude 3.5 is amazing at code")
 - 0.7-0.8: Clearly about a model with discernible sentiment, but less direct
 - 0.5-0.6: Ambiguous — could be about this model, or sentiment is unclear
 - Below 0.5: Weak signal, likely not relevant
@@ -43,11 +61,19 @@ const BATCH_CLASSIFY_PROMPT = `You are classifying social media posts about AI l
 
 For EACH post, determine:
 
-RELEVANCE: Is this post expressing an opinion about an AI model's quality, behavior, or usefulness?
-- RELEVANT: direct experience, quality complaints/praise, model comparisons, switching decisions, trend observations
+RELEVANCE: Is this post expressing a PERSONAL opinion about an AI model's quality, behavior, or usefulness based on direct or reported experience?
+- RELEVANT: direct experience, quality complaints/praise, model comparisons, switching decisions, user-reported quality trends
   Examples: "Claude keeps refusing my coding requests", "GPT-4 just hallucinated my bibliography", "Claude is way better than GPT for coding", "has anyone noticed Gemini getting worse?", "I switched from ChatGPT to Claude"
-- NOT RELEVANT: pure news/funding, job market opinions, tutorials with no quality opinion, company strategy/business moves
-  Examples: "OpenAI raised $6B", "Here's a tutorial on using the ChatGPT API", "AI will replace jobs"
+- NOT RELEVANT:
+  - News/research reporting: "PsyPost: ChatGPT acts as a cognitive crutch", "MIT Tech Review: 2025 is the year of AI hype correction"
+  - Societal/behavioral commentary: "In 10 years will anyone know how to code?", "People are becoming dependent on AI"
+  - Third-party business decisions mentioning a model: "DeviantArt added a Grok video generator"
+  - Benchmark/spec comparisons without personal opinion: "Gemini 3 Flash: 218 tokens/sec vs GPT-4.5: 125 t/s"
+  - Pricing observations without quality judgment: "ChatGPT costs the same as a Starbucks drink"
+  - Pure news/funding/company strategy: "OpenAI raised $6B"
+  - Posts where the model is mentioned but the opinion is about something else (a platform, a person, society)
+
+KEY TEST: "Is this person expressing satisfaction or frustration with the MODEL ITSELF based on using it?" If no → not relevant.
 
 LANGUAGE: If a post is NOT in English, detect the language (ISO 639-1 code) and provide a concise English translation. Classify sentiment based on the translated meaning. If the post IS in English, set both to null.
 
@@ -58,11 +84,15 @@ SENTIMENT (if relevant):
 
 IMPORTANT: If the post describes switching away from, leaving, or replacing the model being discussed, that is NEGATIVE sentiment — even if the overall tone is positive. "I'm happily moving to X, done with Y" is negative for Y. Conversely, if someone is switching TO the model, that is POSITIVE.
 
+IMPORTANT: Watch for sarcasm and irony. Classify based on TRUE intent, not surface tone. "At least ChatGPT would be sycophants" is NEGATIVE.
+
 CATEGORY (if relevant):
 If negative: lazy_responses, hallucinations, refusals, coding_quality, speed, general_drop, pricing_value, censorship, context_window, api_reliability, multimodal_quality, reasoning
 If positive: output_quality, coding_quality, speed, reasoning, creativity, value, reliability, context_handling, multimodal_quality, general_improvement
 
-CONFIDENCE: 0.0-1.0 (0.9+ = explicit model name + clear sentiment, 0.7-0.8 = clear but indirect, below 0.5 = weak)
+Category guidance: hallucinations = model generated false info (NOT someone using the model to generate content). censorship = model refused due to safety filters (NOT copyright concerns). general_drop = quality declined (NOT societal AI concerns). lazy_responses = low-effort text (NOT image/video artifacts — use multimodal_quality).
+
+CONFIDENCE: 0.0-1.0 (0.9+ = explicit model name + clear sentiment from direct experience, 0.7-0.8 = clear but indirect, below 0.5 = weak)
 
 Return ONLY a JSON array with one object per post in the same order:
 [{"relevant": true/false, "sentiment": "..."/null, "complaint_category": "..."/null, "praise_category": "..."/null, "confidence": 0.0-1.0, "language": "..."/null, "english_translation": "..."/null}, ...]
@@ -81,7 +111,9 @@ CRITICAL: The overall TONE of a sentence may differ from sentiment toward the TA
 
 For EACH post, determine:
 
-RELEVANCE: Is this post expressing an opinion about the TARGET model's quality, behavior, or usefulness? If the target model is only mentioned in passing with no opinion about it, mark as not relevant.
+RELEVANCE: Is this post expressing a PERSONAL opinion about the TARGET model's quality, behavior, or usefulness based on direct or reported experience? If the target model is only mentioned in passing with no opinion about it, mark as not relevant.
+- NOT RELEVANT: news/research reporting, societal commentary, third-party business decisions mentioning the model, benchmark/spec comparisons without personal opinion, posts where the opinion is about something else (a platform, a person, society).
+- KEY TEST: "Is this person expressing satisfaction or frustration with the TARGET MODEL ITSELF based on using it?" If no → not relevant.
 
 LANGUAGE: If a post is NOT in English, detect the language (ISO 639-1 code) and provide a concise English translation. Classify sentiment based on the translated meaning. If the post IS in English, set both to null.
 
@@ -90,11 +122,15 @@ SENTIMENT (if relevant, toward the TARGET model only):
 - "negative": complaining, frustrated, disappointed with the target model
 - "neutral": genuinely mixed or purely factual about the target model (should be RARE)
 
+IMPORTANT: Watch for sarcasm and irony. Classify based on TRUE intent, not surface tone.
+
 CATEGORY (if relevant):
 If negative: lazy_responses, hallucinations, refusals, coding_quality, speed, general_drop, pricing_value, censorship, context_window, api_reliability, multimodal_quality, reasoning
 If positive: output_quality, coding_quality, speed, reasoning, creativity, value, reliability, context_handling, multimodal_quality, general_improvement
 
-CONFIDENCE: 0.0-1.0 (0.9+ = explicit target model name + clear sentiment toward it, 0.7-0.8 = clear but indirect, below 0.5 = weak)
+Category guidance: hallucinations = model generated false info. censorship = model refused due to safety filters. general_drop = quality declined. lazy_responses = low-effort text (NOT image/video artifacts — use multimodal_quality).
+
+CONFIDENCE: 0.0-1.0 (0.9+ = explicit target model name + clear sentiment from direct experience, 0.7-0.8 = clear but indirect, below 0.5 = weak)
 
 Return ONLY a JSON array with one object per post in the same order:
 [{"relevant": true/false, "sentiment": "..."/null, "complaint_category": "..."/null, "praise_category": "..."/null, "confidence": 0.0-1.0, "language": "..."/null, "english_translation": "..."/null}, ...]
