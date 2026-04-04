@@ -23,9 +23,7 @@ Deno.serve(async (req) => {
 
     const now = new Date();
     const dailyStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const hourlyStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), now.getUTCHours()));
     const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
-    const since1h = new Date(now.getTime() - 60 * 60 * 1000).toISOString();
 
     const summary: Record<string, any> = {};
 
@@ -68,36 +66,65 @@ Deno.serve(async (req) => {
         await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), result);
         modelSummary.daily = { posts: dailyPosts.length, score: result.score, smoothed: previousScore !== null, thin_data: dailyPosts.length < MIN_POSTS };
       } else {
-        // No posts — carry forward previous score to prevent chart gaps
+        // No posts — carry forward previous score for up to 3 consecutive days
         if (previousScore !== null) {
-          const carryForward: ScoreResult = {
-            score: previousScore,
-            positive_count: 0,
-            negative_count: 0,
-            neutral_count: 0,
-            total_posts: 0,
-            top_complaint: null,
-          };
-          await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), carryForward);
-          modelSummary.daily = { posts: 0, score: previousScore, carried_forward: true };
+          // Check how many consecutive days already carried forward
+          const { data: recentScores } = await supabase
+            .from("vibes_scores")
+            .select("total_posts")
+            .eq("model_id", model.id)
+            .eq("period", "daily")
+            .order("period_start", { ascending: false })
+            .limit(3);
+
+          const consecutiveEmpty = (recentScores || [])
+            .filter((s: any) => s.total_posts === 0).length;
+
+          if (consecutiveEmpty < 3) {
+            const carryForward: ScoreResult = {
+              score: previousScore,
+              positive_count: 0,
+              negative_count: 0,
+              neutral_count: 0,
+              total_posts: 0,
+              top_complaint: null,
+            };
+            await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), carryForward);
+            modelSummary.daily = { posts: 0, score: previousScore, carried_forward: true, consecutive_empty: consecutiveEmpty + 1 };
+          } else {
+            modelSummary.daily = { posts: 0, skipped: true, reason: "carry_forward_cap_reached" };
+          }
         } else {
           modelSummary.daily = { posts: 0, skipped: true };
         }
       }
 
-      // --- Hourly aggregation (last 1h) ---
-      const { data: hourlyPosts } = await supabase
-        .from("scraped_posts")
-        .select("sentiment, complaint_category, confidence, score, content_type")
-        .eq("model_id", model.id)
-        .gte("posted_at", since1h)
-        .limit(5000);
+      // --- Hourly aggregation (trailing 24h) ---
+      const hourlyResults: { hour: string; posts: number; score: number }[] = [];
+      for (let h = 23; h >= 0; h--) {
+        const hStart = new Date(Date.UTC(
+          now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(),
+          now.getUTCHours() - h
+        ));
+        const hEnd = new Date(hStart.getTime() + 60 * 60 * 1000);
 
-      if (hourlyPosts && hourlyPosts.length > 0) {
-        const result = computeScore(hourlyPosts);
-        await upsertScore(supabase, model.id, "hourly", hourlyStart.toISOString(), result);
-        modelSummary.hourly = { posts: hourlyPosts.length, score: result.score };
+        const { data: hPosts } = await supabase
+          .from("scraped_posts")
+          .select("sentiment, complaint_category, confidence, score, content_type")
+          .eq("model_id", model.id)
+          .gte("posted_at", hStart.toISOString())
+          .lt("posted_at", hEnd.toISOString())
+          .limit(5000);
+
+        if (hPosts && hPosts.length > 0) {
+          const result = computeScore(hPosts);
+          await upsertScore(supabase, model.id, "hourly", hStart.toISOString(), result);
+          hourlyResults.push({ hour: hStart.toISOString(), posts: hPosts.length, score: result.score });
+        }
       }
+      modelSummary.hourly = hourlyResults.length > 0
+        ? { hours_with_data: hourlyResults.length, details: hourlyResults }
+        : { hours_with_data: 0 };
 
       summary[model.slug] = modelSummary;
     }

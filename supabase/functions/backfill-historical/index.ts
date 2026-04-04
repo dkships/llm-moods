@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch } from "../_shared/classifier.ts";
+import { loadKeywords, matchModels } from "../_shared/utils.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -12,28 +13,6 @@ const BLUESKY_KEYWORDS = ["ChatGPT", "Claude", "Gemini", "Grok", "LLM", "OpenAI"
 
 const REDDIT_KEYWORDS = ["ChatGPT", "Claude", "Gemini", "Grok"];
 const REDDIT_SUBREDDITS = ["ClaudeAI", "ChatGPT", "LocalLLaMA", "GoogleGemini", "singularity", "artificial", "MachineLearning"];
-
-const MODEL_KEYWORDS: Record<string, string[]> = {
-  claude: ["claude", "sonnet", "opus", "anthropic"],
-  chatgpt: ["chatgpt", "gpt-5", "gpt-4", "gpt-4o", "gpt", "openai", "copilot"],
-  gemini: ["gemini", "gemini pro", "google ai", "bard"],
-  grok: ["grok", "grok 4", "xai"],
-};
-
-function matchModels(text: string): string[] {
-  const lower = text.toLowerCase();
-  const matched: string[] = [];
-  for (const [slug, keywords] of Object.entries(MODEL_KEYWORDS)) {
-    for (const kw of keywords) {
-      const regex = new RegExp(`\\b${kw.replace("-", "[-\\s]?")}\\b`, "i");
-      if (regex.test(lower)) {
-        if (!matched.includes(slug)) matched.push(slug);
-        break;
-      }
-    }
-  }
-  return matched;
-}
 
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -107,9 +86,8 @@ Deno.serve(async (req) => {
 
     await log(supabase, `Backfill started: start=${new Date(startEpoch * 1000).toISOString().split("T")[0]}, end=${new Date(endEpoch * 1000).toISOString().split("T")[0]}, targeted=${isTargeted}`, "health-check");
 
-    const { data: models } = await supabase.from("models").select("id, slug");
-    const modelMap: Record<string, string> = {};
-    for (const m of models || []) modelMap[m.slug] = m.id;
+    // Load model map and keywords from DB (same as active scrapers)
+    const { modelMap, keywords } = await loadKeywords(supabase);
 
     // Load existing URLs for dedup
     const { data: existingData } = await supabase.from("scraped_posts").select("source_url").not("source_url", "is", null).limit(10000);
@@ -140,7 +118,7 @@ Deno.serve(async (req) => {
 
             const title = hit.title || "";
             const text = title;
-            const matchedSlugs = matchModels(text);
+            const matchedSlugs = matchModels(text, keywords);
             if (matchedSlugs.length === 0) continue;
 
             hnCandidates.push({ text, matchedSlugs, sourceUrl, title, score: hit.points || 0, postedAt: hit.created_at || new Date().toISOString() });
@@ -211,7 +189,7 @@ Deno.serve(async (req) => {
             if (postTime < startEpoch * 1000) continue;
             if (postTime > endEpoch * 1000) continue;
 
-            const matchedSlugs = matchModels(text);
+            const matchedSlugs = matchModels(text, keywords);
             if (matchedSlugs.length === 0) continue;
 
             const score = (post.likeCount || 0) + (post.repostCount || 0);
@@ -276,7 +254,7 @@ Deno.serve(async (req) => {
             const title = (post.title || "").slice(0, 500);
             const selftext = (post.selftext || "").slice(0, 500);
             const text = `${title} ${selftext}`;
-            const matchedSlugs = matchModels(text);
+            const matchedSlugs = matchModels(text, keywords);
             if (matchedSlugs.length === 0) continue;
 
             const contentType = selftext.trim() ? "title_and_body" : "title_only";
@@ -380,7 +358,7 @@ Deno.serve(async (req) => {
                   const sourceUrl = tweet.url || (screenName && tweet.id ? `https://x.com/${screenName}/status/${tweet.id}` : "");
                   if (!sourceUrl || existingUrls.has(sourceUrl)) continue;
 
-                  const matchedSlugs = matchModels(text);
+                  const matchedSlugs = matchModels(text, keywords);
                   if (matchedSlugs.length === 0) continue;
 
                   const createdAt = new Date(tweet.created_at || tweet.createdAt);
@@ -440,7 +418,7 @@ Deno.serve(async (req) => {
           const sourceUrl = item.link;
           if (!sourceUrl || existingUrls.has(sourceUrl)) continue;
 
-          const matchedSlugs = matchModels(title + " " + body);
+          const matchedSlugs = matchModels(title + " " + body, keywords);
           if (matchedSlugs.length === 0) continue;
 
           soCandidates.push({
@@ -509,11 +487,11 @@ Deno.serve(async (req) => {
           let matchedSlugs: string[];
           if (defaultSlug) {
             matchedSlugs = [defaultSlug];
-            for (const s of matchModels(text)) {
+            for (const s of matchModels(text, keywords)) {
               if (!matchedSlugs.includes(s)) matchedSlugs.push(s);
             }
           } else {
-            matchedSlugs = matchModels(text);
+            matchedSlugs = matchModels(text, keywords);
             if (matchedSlugs.length === 0) continue;
           }
 

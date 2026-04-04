@@ -135,6 +135,7 @@ Deno.serve(async (req) => {
         .maybeSingle();
 
       let previousScore: number | null = seedRow?.score ?? null;
+      let consecutiveEmpty = 0;
 
       for (const day of days) {
         const dayStart = day.toISOString();
@@ -154,8 +155,9 @@ Deno.serve(async (req) => {
         const postCount = posts?.length ?? 0;
 
         if (postCount === 0) {
-          // Carry forward previous score to avoid chart gaps
-          if (previousScore !== null) {
+          consecutiveEmpty++;
+          // Carry forward previous score for up to 3 days to avoid short chart gaps
+          if (previousScore !== null && consecutiveEmpty <= 3) {
             const carryForward: ScoreResult = {
               score: previousScore,
               positive_count: 0,
@@ -174,6 +176,8 @@ Deno.serve(async (req) => {
           }
           continue;
         }
+
+        consecutiveEmpty = 0;
 
         const result = computeScore(posts!);
 
