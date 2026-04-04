@@ -11,8 +11,7 @@ const SCRAPERS = [
   "scrape-bluesky",
   "scrape-twitter",
   "scrape-mastodon",
-  "scrape-lobsters",
-  "scrape-discourse",
+  "scrape-lemmy",
 ];
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;

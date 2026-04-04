@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 7 social platforms. Scores models 0-100 daily based on scraped post sentiment.
+Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 6 social platforms. Scores models 0-100 daily based on scraped post sentiment.
 
 **Live at:** llmvibes.ai (Lovable-hosted)
 
@@ -31,7 +31,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 | State | TanStack React Query 5.83 |
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Edge Functions | 18 Deno functions (7 active scrapers + utilities; dormant scraper dirs kept for Lovable) |
+| Edge Functions | 18 Deno functions (6 active scrapers + utilities; dormant scraper dirs kept for Lovable) |
 | Sentiment AI | Gemini 3.1 Flash-Lite via Google AI API (batch classification, 25 posts/call) |
 
 ## Key Routes
@@ -57,7 +57,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 
 ## Scrapers (Edge Functions)
 
-Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 4 instances), Lobsters (public API), Discourse (community.openai.com + community.anthropic.com). Orchestrated by `run-scrapers` (batches of 3, cron `0 6,14,22 * * *` — 3x/day at 6AM, 2PM, 10PM UTC). Dormant scraper directories (Lemmy, Dev.to, Stack Overflow, Medium, GitHub) still exist but are not in the orchestrator — kept for Lovable file structure compatibility.
+Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances), Lemmy (public API, 2 instances). Orchestrated by `run-scrapers` (batches of 3, cron `0 6,14,22 * * *` — 3x/day at 6AM, 2PM, 10PM UTC). Dormant scraper directories (Lobsters, Discourse, Dev.to, Stack Overflow, Medium, GitHub) still exist but are not in the orchestrator — kept for Lovable file structure compatibility.
 
 Shared utilities (keyword matching, dedup, error logging) are in `_shared/utils.ts` — scrapers import from there instead of duplicating code.
 

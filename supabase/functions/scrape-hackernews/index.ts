@@ -3,8 +3,7 @@ import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
 import { corsHeaders, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
 
 const ALGOLIA_BASE = "https://hn.algolia.com/api/v1/search_by_date";
-const STORY_SEARCH_TERMS = ["Claude", "ChatGPT", "GPT-5", "Gemini", "Grok", "OpenAI", "Anthropic"];
-const COMMENT_SEARCH_TERMS = ["Claude dumb", "ChatGPT worse", "GPT bad", "Gemini sucks", "Grok useless"];
+const STORY_SEARCH_TERMS = ["Claude", "ChatGPT", "Gemini", "Grok", "OpenAI"];
 
 const delay = (ms: number) => new Promise(r => setTimeout(r, ms));
 
@@ -24,7 +23,7 @@ Deno.serve(async (req) => {
     const titleKeys = await loadRecentTitleKeys(supabase);
 
     const oneDayAgo = Math.floor((Date.now() - 24 * 3600000) / 1000);
-    const summary = { stories: 0, comments: 0, classified: 0, inserted: 0, irrelevant: 0, skipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
+    const summary = { fetched: 0, stories: 0, comments: 0, classified: 0, inserted: 0, irrelevant: 0, skipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
 
     for (const term of STORY_SEARCH_TERMS) {
       try {
@@ -34,6 +33,7 @@ Deno.serve(async (req) => {
         const data = await res.json();
         const hits = data.hits || [];
         summary.stories += hits.length;
+        summary.fetched += hits.length;
 
         // Pass 1: collect story candidates
         const storyCandidates: { text: string; matchedSlugs: string[]; sourceUrl: string; title: string; score: number; postedAt: string }[] = [];
@@ -112,97 +112,10 @@ Deno.serve(async (req) => {
           }
         }
       } catch (e) { summary.errors.push(`Story ${term}: ${e instanceof Error ? e.message : "unknown"}`); }
-      await delay(1000);
+      await delay(500);
     }
 
-    for (const term of COMMENT_SEARCH_TERMS) {
-      try {
-        const url = `${ALGOLIA_BASE}?query=${encodeURIComponent(term)}&tags=comment&numericFilters=created_at_i>${oneDayAgo}&hitsPerPage=30`;
-        const res = await fetch(url);
-        if (!res.ok) { await delay(1000); continue; }
-        const data = await res.json();
-        const hits = data.hits || [];
-        summary.comments += hits.length;
-
-        // Pass 1: collect comment candidates
-        const commentCandidates: { text: string; matchedSlugs: string[]; sourceUrl: string; score: number; postedAt: string }[] = [];
-        for (const hit of hits) {
-          const text = (hit.comment_text || "").replace(/<[^>]*>/g, "")
-            .replace(/&#(\d+);/g, (_: string, n: string) => String.fromCharCode(Number(n)))
-            .replace(/&#x([0-9a-fA-F]+);/g, (_: string, h: string) => String.fromCharCode(parseInt(h, 16)))
-            .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-            .replace(/&quot;/g, '"').replace(/&apos;/g, "'");
-          if (!text) continue;
-          if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
-          const sourceUrl = hit.story_id ? `https://news.ycombinator.com/item?id=${hit.story_id}` : `https://news.ycombinator.com/item?id=${hit.objectID}`;
-          if (existingUrls.has(sourceUrl)) { summary.skipped++; continue; }
-
-          const matchedSlugs = matchModels(text, keywords);
-          if (matchedSlugs.length === 0) continue;
-
-          commentCandidates.push({ text, matchedSlugs, sourceUrl, score: hit.points || 0, postedAt: hit.created_at || new Date().toISOString() });
-        }
-
-        // Pass 2: batch classify comments
-        const hnCommentLogError = async (msg: string, ctx?: string) => {
-          await logToErrorLog(supabase, "scrape-hackernews", msg, ctx || "classify");
-        };
-        const commentClassifications = await classifyBatch(commentCandidates.map(c => c.text), lovableApiKey, 25, hnCommentLogError);
-        summary.classified += commentClassifications.length;
-        summary.irrelevant += commentClassifications.filter(c => !c.relevant).length;
-
-        // Pass 2b: Re-classify multi-model comments with targeted sentiment
-        const commentMultiModelItems: { idx: number; slug: string }[] = [];
-        for (let i = 0; i < commentCandidates.length; i++) {
-          if (commentCandidates[i].matchedSlugs.length > 1 && commentClassifications[i].relevant) {
-            for (const slug of commentCandidates[i].matchedSlugs) {
-              commentMultiModelItems.push({ idx: i, slug });
-            }
-          }
-        }
-        const commentTargetedResults = commentMultiModelItems.length > 0
-          ? await classifyBatchTargeted(
-              commentMultiModelItems.map(m => ({ text: commentCandidates[m.idx].text, targetModel: m.slug })),
-              lovableApiKey, 25, hnCommentLogError
-            )
-          : [];
-        const commentTargetedMap = new Map<string, typeof commentClassifications[0]>();
-        commentMultiModelItems.forEach((m, j) => commentTargetedMap.set(`${m.idx}:${m.slug}`, commentTargetedResults[j]));
-
-        // Pass 3: insert comments
-        for (let i = 0; i < commentCandidates.length; i++) {
-          const baseClassification = commentClassifications[i];
-          if (!baseClassification.relevant) continue;
-          const c = commentCandidates[i];
-
-          for (const slug of c.matchedSlugs) {
-            const classification = c.matchedSlugs.length > 1
-              ? (commentTargetedMap.get(`${i}:${slug}`) || commentClassifications[i])
-              : commentClassifications[i];
-            const modelId = modelMap[slug];
-            if (!modelId || isDuplicate(titleKeys, c.text.slice(0, 200), modelId)) continue;
-            const { error } = await supabase.from("scraped_posts").upsert({
-              model_id: modelId, source: "hackernews", source_url: c.sourceUrl,
-              title: c.text.slice(0, 200), content: c.text.slice(0, 2000),
-              sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-              praise_category: classification.praise_category,
-              confidence: classification.confidence, content_type: "full_content",
-              original_language: classification.language || null,
-              translated_content: classification.english_translation || null,
-              score: c.score, posted_at: c.postedAt,
-            }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
-            if (error) { summary.errors.push(error.message); } else {
-              summary.inserted++;
-              existingUrls.add(c.sourceUrl);
-              titleKeys.add(`${modelId}:${c.text.slice(0, 80).toLowerCase()}`);
-            }
-          }
-        }
-      } catch (e) { summary.errors.push(`Comment ${term}: ${e instanceof Error ? e.message : "unknown"}`); }
-      await delay(1000);
-    }
-
-    await logToErrorLog(supabase, "scrape-hackernews", `Algolia: inserted=${summary.inserted} stories=${summary.stories} comments=${summary.comments} classified=${summary.classified} irrelevant=${summary.irrelevant}`, `skipped=${summary.skipped} errors=${summary.errors.length}`);
+    await logToErrorLog(supabase, "scrape-hackernews", `Completed: fetched=${summary.fetched} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted}`, "summary");
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

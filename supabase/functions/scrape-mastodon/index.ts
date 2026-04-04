@@ -2,8 +2,16 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
 import { corsHeaders, loadKeywords, matchModels, meetsMinLength, logToErrorLog } from "../_shared/utils.ts";
 
-const INSTANCES = ["mastodon.social", "mastodon.online", "techhub.social", "sigmoid.social"];
-const HASHTAGS = ["chatgpt", "claudeai", "gemini", "grok", "llm", "aitools"];
+const MAIN_INSTANCE = "mastodon.social";
+const MAIN_HASHTAGS = ["chatgpt", "claudeai", "grok", "llm"];
+const TECH_INSTANCES = ["mastodon.online", "techhub.social", "sigmoid.social", "hachyderm.io"];
+const TECH_HASHTAGS = ["llm", "chatgpt"];
+
+const ASTROLOGY_TERMS = ["horoscope", "zodiac", "mercury retrograde", "natal chart", "birth chart", "sun sign", "moon sign", "rising sign", "astrology"];
+function isAstrologyPost(text: string): boolean {
+  const lower = text.toLowerCase();
+  return ASTROLOGY_TERMS.some(term => lower.includes(term));
+}
 
 const SEARCH_QUERIES = [
   "Claude AI", "ChatGPT", "GPT dumber", "Claude worse", "Gemini bad", "AI getting worse",
@@ -62,9 +70,26 @@ Deno.serve(async (req) => {
     // Collect all statuses, deduped by URL
     const allStatuses = new Map<string, Status>();
 
-    // Phase 1: Hashtag timelines across all instances
-    for (const instance of INSTANCES) {
-      for (const hashtag of HASHTAGS) {
+    // Phase 1a: Full hashtag set on main instance
+    for (const hashtag of MAIN_HASHTAGS) {
+      await delay(1000);
+      try {
+        const url = `https://${MAIN_INSTANCE}/api/v1/timelines/tag/${hashtag}?limit=40`;
+        const res = await fetchWithTimeout(url);
+        if (!res.ok) { summary.errors.push(`${MAIN_INSTANCE}/#${hashtag}: HTTP ${res.status}`); continue; }
+        const statuses: Status[] = await res.json();
+        if (!Array.isArray(statuses)) continue;
+        for (const s of statuses) {
+          if (s.url && !allStatuses.has(s.url)) allStatuses.set(s.url, s);
+        }
+      } catch (e) {
+        summary.errors.push(`${MAIN_INSTANCE}/#${hashtag}: ${e instanceof Error ? e.message : String(e)}`);
+      }
+    }
+
+    // Phase 1b: Targeted hashtags on tech instances
+    for (const instance of TECH_INSTANCES) {
+      for (const hashtag of TECH_HASHTAGS) {
         await delay(1000);
         try {
           const url = `https://${instance}/api/v1/timelines/tag/${hashtag}?limit=40`;
@@ -108,6 +133,7 @@ Deno.serve(async (req) => {
 
       const content = stripHtml(status.content || "");
       if (!meetsMinLength("", content)) { summary.contentSkipped++; continue; }
+      if (isAstrologyPost(content)) { summary.contentSkipped++; continue; }
 
       const matchedSlugs = matchModels(content, keywords);
       if (matchedSlugs.length === 0) continue;
