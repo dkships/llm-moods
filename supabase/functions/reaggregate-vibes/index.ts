@@ -154,7 +154,24 @@ Deno.serve(async (req) => {
         const postCount = posts?.length ?? 0;
 
         if (postCount === 0) {
-          modelResult.days_skipped++;
+          // Carry forward previous score to avoid chart gaps
+          if (previousScore !== null) {
+            const carryForward: ScoreResult = {
+              score: previousScore,
+              positive_count: 0,
+              negative_count: 0,
+              neutral_count: 0,
+              total_posts: 0,
+              top_complaint: null,
+            };
+            if (!dryRun) {
+              await upsertScore(supabase, model.id, "daily", dayStart, carryForward);
+            }
+            modelResult.days_processed++;
+            modelResult.scores.push({ date: dayLabel, score: previousScore, posts: 0 });
+          } else {
+            modelResult.days_skipped++;
+          }
           continue;
         }
 

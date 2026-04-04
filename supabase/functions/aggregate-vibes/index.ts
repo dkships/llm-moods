@@ -68,8 +68,21 @@ Deno.serve(async (req) => {
         await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), result);
         modelSummary.daily = { posts: dailyPosts.length, score: result.score, smoothed: previousScore !== null, thin_data: dailyPosts.length < MIN_POSTS };
       } else {
-        // No posts — skip instead of carrying forward a stale score
-        modelSummary.daily = { posts: 0, skipped: true };
+        // No posts — carry forward previous score to prevent chart gaps
+        if (previousScore !== null) {
+          const carryForward: ScoreResult = {
+            score: previousScore,
+            positive_count: 0,
+            negative_count: 0,
+            neutral_count: 0,
+            total_posts: 0,
+            top_complaint: null,
+          };
+          await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), carryForward);
+          modelSummary.daily = { posts: 0, score: previousScore, carried_forward: true };
+        } else {
+          modelSummary.daily = { posts: 0, skipped: true };
+        }
       }
 
       // --- Hourly aggregation (last 1h) ---
