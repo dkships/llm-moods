@@ -131,6 +131,8 @@ npm run test         # Vitest
 - Do not suggest Deno/Supabase features without verifying they are available in this project's edge function runtime
 - When referencing scraper configurations or API integrations, verify against `supabase/functions/` source files
 - Cite specific file paths when making recommendations
+- When analyzing scraper data, sentiment results, or edge function output, extract direct quotes and specific numbers first, then base conclusions on those — not on memory or paraphrase
+- After generating claims or recommendations, self-verify each against the source material; retract any claim that lacks a supporting code reference or data point
 
 ## Working Here with Claude Code
 

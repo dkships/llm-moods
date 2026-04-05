@@ -22,6 +22,12 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 - Always commit after completing work — don't leave dirty `main`
 - Shared scraper utilities in `supabase/functions/_shared/utils.ts`
 
+## Hallucination Prevention
+- When analyzing code or data, extract verbatim quotes before drawing conclusions — do not paraphrase from memory
+- After generating claims, verify each against source material and remove any that lack supporting evidence
+- When source documents are provided, restrict analysis to those sources — explicitly flag any use of general training knowledge
+- For complex reasoning, show intermediate steps before final conclusions
+
 ## Definition Of Done
 - Changes build successfully (`npm run build`)
 - All tables have RLS enabled; anon key can only SELECT
