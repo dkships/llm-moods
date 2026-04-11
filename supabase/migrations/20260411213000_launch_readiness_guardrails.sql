@@ -35,6 +35,13 @@ UPDATE public.vibes_scores
 SET top_complaint = public.normalize_public_complaint_category(top_complaint)
 WHERE top_complaint IS DISTINCT FROM public.normalize_public_complaint_category(top_complaint);
 
+DELETE FROM public.scraped_posts sp
+USING public.models m
+WHERE sp.model_id = m.id
+  AND m.slug = 'chatgpt'
+  AND lower(COALESCE(sp.title, '') || ' ' || COALESCE(sp.content, '')) ~ '(gpt[: -]?oss|oss[- ]?(20b|120b)|self-?hosted|local llm|home lab|ollama|lm studio|huggingface\\.co/openai/gpt-oss)'
+  AND lower(COALESCE(sp.title, '') || ' ' || COALESCE(sp.content, '')) !~ '(chat ?gpt|gpt[- ]4o|gpt[- ]5(\\.4)?|o4(-mini)?)';
+
 CREATE OR REPLACE FUNCTION public.get_landing_vibes()
 RETURNS TABLE (
   model_id uuid,
