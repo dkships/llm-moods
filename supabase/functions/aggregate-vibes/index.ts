@@ -1,4 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { normalizeComplaintCategory } from "../_shared/taxonomy.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -207,7 +208,8 @@ function computeScore(posts: { sentiment: string | null; complaint_category: str
     if (e.sentiment === "positive") { positiveW += w; positiveC++; }
     else if (e.sentiment === "negative") {
       negativeW += w; negativeC++;
-      if (e.complaint_category) complaints[e.complaint_category] = (complaints[e.complaint_category] || 0) + w;
+      const complaintCategory = normalizeComplaintCategory(e.complaint_category);
+      if (complaintCategory) complaints[complaintCategory] = (complaints[complaintCategory] || 0) + w;
     } else { neutralW += w; neutralC++; }
   }
 

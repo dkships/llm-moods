@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
-import { corsHeaders, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
+import { corsHeaders, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog, triggerAggregateVibes } from "../_shared/utils.ts";
 
 const ALGOLIA_BASE = "https://hn.algolia.com/api/v1/search_by_date";
 const STORY_SEARCH_TERMS = ["Claude", "ChatGPT", "Gemini", "Grok", "OpenAI"];
@@ -116,6 +116,9 @@ Deno.serve(async (req) => {
     }
 
     await logToErrorLog(supabase, "scrape-hackernews", `Completed: fetched=${summary.fetched} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted}`, "summary");
+    if (summary.inserted > 0) {
+      await triggerAggregateVibes(supabase, "scrape-hackernews");
+    }
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

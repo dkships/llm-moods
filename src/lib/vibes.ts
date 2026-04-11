@@ -32,7 +32,7 @@ export const SOURCE_LABELS: Record<string, string> = {
 
 export const SENTIMENT_STYLES: Record<string, { label: string; classes: string }> = {
   positive: { label: "Positive", classes: "bg-primary/15 text-primary border-primary/20" },
-  negative: { label: "Negative", classes: "bg-destructive/15 text-destructive border-destructive/20" },
+  negative: { label: "Negative", classes: "bg-red-500/20 text-white border-red-400/40" },
   neutral: { label: "Neutral", classes: "bg-muted text-muted-foreground border-border" },
 };
 
@@ -66,6 +66,11 @@ export function formatSourceDisplay(source: string): { emoji: string; label: str
   if (source === "github") return { emoji: "🐙", label: "GitHub" };
   if (source === "twitter") return { emoji: "⚪", label: "𝕏" };
   return { emoji: "⚪", label: source };
+}
+
+export function formatComplaintLabel(category: string | null | undefined): string {
+  if (!category) return "Unknown";
+  return COMPLAINT_LABELS[category] || category.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 /** Decode common HTML entities found in scraped content */

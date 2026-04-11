@@ -1,3 +1,5 @@
+import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "./taxonomy.ts";
+
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const MODEL = "gemini-3.1-flash-lite-preview";
 
@@ -157,11 +159,15 @@ const SKIP_RESULT: ClassifyResult = {
 };
 
 function parseResult(parsed: any): ClassifyResult {
+  const sentiment = normalizeSentiment(parsed.sentiment);
+  const complaintCategory = normalizeComplaintCategory(parsed.complaint_category);
+  const praiseCategory = normalizePraiseCategory(parsed.praise_category);
+
   return {
     relevant: parsed.relevant !== false,
-    sentiment: parsed.sentiment || null,
-    complaint_category: parsed.complaint_category || null,
-    praise_category: parsed.praise_category || null,
+    sentiment,
+    complaint_category: sentiment === "negative" ? complaintCategory : null,
+    praise_category: sentiment === "positive" ? praiseCategory : null,
     confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.5,
     language: parsed.language || null,
     english_translation: parsed.english_translation || null,

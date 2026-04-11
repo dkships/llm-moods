@@ -8,7 +8,7 @@ interface HeadConfig {
 
 const BASE_URL = "https://llmvibes.ai";
 const DEFAULT_DESCRIPTION =
-  "Track real-time community sentiment for Claude, ChatGPT, Gemini, and Grok. Is your AI having a bad day? Find out instantly.";
+  "Track community sentiment for Claude, ChatGPT, Gemini, and Grok. Is your AI having a bad day? Find out instantly.";
 
 function setMetaContent(selector: string, content: string) {
   const el = document.querySelector<HTMLMetaElement>(selector);

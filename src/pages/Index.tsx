@@ -21,7 +21,7 @@ const HOW_IT_WORKS = [
   {
     icon: Monitor,
     title: "We Scrape",
-    description: "We automatically scan Reddit, Bluesky, Mastodon, X, and more for real-time chatter about AI models.",
+    description: "We automatically scan Reddit, Bluesky, Mastodon, X, and more for recent chatter about AI models.",
   },
   {
     icon: Brain,
@@ -31,7 +31,7 @@ const HOW_IT_WORKS = [
   {
     icon: CheckCircle,
     title: "You Check",
-    description: "Check real-time vibes at a glance. No voting needed — the data speaks for itself.",
+    description: "Check the latest vibe snapshots at a glance. No voting needed — the data speaks for itself.",
   },
 ];
 
@@ -97,105 +97,106 @@ const Index = () => {
     <PageTransition>
       <div className="min-h-screen bg-background">
         <NavBar />
-
-        {/* Hero */}
-        <section className="container pt-24 sm:pt-32 pb-16 relative">
-          <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.10)_0%,_transparent_70%)] pointer-events-none" />
-          <motion.div
-            className="max-w-3xl relative"
-            initial="hidden"
-            animate="visible"
-            variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
-          >
-            <motion.div variants={fadeUp} custom={0} className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-mono text-primary">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-              </span>
-              Tracking {models?.length ?? "..."} models live
-            </motion.div>
-            <motion.h1 variants={fadeUp} custom={1} className="text-4xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
-              Is your AI having<br />
-              a <span className="text-primary glow-text">bad day</span>?
-            </motion.h1>
-            <motion.p variants={fadeUp} custom={2} className="mt-5 text-lg sm:text-xl text-muted-foreground max-w-xl leading-relaxed">
-              Real-time community sentiment for Claude, ChatGPT, Gemini, and Grok. Know when the vibes are off.
-            </motion.p>
-            <motion.div variants={fadeUp} custom={3} className="mt-8 flex flex-wrap items-center gap-4">
-              <Link to="/dashboard">
-                <Button size="lg" className="font-mono text-sm gap-2 group">
-                  Check the Vibes
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Button>
-              </Link>
-              <a
-                href="https://github.com/dkships/llm-moods"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm font-mono text-muted-foreground hover:text-foreground transition-colors"
-              >
-                <GitHubIcon className="h-4 w-4" />
-                Open Source
-              </a>
-            </motion.div>
-          </motion.div>
-        </section>
-
-        {/* Live Vibes Preview */}
-        <section className="container pb-24">
-          {isLoading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
-            </div>
-          ) : isError ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
-          ) : (
+        <main>
+          {/* Hero */}
+          <section className="container pt-24 sm:pt-32 pb-16 relative">
+            <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.10)_0%,_transparent_70%)] pointer-events-none" />
             <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true, margin: "-80px" }}
-              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-              className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
-            >
-              {(models || []).map((m, i) => (
-                <LandingModelCard key={m.id} m={m} i={i} onHover={handleHover} />
-              ))}
-            </motion.div>
-          )}
-        </section>
-
-        {/* How It Works */}
-        <section className="border-y border-border bg-card/40">
-          <div className="container py-24">
-            <motion.h2
-              initial={{ opacity: 0, y: 16 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="text-center text-2xl sm:text-3xl font-bold text-foreground mb-16"
-            >
-              How it works
-            </motion.h2>
-            <motion.div
+              className="max-w-3xl relative"
               initial="hidden"
               animate="visible"
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
-              className="grid grid-cols-1 sm:grid-cols-3 gap-8"
             >
-              {HOW_IT_WORKS.map((step, i) => (
-                <motion.div key={step.title} variants={fadeUp} custom={i} className="text-center">
-                  <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
-                    <step.icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <h3 className="font-display text-lg font-semibold text-foreground">{step.title}</h3>
-                  <p className="mt-2 text-sm text-muted-foreground leading-relaxed max-w-xs mx-auto">
-                    {step.description}
-                  </p>
-                </motion.div>
-              ))}
+              <motion.div variants={fadeUp} custom={0} className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-mono text-primary">
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+                </span>
+                Tracking {models?.length ?? "..."} models
+              </motion.div>
+              <motion.h1 variants={fadeUp} custom={1} className="text-4xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
+                Is your AI having<br />
+                a <span className="text-primary glow-text">bad day</span>?
+              </motion.h1>
+              <motion.p variants={fadeUp} custom={2} className="mt-5 text-lg sm:text-xl text-foreground/70 max-w-xl leading-relaxed">
+                Community sentiment for Claude, ChatGPT, Gemini, and Grok. Know when the vibes are off.
+              </motion.p>
+              <motion.div variants={fadeUp} custom={3} className="mt-8 flex flex-wrap items-center gap-4">
+                <Link to="/dashboard">
+                  <Button size="lg" className="font-mono text-sm gap-2 group">
+                    Check the Vibes
+                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  </Button>
+                </Link>
+                <a
+                  href="https://github.com/dkships/llm-moods"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 text-sm font-mono text-foreground/70 hover:text-foreground transition-colors"
+                >
+                  <GitHubIcon className="h-4 w-4" />
+                  Open Source
+                </a>
+              </motion.div>
             </motion.div>
-          </div>
-        </section>
+          </section>
+
+          {/* Live Vibes Preview */}
+          <section className="container pb-24">
+            {isLoading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
+              </div>
+            ) : isError ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
+            ) : (
+              <motion.div
+                initial="hidden"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-80px" }}
+                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+              >
+                {(models || []).map((m, i) => (
+                  <LandingModelCard key={m.id} m={m} i={i} onHover={handleHover} />
+                ))}
+              </motion.div>
+            )}
+          </section>
+
+          {/* How It Works */}
+          <section className="border-y border-border bg-card/40">
+            <div className="container py-24">
+              <motion.h2
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5 }}
+                className="text-center text-2xl sm:text-3xl font-bold text-foreground mb-16"
+              >
+                How it works
+              </motion.h2>
+              <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
+                className="grid grid-cols-1 sm:grid-cols-3 gap-8"
+              >
+                {HOW_IT_WORKS.map((step, i) => (
+                  <motion.div key={step.title} variants={fadeUp} custom={i} className="text-center">
+                    <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
+                      <step.icon className="h-6 w-6 text-primary" />
+                    </div>
+                    <h3 className="font-display text-lg font-semibold text-foreground">{step.title}</h3>
+                    <p className="mt-2 text-sm text-foreground/70 leading-relaxed max-w-xs mx-auto">
+                      {step.description}
+                    </p>
+                  </motion.div>
+                ))}
+              </motion.div>
+            </div>
+          </section>
+        </main>
 
         <Footer />
       </div>

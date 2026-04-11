@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Flame, TrendingUp, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
-import { COMPLAINT_LABELS } from "@/lib/vibes";
+import { formatComplaintLabel } from "@/lib/vibes";
 
 interface TrendingItem {
   model_id: string;
@@ -69,14 +69,14 @@ const TrendingComplaints = () => {
       <div className="px-5 pt-5 pb-4 flex items-center gap-2">
         <Flame className="h-4 w-4 text-destructive" />
         <h3 className="text-sm font-semibold text-foreground">Trending Complaints</h3>
-        <span className="text-[10px] font-mono text-muted-foreground ml-auto">vs last week</span>
+        <span className="text-[10px] font-mono text-foreground/60 ml-auto">vs last week</span>
       </div>
 
       <div className="max-h-[280px] overflow-y-auto scrollbar-thin px-5 pb-5 space-y-2">
         {topMovers.map((item) => {
           const isSpike = item.pct_change > 50;
           const isUp = item.pct_change > 0;
-          const label = COMPLAINT_LABELS[item.category] || item.category;
+          const label = formatComplaintLabel(item.category);
 
           return (
             <div
@@ -90,7 +90,7 @@ const TrendingComplaints = () => {
               </div>
 
               {/* Category */}
-              <span className="text-xs text-muted-foreground flex-1 truncate">{label}</span>
+              <span className="text-xs text-foreground/70 flex-1 truncate">{label}</span>
 
               {/* Change indicator */}
               <div className="flex items-center gap-1.5 shrink-0">
@@ -101,14 +101,14 @@ const TrendingComplaints = () => {
                   <TrendingDown className="h-3 w-3 text-primary" />
                 )}
                 <span className={`text-xs font-mono font-medium ${
-                  isSpike ? "text-destructive" : isUp ? "text-destructive/80" : "text-primary"
+                  isSpike ? "text-destructive" : isUp ? "text-destructive" : "text-primary"
                 }`}>
                   {isUp ? "↑" : "↓"} {Math.abs(item.pct_change)}%
                 </span>
               </div>
 
               {/* Volume */}
-              <span className="text-[10px] font-mono text-muted-foreground shrink-0 w-16 text-right">
+              <span className="text-[10px] font-mono text-foreground/60 shrink-0 w-16 text-right">
                 {item.this_week} posts
               </span>
             </div>

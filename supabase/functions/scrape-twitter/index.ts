@@ -1,6 +1,7 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
-import { corsHeaders, KeywordEntry, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
+import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "../_shared/taxonomy.ts";
+import { corsHeaders, KeywordEntry, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog, triggerAggregateVibes } from "../_shared/utils.ts";
 
 function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -228,18 +229,6 @@ async function runApifyPath(
   return summary;
 }
 
-const VALID_SENTIMENTS = new Set(["positive", "negative", "neutral"]);
-const VALID_COMPLAINTS = new Set([
-  "lazy_responses", "hallucinations", "refusals", "coding_quality", "speed",
-  "general_drop", "pricing_value", "censorship", "context_window",
-  "api_reliability", "multimodal_quality", "reasoning",
-]);
-const VALID_PRAISES = new Set([
-  "output_quality", "coding_quality", "speed", "reasoning", "creativity",
-  "value", "reliability", "context_handling", "multimodal_quality",
-  "general_improvement",
-]);
-
 // ─── Grok path (fallback) ─────────────────────────────────────────────────────
 
 async function runGrokPath(
@@ -328,12 +317,12 @@ async function runGrokPath(
     if (allDuped) { summary.dedupSkipped++; continue; }
 
     // Grok already classified — validate against allowed values before inserting
-    const sentiment = VALID_SENTIMENTS.has(post.sentiment) ? post.sentiment : null;
+    const sentiment = normalizeSentiment(post.sentiment);
     if (!sentiment) { summary.irrelevant++; continue; }
     summary.classified++;
 
-    const complaint = VALID_COMPLAINTS.has(post.complaint_category) ? post.complaint_category : null;
-    const praise = VALID_PRAISES.has(post.praise_category) ? post.praise_category : null;
+    const complaint = sentiment === "negative" ? normalizeComplaintCategory(post.complaint_category) : null;
+    const praise = sentiment === "positive" ? normalizePraiseCategory(post.praise_category) : null;
     const confidence = typeof post.confidence === "number" && post.confidence >= 0 && post.confidence <= 1
       ? post.confidence : 0.5;
     const postedAt = post.posted_at ? new Date(post.posted_at).toISOString() : new Date().toISOString();
@@ -418,6 +407,9 @@ Deno.serve(async (req) => {
       `Completed (${summary.backend}): fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} dedupSkipped=${summary.dedupSkipped}`,
       "summary",
     );
+    if (summary.inserted > 0) {
+      await triggerAggregateVibes(supabase, "scrape-twitter");
+    }
 
     return new Response(JSON.stringify(summary, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

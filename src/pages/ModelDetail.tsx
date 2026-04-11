@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useState, useEffect, lazy, Suspense, memo } from "react";
+import { useState, lazy, Suspense } from "react";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
@@ -15,7 +15,7 @@ import {
 } from "@/hooks/useVibesData";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import {
-  getVibeStatus, fadeUp, COMPLAINT_LABELS, SOURCE_LABELS,
+  getVibeStatus, fadeUp, formatComplaintLabel, SOURCE_LABELS,
   SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
@@ -24,11 +24,6 @@ import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skele
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
 const TIME_RANGES = ["24h", "7d", "30d"] as const;
-const TIME_RANGE_LABELS: Record<string, string> = {
-  "24h": "Show last 24 hours",
-  "7d": "Show last 7 days",
-  "30d": "Show last 30 days",
-};
 
 const ModelDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -54,7 +49,7 @@ const ModelDetail = () => {
   useHead({
     title: model ? `${model.name} Vibes — LLM Vibes` : "Loading — LLM Vibes",
     description: model
-      ? `Real-time community sentiment and complaint trends for ${model.name}.`
+      ? `Latest community sentiment and complaint trends for ${model.name}.`
       : undefined,
     url: slug ? `/model/${slug}` : undefined,
   });
@@ -141,49 +136,49 @@ const ModelDetail = () => {
     <PageTransition>
       <div className="min-h-screen bg-background">
         <NavBar />
+        <main>
+          {/* Model Header */}
+          <section className="container pt-10 pb-8">
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              <Link to="/dashboard" className="inline-flex items-center gap-1.5 text-sm text-foreground/70 hover:text-foreground transition-colors mb-6">
+                <ArrowLeft className="h-4 w-4" />
+                Back to Dashboard
+              </Link>
+              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+                <div className="flex items-center gap-3">
+                  <div className="h-10 w-1.5 rounded-full" style={{ background: accent }} />
+                  <h1 className="text-3xl sm:text-4xl font-bold text-foreground">{model.name}</h1>
+                </div>
+                <div className="flex items-center gap-2">
+                  <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
+                  <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
+                </div>
+              </div>
+              <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
+                <p className="text-5xl sm:text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-foreground/65 ml-1">/ 100</span></p>
+                <div className="flex items-center gap-2 pb-2">
+                  {trend.direction === "up" ? (
+                    <TrendingUp className="h-4 w-4 text-primary" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-200" />
+                  )}
+                  <span className={`text-sm font-mono ${trend.direction === "up" ? "text-primary" : "text-red-200"}`}>
+                    {trend.direction === "up" ? "up" : "down"} {trend.pts} pts from yesterday
+                  </span>
+                </div>
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <p className="text-sm text-foreground/70 font-mono">
+                  Latest daily score with {totalPosts.toLocaleString()} recent posts over the last 7 days across Reddit, Bluesky, X, Mastodon, and more.
+                </p>
+                <DataFreshnessIndicator lastUpdated={enriched?.lastUpdated ?? null} />
+              </div>
+            </motion.div>
+          </section>
 
-        {/* Model Header */}
-        <section className="container pt-10 pb-8">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <Link to="/dashboard" aria-label="Back to Dashboard" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors mb-6">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
-            </Link>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-1.5 rounded-full" style={{ background: accent }} />
-                <h1 className="text-3xl sm:text-4xl font-bold text-foreground">{model.name}</h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
-                <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
-              </div>
-            </div>
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
-              <p className="text-5xl sm:text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-muted-foreground ml-1">/ 100</span></p>
-              <div className="flex items-center gap-2 pb-2">
-                {trend.direction === "up" ? (
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                ) : (
-                  <TrendingDown className="h-4 w-4 text-destructive" />
-                )}
-                <span className={`text-sm font-mono ${trend.direction === "up" ? "text-primary" : "text-destructive"}`}>
-                  {trend.direction === "up" ? "up" : "down"} {trend.pts} pts from yesterday
-                </span>
-              </div>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-              <p className="text-sm text-muted-foreground font-mono">
-                Sentiment based on {totalPosts.toLocaleString()} posts over the last 7 days across Reddit, Bluesky, X, Mastodon, and more.
-              </p>
-              <DataFreshnessIndicator />
-            </div>
-          </motion.div>
-        </section>
-
-        {/* Main Content: Two Columns */}
-        <section className="container pb-12">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content: Two Columns */}
+          <section className="container pb-12">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column — Chart */}
             <motion.div
               className="lg:col-span-2 glass rounded-xl p-6 self-start"
@@ -198,7 +193,7 @@ const ModelDetail = () => {
               ) : (
                 <>
                   <h2 className="text-lg font-semibold text-foreground mb-1">Vibes Over Time</h2>
-                  <p className="text-xs text-muted-foreground font-mono mb-4">
+                  <p className="text-xs text-foreground/70 font-mono mb-4">
                     {timeRange === "24h" ? "Hourly" : "Daily"} vibes score
                   </p>
                   <div className="h-64">
@@ -211,11 +206,11 @@ const ModelDetail = () => {
                       <button
                         key={r}
                         onClick={() => setTimeRange(r)}
-                        aria-label={TIME_RANGE_LABELS[r]}
+                        title={`Show ${r}`}
                         className={`px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
                           timeRange === r
                             ? "bg-primary/15 text-primary border border-primary/30"
-                            : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                            : "text-foreground/70 hover:text-foreground hover:bg-secondary/50"
                         }`}
                       >
                         {r}
@@ -244,7 +239,7 @@ const ModelDetail = () => {
                     {complaints.map((c) => (
                       <div key={c.category}>
                         <div className="flex justify-between text-xs font-mono mb-1">
-                          <span className="text-muted-foreground">{COMPLAINT_LABELS[c.category] || c.category}</span>
+                          <span className="text-foreground/70">{formatComplaintLabel(c.category)}</span>
                           <span className="text-foreground">{c.pct}%</span>
                         </div>
                         <div className="h-2 rounded-full bg-secondary overflow-hidden">
@@ -268,6 +263,7 @@ const ModelDetail = () => {
                 transition={{ delay: 0.3, duration: 0.45 }}
               >
                 <h2 className="text-lg font-semibold text-foreground mb-4">Sources</h2>
+                <p className="text-xs text-foreground/65 font-mono mb-4">Share of recent posts over the last 30 days</p>
                 {sourcesError ? (
                   <p className="text-sm text-muted-foreground">Failed to load data</p>
                 ) : sourcesLoading ? (
@@ -277,7 +273,7 @@ const ModelDetail = () => {
                     {sources.filter((s) => s.pct > 0).map((s) => (
                       <div key={s.source}>
                         <div className="flex justify-between text-xs font-mono mb-1">
-                          <span className="text-muted-foreground">{SOURCE_LABELS[s.source] || s.source}</span>
+                          <span className="text-foreground/70">{SOURCE_LABELS[s.source] || s.source}</span>
                           <span className="text-foreground">{s.pct}%</span>
                         </div>
                         <div className="h-2 rounded-full bg-secondary overflow-hidden">
@@ -295,77 +291,91 @@ const ModelDetail = () => {
               </motion.div>
             </div>
           </div>
-        </section>
+          </section>
 
-        {/* Recent Posts — lazy loaded on scroll */}
-        <section className="container pb-12">
-          <motion.h2
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4 }}
-            className="text-xl font-bold text-foreground mb-6"
-          >
-            Recent Posts about {model.name}
-          </motion.h2>
-
-          {postsError ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
-          ) : postsLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 5 }).map((_, i) => <ChatterSkeleton key={i} />)}
-            </div>
-          ) : (
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
-              className="space-y-3"
+          {/* Recent Posts — lazy loaded on scroll */}
+          <section className="container pb-12">
+            <motion.h2
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4 }}
+              className="text-xl font-bold text-foreground mb-6"
             >
-              {(recentPosts || []).map((post, i) => {
-                const s = SENTIMENT_STYLES[post.sentiment || "neutral"];
-                const src = formatSourceDisplay(post.source);
-                return (
-                  <motion.div
-                    key={post.id}
-                    variants={fadeUp}
-                    custom={i}
-                    className={`glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${post.sentiment === "positive" ? "border-l-emerald-500" : post.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"} transition-all duration-200 ${post.source_url ? "cursor-pointer hover:brightness-125 hover:border-border/60" : ""}`}
-                    onClick={() => post.source_url && window.open(post.source_url, "_blank", "noopener,noreferrer")}
-                  >
-                    <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border shrink-0">
-                      {src.emoji} {src.label}
-                    </span>
-                    <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">
-                      {decodeHTMLEntities((post as any).translated_content || post.content || post.title)}
-                      {(post as any).original_language && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-muted-foreground/60 bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
-                              Translated from {((post as any).original_language as string).toUpperCase()}
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-sm">
-                            <p className="text-xs">{decodeHTMLEntities(post.content?.slice(0, 300) || "")}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                    </p>
-                    <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                      <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
-                        {s.label}
-                      </Badge>
-                      {post.posted_at && (
-                        <span className="text-xs text-muted-foreground font-mono">{formatTimeAgo(post.posted_at)}</span>
-                      )}
-                      {post.source_url && <ExternalLink className="h-3 w-3 text-muted-foreground/50 shrink-0" />}
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </motion.div>
-          )}
-        </section>
+              Recent Posts about {model.name}
+            </motion.h2>
+
+            {postsError ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
+            ) : postsLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 5 }).map((_, i) => <ChatterSkeleton key={i} />)}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(recentPosts || []).map((post, i) => {
+                  const s = SENTIMENT_STYLES[post.sentiment || "neutral"];
+                  const src = formatSourceDisplay(post.source);
+                  const className = `glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${post.sentiment === "positive" ? "border-l-emerald-500" : post.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"} transition-all duration-200 ${post.source_url ? "cursor-pointer hover:brightness-125 hover:border-border/60" : ""}`;
+                  const content = (
+                    <>
+                      <span className="text-xs font-mono text-foreground px-2 py-0.5 rounded bg-secondary border border-border shrink-0">
+                        {src.emoji} {src.label}
+                      </span>
+                      <p className="text-sm text-foreground flex-1 leading-relaxed line-clamp-2">
+                        {decodeHTMLEntities((post as any).translated_content || post.content || post.title)}
+                        {(post as any).original_language && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-foreground/60 bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
+                                Translated from {((post as any).original_language as string).toUpperCase()}
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top" className="max-w-sm">
+                              <p className="text-xs">{decodeHTMLEntities(post.content?.slice(0, 300) || "")}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </p>
+                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
+                          {s.label}
+                        </Badge>
+                        {post.posted_at && (
+                          <span className="text-xs text-foreground font-mono">{formatTimeAgo(post.posted_at)}</span>
+                        )}
+                        {post.source_url && <ExternalLink className="h-3 w-3 text-foreground/50 shrink-0" />}
+                      </div>
+                    </>
+                  );
+
+                  return post.source_url ? (
+                    <motion.a
+                      key={post.id}
+                      variants={fadeUp}
+                      custom={i}
+                      className={className}
+                      href={post.source_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {content}
+                    </motion.a>
+                  ) : (
+                    <motion.div
+                      key={post.id}
+                      variants={fadeUp}
+                      custom={i}
+                      className={className}
+                    >
+                      {content}
+                    </motion.div>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        </main>
         <Footer />
       </div>
     </PageTransition>

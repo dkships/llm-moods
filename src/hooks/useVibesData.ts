@@ -90,24 +90,6 @@ export function useRecentChatter(enabled = true) {
   });
 }
 
-export function useDataFreshness() {
-  return useQuery({
-    queryKey: ["data-freshness"],
-    staleTime: 60_000,
-    refetchInterval: 60_000,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("scraped_posts")
-        .select("created_at")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      if (error) throw error;
-      return data?.created_at ?? null;
-    },
-  });
-}
-
 export function useModelDetail(slug: string | undefined) {
   return useQuery({
     queryKey: ["model-detail", slug],

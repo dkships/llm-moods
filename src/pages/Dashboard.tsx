@@ -1,7 +1,6 @@
 import { TrendingUp, TrendingDown, MessageSquare, Zap, ExternalLink } from "lucide-react";
-import { memo, useState, useEffect, useRef, useCallback } from "react";
+import { memo, useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
-import { lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import NavBar from "@/components/NavBar";
@@ -11,26 +10,12 @@ import Footer from "@/components/Footer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, type ModelWithVibes } from "@/hooks/useVibesData";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
-import { getVibeStatus, fadeUp, COMPLAINT_LABELS, SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
+import { getVibeStatus, fadeUp, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
 
 // Lazy load recharts sparkline
 const LazySparkline = lazy(() => import("@/components/Sparkline"));
-
-/** Isolated timer so it doesn't re-render the whole page */
-const LastUpdatedTimer = memo(({ lastUpdated }: { lastUpdated: string | null }) => {
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (!lastUpdated) return;
-    const id = setInterval(() => setTick((t) => t + 1), 60_000);
-    return () => clearInterval(id);
-  }, [lastUpdated]);
-
-  if (!lastUpdated) return <>—</>;
-  return <>{formatTimeAgo(lastUpdated)}</>;
-});
-LastUpdatedTimer.displayName = "LastUpdatedTimer";
 
 /** Memoized model card */
 const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }) => {
@@ -72,7 +57,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
                   0 = everyone's complaining, 100 = pure good vibes
                 </TooltipContent>
               </Tooltip>
-              <p className="text-xs text-muted-foreground font-mono mt-0.5">/ 100</p>
+              <p className="text-xs text-foreground/65 font-mono mt-0.5">/ 100</p>
             </div>
           </div>
 
@@ -90,20 +75,20 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
               {m.trend.direction === "up" ? (
                 <TrendingUp className="h-3.5 w-3.5 text-primary" />
               ) : (
-                <TrendingDown className="h-3.5 w-3.5 text-destructive" />
+                <TrendingDown className="h-3.5 w-3.5 text-red-200" />
               )}
-              <span className={m.trend.direction === "up" ? "text-primary" : "text-destructive"}>
+              <span className={m.trend.direction === "up" ? "text-primary" : "text-red-200"}>
                 {m.trend.direction === "up" ? "up" : "down"} {m.trend.pts} pts from yesterday
               </span>
             </div>
-            <span className="text-muted-foreground">Based on {(m.totalPosts || 0).toLocaleString()} posts (7d)</span>
+            <span className="text-foreground/65">Recent volume: {(m.totalPosts || 0).toLocaleString()} posts (7d)</span>
           </div>
 
           {m.topComplaint && (
             <div className="mt-3 flex items-center gap-2 text-xs">
-              <Zap className="h-3.5 w-3.5 text-muted-foreground" />
-              <span className="text-muted-foreground">Top complaint:</span>
-              <span className="text-foreground font-medium">{COMPLAINT_LABELS[m.topComplaint] || m.topComplaint}</span>
+              <Zap className="h-3.5 w-3.5 text-foreground/65" />
+              <span className="text-foreground/65">Top complaint:</span>
+              <span className="text-foreground font-medium">{formatComplaintLabel(m.topComplaint)}</span>
             </div>
           )}
         </div>
@@ -121,24 +106,20 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
   const modelData = post.models as { name: string; accent_color: string | null; slug: string } | null;
   const sentimentBorderColor = sentiment === "positive" ? "border-l-emerald-500" : sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30";
   const sourceUrl = post.source_url as string | undefined;
-  return (
-    <motion.div
-      variants={fadeUp}
-      custom={i}
-      className={`glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderColor} transition-all duration-200 hover:brightness-125 hover:border-border/60 ${sourceUrl ? "cursor-pointer" : ""}`}
-      onClick={() => sourceUrl && window.open(sourceUrl, "_blank", "noopener,noreferrer")}
-    >
+  const className = `glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderColor} transition-all duration-200 hover:brightness-125 hover:border-border/60 ${sourceUrl ? "cursor-pointer" : ""}`;
+  const content = (
+    <>
       <div className="flex items-center gap-3 shrink-0">
-        <span className="text-xs font-mono text-muted-foreground px-2 py-0.5 rounded bg-secondary border border-border">
+        <span className="text-xs font-mono text-foreground px-2 py-0.5 rounded bg-secondary border border-border">
           {src.emoji} {src.label}
         </span>
       </div>
-      <p className="text-sm text-foreground/80 flex-1 leading-relaxed line-clamp-2">
+      <p className="text-sm text-foreground flex-1 leading-relaxed line-clamp-2">
         {decodeHTMLEntities((post.translated_content as string) || (post.content as string) || (post.title as string))}
         {(post.original_language as string) && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-muted-foreground/60 bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
+              <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-foreground/60 bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
                 Translated from {(post.original_language as string).toUpperCase()}
               </span>
             </TooltipTrigger>
@@ -152,17 +133,42 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
         {modelData && (
           <>
             <span className="h-2 w-2 rounded-full shrink-0" style={{ background: modelData.accent_color || "#888" }} />
-            <span className="text-xs font-mono text-muted-foreground">{modelData.name}</span>
+            <span className="text-xs font-mono text-foreground">{modelData.name}</span>
           </>
         )}
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
           {s.label}
         </Badge>
         {post.posted_at && (
-          <span className="text-xs text-muted-foreground font-mono">{formatTimeAgo(post.posted_at as string)}</span>
+          <span className="text-xs text-foreground font-mono">{formatTimeAgo(post.posted_at as string)}</span>
         )}
-        {sourceUrl && <ExternalLink className="h-3 w-3 text-muted-foreground/50 shrink-0" />}
+        {sourceUrl && <ExternalLink className="h-3 w-3 text-foreground/50 shrink-0" />}
       </div>
+    </>
+  );
+
+  if (sourceUrl) {
+    return (
+      <motion.a
+        variants={fadeUp}
+        custom={i}
+        className={className}
+        href={sourceUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        {content}
+      </motion.a>
+    );
+  }
+
+  return (
+    <motion.div
+      variants={fadeUp}
+      custom={i}
+      className={className}
+    >
+      {content}
     </motion.div>
   );
 });
@@ -171,7 +177,7 @@ ChatterPost.displayName = "ChatterPost";
 const Dashboard = () => {
   useHead({
     title: "Dashboard — LLM Vibes",
-    description: "Live sentiment scores, trends, and community chatter for Claude, ChatGPT, Gemini, and Grok.",
+    description: "Latest sentiment scores, trends, and community chatter for Claude, ChatGPT, Gemini, and Grok.",
     url: "/dashboard",
   });
   const { data: models, isLoading: modelsLoading, isError: modelsError } = useModelsWithLatestVibes();
@@ -204,98 +210,99 @@ const Dashboard = () => {
     prefetch(slug, id);
   }, [prefetch]);
 
+  const latestScoreUpdate = (models || []).reduce<string | null>((latest, model) => {
+    if (!model.lastUpdated) return latest;
+    if (!latest) return model.lastUpdated;
+    return new Date(model.lastUpdated).getTime() > new Date(latest).getTime() ? model.lastUpdated : latest;
+  }, null);
+
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
         <NavBar />
-
-        {/* Page Header */}
-        <section className="container pt-10 pb-8">
-          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
-              <DataFreshnessIndicator />
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-              <p className="text-sm text-muted-foreground font-mono">{today}</p>
-            </div>
-            <p className="mt-2 text-sm text-muted-foreground">Real-time AI model sentiment from Reddit, Bluesky, Mastodon, X, and more.</p>
-          </motion.div>
-        </section>
-
-        {/* Model Cards */}
-        <section className="container pb-12">
-          {modelsLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
-            </div>
-          ) : modelsError ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
-          ) : (
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-              className="grid grid-cols-1 md:grid-cols-2 gap-4"
-            >
-              {(models || []).map((m, i) => (
-                <ModelCard key={m.id} m={m} i={i} onHover={handleHover} />
-              ))}
+        <main>
+          {/* Page Header */}
+          <section className="container pt-10 pb-8">
+            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
+                <DataFreshnessIndicator lastUpdated={latestScoreUpdate} />
+              </div>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                <p className="text-sm text-foreground/70 font-mono">{today}</p>
+              </div>
+              <p className="mt-2 text-sm text-foreground/70">Latest daily sentiment score with recent chatter from Reddit, Bluesky, Mastodon, X, and more.</p>
             </motion.div>
-          )}
-        </section>
+          </section>
 
-        {/* Trending Complaints */}
-        <section className="container pb-12">
-          <TrendingComplaints />
-        </section>
-
-        {/* Community Chatter — lazy loaded on scroll */}
-        <section className="container pb-12" ref={chatterRef}>
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            whileInView={{ opacity: 1, y: 0 }}
-            viewport={{ once: true }}
-            transition={{ duration: 0.4 }}
-          >
-            <div className="flex items-center gap-2 mb-6">
-              <MessageSquare className="h-5 w-5 text-primary" />
-              <h2 className="text-xl font-bold text-foreground">Recent Community Chatter</h2>
-            </div>
-          </motion.div>
-
-          {chatterError ? (
-            <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
-          ) : !chatterVisible || chatterLoading ? (
-            <div className="space-y-3">
-              {Array.from({ length: 6 }).map((_, i) => <ChatterSkeleton key={i} />)}
-            </div>
-          ) : (
-            <motion.div
-              initial="hidden"
-              animate="visible"
-              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.06 } } }}
-              className="space-y-3"
-            >
-              {(chatterData?.pages ?? []).flatMap((page) => page).map((post, i) => (
-                <ChatterPost key={post.id} post={post as unknown as Record<string, unknown>} i={i} />
-              ))}
-            </motion.div>
-          )}
-
-          {hasNextPage && (
-            <div className="mt-6 flex justify-center">
-              <button
-                onClick={() => fetchNextPage()}
-                disabled={isFetchingNextPage}
-                aria-label="Load more posts"
-                className="px-5 py-2 rounded-lg text-xs font-mono text-muted-foreground bg-secondary/50 border border-border hover:bg-secondary hover:text-foreground transition-colors disabled:opacity-50"
+          {/* Model Cards */}
+          <section className="container pb-12">
+            {modelsLoading ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
+              </div>
+            ) : modelsError ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
+            ) : (
+              <motion.div
+                initial="hidden"
+                animate="visible"
+                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
               >
-                {isFetchingNextPage ? "Loading..." : "Load more"}
-              </button>
-            </div>
-          )}
-        </section>
+                {(models || []).map((m, i) => (
+                  <ModelCard key={m.id} m={m} i={i} onHover={handleHover} />
+                ))}
+              </motion.div>
+            )}
+          </section>
+
+          {/* Trending Complaints */}
+          <section className="container pb-12">
+            <TrendingComplaints />
+          </section>
+
+          {/* Community Chatter — lazy loaded on scroll */}
+          <section className="container pb-12" ref={chatterRef}>
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.4 }}
+            >
+              <div className="flex items-center gap-2 mb-6">
+                <MessageSquare className="h-5 w-5 text-primary" />
+                <h2 className="text-xl font-bold text-foreground">Recent Community Chatter</h2>
+              </div>
+            </motion.div>
+
+            {chatterError ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
+            ) : !chatterVisible || chatterLoading ? (
+              <div className="space-y-3">
+                {Array.from({ length: 6 }).map((_, i) => <ChatterSkeleton key={i} />)}
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {(chatterData?.pages ?? []).flatMap((page) => page).map((post, i) => (
+                  <ChatterPost key={post.id} post={post as unknown as Record<string, unknown>} i={i} />
+                ))}
+              </div>
+            )}
+
+            {hasNextPage && (
+              <div className="mt-6 flex justify-center">
+                <button
+                  onClick={() => fetchNextPage()}
+                  disabled={isFetchingNextPage}
+                  className="px-5 py-2 rounded-lg text-xs font-mono text-foreground/70 bg-secondary/50 border border-border hover:bg-secondary hover:text-foreground transition-colors disabled:opacity-50"
+                >
+                  {isFetchingNextPage ? "Loading..." : "Load more"}
+                </button>
+              </div>
+            )}
+          </section>
+        </main>
         <Footer />
       </div>
     </PageTransition>

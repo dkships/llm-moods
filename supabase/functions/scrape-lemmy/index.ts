@@ -1,6 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
-import { corsHeaders, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog } from "../_shared/utils.ts";
+import { corsHeaders, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog, triggerAggregateVibes } from "../_shared/utils.ts";
 
 const INSTANCES = ["https://lemmy.world", "https://lemmy.ml"];
 const SEARCH_TERMS = ["Claude", "ChatGPT", "GPT-5", "Gemini", "Grok", "LLM"];
@@ -134,6 +134,9 @@ Deno.serve(async (req) => {
     }
 
     await logToErrorLog(supabase, "scrape-lemmy", `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted}`, "summary");
+    if (summary.inserted > 0) {
+      await triggerAggregateVibes(supabase, "scrape-lemmy");
+    }
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown";

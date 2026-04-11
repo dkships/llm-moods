@@ -13,7 +13,7 @@ const NotFound = () => {
     <PageTransition>
       <div className="min-h-screen bg-background flex flex-col">
         <NavBar />
-        <div className="flex-1 flex items-center justify-center">
+        <main className="flex-1 flex items-center justify-center">
           <div className="text-center">
             <p className="text-7xl font-bold font-mono text-primary glow-text mb-4">404</p>
             <p className="text-lg text-muted-foreground font-mono mb-8">
@@ -26,7 +26,7 @@ const NotFound = () => {
               </Button>
             </Link>
           </div>
-        </div>
+        </main>
         <Footer />
       </div>
     </PageTransition>

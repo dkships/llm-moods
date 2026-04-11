@@ -9,7 +9,7 @@ const GitHubIcon = ({ className }: { className?: string }) => (
 const NavBar = () => (
   <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
     <div className="container flex h-16 items-center justify-between">
-      <Link to="/" aria-label="Home" className="font-display text-lg font-bold tracking-tight text-foreground">
+      <Link to="/" className="font-display text-lg font-bold tracking-tight text-foreground">
         🌊 LLM <span className="text-primary">Vibes</span>
       </Link>
       <a

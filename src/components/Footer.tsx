@@ -9,16 +9,16 @@ const GitHubIcon = ({ className }: { className?: string }) => (
 const Footer = () => (
   <footer className="border-t border-border">
     <div className="container flex flex-col items-center gap-3 py-8">
-      <p className="text-sm text-muted-foreground font-mono">
+      <p className="text-sm text-foreground/70 font-mono">
         Built for the AI-obsessed. LLM Vibes 2026.
       </p>
-      <p className="text-sm text-muted-foreground font-mono">
+      <p className="text-sm text-foreground/70 font-mono">
         Made with <Heart className="inline h-3.5 w-3.5 text-destructive fill-destructive" /> by{" "}
         <a
           href="https://dmkthinks.org"
           target="_blank"
           rel="noopener noreferrer"
-          className="text-foreground hover:text-primary transition-colors"
+          className="text-foreground underline underline-offset-2 hover:text-primary transition-colors"
         >
           David Kelly
         </a>
@@ -27,7 +27,7 @@ const Footer = () => (
         href="https://github.com/dkships/llm-moods"
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 text-sm font-mono text-muted-foreground hover:text-foreground transition-colors"
+        className="inline-flex items-center gap-1.5 text-sm font-mono text-foreground/70 hover:text-foreground transition-colors"
       >
         <GitHubIcon className="h-3.5 w-3.5" />
         Open Source — Contribute on GitHub
