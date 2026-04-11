@@ -407,9 +407,7 @@ Deno.serve(async (req) => {
       `Completed (${summary.backend}): fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} dedupSkipped=${summary.dedupSkipped}`,
       "summary",
     );
-    if (summary.inserted > 0) {
-      await triggerAggregateVibes(supabase, "scrape-twitter");
-    }
+    await triggerAggregateVibes(supabase, "scrape-twitter");
 
     return new Response(JSON.stringify(summary, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

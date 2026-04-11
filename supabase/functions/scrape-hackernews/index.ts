@@ -116,9 +116,7 @@ Deno.serve(async (req) => {
     }
 
     await logToErrorLog(supabase, "scrape-hackernews", `Completed: fetched=${summary.fetched} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted}`, "summary");
-    if (summary.inserted > 0) {
-      await triggerAggregateVibes(supabase, "scrape-hackernews");
-    }
+    await triggerAggregateVibes(supabase, "scrape-hackernews");
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

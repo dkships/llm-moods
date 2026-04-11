@@ -203,9 +203,7 @@ Deno.serve(async (req) => {
     }
 
     await logToErrorLog(supabase, "scrape-mastodon", `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} errors=${summary.errors.length}`, "summary");
-    if (summary.inserted > 0) {
-      await triggerAggregateVibes(supabase, "scrape-mastodon");
-    }
+    await triggerAggregateVibes(supabase, "scrape-mastodon");
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown";

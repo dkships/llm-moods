@@ -188,9 +188,7 @@ Deno.serve(async (req) => {
     }
 
     await logToErrorLog(supabase, "scrape-reddit-apify", `Completed: posts=${summary.apifyPosts} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} dedupSkipped=${summary.dedupSkipped}`, "summary");
-    if (summary.inserted > 0) {
-      await triggerAggregateVibes(supabase, "scrape-reddit-apify");
-    }
+    await triggerAggregateVibes(supabase, "scrape-reddit-apify");
     return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (e) {
     const msg = e instanceof Error ? e.message : "Unknown";
