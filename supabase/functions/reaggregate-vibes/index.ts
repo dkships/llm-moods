@@ -1,79 +1,16 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { normalizeComplaintCategory } from "../_shared/taxonomy.ts";
+import {
+  applyScoreSmoothing,
+  computeScore,
+  getUtcDayWindow,
+  type ScoreResult,
+} from "../_shared/vibes-scoring.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
-
-interface ScoreResult {
-  score: number;
-  positive_count: number;
-  negative_count: number;
-  neutral_count: number;
-  total_posts: number;
-  top_complaint: string | null;
-}
-
-function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null; score: number | null; content_type: string | null; source?: string | null }[]): ScoreResult {
-  const MIN_CONFIDENCE = 0.65;
-  const MAX_SOURCE_SHARE = 0.5;
-
-  // First pass: compute per-source total weights to detect dominance
-  const sourceRawWeights: Record<string, number> = {};
-  const eligible: { w: number; sentiment: string | null; complaint_category: string | null; source: string }[] = [];
-
-  for (const p of posts) {
-    const rawConf = p.confidence ?? 0.5;
-    if (rawConf < MIN_CONFIDENCE) continue; // Skip low-confidence posts
-
-    const contentMult = p.content_type === "title_only" ? 0.6 : 1.0;
-    const conf = Math.max(0, Math.min(1, rawConf)) * contentMult;
-    const engagement = (p.score && p.score > 0) ? Math.log(p.score + 1) : 1.0;
-    const w = conf * engagement;
-    const src = p.source || "unknown";
-    sourceRawWeights[src] = (sourceRawWeights[src] || 0) + w;
-    eligible.push({ w, sentiment: p.sentiment, complaint_category: p.complaint_category, source: src });
-  }
-
-  // Compute per-source scale factors to cap dominant sources
-  const totalRaw = Object.values(sourceRawWeights).reduce((a, b) => a + b, 0);
-  const sourceScale: Record<string, number> = {};
-  if (totalRaw > 0) {
-    const maxAllowed = totalRaw * MAX_SOURCE_SHARE;
-    for (const [src, srcW] of Object.entries(sourceRawWeights)) {
-      sourceScale[src] = srcW > maxAllowed ? maxAllowed / srcW : 1.0;
-    }
-  }
-
-  // Second pass: accumulate with source caps applied
-  let positiveW = 0, negativeW = 0, neutralW = 0;
-  let positiveC = 0, negativeC = 0, neutralC = 0;
-  const complaints: Record<string, number> = {};
-
-  for (const e of eligible) {
-    const w = e.w * (sourceScale[e.source] ?? 1.0);
-    if (e.sentiment === "positive") { positiveW += w; positiveC++; }
-    else if (e.sentiment === "negative") {
-      negativeW += w; negativeC++;
-      const complaintCategory = normalizeComplaintCategory(e.complaint_category);
-      if (complaintCategory) complaints[complaintCategory] = (complaints[complaintCategory] || 0) + w;
-    } else { neutralW += w; neutralC++; }
-  }
-
-  const totalW = positiveW + negativeW + neutralW;
-  const effectivePositive = positiveW + neutralW * 0.3;
-  const score = totalW > 0 ? Math.round((effectivePositive / totalW) * 100) : 50;
-
-  let topComplaint: string | null = null;
-  let maxCount = 0;
-  for (const [cat, count] of Object.entries(complaints)) {
-    if (count > maxCount) { maxCount = count; topComplaint = cat; }
-  }
-
-  return { score, positive_count: positiveC, negative_count: negativeC, neutral_count: neutralC, total_posts: posts.length, top_complaint: topComplaint };
-}
 
 async function upsertScore(supabase: any, modelId: string, period: string, periodStart: string, result: ScoreResult) {
   const { data: existing } = await supabase
@@ -168,18 +105,15 @@ Deno.serve(async (req) => {
       let consecutiveEmpty = 0;
 
       for (const day of days) {
-        const dayStart = day.toISOString();
-        const nextDay = new Date(day.getTime() + 24 * 60 * 60 * 1000);
-        const dayEnd = nextDay.toISOString();
-        const dayLabel = dayStart.split("T")[0];
+        const dayWindow = getUtcDayWindow(day);
 
         // Get all posts for this calendar day
         const { data: posts } = await supabase
           .from("scraped_posts")
           .select("sentiment, complaint_category, confidence, score, content_type, source")
           .eq("model_id", model.id)
-          .gte("posted_at", dayStart)
-          .lt("posted_at", dayEnd)
+          .gte("posted_at", dayWindow.rangeStart)
+          .lt("posted_at", dayWindow.rangeEnd)
           .limit(5000);
 
         const postCount = posts?.length ?? 0;
@@ -197,10 +131,10 @@ Deno.serve(async (req) => {
               top_complaint: null,
             };
             if (!dryRun) {
-              await upsertScore(supabase, model.id, "daily", dayStart, carryForward);
+              await upsertScore(supabase, model.id, "daily", dayWindow.periodStart, carryForward);
             }
             modelResult.days_processed++;
-            modelResult.scores.push({ date: dayLabel, score: previousScore, posts: 0 });
+            modelResult.scores.push({ date: dayWindow.label, score: previousScore, posts: 0 });
           } else {
             modelResult.days_skipped++;
           }
@@ -210,25 +144,15 @@ Deno.serve(async (req) => {
         consecutiveEmpty = 0;
 
         const result = computeScore(posts!);
-
-        // Apply smoothing based on post count
-        if (previousScore !== null) {
-          if (postCount < minPosts) {
-            // Thin data: heavy smoothing toward previous score
-            result.score = Math.round(0.4 * result.score + 0.6 * previousScore);
-          } else {
-            // Normal data: standard smoothing
-            result.score = Math.round(0.7 * result.score + 0.3 * previousScore);
-          }
-        }
+        result.score = applyScoreSmoothing(result.score, previousScore, postCount, minPosts);
 
         if (!dryRun) {
-          await upsertScore(supabase, model.id, "daily", dayStart, result);
+          await upsertScore(supabase, model.id, "daily", dayWindow.periodStart, result);
         }
 
         previousScore = result.score;
         modelResult.days_processed++;
-        modelResult.scores.push({ date: dayLabel, score: result.score, posts: postCount });
+        modelResult.scores.push({ date: dayWindow.label, score: result.score, posts: postCount });
       }
 
       summary[model.slug] = modelResult;

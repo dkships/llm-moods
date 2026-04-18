@@ -1,5 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { normalizeComplaintCategory } from "../_shared/taxonomy.ts";
+import {
+  applyScoreSmoothing,
+  computeScore,
+  DEFAULT_MIN_POSTS,
+  getPreviousDailyScore,
+  getUtcDayWindow,
+  type ScoreResult,
+} from "../_shared/vibes-scoring.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,58 +30,63 @@ Deno.serve(async (req) => {
     }
 
     const now = new Date();
-    const dailyStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
-    const since24h = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const dailyWindow = getUtcDayWindow(now);
 
     const summary: Record<string, any> = {};
 
     for (const model of models) {
       const modelSummary: any = { daily: null, hourly: null };
 
-      // --- Daily aggregation (last 24h) ---
+      // --- Daily aggregation (UTC calendar day) ---
       const { data: dailyPosts } = await supabase
         .from("scraped_posts")
         .select("sentiment, complaint_category, confidence, score, content_type, source")
         .eq("model_id", model.id)
-        .gte("posted_at", since24h)
+        .gte("posted_at", dailyWindow.rangeStart)
+        .lt("posted_at", dailyWindow.rangeEnd)
         .limit(5000);
 
-      // Get previous daily score for exponential smoothing
-      const { data: prevDailyScore } = await supabase
+      // Get the most recent historical daily row. Exclude today's row so repeated
+      // runs do not smooth against their own already-updated output.
+      const { data: recentDailyScores } = await supabase
         .from("vibes_scores")
-        .select("score")
+        .select("period_start, score")
         .eq("model_id", model.id)
         .eq("period", "daily")
         .order("period_start", { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .limit(4);
 
-      const previousScore = prevDailyScore?.score ?? null;
-
-      const MIN_POSTS = 5;
+      const previousScore = getPreviousDailyScore(
+        (recentDailyScores ?? []) as { period_start: string; score: number }[],
+        dailyWindow.periodStart,
+      );
 
       if (dailyPosts && dailyPosts.length > 0) {
         const result = computeScore(dailyPosts);
-        // Apply smoothing: heavier toward previous when data is thin
-        if (previousScore !== null) {
-          if (dailyPosts.length < MIN_POSTS) {
-            // Thin data: lean more on previous score to dampen noise
-            result.score = Math.round(0.4 * result.score + 0.6 * previousScore);
-          } else {
-            result.score = Math.round(0.7 * result.score + 0.3 * previousScore);
-          }
-        }
-        await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), result);
-        modelSummary.daily = { posts: dailyPosts.length, score: result.score, smoothed: previousScore !== null, thin_data: dailyPosts.length < MIN_POSTS };
+        result.score = applyScoreSmoothing(
+          result.score,
+          previousScore,
+          dailyPosts.length,
+          DEFAULT_MIN_POSTS,
+        );
+
+        await upsertScore(supabase, model.id, "daily", dailyWindow.periodStart, result);
+        modelSummary.daily = {
+          posts: dailyPosts.length,
+          score: result.score,
+          smoothed: previousScore !== null,
+          thin_data: dailyPosts.length < DEFAULT_MIN_POSTS,
+        };
       } else {
         // No posts — carry forward previous score for up to 3 consecutive days
         if (previousScore !== null) {
           // Check how many consecutive days already carried forward
           const { data: recentScores } = await supabase
             .from("vibes_scores")
-            .select("total_posts")
+            .select("period_start, total_posts")
             .eq("model_id", model.id)
             .eq("period", "daily")
+            .lt("period_start", dailyWindow.periodStart)
             .order("period_start", { ascending: false })
             .limit(3);
 
@@ -90,7 +102,7 @@ Deno.serve(async (req) => {
               total_posts: 0,
               top_complaint: null,
             };
-            await upsertScore(supabase, model.id, "daily", dailyStart.toISOString(), carryForward);
+            await upsertScore(supabase, model.id, "daily", dailyWindow.periodStart, carryForward);
             modelSummary.daily = { posts: 0, score: previousScore, carried_forward: true, consecutive_empty: consecutiveEmpty + 1 };
           } else {
             modelSummary.daily = { posts: 0, skipped: true, reason: "carry_forward_cap_reached" };
@@ -157,74 +169,6 @@ Deno.serve(async (req) => {
     );
   }
 });
-
-interface ScoreResult {
-  score: number;
-  positive_count: number;
-  negative_count: number;
-  neutral_count: number;
-  total_posts: number;
-  top_complaint: string | null;
-}
-
-function computeScore(posts: { sentiment: string | null; complaint_category: string | null; confidence: number | null; score: number | null; content_type: string | null; source?: string | null }[]): ScoreResult {
-  const MIN_CONFIDENCE = 0.65;
-  const MAX_SOURCE_SHARE = 0.5;
-
-  // First pass: compute per-source total weights to detect dominance
-  const sourceRawWeights: Record<string, number> = {};
-  const eligible: { w: number; sentiment: string | null; complaint_category: string | null; source: string }[] = [];
-
-  for (const p of posts) {
-    const rawConf = p.confidence ?? 0.5;
-    if (rawConf < MIN_CONFIDENCE) continue; // Skip low-confidence posts
-
-    const contentMult = p.content_type === "title_only" ? 0.6 : 1.0;
-    const conf = Math.max(0, Math.min(1, rawConf)) * contentMult;
-    const engagement = (p.score && p.score > 0) ? Math.log(p.score + 1) : 1.0;
-    const w = conf * engagement;
-    const src = p.source || "unknown";
-    sourceRawWeights[src] = (sourceRawWeights[src] || 0) + w;
-    eligible.push({ w, sentiment: p.sentiment, complaint_category: p.complaint_category, source: src });
-  }
-
-  // Compute per-source scale factors to cap dominant sources
-  const totalRaw = Object.values(sourceRawWeights).reduce((a, b) => a + b, 0);
-  const sourceScale: Record<string, number> = {};
-  if (totalRaw > 0) {
-    const maxAllowed = totalRaw * MAX_SOURCE_SHARE;
-    for (const [src, srcW] of Object.entries(sourceRawWeights)) {
-      sourceScale[src] = srcW > maxAllowed ? maxAllowed / srcW : 1.0;
-    }
-  }
-
-  // Second pass: accumulate with source caps applied
-  let positiveW = 0, negativeW = 0, neutralW = 0;
-  let positiveC = 0, negativeC = 0, neutralC = 0;
-  const complaints: Record<string, number> = {};
-
-  for (const e of eligible) {
-    const w = e.w * (sourceScale[e.source] ?? 1.0);
-    if (e.sentiment === "positive") { positiveW += w; positiveC++; }
-    else if (e.sentiment === "negative") {
-      negativeW += w; negativeC++;
-      const complaintCategory = normalizeComplaintCategory(e.complaint_category);
-      if (complaintCategory) complaints[complaintCategory] = (complaints[complaintCategory] || 0) + w;
-    } else { neutralW += w; neutralC++; }
-  }
-
-  const totalW = positiveW + negativeW + neutralW;
-  const effectivePositive = positiveW + neutralW * 0.3;
-  const score = totalW > 0 ? Math.round((effectivePositive / totalW) * 100) : 50;
-
-  let topComplaint: string | null = null;
-  let maxCount = 0;
-  for (const [cat, count] of Object.entries(complaints)) {
-    if (count > maxCount) { maxCount = count; topComplaint = cat; }
-  }
-
-  return { score, positive_count: positiveC, negative_count: negativeC, neutral_count: neutralC, total_posts: posts.length, top_complaint: topComplaint };
-}
 
 async function upsertScore(supabase: any, modelId: string, period: string, periodStart: string, result: ScoreResult) {
   const { data: existing } = await supabase
