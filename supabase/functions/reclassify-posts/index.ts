@@ -21,6 +21,9 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const mode = url.searchParams.get("mode") || "neutral";
     const batchSize = Math.max(1, Math.min(parseInt(url.searchParams.get("batch_size") || "100", 10) || 100, 500));
+    const offset = Math.max(0, parseInt(url.searchParams.get("offset") || "0", 10) || 0);
+    const postedAfter = url.searchParams.get("posted_after");
+    const postedBefore = url.searchParams.get("posted_before");
 
     if (mode === "multi_model") {
       return await handleMultiModel(supabase, apiKey, batchSize, logError);
@@ -28,7 +31,16 @@ Deno.serve(async (req) => {
 
     if (mode === "recent_targeted") {
       const daysBack = Math.max(1, Math.min(parseInt(url.searchParams.get("days_back") || "7", 10) || 7, 30));
-      return await handleRecentTargeted(supabase, apiKey, batchSize, daysBack, logError);
+      return await handleRecentTargeted(
+        supabase,
+        apiKey,
+        batchSize,
+        daysBack,
+        offset,
+        postedAfter,
+        postedBefore,
+        logError,
+      );
     }
 
     // Default mode: reclassify low-confidence neutral posts
@@ -121,7 +133,7 @@ async function handleMultiModel(
     });
   }
 
-  return await reclassifyTargetedPosts(supabase, apiKey, dupes, "multi_model", logError);
+  return await reclassifyTargetedPosts(supabase, apiKey, dupes, "multi_model", null, logError);
 }
 
 async function handleRecentTargeted(
@@ -129,22 +141,40 @@ async function handleRecentTargeted(
   apiKey: string,
   batchSize: number,
   daysBack: number,
+  offset: number,
+  postedAfter: string | null,
+  postedBefore: string | null,
   logError: (msg: string, ctx?: string) => Promise<void>,
 ): Promise<Response> {
-  const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
+  const effectiveAfter = postedAfter || new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
+  const effectiveBefore = postedBefore || null;
 
-  const [{ data: posts, error: postsError }, { data: models, error: modelsError }] = await Promise.all([
-    supabase
-      .from("scraped_posts")
-      .select("id, model_id, title, content, posted_at")
-      .gte("posted_at", since)
-      .order("posted_at", { ascending: false })
-      .limit(batchSize),
+  let postsQuery = supabase
+    .from("scraped_posts")
+    .select("id, model_id, title, content, posted_at")
+    .gte("posted_at", effectiveAfter)
+    .order("posted_at", { ascending: false })
+    .range(offset, offset + batchSize - 1);
+
+  let countQuery = supabase
+    .from("scraped_posts")
+    .select("id", { count: "exact", head: true })
+    .gte("posted_at", effectiveAfter);
+
+  if (effectiveBefore) {
+    postsQuery = postsQuery.lt("posted_at", effectiveBefore);
+    countQuery = countQuery.lt("posted_at", effectiveBefore);
+  }
+
+  const [{ data: posts, error: postsError }, { data: models, error: modelsError }, { count, error: countError }] = await Promise.all([
+    postsQuery,
     supabase.from("models").select("id, slug"),
+    countQuery,
   ]);
 
   if (postsError) throw postsError;
   if (modelsError) throw modelsError;
+  if (countError) throw countError;
 
   const slugById: Record<string, string> = {};
   for (const model of models || []) slugById[model.id] = model.slug;
@@ -160,13 +190,31 @@ async function handleRecentTargeted(
   if (items.length === 0) {
     return new Response(JSON.stringify({
       mode: "recent_targeted",
-      message: "No recent posts found to reclassify",
-      since,
+      message: "No posts found to reclassify in this window",
+      posted_after: effectiveAfter,
+      posted_before: effectiveBefore,
+      offset,
+      batch_size: batchSize,
+      total_matching: count || 0,
       total: 0,
     }), { headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" } });
   }
 
-  return await reclassifyTargetedPosts(supabase, apiKey, items, "recent_targeted", logError);
+  return await reclassifyTargetedPosts(
+    supabase,
+    apiKey,
+    items,
+    "recent_targeted",
+    {
+      posted_after: effectiveAfter,
+      posted_before: effectiveBefore,
+      offset,
+      batch_size: batchSize,
+      total_matching: count || items.length,
+      remaining_after_batch: Math.max((count || items.length) - offset - items.length, 0),
+    },
+    logError,
+  );
 }
 
 async function handleMultiModelFallback(
@@ -231,7 +279,7 @@ async function handleMultiModelFallback(
     id: p.id,
     text: `${p.title || ""} ${p.content || ""}`.trim(),
     model_slug: slugById[p.model_id] || "unknown",
-  })), "multi_model", logError);
+  })), "multi_model", null, logError);
 }
 
 async function reclassifyTargetedPosts(
@@ -239,6 +287,7 @@ async function reclassifyTargetedPosts(
   apiKey: string,
   items: { id: string; text: string; model_slug: string }[],
   mode: "multi_model" | "recent_targeted",
+  meta: Record<string, unknown> | null,
   logError: (msg: string, ctx?: string) => Promise<void>,
 ): Promise<Response> {
   const targetedItems = items.map(item => ({ text: item.text, targetModel: item.model_slug }));
@@ -288,6 +337,7 @@ async function reclassifyTargetedPosts(
     reclassified,
     cleared_irrelevant: clearedIrrelevant,
     errors,
+    ...(meta || {}),
     message: (reclassified > 0 || clearedIrrelevant > 0)
       ? `Updated ${reclassified} posts with model-targeted sentiment and cleared ${clearedIrrelevant} irrelevant rows`
       : "No changes needed",
