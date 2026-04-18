@@ -3,6 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Flame, TrendingUp, TrendingDown } from "lucide-react";
 import { motion } from "framer-motion";
 import { formatComplaintLabel } from "@/lib/vibes";
+import { normalizePublicComplaintCategory } from "@/shared/public-taxonomy";
 
 interface TrendingItem {
   model_id: string;
@@ -53,7 +54,9 @@ const TrendingComplaints = () => {
     );
   }
 
-  const topMovers = pickTopPerModel(data || []);
+  const topMovers = pickTopPerModel(
+    (data || []).filter((item) => normalizePublicComplaintCategory(item.category) !== null),
+  );
 
   if (topMovers.length === 0) {
     return null;

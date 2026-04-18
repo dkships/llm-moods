@@ -8,16 +8,22 @@ const GitHubIcon = ({ className }: { className?: string }) => (
 
 const NavBar = () => (
   <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+    <a href="#main-content" className="skip-link">
+      Skip to main content
+    </a>
     <div className="container flex h-16 items-center justify-between">
-      <Link to="/" className="font-display text-lg font-bold tracking-tight text-foreground">
+      <Link
+        to="/"
+        className="rounded-md font-display text-lg font-bold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
         🌊 LLM <span className="text-primary">Vibes</span>
       </Link>
       <a
         href="https://github.com/dkships/llm-moods"
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="GitHub"
-        className="text-muted-foreground hover:text-foreground transition-colors"
+        aria-label="GitHub repository"
+        className="rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <GitHubIcon className="h-5 w-5" />
       </a>

@@ -20,7 +20,7 @@
     --secondary-foreground: 160 5% 78%;
 
     --muted: 220 14% 14%;
-    --muted-foreground: 220 10% 50%;
+    --muted-foreground: 220 10% 58%;
 
     --accent: 270 60% 60%;
     --accent-foreground: 0 0% 98%;
@@ -53,6 +53,10 @@
 @layer base {
   * {
     @apply border-border;
+  }
+
+  html {
+    color-scheme: dark;
   }
 
   body {
@@ -91,5 +95,30 @@
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
     border-radius: 2px;
+  }
+
+  .skip-link {
+    @apply absolute left-4 top-4 z-[60] rounded-md bg-background px-3 py-2 text-sm font-mono text-foreground shadow-lg ring-2 ring-ring ring-offset-2 ring-offset-background;
+    transform: translateY(-200%);
+    transition: transform 0.2s ease;
+  }
+
+  .skip-link:focus {
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

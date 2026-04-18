@@ -2,9 +2,28 @@ import { useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-quer
 import { supabase } from "@/integrations/supabase/client";
 import { useCallback } from "react";
 import type { Database } from "@/integrations/supabase/types";
+import { normalizePublicComplaintCategory } from "@/shared/public-taxonomy";
 
 type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Returns"][number];
 type SparklineRow = Database["public"]["Functions"]["get_sparkline_scores"]["Returns"][number];
+type ScrapedPostRow = Database["public"]["Tables"]["scraped_posts"]["Row"];
+type ModelRow = Database["public"]["Tables"]["models"]["Row"];
+
+export interface ComplaintBreakdownItem {
+  category: string;
+  count: number;
+  pct: number;
+}
+
+export interface SourceBreakdownItem {
+  source: string;
+  count: number;
+  pct: number;
+}
+
+export interface RecentChatterPost extends ScrapedPostRow {
+  models: Pick<ModelRow, "name" | "accent_color" | "slug"> | null;
+}
 
 export interface ModelWithVibes {
   id: string;
@@ -42,6 +61,7 @@ export function useModelsWithLatestVibes() {
       return (landing || []).map((m: LandingVibesRow): ModelWithVibes => {
         const sparkline = sparkMap.get(m.model_id) || [];
         const trendPts = m.previous_score != null ? m.latest_score - m.previous_score : 0;
+        const topComplaint = normalizePublicComplaintCategory(m.top_complaint);
 
         return {
           id: m.model_id,
@@ -52,7 +72,7 @@ export function useModelsWithLatestVibes() {
           vibe: m.latest_score ?? 50,
           trend: { direction: trendPts >= 0 ? "up" : "down", pts: Math.abs(trendPts) },
           sparkline,
-          topComplaint: m.top_complaint ?? null,
+          topComplaint,
           totalPosts: m.total_posts ?? 0,
           lastUpdated: m.last_updated ?? null,
         };
@@ -64,7 +84,7 @@ export function useModelsWithLatestVibes() {
 const CHATTER_PAGE_SIZE = 25;
 
 export function useRecentChatter(enabled = true) {
-  return useInfiniteQuery({
+  return useInfiniteQuery<RecentChatterPost[]>({
     queryKey: ["recent-chatter"],
     staleTime: 60_000,
     enabled,
@@ -80,7 +100,7 @@ export function useRecentChatter(enabled = true) {
       }
       const { data, error } = await query;
       if (error) throw error;
-      return data || [];
+      return (data || []) as RecentChatterPost[];
     },
     getNextPageParam: (lastPage) => {
       if (lastPage.length < CHATTER_PAGE_SIZE) return undefined;
@@ -139,7 +159,7 @@ export function useVibesHistory(modelId: string | undefined, period: string, ran
 }
 
 export function useComplaintBreakdown(modelId: string | undefined) {
-  return useQuery({
+  return useQuery<ComplaintBreakdownItem[]>({
     queryKey: ["complaint-breakdown", modelId],
     enabled: !!modelId,
     staleTime: 60_000,
@@ -147,18 +167,26 @@ export function useComplaintBreakdown(modelId: string | undefined) {
       const { data, error } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId! });
       if (error) throw error;
 
-      const total = (data || []).reduce((sum: number, r) => sum + Number(r.count), 0);
-      return (data || []).map((r) => ({
-        category: r.category,
-        count: Number(r.count),
-        pct: total > 0 ? Math.round((Number(r.count) / total) * 100) : 0,
+      const normalizedRows = (data || [])
+        .map((row) => ({
+          category: normalizePublicComplaintCategory(row.category),
+          count: Number(row.count),
+        }))
+        .filter((row): row is { category: string; count: number } => row.category !== null);
+
+      const total = normalizedRows.reduce((sum, row) => sum + row.count, 0);
+
+      return normalizedRows.map((row) => ({
+        category: row.category,
+        count: row.count,
+        pct: total > 0 ? Math.round((row.count / total) * 100) : 0,
       }));
     },
   });
 }
 
 export function useSourceBreakdown(modelId: string | undefined) {
-  return useQuery({
+  return useQuery<SourceBreakdownItem[]>({
     queryKey: ["source-breakdown", modelId],
     enabled: !!modelId,
     staleTime: 60_000,
@@ -166,18 +194,18 @@ export function useSourceBreakdown(modelId: string | undefined) {
       const { data, error } = await supabase.rpc("get_source_breakdown", { p_model_id: modelId! });
       if (error) throw error;
 
-      const total = (data || []).reduce((sum: number, r) => sum + Number(r.count), 0);
-      return (data || []).map((r) => ({
-        source: r.source,
-        count: Number(r.count),
-        pct: total > 0 ? Math.round((Number(r.count) / total) * 100) : 0,
+      const total = (data || []).reduce((sum: number, row) => sum + Number(row.count), 0);
+      return (data || []).map((row) => ({
+        source: row.source,
+        count: Number(row.count),
+        pct: total > 0 ? Math.round((Number(row.count) / total) * 100) : 0,
       }));
     },
   });
 }
 
 export function useModelPosts(modelId: string | undefined, limit = 25, enabled = true) {
-  return useQuery({
+  return useQuery<ScrapedPostRow[]>({
     queryKey: ["model-posts", modelId, limit],
     enabled: !!modelId && enabled,
     staleTime: 60_000,
@@ -189,7 +217,7 @@ export function useModelPosts(modelId: string | undefined, limit = 25, enabled =
         .order("posted_at", { ascending: false })
         .limit(limit);
       if (error) throw error;
-      return data || [];
+      return (data || []) as ScrapedPostRow[];
     },
   });
 }
@@ -221,11 +249,19 @@ export function usePrefetchModelDetail() {
       staleTime: 60_000,
       queryFn: async () => {
         const { data } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId });
-        const total = (data || []).reduce((sum: number, r) => sum + Number(r.count), 0);
-        return (data || []).map((r) => ({
-          category: r.category,
-          count: Number(r.count),
-          pct: total > 0 ? Math.round((Number(r.count) / total) * 100) : 0,
+        const normalizedRows = (data || [])
+          .map((row) => ({
+            category: normalizePublicComplaintCategory(row.category),
+            count: Number(row.count),
+          }))
+          .filter((row): row is { category: string; count: number } => row.category !== null);
+
+        const total = normalizedRows.reduce((sum, row) => sum + row.count, 0);
+
+        return normalizedRows.map((row) => ({
+          category: row.category,
+          count: row.count,
+          pct: total > 0 ? Math.round((row.count / total) * 100) : 0,
         }));
       },
     });

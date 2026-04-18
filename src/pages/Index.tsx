@@ -48,7 +48,12 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
     const VibeIcon = vibe.icon;
     const brandColor = m.accent_color || "#888";
     return (
-      <Link ref={ref} to={`/model/${m.slug}`} onMouseEnter={() => onHover(m.slug, m.id)}>
+      <Link
+        ref={ref}
+        to={`/model/${m.slug}`}
+        onMouseEnter={() => onHover(m.slug, m.id)}
+        className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
         <motion.div
           variants={fadeUp}
           custom={i}
@@ -72,10 +77,10 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
             </div>
             <div className="mt-3 flex items-center justify-between">
               <TrendIcon trend={m.trend.direction} />
-              <span className="text-xs font-mono text-muted-foreground">
-                {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts (7d)` : "Tracking"}
-              </span>
-            </div>
+                <span className="text-xs font-mono text-foreground/70">
+                  {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts (7d)` : "Tracking"}
+                </span>
+              </div>
           </div>
         </motion.div>
       </Link>
@@ -97,7 +102,7 @@ const Index = () => {
     <PageTransition>
       <div className="min-h-screen bg-background">
         <NavBar />
-        <main>
+        <main id="main-content" tabIndex={-1} className="scroll-mt-24">
           {/* Hero */}
           <section className="container pt-24 sm:pt-32 pb-16 relative">
             <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.10)_0%,_transparent_70%)] pointer-events-none" />
@@ -112,7 +117,7 @@ const Index = () => {
                   <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
                 </span>
-                Tracking {models?.length ?? "..."} models
+                Tracking {models?.length ?? "…"} models
               </motion.div>
               <motion.h1 variants={fadeUp} custom={1} className="text-4xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
                 Is your AI having<br />
@@ -122,17 +127,17 @@ const Index = () => {
                 Community sentiment for Claude, ChatGPT, Gemini, and Grok. Know when the vibes are off.
               </motion.p>
               <motion.div variants={fadeUp} custom={3} className="mt-8 flex flex-wrap items-center gap-4">
-                <Link to="/dashboard">
-                  <Button size="lg" className="font-mono text-sm gap-2 group">
+                <Button asChild size="lg" className="font-mono text-sm gap-2 group">
+                  <Link to="/dashboard">
                     Check the Vibes
                     <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-                  </Button>
-                </Link>
+                  </Link>
+                </Button>
                 <a
                   href="https://github.com/dkships/llm-moods"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-sm font-mono text-foreground/70 hover:text-foreground transition-colors"
+                  className="inline-flex items-center gap-1.5 rounded-md text-sm font-mono text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <GitHubIcon className="h-4 w-4" />
                   Open Source
@@ -144,18 +149,20 @@ const Index = () => {
           {/* Live Vibes Preview */}
           <section className="container pb-24">
             {isLoading ? (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="status" aria-live="polite">
                 {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
               </div>
             ) : isError ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
+              <p className="py-8 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+                Failed to load data
+              </p>
             ) : (
               <motion.div
                 initial="hidden"
                 whileInView="visible"
                 viewport={{ once: true, margin: "-80px" }}
                 variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"
+                className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
               >
                 {(models || []).map((m, i) => (
                   <LandingModelCard key={m.id} m={m} i={i} onHover={handleHover} />

@@ -13,18 +13,18 @@ const NotFound = () => {
     <PageTransition>
       <div className="min-h-screen bg-background flex flex-col">
         <NavBar />
-        <main className="flex-1 flex items-center justify-center">
+        <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center scroll-mt-24">
           <div className="text-center">
             <p className="text-7xl font-bold font-mono text-primary glow-text mb-4">404</p>
             <p className="text-lg text-muted-foreground font-mono mb-8">
               This page doesn't exist.
             </p>
-            <Link to="/">
-              <Button variant="outline" className="font-mono text-sm gap-2">
+            <Button asChild variant="outline" className="font-mono text-sm gap-2">
+              <Link to="/">
                 <ArrowLeft className="h-4 w-4" />
                 Back to Home
-              </Button>
-            </Link>
+              </Link>
+            </Button>
           </div>
         </main>
         <Footer />

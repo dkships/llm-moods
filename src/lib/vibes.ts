@@ -1,19 +1,10 @@
 import { Sun, CloudSun, CloudLightning } from "lucide-react";
+import {
+  PUBLIC_COMPLAINT_LABELS,
+  getPublicComplaintLabel,
+} from "@/shared/public-taxonomy";
 
-export const COMPLAINT_LABELS: Record<string, string> = {
-  lazy_responses: "Lazy responses",
-  hallucinations: "Hallucinations",
-  refusals: "Refusals",
-  coding_quality: "Coding quality",
-  speed: "Speed",
-  general_drop: "General drop",
-  pricing_value: "Pricing / value",
-  censorship: "Censorship",
-  context_window: "Context window",
-  api_reliability: "API reliability",
-  multimodal_quality: "Multimodal quality",
-  reasoning: "Reasoning",
-};
+export const COMPLAINT_LABELS = PUBLIC_COMPLAINT_LABELS;
 
 export const SOURCE_LABELS: Record<string, string> = {
   reddit: "Reddit",
@@ -70,7 +61,7 @@ export function formatSourceDisplay(source: string): { emoji: string; label: str
 
 export function formatComplaintLabel(category: string | null | undefined): string {
   if (!category) return "Unknown";
-  return COMPLAINT_LABELS[category] || category.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
+  return getPublicComplaintLabel(category);
 }
 
 /** Decode common HTML entities found in scraped content */

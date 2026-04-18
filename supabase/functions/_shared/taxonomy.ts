@@ -1,48 +1,22 @@
-const VALID_SENTIMENTS = new Set(["positive", "negative", "neutral"]);
+import {
+  PUBLIC_COMPLAINT_CATEGORIES,
+  PRAISE_CATEGORIES,
+  normalizePraiseCategory as normalizeSharedPraiseCategory,
+  normalizePublicComplaintCategory,
+  normalizeSentiment as normalizeSharedSentiment,
+} from "../../../src/shared/public-taxonomy.ts";
 
-export const VALID_PUBLIC_COMPLAINTS = new Set([
-  "lazy_responses",
-  "hallucinations",
-  "refusals",
-  "coding_quality",
-  "speed",
-  "general_drop",
-  "pricing_value",
-  "censorship",
-  "context_window",
-  "api_reliability",
-  "multimodal_quality",
-  "reasoning",
-]);
-
-export const VALID_PRAISE_CATEGORIES = new Set([
-  "output_quality",
-  "coding_quality",
-  "speed",
-  "reasoning",
-  "creativity",
-  "value",
-  "reliability",
-  "context_handling",
-  "multimodal_quality",
-  "general_improvement",
-]);
-
-const COMPLAINT_ALIASES: Record<string, string> = {
-  reliability: "api_reliability",
-};
+export const VALID_PUBLIC_COMPLAINTS = new Set(PUBLIC_COMPLAINT_CATEGORIES);
+export const VALID_PRAISE_CATEGORIES = new Set(PRAISE_CATEGORIES);
 
 export function normalizeSentiment(sentiment: string | null | undefined): string | null {
-  return sentiment && VALID_SENTIMENTS.has(sentiment) ? sentiment : null;
+  return normalizeSharedSentiment(sentiment);
 }
 
 export function normalizeComplaintCategory(category: string | null | undefined): string | null {
-  if (!category) return null;
-  const normalized = COMPLAINT_ALIASES[category] || category;
-  return VALID_PUBLIC_COMPLAINTS.has(normalized) ? normalized : null;
+  return normalizePublicComplaintCategory(category);
 }
 
 export function normalizePraiseCategory(category: string | null | undefined): string | null {
-  if (!category) return null;
-  return VALID_PRAISE_CATEGORIES.has(category) ? category : null;
+  return normalizeSharedPraiseCategory(category);
 }

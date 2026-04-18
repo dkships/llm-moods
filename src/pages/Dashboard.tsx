@@ -8,7 +8,13 @@ import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { useModelsWithLatestVibes, useRecentChatter, usePrefetchModelDetail, type ModelWithVibes } from "@/hooks/useVibesData";
+import {
+  useModelsWithLatestVibes,
+  useRecentChatter,
+  usePrefetchModelDetail,
+  type ModelWithVibes,
+  type RecentChatterPost,
+} from "@/hooks/useVibesData";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import { getVibeStatus, fadeUp, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
@@ -26,7 +32,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
   return (
     <Link
       to={`/model/${m.slug}`}
-      className="block"
+      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       onMouseEnter={() => onHover(m.slug, m.id)}
     >
       <motion.div
@@ -81,7 +87,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
                 {m.trend.direction === "up" ? "up" : "down"} {m.trend.pts} pts from yesterday
               </span>
             </div>
-            <span className="text-foreground/65">Recent volume: {(m.totalPosts || 0).toLocaleString()} posts (7d)</span>
+            <span className="text-foreground/70">Recent volume: {(m.totalPosts || 0).toLocaleString()} posts (7d)</span>
           </div>
 
           {m.topComplaint && (
@@ -99,14 +105,14 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
 ModelCard.displayName = "ModelCard";
 
 /** Memoized chatter post */
-const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: number }) => {
-  const sentiment = (post.sentiment as string) || "neutral";
+const ChatterPost = memo(({ post, i }: { post: RecentChatterPost; i: number }) => {
+  const sentiment = post.sentiment || "neutral";
   const s = SENTIMENT_STYLES[sentiment];
-  const src = formatSourceDisplay(post.source as string);
-  const modelData = post.models as { name: string; accent_color: string | null; slug: string } | null;
+  const src = formatSourceDisplay(post.source);
+  const modelData = post.models;
   const sentimentBorderColor = sentiment === "positive" ? "border-l-emerald-500" : sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30";
-  const sourceUrl = post.source_url as string | undefined;
-  const className = `glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderColor} transition-all duration-200 hover:brightness-125 hover:border-border/60 ${sourceUrl ? "cursor-pointer" : ""}`;
+  const sourceUrl = post.source_url ?? undefined;
+  const className = `glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderColor} transition-all duration-200 hover:brightness-125 hover:border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${sourceUrl ? "cursor-pointer" : ""}`;
   const content = (
     <>
       <div className="flex items-center gap-3 shrink-0">
@@ -115,16 +121,16 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
         </span>
       </div>
       <p className="text-sm text-foreground flex-1 leading-relaxed line-clamp-2">
-        {decodeHTMLEntities((post.translated_content as string) || (post.content as string) || (post.title as string))}
-        {(post.original_language as string) && (
+        {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
+        {post.original_language && (
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-foreground/60 bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
-                Translated from {(post.original_language as string).toUpperCase()}
+                Translated from {post.original_language.toUpperCase()}
               </span>
             </TooltipTrigger>
             <TooltipContent side="top" className="max-w-sm">
-              <p className="text-xs">{(post.content as string)?.slice(0, 300)}</p>
+              <p className="text-xs">{post.content?.slice(0, 300)}</p>
             </TooltipContent>
           </Tooltip>
         )}
@@ -139,9 +145,7 @@ const ChatterPost = memo(({ post, i }: { post: Record<string, unknown>; i: numbe
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
           {s.label}
         </Badge>
-        {post.posted_at && (
-          <span className="text-xs text-foreground font-mono">{formatTimeAgo(post.posted_at as string)}</span>
-        )}
+        {post.posted_at && <span className="text-xs text-foreground font-mono">{formatTimeAgo(post.posted_at)}</span>}
         {sourceUrl && <ExternalLink className="h-3 w-3 text-foreground/50 shrink-0" />}
       </div>
     </>
@@ -220,7 +224,7 @@ const Dashboard = () => {
     <PageTransition>
       <div className="min-h-screen bg-background">
         <NavBar />
-        <main>
+        <main id="main-content" tabIndex={-1} className="scroll-mt-24">
           {/* Page Header */}
           <section className="container pt-10 pb-8">
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
@@ -238,17 +242,19 @@ const Dashboard = () => {
           {/* Model Cards */}
           <section className="container pb-12">
             {modelsLoading ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2" role="status" aria-live="polite">
                 {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
               </div>
             ) : modelsError ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
+              <p className="py-8 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+                Failed to load data
+              </p>
             ) : (
               <motion.div
                 initial="hidden"
                 animate="visible"
                 variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+                className="grid grid-cols-1 gap-4 md:grid-cols-2"
               >
                 {(models || []).map((m, i) => (
                   <ModelCard key={m.id} m={m} i={i} onHover={handleHover} />
@@ -277,15 +283,17 @@ const Dashboard = () => {
             </motion.div>
 
             {chatterError ? (
-              <p className="text-sm text-muted-foreground text-center py-8">Failed to load data</p>
+              <p className="py-8 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+                Failed to load data
+              </p>
             ) : !chatterVisible || chatterLoading ? (
-              <div className="space-y-3">
+              <div className="space-y-3" role="status" aria-live="polite">
                 {Array.from({ length: 6 }).map((_, i) => <ChatterSkeleton key={i} />)}
               </div>
             ) : (
               <div className="space-y-3">
                 {(chatterData?.pages ?? []).flatMap((page) => page).map((post, i) => (
-                  <ChatterPost key={post.id} post={post as unknown as Record<string, unknown>} i={i} />
+                  <ChatterPost key={post.id} post={post} i={i} />
                 ))}
               </div>
             )}
@@ -295,7 +303,8 @@ const Dashboard = () => {
                 <button
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
-                  className="px-5 py-2 rounded-lg text-xs font-mono text-foreground/70 bg-secondary/50 border border-border hover:bg-secondary hover:text-foreground transition-colors disabled:opacity-50"
+                  aria-label="Load more community posts"
+                  className="rounded-lg border border-border bg-secondary/50 px-5 py-2 text-xs font-mono text-foreground/70 transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
                 >
                   {isFetchingNextPage ? "Loading..." : "Load more"}
                 </button>
