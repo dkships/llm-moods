@@ -172,7 +172,7 @@ export function useComplaintBreakdown(modelId: string | undefined) {
           category: normalizePublicComplaintCategory(row.category),
           count: Number(row.count),
         }))
-        .filter((row): row is { category: string; count: number } => row.category !== null);
+        .filter((row): row is { category: NonNullable<typeof row.category>; count: number } => row.category !== null);
 
       const total = normalizedRows.reduce((sum, row) => sum + row.count, 0);
 
@@ -254,7 +254,7 @@ export function usePrefetchModelDetail() {
             category: normalizePublicComplaintCategory(row.category),
             count: Number(row.count),
           }))
-          .filter((row): row is { category: string; count: number } => row.category !== null);
+          .filter((row): row is { category: NonNullable<typeof row.category>; count: number } => row.category !== null);
 
         const total = normalizedRows.reduce((sum, row) => sum + row.count, 0);
 

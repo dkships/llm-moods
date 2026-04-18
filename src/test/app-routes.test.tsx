@@ -20,7 +20,7 @@ vi.mock("framer-motion", async () => {
 
   const createMotionComponent = (tag: keyof React.JSX.IntrinsicElements) =>
     ReactModule.forwardRef<HTMLElement, Record<string, unknown>>(({ children, ...props }, ref) =>
-      ReactModule.createElement(tag, { ref, ...stripMotionProps(props) }, children),
+      ReactModule.createElement(tag, { ref, ...stripMotionProps(props) }, children as React.ReactNode),
     );
 
   return {
