@@ -155,7 +155,7 @@ async function handleRecentTargeted(
       text: `${post.title || ""} ${post.content || ""}`.trim(),
       model_slug: slugById[post.model_id] || "unknown",
     }))
-    .filter((item) => item.text.length > 0 && item.model_slug !== "unknown");
+    .filter((item: { id: string; text: string; model_slug: string }) => item.text.length > 0 && item.model_slug !== "unknown");
 
   if (items.length === 0) {
     return new Response(JSON.stringify({
