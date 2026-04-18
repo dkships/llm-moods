@@ -18,6 +18,7 @@ Object.defineProperty(window, "matchMedia", {
 class IntersectionObserverMock implements IntersectionObserver {
   readonly root = null;
   readonly rootMargin = "";
+  readonly scrollMargin = "";
   readonly thresholds = [];
 
   constructor(private readonly callback: IntersectionObserverCallback) {}
