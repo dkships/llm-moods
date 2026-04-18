@@ -15,6 +15,7 @@ export interface ScoreResult {
   negative_count: number;
   neutral_count: number;
   total_posts: number;
+  eligible_posts: number;
   top_complaint: string | null;
 }
 
@@ -73,7 +74,14 @@ export function applyScoreSmoothing(
     return score;
   }
 
-  const currentWeight = postCount < minPosts ? 0.4 : 0.7;
+  let currentWeight = 0.7;
+  if (postCount <= 1) {
+    currentWeight = 0.2;
+  } else if (postCount <= 3) {
+    currentWeight = 0.3;
+  } else if (postCount < minPosts) {
+    currentWeight = 0.4;
+  }
   const previousWeight = 1 - currentWeight;
 
   return Math.round((currentWeight * score) + (previousWeight * previousScore));
@@ -170,6 +178,7 @@ export function computeScore(posts: ScoreInputPost[]): ScoreResult {
     negative_count: negativeCount,
     neutral_count: neutralCount,
     total_posts: posts.length,
+    eligible_posts: eligible.length,
     top_complaint: topComplaint,
   };
 }

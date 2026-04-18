@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { classifyBatch } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
 import { loadKeywords, matchModels } from "../_shared/utils.ts";
 
 const corsHeaders = {
@@ -126,6 +126,21 @@ Deno.serve(async (req) => {
 
           // Pass 2: batch classify
           const hnClassifications = await classifyBatch(hnCandidates.map(c => c.text), apiKey);
+          const hnTargetedItems: { idx: number; slug: string }[] = [];
+          for (let j = 0; j < hnCandidates.length; j++) {
+            if (!hnClassifications[j].relevant) continue;
+            for (const slug of hnCandidates[j].matchedSlugs) {
+              hnTargetedItems.push({ idx: j, slug });
+            }
+          }
+          const hnTargetedResults = hnTargetedItems.length > 0
+            ? await classifyBatchTargeted(
+                hnTargetedItems.map(item => ({ text: hnCandidates[item.idx].text, targetModel: item.slug })),
+                apiKey,
+              )
+            : [];
+          const hnTargetedMap = new Map<string, typeof hnClassifications[0]>();
+          hnTargetedItems.forEach((item, j) => hnTargetedMap.set(`${item.idx}:${item.slug}`, hnTargetedResults[j]));
 
           // Pass 3: insert
           for (let j = 0; j < hnCandidates.length; j++) {
@@ -134,14 +149,16 @@ Deno.serve(async (req) => {
             const c = hnCandidates[j];
 
             for (const slug of c.matchedSlugs) {
+              const targetedClassification = hnTargetedMap.get(`${j}:${slug}`) || classification;
+              if (!targetedClassification.relevant) continue;
               const modelId = modelMap[slug];
               if (!modelId) continue;
               const { error } = await supabase.from("scraped_posts").upsert({
                 model_id: modelId, source: "hackernews", source_url: c.sourceUrl,
                 title: c.title.slice(0, 500), content: null,
-                sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-                praise_category: classification.praise_category,
-                confidence: classification.confidence, content_type: "title_only",
+                sentiment: targetedClassification.sentiment, complaint_category: targetedClassification.complaint_category,
+                praise_category: targetedClassification.praise_category,
+                confidence: targetedClassification.confidence, content_type: "title_only",
                 score: c.score, posted_at: c.postedAt,
                 is_backfill: true,
               }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
@@ -198,6 +215,21 @@ Deno.serve(async (req) => {
 
           // Pass 2: batch classify
           const bskyClassifications = await classifyBatch(bskyCandidates.map(c => c.text), apiKey);
+          const bskyTargetedItems: { idx: number; slug: string }[] = [];
+          for (let j = 0; j < bskyCandidates.length; j++) {
+            if (!bskyClassifications[j].relevant) continue;
+            for (const slug of bskyCandidates[j].matchedSlugs) {
+              bskyTargetedItems.push({ idx: j, slug });
+            }
+          }
+          const bskyTargetedResults = bskyTargetedItems.length > 0
+            ? await classifyBatchTargeted(
+                bskyTargetedItems.map(item => ({ text: bskyCandidates[item.idx].text, targetModel: item.slug })),
+                apiKey,
+              )
+            : [];
+          const bskyTargetedMap = new Map<string, typeof bskyClassifications[0]>();
+          bskyTargetedItems.forEach((item, j) => bskyTargetedMap.set(`${item.idx}:${item.slug}`, bskyTargetedResults[j]));
 
           // Pass 3: insert
           for (let j = 0; j < bskyCandidates.length; j++) {
@@ -206,14 +238,16 @@ Deno.serve(async (req) => {
             const c = bskyCandidates[j];
 
             for (const slug of c.matchedSlugs) {
+              const targetedClassification = bskyTargetedMap.get(`${j}:${slug}`) || classification;
+              if (!targetedClassification.relevant) continue;
               const modelId = modelMap[slug];
               if (!modelId) continue;
               const { error } = await supabase.from("scraped_posts").upsert({
                 model_id: modelId, source: "bluesky", source_url: c.sourceUrl,
                 title: c.text.slice(0, 120), content: c.text.slice(0, 2000),
-                sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-                praise_category: classification.praise_category,
-                confidence: classification.confidence, content_type: "full_content",
+                sentiment: targetedClassification.sentiment, complaint_category: targetedClassification.complaint_category,
+                praise_category: targetedClassification.praise_category,
+                confidence: targetedClassification.confidence, content_type: "full_content",
                 score: c.score, posted_at: c.createdAt,
                 is_backfill: true,
               }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
@@ -264,6 +298,21 @@ Deno.serve(async (req) => {
 
           // Pass 2: batch classify
           const redditClassifications = await classifyBatch(redditCandidates.map(c => c.text), apiKey);
+          const redditTargetedItems: { idx: number; slug: string }[] = [];
+          for (let j = 0; j < redditCandidates.length; j++) {
+            if (!redditClassifications[j].relevant) continue;
+            for (const slug of redditCandidates[j].matchedSlugs) {
+              redditTargetedItems.push({ idx: j, slug });
+            }
+          }
+          const redditTargetedResults = redditTargetedItems.length > 0
+            ? await classifyBatchTargeted(
+                redditTargetedItems.map(item => ({ text: redditCandidates[item.idx].text, targetModel: item.slug })),
+                apiKey,
+              )
+            : [];
+          const redditTargetedMap = new Map<string, typeof redditClassifications[0]>();
+          redditTargetedItems.forEach((item, j) => redditTargetedMap.set(`${item.idx}:${item.slug}`, redditTargetedResults[j]));
 
           // Pass 3: insert
           for (let j = 0; j < redditCandidates.length; j++) {
@@ -272,14 +321,16 @@ Deno.serve(async (req) => {
             const c = redditCandidates[j];
 
             for (const slug of c.matchedSlugs) {
+              const targetedClassification = redditTargetedMap.get(`${j}:${slug}`) || classification;
+              if (!targetedClassification.relevant) continue;
               const modelId = modelMap[slug];
               if (!modelId) continue;
               const { error } = await supabase.from("scraped_posts").upsert({
                 model_id: modelId, source: "reddit", source_url: c.postUrl,
                 title: c.title, content: c.selftext.slice(0, 2000),
-                sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-                praise_category: classification.praise_category,
-                confidence: classification.confidence, content_type: c.contentType,
+                sentiment: targetedClassification.sentiment, complaint_category: targetedClassification.complaint_category,
+                praise_category: targetedClassification.praise_category,
+                confidence: targetedClassification.confidence, content_type: c.contentType,
                 score: c.score, posted_at: c.postedAt,
                 is_backfill: true,
               }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
@@ -367,19 +418,36 @@ Deno.serve(async (req) => {
                 }
 
                 const twitterClassifications = await classifyBatch(twitterCandidates.map(c => c.text), apiKey);
+                const twitterTargetedItems: { idx: number; slug: string }[] = [];
+                for (let j = 0; j < twitterCandidates.length; j++) {
+                  if (!twitterClassifications[j].relevant) continue;
+                  for (const slug of twitterCandidates[j].matchedSlugs) {
+                    twitterTargetedItems.push({ idx: j, slug });
+                  }
+                }
+                const twitterTargetedResults = twitterTargetedItems.length > 0
+                  ? await classifyBatchTargeted(
+                      twitterTargetedItems.map(item => ({ text: twitterCandidates[item.idx].text, targetModel: item.slug })),
+                      apiKey,
+                    )
+                  : [];
+                const twitterTargetedMap = new Map<string, typeof twitterClassifications[0]>();
+                twitterTargetedItems.forEach((item, j) => twitterTargetedMap.set(`${item.idx}:${item.slug}`, twitterTargetedResults[j]));
                 for (let j = 0; j < twitterCandidates.length; j++) {
                   const classification = twitterClassifications[j];
                   if (!classification.relevant) continue;
                   const c = twitterCandidates[j];
                   for (const slug of c.matchedSlugs) {
+                    const targetedClassification = twitterTargetedMap.get(`${j}:${slug}`) || classification;
+                    if (!targetedClassification.relevant) continue;
                     const modelId = modelMap[slug];
                     if (!modelId) continue;
                     const { error } = await supabase.from("scraped_posts").upsert({
                       model_id: modelId, source: "twitter", source_url: c.sourceUrl,
                       title: c.text.slice(0, 120), content: c.text.slice(0, 2000),
-                      sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-                      praise_category: classification.praise_category,
-                      confidence: classification.confidence, content_type: "title_only",
+                      sentiment: targetedClassification.sentiment, complaint_category: targetedClassification.complaint_category,
+                      praise_category: targetedClassification.praise_category,
+                      confidence: targetedClassification.confidence, content_type: "title_only",
                       score: c.score, posted_at: c.postedAt, is_backfill: true,
                     }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
                     if (!error) { existingUrls.add(c.sourceUrl); addTotal("twitter", slug); }
@@ -429,19 +497,36 @@ Deno.serve(async (req) => {
         }
 
         const soClassifications = await classifyBatch(soCandidates.map(c => c.text), apiKey);
+        const soTargetedItems: { idx: number; slug: string }[] = [];
+        for (let j = 0; j < soCandidates.length; j++) {
+          if (!soClassifications[j].relevant) continue;
+          for (const slug of soCandidates[j].matchedSlugs) {
+            soTargetedItems.push({ idx: j, slug });
+          }
+        }
+        const soTargetedResults = soTargetedItems.length > 0
+          ? await classifyBatchTargeted(
+              soTargetedItems.map(item => ({ text: soCandidates[item.idx].text, targetModel: item.slug })),
+              apiKey,
+            )
+          : [];
+        const soTargetedMap = new Map<string, typeof soClassifications[0]>();
+        soTargetedItems.forEach((item, j) => soTargetedMap.set(`${item.idx}:${item.slug}`, soTargetedResults[j]));
         for (let j = 0; j < soCandidates.length; j++) {
           const classification = soClassifications[j];
           if (!classification.relevant) continue;
           const c = soCandidates[j];
           for (const slug of c.matchedSlugs) {
+            const targetedClassification = soTargetedMap.get(`${j}:${slug}`) || classification;
+            if (!targetedClassification.relevant) continue;
             const modelId = modelMap[slug];
             if (!modelId) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "stackoverflow", source_url: c.sourceUrl,
               title: c.title.slice(0, 500), content: c.body.slice(0, 2000),
-              sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-              praise_category: classification.praise_category,
-              confidence: classification.confidence, content_type: "title_and_body",
+              sentiment: targetedClassification.sentiment, complaint_category: targetedClassification.complaint_category,
+              praise_category: targetedClassification.praise_category,
+              confidence: targetedClassification.confidence, content_type: "title_and_body",
               score: c.score, posted_at: c.postedAt, is_backfill: true,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (!error) { existingUrls.add(c.sourceUrl); addTotal("stackoverflow", slug); }
@@ -502,19 +587,36 @@ Deno.serve(async (req) => {
         }
 
         const ghClassifications = await classifyBatch(ghCandidates.map(c => c.text), apiKey);
+        const ghTargetedItems: { idx: number; slug: string }[] = [];
+        for (let j = 0; j < ghCandidates.length; j++) {
+          if (!ghClassifications[j].relevant) continue;
+          for (const slug of ghCandidates[j].matchedSlugs) {
+            ghTargetedItems.push({ idx: j, slug });
+          }
+        }
+        const ghTargetedResults = ghTargetedItems.length > 0
+          ? await classifyBatchTargeted(
+              ghTargetedItems.map(item => ({ text: ghCandidates[item.idx].text, targetModel: item.slug })),
+              apiKey,
+            )
+          : [];
+        const ghTargetedMap = new Map<string, typeof ghClassifications[0]>();
+        ghTargetedItems.forEach((item, j) => ghTargetedMap.set(`${item.idx}:${item.slug}`, ghTargetedResults[j]));
         for (let j = 0; j < ghCandidates.length; j++) {
           const classification = ghClassifications[j];
           if (!classification.relevant) continue;
           const c = ghCandidates[j];
           for (const slug of c.matchedSlugs) {
+            const targetedClassification = ghTargetedMap.get(`${j}:${slug}`) || classification;
+            if (!targetedClassification.relevant) continue;
             const modelId = modelMap[slug];
             if (!modelId) continue;
             const { error } = await supabase.from("scraped_posts").upsert({
               model_id: modelId, source: "github", source_url: c.htmlUrl,
               title: c.title.slice(0, 500), content: c.body.slice(0, 2000),
-              sentiment: classification.sentiment, complaint_category: classification.complaint_category,
-              praise_category: classification.praise_category,
-              confidence: classification.confidence, content_type: c.contentType,
+              sentiment: targetedClassification.sentiment, complaint_category: targetedClassification.complaint_category,
+              praise_category: targetedClassification.praise_category,
+              confidence: targetedClassification.confidence, content_type: c.contentType,
               score: c.score, posted_at: c.createdAt, is_backfill: true,
             }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
             if (!error) { existingUrls.add(c.htmlUrl); addTotal("github", slug); }

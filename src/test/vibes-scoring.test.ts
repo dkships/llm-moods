@@ -28,7 +28,7 @@ describe("vibes scoring helpers", () => {
     expect(previousScore).toBe(36);
   });
 
-  it("keeps thin-data smoothing anchored to the prior day instead of ratcheting intra-day", () => {
+  it("keeps ultra-thin daily samples anchored close to the prior day", () => {
     const rawScore = computeScore([
       {
         sentiment: "positive",
@@ -41,7 +41,57 @@ describe("vibes scoring helpers", () => {
     ]).score;
 
     expect(rawScore).toBe(100);
-    expect(applyScoreSmoothing(rawScore, 36, 1, 5)).toBe(62);
-    expect(applyScoreSmoothing(rawScore, 62, 1, 5)).toBe(77);
+    expect(applyScoreSmoothing(rawScore, 36, 1, 5)).toBe(49);
+    expect(applyScoreSmoothing(rawScore, 62, 1, 5)).toBe(70);
+  });
+
+  it("counts only eligible scored posts when smoothing thin daily samples", () => {
+    const result = computeScore([
+      {
+        sentiment: "positive",
+        complaint_category: null,
+        confidence: 0.9,
+        score: 1,
+        content_type: "full_text",
+        source: "mastodon",
+      },
+      {
+        sentiment: "positive",
+        complaint_category: null,
+        confidence: 0.85,
+        score: 1,
+        content_type: "full_text",
+        source: "mastodon",
+      },
+      {
+        sentiment: "positive",
+        complaint_category: null,
+        confidence: 0.9,
+        score: 1,
+        content_type: "full_text",
+        source: "mastodon",
+      },
+      {
+        sentiment: null,
+        complaint_category: null,
+        confidence: 0,
+        score: 1,
+        content_type: "full_text",
+        source: "bluesky",
+      },
+      {
+        sentiment: null,
+        complaint_category: null,
+        confidence: 0,
+        score: 1,
+        content_type: "full_text",
+        source: "bluesky",
+      },
+    ]);
+
+    expect(result.score).toBe(100);
+    expect(result.total_posts).toBe(5);
+    expect(result.eligible_posts).toBe(3);
+    expect(applyScoreSmoothing(result.score, 46, result.eligible_posts, 5)).toBe(62);
   });
 });

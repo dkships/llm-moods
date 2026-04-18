@@ -128,6 +128,7 @@ Deno.serve(async (req) => {
               negative_count: 0,
               neutral_count: 0,
               total_posts: 0,
+              eligible_posts: 0,
               top_complaint: null,
             };
             if (!dryRun) {
@@ -144,7 +145,7 @@ Deno.serve(async (req) => {
         consecutiveEmpty = 0;
 
         const result = computeScore(posts!);
-        result.score = applyScoreSmoothing(result.score, previousScore, postCount, minPosts);
+        result.score = applyScoreSmoothing(result.score, previousScore, result.eligible_posts, minPosts);
 
         if (!dryRun) {
           await upsertScore(supabase, model.id, "daily", dayWindow.periodStart, result);

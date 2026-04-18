@@ -64,23 +64,22 @@ Deno.serve(async (req) => {
         summary.classified += storyClassifications.length;
         summary.irrelevant += storyClassifications.filter(c => !c.relevant).length;
 
-        // Pass 2b: Re-classify multi-model posts with targeted sentiment
-        const storyMultiModelItems: { idx: number; slug: string }[] = [];
+        // Pass 2b: Re-classify each matched model with targeted sentiment.
+        const targetedItems: { idx: number; slug: string }[] = [];
         for (let i = 0; i < storyCandidates.length; i++) {
-          if (storyCandidates[i].matchedSlugs.length > 1 && storyClassifications[i].relevant) {
-            for (const slug of storyCandidates[i].matchedSlugs) {
-              storyMultiModelItems.push({ idx: i, slug });
-            }
+          if (!storyClassifications[i].relevant) continue;
+          for (const slug of storyCandidates[i].matchedSlugs) {
+            targetedItems.push({ idx: i, slug });
           }
         }
-        const storyTargetedResults = storyMultiModelItems.length > 0
+        const storyTargetedResults = targetedItems.length > 0
           ? await classifyBatchTargeted(
-              storyMultiModelItems.map(m => ({ text: storyCandidates[m.idx].text, targetModel: m.slug })),
+              targetedItems.map(item => ({ text: storyCandidates[item.idx].text, targetModel: item.slug })),
               lovableApiKey, 25, hnLogError
             )
           : [];
         const storyTargetedMap = new Map<string, typeof storyClassifications[0]>();
-        storyMultiModelItems.forEach((m, j) => storyTargetedMap.set(`${m.idx}:${m.slug}`, storyTargetedResults[j]));
+        targetedItems.forEach((item, j) => storyTargetedMap.set(`${item.idx}:${item.slug}`, storyTargetedResults[j]));
 
         // Pass 3: insert stories
         for (let i = 0; i < storyCandidates.length; i++) {
@@ -89,9 +88,7 @@ Deno.serve(async (req) => {
           const c = storyCandidates[i];
 
           for (const slug of c.matchedSlugs) {
-            const classification = c.matchedSlugs.length > 1
-              ? (storyTargetedMap.get(`${i}:${slug}`) || storyClassifications[i])
-              : storyClassifications[i];
+            const classification = storyTargetedMap.get(`${i}:${slug}`) || storyClassifications[i];
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, c.title, modelId)) continue;
             const { error } = await supabase.from("scraped_posts").upsert({

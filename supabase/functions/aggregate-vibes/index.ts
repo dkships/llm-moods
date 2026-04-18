@@ -66,16 +66,17 @@ Deno.serve(async (req) => {
         result.score = applyScoreSmoothing(
           result.score,
           previousScore,
-          dailyPosts.length,
+          result.eligible_posts,
           DEFAULT_MIN_POSTS,
         );
 
         await upsertScore(supabase, model.id, "daily", dailyWindow.periodStart, result);
         modelSummary.daily = {
           posts: dailyPosts.length,
+          eligible_posts: result.eligible_posts,
           score: result.score,
           smoothed: previousScore !== null,
-          thin_data: dailyPosts.length < DEFAULT_MIN_POSTS,
+          thin_data: result.eligible_posts < DEFAULT_MIN_POSTS,
         };
       } else {
         // No posts — carry forward previous score for up to 3 consecutive days
@@ -100,6 +101,7 @@ Deno.serve(async (req) => {
               negative_count: 0,
               neutral_count: 0,
               total_posts: 0,
+              eligible_posts: 0,
               top_complaint: null,
             };
             await upsertScore(supabase, model.id, "daily", dailyWindow.periodStart, carryForward);

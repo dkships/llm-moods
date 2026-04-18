@@ -20,10 +20,15 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const mode = url.searchParams.get("mode") || "neutral";
-    const batchSize = 50;
+    const batchSize = Math.max(1, Math.min(parseInt(url.searchParams.get("batch_size") || "100", 10) || 100, 500));
 
     if (mode === "multi_model") {
       return await handleMultiModel(supabase, apiKey, batchSize, logError);
+    }
+
+    if (mode === "recent_targeted") {
+      const daysBack = Math.max(1, Math.min(parseInt(url.searchParams.get("days_back") || "7", 10) || 7, 30));
+      return await handleRecentTargeted(supabase, apiKey, batchSize, daysBack, logError);
     }
 
     // Default mode: reclassify low-confidence neutral posts
@@ -116,7 +121,52 @@ async function handleMultiModel(
     });
   }
 
-  return await reclassifyMultiModelPosts(supabase, apiKey, dupes, logError);
+  return await reclassifyTargetedPosts(supabase, apiKey, dupes, "multi_model", logError);
+}
+
+async function handleRecentTargeted(
+  supabase: any,
+  apiKey: string,
+  batchSize: number,
+  daysBack: number,
+  logError: (msg: string, ctx?: string) => Promise<void>,
+): Promise<Response> {
+  const since = new Date(Date.now() - daysBack * 24 * 60 * 60 * 1000).toISOString();
+
+  const [{ data: posts, error: postsError }, { data: models, error: modelsError }] = await Promise.all([
+    supabase
+      .from("scraped_posts")
+      .select("id, model_id, title, content, posted_at")
+      .gte("posted_at", since)
+      .order("posted_at", { ascending: false })
+      .limit(batchSize),
+    supabase.from("models").select("id, slug"),
+  ]);
+
+  if (postsError) throw postsError;
+  if (modelsError) throw modelsError;
+
+  const slugById: Record<string, string> = {};
+  for (const model of models || []) slugById[model.id] = model.slug;
+
+  const items = (posts || [])
+    .map((post: any) => ({
+      id: post.id,
+      text: `${post.title || ""} ${post.content || ""}`.trim(),
+      model_slug: slugById[post.model_id] || "unknown",
+    }))
+    .filter((item) => item.text.length > 0 && item.model_slug !== "unknown");
+
+  if (items.length === 0) {
+    return new Response(JSON.stringify({
+      mode: "recent_targeted",
+      message: "No recent posts found to reclassify",
+      since,
+      total: 0,
+    }), { headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" } });
+  }
+
+  return await reclassifyTargetedPosts(supabase, apiKey, items, "recent_targeted", logError);
 }
 
 async function handleMultiModelFallback(
@@ -177,51 +227,69 @@ async function handleMultiModelFallback(
   const slugById: Record<string, string> = {};
   for (const m of models || []) slugById[m.id] = m.slug;
 
-  return await reclassifyMultiModelPosts(supabase, apiKey, toProcess.map((p: any) => ({
+  return await reclassifyTargetedPosts(supabase, apiKey, toProcess.map((p: any) => ({
     id: p.id,
     text: `${p.title || ""} ${p.content || ""}`.trim(),
     model_slug: slugById[p.model_id] || "unknown",
-  })), logError);
+  })), "multi_model", logError);
 }
 
-async function reclassifyMultiModelPosts(
+async function reclassifyTargetedPosts(
   supabase: any,
   apiKey: string,
   items: { id: string; text: string; model_slug: string }[],
+  mode: "multi_model" | "recent_targeted",
   logError: (msg: string, ctx?: string) => Promise<void>,
 ): Promise<Response> {
   const targetedItems = items.map(item => ({ text: item.text, targetModel: item.model_slug }));
   const classifications = await classifyBatchTargeted(targetedItems, apiKey, 25, logError);
 
-  let reclassified = 0, irrelevant = 0, errors = 0;
+  let reclassified = 0, clearedIrrelevant = 0, errors = 0;
 
   for (let i = 0; i < items.length; i++) {
     const result = classifications[i];
     const item = items[i];
 
-    if (!result.relevant) {
-      irrelevant++;
+    const payload = result.relevant
+      ? {
+          sentiment: result.sentiment,
+          complaint_category: result.complaint_category,
+          praise_category: result.praise_category,
+          confidence: result.confidence,
+          original_language: result.language || null,
+          translated_content: result.english_translation || null,
+        }
+      : {
+          sentiment: null,
+          complaint_category: null,
+          praise_category: null,
+          confidence: 0,
+          original_language: null,
+          translated_content: null,
+        };
+
+    const { error } = await supabase.from("scraped_posts").update(payload).eq("id", item.id);
+
+    if (error) {
+      errors++;
       continue;
     }
 
-    const { error } = await supabase.from("scraped_posts").update({
-      sentiment: result.sentiment,
-      complaint_category: result.complaint_category,
-      praise_category: result.praise_category,
-      confidence: result.confidence,
-      original_language: result.language || null,
-      translated_content: result.english_translation || null,
-    }).eq("id", item.id);
-
-    if (error) { errors++; } else { reclassified++; }
+    if (result.relevant) {
+      reclassified++;
+    } else {
+      clearedIrrelevant++;
+    }
   }
 
   return new Response(JSON.stringify({
-    mode: "multi_model",
+    mode,
     total: items.length,
     reclassified,
-    irrelevant,
+    cleared_irrelevant: clearedIrrelevant,
     errors,
-    message: reclassified > 0 ? `Reclassified ${reclassified} posts with model-targeted sentiment` : "No changes needed",
+    message: (reclassified > 0 || clearedIrrelevant > 0)
+      ? `Updated ${reclassified} posts with model-targeted sentiment and cleared ${clearedIrrelevant} irrelevant rows`
+      : "No changes needed",
   }), { headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" } });
 }

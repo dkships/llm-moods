@@ -110,23 +110,22 @@ Deno.serve(async (req) => {
         summary.classified += classifications.length;
         summary.irrelevant += classifications.filter(c => !c.relevant).length;
 
-        // Pass 2b: Re-classify multi-model posts with targeted sentiment
-        const multiModelItems: { idx: number; slug: string }[] = [];
+        // Pass 2b: Re-classify each matched model with targeted sentiment.
+        const targetedItems: { idx: number; slug: string }[] = [];
         for (let i = 0; i < candidates.length; i++) {
-          if (candidates[i].matchedSlugs.length > 1 && classifications[i].relevant) {
-            for (const slug of candidates[i].matchedSlugs) {
-              multiModelItems.push({ idx: i, slug });
-            }
+          if (!classifications[i].relevant) continue;
+          for (const slug of candidates[i].matchedSlugs) {
+            targetedItems.push({ idx: i, slug });
           }
         }
-        const targetedResults = multiModelItems.length > 0
+        const targetedResults = targetedItems.length > 0
           ? await classifyBatchTargeted(
-              multiModelItems.map(m => ({ text: candidates[m.idx].text, targetModel: m.slug })),
+              targetedItems.map(item => ({ text: candidates[item.idx].text, targetModel: item.slug })),
               lovableApiKey, 25, bskyLogError
             )
           : [];
         const targetedMap = new Map<string, typeof classifications[0]>();
-        multiModelItems.forEach((m, j) => targetedMap.set(`${m.idx}:${m.slug}`, targetedResults[j]));
+        targetedItems.forEach((item, j) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[j]));
 
         // Pass 3: insert
         for (let i = 0; i < candidates.length; i++) {
@@ -135,9 +134,7 @@ Deno.serve(async (req) => {
           const c = candidates[i];
 
           for (const slug of c.matchedSlugs) {
-            const classification = c.matchedSlugs.length > 1
-              ? (targetedMap.get(`${i}:${slug}`) || classifications[i])
-              : classifications[i];
+            const classification = targetedMap.get(`${i}:${slug}`) || classifications[i];
             const modelId = modelMap[slug];
             if (!modelId || isDuplicate(titleKeys, c.text.slice(0, 120), modelId)) continue;
             const { error } = await supabase.from("scraped_posts").upsert({

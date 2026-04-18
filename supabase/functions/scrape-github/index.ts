@@ -99,23 +99,22 @@ Deno.serve(async (req) => {
         summary.classified += classifications.length;
         summary.irrelevant += classifications.filter(c => !c.relevant).length;
 
-        // Pass 2.5: targeted classification for multi-model posts
-        const multiModelItems: { idx: number; slug: string }[] = [];
+        // Pass 2.5: targeted classification for each matched model.
+        const targetedItems: { idx: number; slug: string }[] = [];
         for (let i = 0; i < candidates.length; i++) {
-          if (candidates[i].matchedSlugs.length > 1 && classifications[i].relevant) {
-            for (const slug of candidates[i].matchedSlugs) {
-              multiModelItems.push({ idx: i, slug });
-            }
+          if (!classifications[i].relevant) continue;
+          for (const slug of candidates[i].matchedSlugs) {
+            targetedItems.push({ idx: i, slug });
           }
         }
-        const targetedResults = multiModelItems.length > 0
+        const targetedResults = targetedItems.length > 0
           ? await classifyBatchTargeted(
-              multiModelItems.map(m => ({ text: candidates[m.idx].text, targetModel: m.slug })),
+              targetedItems.map(item => ({ text: candidates[item.idx].text, targetModel: item.slug })),
               lovableApiKey, 25, githubLogError
             )
           : [];
         const targetedMap = new Map<string, typeof classifications[0]>();
-        multiModelItems.forEach((m, j) => targetedMap.set(`${m.idx}:${m.slug}`, targetedResults[j]));
+        targetedItems.forEach((item, j) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[j]));
 
         // Pass 3: insert
         for (let i = 0; i < candidates.length; i++) {
@@ -124,9 +123,7 @@ Deno.serve(async (req) => {
           const c = candidates[i];
 
           for (const slug of c.matchedSlugs) {
-            const cls = c.matchedSlugs.length > 1
-              ? (targetedMap.get(`${i}:${slug}`) || classification)
-              : classification;
+            const cls = targetedMap.get(`${i}:${slug}`) || classification;
             if (!cls.relevant) continue;
             const modelId = modelMap[slug];
             if (!modelId) continue;
