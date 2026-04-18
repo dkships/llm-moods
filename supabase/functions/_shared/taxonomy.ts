@@ -4,7 +4,7 @@ import {
   normalizePraiseCategory as normalizeSharedPraiseCategory,
   normalizePublicComplaintCategory,
   normalizeSentiment as normalizeSharedSentiment,
-} from "../../../src/shared/public-taxonomy.ts";
+} from "./public-taxonomy.ts";
 
 export const VALID_PUBLIC_COMPLAINTS = new Set(PUBLIC_COMPLAINT_CATEGORIES);
 export const VALID_PRAISE_CATEGORIES = new Set(PRAISE_CATEGORIES);
