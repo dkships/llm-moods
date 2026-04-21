@@ -15,7 +15,7 @@ import {
 } from "@/hooks/useVibesData";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import {
-  getVibeStatus, fadeUp, formatComplaintLabel, SOURCE_LABELS,
+  getPacificDateLabel, getVibeStatus, fadeUp, formatComplaintLabel, SOURCE_LABELS,
   SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
@@ -111,8 +111,8 @@ const ModelDetail = () => {
       });
     }
 
-    // For 7d/30d: build a complete date range so gaps are visible
-    // Use UTC dates to match period_start (stored as UTC midnight)
+    // For 7d/30d: build a complete date range so gaps are visible.
+    // Daily period_start values represent Pacific-local days stored as UTC instants.
     const scoresByDate = new Map<string, number>();
     for (const v of history) {
       const key = new Date(v.period_start).toISOString().slice(0, 10);
@@ -121,12 +121,12 @@ const ModelDetail = () => {
 
     const days = timeRange === "7d" ? 7 : 30;
     const now = new Date();
-    const todayUTC = now.toISOString().slice(0, 10);
+    const todayPacific = getPacificDateLabel(now);
     const result: { day: string; score: number | null }[] = [];
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
       const key = d.toISOString().slice(0, 10);
-      const label = key === todayUTC
+      const label = key === todayPacific
         ? "Today"
         : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
       result.push({ day: label, score: scoresByDate.get(key) ?? null });

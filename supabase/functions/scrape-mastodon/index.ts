@@ -1,210 +1,366 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
-import { corsHeaders, loadKeywords, matchModels, meetsMinLength, isLikelyNewsShare, logToErrorLog, triggerAggregateVibes } from "../_shared/utils.ts";
+import {
+  createRunRecord,
+  deriveRunMetrics,
+  isUniqueViolation,
+  readJsonBody,
+  type RunRecordRow,
+  updateRunRecord,
+} from "../_shared/runtime.ts";
+import {
+  corsHeaders,
+  loadKeywords,
+  matchModels,
+  meetsMinLength,
+  isLikelyNewsShare,
+  logToErrorLog,
+  triggerAggregateVibes,
+  upsertScrapedPost,
+} from "../_shared/utils.ts";
 
+const SOURCE = "scrape-mastodon";
 const MAIN_INSTANCE = "mastodon.social";
 const MAIN_HASHTAGS = ["chatgpt", "claudeai", "grok", "llm"];
 const TECH_INSTANCES = ["mastodon.online", "techhub.social", "sigmoid.social", "hachyderm.io"];
 const TECH_HASHTAGS = ["llm", "chatgpt"];
+const SEARCH_QUERIES = ["Claude AI", "ChatGPT", "GPT dumber", "Claude worse", "Gemini bad", "AI getting worse"];
+const SEARCH_INSTANCE = "mastodon.social";
+const ASTROLOGY_TERMS = [
+  "horoscope",
+  "zodiac",
+  "mercury retrograde",
+  "natal chart",
+  "birth chart",
+  "sun sign",
+  "moon sign",
+  "rising sign",
+  "astrology",
+];
 
-const ASTROLOGY_TERMS = ["horoscope", "zodiac", "mercury retrograde", "natal chart", "birth chart", "sun sign", "moon sign", "rising sign", "astrology"];
 function isAstrologyPost(text: string): boolean {
   const lower = text.toLowerCase();
-  return ASTROLOGY_TERMS.some(term => lower.includes(term));
+  return ASTROLOGY_TERMS.some((term) => lower.includes(term));
 }
-
-const SEARCH_QUERIES = [
-  "Claude AI", "ChatGPT", "GPT dumber", "Claude worse", "Gemini bad", "AI getting worse",
-];
-const SEARCH_INSTANCE = "mastodon.social";
 
 function stripHtml(html: string): string {
   return html.replace(/<[^>]*>/g, "")
-    .replace(/&#(\d+);/g, (_: string, n: string) => String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_: string, h: string) => String.fromCharCode(parseInt(h, 16)))
-    .replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").trim();
+    .replace(/&#(\d+);/g, (_match: string, value: string) => String.fromCharCode(Number(value)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_match: string, value: string) => String.fromCharCode(parseInt(value, 16)))
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .trim();
 }
 
-function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
-
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 async function fetchWithTimeout(url: string, timeoutMs = 15000): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    const res = await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
-    return res;
+    return await fetch(url, { headers: { Accept: "application/json" }, signal: controller.signal });
   } finally {
     clearTimeout(timer);
   }
 }
 
 interface Status {
-  id: string;
   content: string;
   created_at: string;
   url: string;
   favourites_count: number;
   reblogs_count: number;
-  language: string | null;
-  account?: { acct?: string };
 }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const body = await readJsonBody(req);
+  let runRecord: RunRecordRow | null = null;
 
   try {
-    const lovableApiKey = Deno.env.get("GEMINI_API_KEY")!;
-    await logToErrorLog(supabase, "scrape-mastodon", "Mastodon scraper started (v3 - multi-instance + search)", "health-check");
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+    if (!geminiApiKey) throw new Error("GEMINI_API_KEY not configured");
+
+    const { data: startedRun, error: runError } = await createRunRecord(supabase, {
+      source: SOURCE,
+      run_kind: "scraper",
+      status: "running",
+      parent_run_id: typeof body.parent_run_id === "string" ? body.parent_run_id : null,
+      triggered_by: body.orchestrated ? "orchestrator" : "manual",
+      window_label: typeof body.window_label === "string" ? body.window_label : null,
+      window_local_date: typeof body.window_local_date === "string" ? body.window_local_date : null,
+      timezone: typeof body.timezone === "string" ? body.timezone : null,
+      started_at: new Date().toISOString(),
+    });
+
+    if (runError) {
+      if (isUniqueViolation(runError)) {
+        return new Response(JSON.stringify({
+          source: SOURCE,
+          status: "skipped",
+          skipped: true,
+          reason: "already_running",
+          errors: [],
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw runError;
+    }
+    runRecord = startedRun;
+
+    await logToErrorLog(supabase, SOURCE, "Mastodon scraper started", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
-    const { data: existing } = await supabase.from("scraped_posts").select("source_url").eq("source", "mastodon").limit(10000);
-    const existingUrls = new Set((existing || []).map((e: any) => e.source_url).filter(Boolean));
+    const { data: existing } = await supabase
+      .from("scraped_posts")
+      .select("source_url")
+      .eq("source", "mastodon")
+      .limit(10000);
+    const existingUrls = new Set((existing || []).map((entry: any) => entry.source_url).filter(Boolean));
 
     const cutoff = new Date(Date.now() - 24 * 3600000);
-    const summary = { fetched: 0, filtered: 0, classified: 0, inserted: 0, irrelevant: 0, langSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[] };
+    const summary = {
+      source: SOURCE,
+      posts_found: 0,
+      filtered_candidates: 0,
+      classified: 0,
+      net_new_rows: 0,
+      duplicate_conflicts: 0,
+      irrelevant: 0,
+      dedupSkipped: 0,
+      contentSkipped: 0,
+      errors: [] as string[],
+    };
 
-    // Collect all statuses, deduped by URL
     const allStatuses = new Map<string, Status>();
 
-    // Phase 1a: Full hashtag set on main instance
     for (const hashtag of MAIN_HASHTAGS) {
       await delay(1000);
       try {
         const url = `https://${MAIN_INSTANCE}/api/v1/timelines/tag/${hashtag}?limit=40`;
         const res = await fetchWithTimeout(url);
-        if (!res.ok) { summary.errors.push(`${MAIN_INSTANCE}/#${hashtag}: HTTP ${res.status}`); continue; }
+        if (!res.ok) {
+          summary.errors.push(`${MAIN_INSTANCE}/#${hashtag}: HTTP ${res.status}`);
+          continue;
+        }
         const statuses: Status[] = await res.json();
         if (!Array.isArray(statuses)) continue;
-        for (const s of statuses) {
-          if (s.url && !allStatuses.has(s.url)) allStatuses.set(s.url, s);
+        for (const status of statuses) {
+          if (status.url && !allStatuses.has(status.url)) allStatuses.set(status.url, status);
         }
-      } catch (e) {
-        summary.errors.push(`${MAIN_INSTANCE}/#${hashtag}: ${e instanceof Error ? e.message : String(e)}`);
+      } catch (error) {
+        summary.errors.push(`${MAIN_INSTANCE}/#${hashtag}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
-    // Phase 1b: Targeted hashtags on tech instances
     for (const instance of TECH_INSTANCES) {
       for (const hashtag of TECH_HASHTAGS) {
         await delay(1000);
         try {
           const url = `https://${instance}/api/v1/timelines/tag/${hashtag}?limit=40`;
           const res = await fetchWithTimeout(url);
-          if (!res.ok) { summary.errors.push(`${instance}/#${hashtag}: HTTP ${res.status}`); continue; }
+          if (!res.ok) {
+            summary.errors.push(`${instance}/#${hashtag}: HTTP ${res.status}`);
+            continue;
+          }
           const statuses: Status[] = await res.json();
           if (!Array.isArray(statuses)) continue;
-          for (const s of statuses) {
-            if (s.url && !allStatuses.has(s.url)) allStatuses.set(s.url, s);
+          for (const status of statuses) {
+            if (status.url && !allStatuses.has(status.url)) allStatuses.set(status.url, status);
           }
-        } catch (e) {
-          summary.errors.push(`${instance}/#${hashtag}: ${e instanceof Error ? e.message : String(e)}`);
+        } catch (error) {
+          summary.errors.push(`${instance}/#${hashtag}: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
     }
 
-    // Phase 2: Search queries on mastodon.social
     for (const query of SEARCH_QUERIES) {
       await delay(1000);
       try {
         const url = `https://${SEARCH_INSTANCE}/api/v2/search?q=${encodeURIComponent(query)}&type=statuses&limit=20`;
         const res = await fetchWithTimeout(url);
-        if (!res.ok) { summary.errors.push(`search "${query}": HTTP ${res.status}`); continue; }
+        if (!res.ok) {
+          summary.errors.push(`search "${query}": HTTP ${res.status}`);
+          continue;
+        }
         const result = await res.json();
         const statuses: Status[] = result.statuses || [];
-        for (const s of statuses) {
-          if (s.url && !allStatuses.has(s.url)) allStatuses.set(s.url, s);
+        for (const status of statuses) {
+          if (status.url && !allStatuses.has(status.url)) allStatuses.set(status.url, status);
         }
-      } catch (e) {
-        summary.errors.push(`search "${query}": ${e instanceof Error ? e.message : String(e)}`);
+      } catch (error) {
+        summary.errors.push(`search "${query}": ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 
-    summary.fetched = allStatuses.size;
+    summary.posts_found = allStatuses.size;
 
-    // Phase 3: Collect candidates from all statuses
-    const candidates: { content: string; matchedSlugs: string[]; sourceUrl: string; score: number; postedAt: string }[] = [];
+    const candidates: {
+      content: string;
+      matchedSlugs: string[];
+      sourceUrl: string;
+      score: number;
+      postedAt: string;
+    }[] = [];
+
     for (const [sourceUrl, status] of allStatuses) {
       const createdAt = new Date(status.created_at);
       if (createdAt < cutoff) continue;
 
       const content = stripHtml(status.content || "");
-      if (!meetsMinLength("", content)) { summary.contentSkipped++; continue; }
-      if (isAstrologyPost(content)) { summary.contentSkipped++; continue; }
-      if (isLikelyNewsShare("", content)) { summary.contentSkipped++; continue; }
+      if (!meetsMinLength("", content)) {
+        summary.contentSkipped++;
+        continue;
+      }
+      if (isAstrologyPost(content)) {
+        summary.contentSkipped++;
+        continue;
+      }
+      if (isLikelyNewsShare("", content)) {
+        summary.contentSkipped++;
+        continue;
+      }
 
       const matchedSlugs = matchModels(content, keywords);
       if (matchedSlugs.length === 0) continue;
-      summary.filtered++;
+      summary.filtered_candidates++;
 
-      if (existingUrls.has(sourceUrl)) { summary.dedupSkipped++; continue; }
+      if (existingUrls.has(sourceUrl)) {
+        summary.dedupSkipped++;
+        continue;
+      }
 
       const score = (status.favourites_count || 0) + (status.reblogs_count || 0);
       candidates.push({ content, matchedSlugs, sourceUrl, score, postedAt: status.created_at });
     }
 
-    // Pass 2: batch classify
     const mastodonLogError = async (msg: string, ctx?: string) => {
-      await logToErrorLog(supabase, "scrape-mastodon", msg, ctx || "classify");
+      await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
     };
-    const classifications = await classifyBatch(candidates.map(c => c.content), lovableApiKey, 25, mastodonLogError);
+    const classifications = await classifyBatch(candidates.map((candidate) => candidate.content), geminiApiKey, 25, mastodonLogError);
     summary.classified = classifications.length;
-    summary.irrelevant = classifications.filter(c => !c.relevant).length;
+    summary.irrelevant = classifications.filter((classification) => !classification.relevant).length;
 
-    // Pass 2b: Re-classify each matched model with targeted sentiment.
     const targetedItems: { idx: number; slug: string }[] = [];
-    for (let i = 0; i < candidates.length; i++) {
-      if (!classifications[i].relevant) continue;
-      for (const slug of candidates[i].matchedSlugs) {
-        targetedItems.push({ idx: i, slug });
+    for (let index = 0; index < candidates.length; index++) {
+      if (!classifications[index].relevant) continue;
+      for (const slug of candidates[index].matchedSlugs) {
+        targetedItems.push({ idx: index, slug });
       }
     }
     const targetedResults = targetedItems.length > 0
       ? await classifyBatchTargeted(
-          targetedItems.map(item => ({ text: candidates[item.idx].content, targetModel: item.slug })),
-          lovableApiKey, 25, mastodonLogError
-        )
+        targetedItems.map((item) => ({ text: candidates[item.idx].content, targetModel: item.slug })),
+        geminiApiKey,
+        25,
+        mastodonLogError,
+      )
       : [];
     const targetedMap = new Map<string, typeof classifications[0]>();
-    targetedItems.forEach((item, j) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[j]));
+    targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
 
-    // Pass 3: insert
-    for (let i = 0; i < candidates.length; i++) {
-      const classification = classifications[i];
-      if (!classification.relevant) continue;
-      const c = candidates[i];
+    for (let index = 0; index < candidates.length; index++) {
+      const baseClassification = classifications[index];
+      if (!baseClassification.relevant) continue;
+      const candidate = candidates[index];
 
-      for (const slug of c.matchedSlugs) {
+      for (const slug of candidate.matchedSlugs) {
         const modelId = modelMap[slug];
         if (!modelId) continue;
-        const cls = targetedMap.get(`${i}:${slug}`) || classification;
-        if (!cls.relevant) continue;
-        const { error } = await supabase.from("scraped_posts").upsert({
-          model_id: modelId, source: "mastodon", source_url: c.sourceUrl,
-          title: c.content.slice(0, 120), content: c.content.slice(0, 2000),
-          sentiment: cls.sentiment, complaint_category: cls.complaint_category,
-          praise_category: cls.praise_category,
-          confidence: cls.confidence, content_type: "full_content",
-          original_language: cls.language || null,
-          translated_content: cls.english_translation || null,
-          score: c.score, posted_at: c.postedAt,
-        }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
-        if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
-          summary.inserted++;
-          existingUrls.add(c.sourceUrl);
+        const classification = targetedMap.get(`${index}:${slug}`) || baseClassification;
+        if (!classification.relevant) continue;
+
+        const upsertResult = await upsertScrapedPost(supabase, {
+          model_id: modelId,
+          source: "mastodon",
+          source_url: candidate.sourceUrl,
+          title: candidate.content.slice(0, 120),
+          content: candidate.content.slice(0, 2000),
+          sentiment: classification.sentiment,
+          complaint_category: classification.complaint_category,
+          praise_category: classification.praise_category,
+          confidence: classification.confidence,
+          content_type: "full_content",
+          original_language: classification.language || null,
+          translated_content: classification.english_translation || null,
+          score: candidate.score,
+          posted_at: candidate.postedAt,
+        });
+
+        if (upsertResult.error) {
+          summary.errors.push(`Insert: ${upsertResult.error}`);
+          continue;
+        }
+
+        if (upsertResult.inserted) {
+          summary.net_new_rows++;
+          existingUrls.add(candidate.sourceUrl);
+        } else {
+          summary.duplicate_conflicts++;
         }
       }
     }
 
-    await logToErrorLog(supabase, "scrape-mastodon", `Completed: fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} errors=${summary.errors.length}`, "summary");
-    await triggerAggregateVibes(supabase, "scrape-mastodon");
-    return new Response(JSON.stringify(summary, null, 2), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown";
-    await logToErrorLog(supabase, "scrape-mastodon", msg, "top-level error");
-    return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    const derived = deriveRunMetrics(summary);
+    await updateRunRecord(supabase, runRecord.id, {
+      status: derived.status,
+      posts_found: derived.posts_found,
+      posts_classified: derived.posts_classified,
+      filtered_candidates: derived.filtered_candidates,
+      net_new_rows: derived.net_new_rows,
+      duplicate_conflicts: derived.duplicate_conflicts,
+      errors: derived.errors,
+      metadata: {
+        irrelevant: summary.irrelevant,
+        dedup_skipped: summary.dedupSkipped,
+        content_skipped: summary.contentSkipped,
+      },
+      completed_at: new Date().toISOString(),
+    });
+
+    await logToErrorLog(
+      supabase,
+      SOURCE,
+      `Completed: fetched=${summary.posts_found} filtered=${summary.filtered_candidates} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.net_new_rows} duplicateConflicts=${summary.duplicate_conflicts} errors=${summary.errors.length}`,
+      "summary",
+    );
+
+    const responseBody = {
+      ...summary,
+      status: derived.status,
+      posts_classified: derived.posts_classified,
+    };
+
+    if (!body.orchestrated) {
+      await triggerAggregateVibes(supabase, SOURCE, { reason: "standalone_run" });
+    }
+
+    return new Response(JSON.stringify(responseBody, null, 2), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown";
+    await logToErrorLog(supabase, SOURCE, message, "top-level error");
+    if (runRecord) {
+      await updateRunRecord(supabase, runRecord.id, {
+        status: "failed",
+        errors: [message],
+        metadata: { error: message },
+        completed_at: new Date().toISOString(),
+      });
+    }
+    return new Response(JSON.stringify({ source: SOURCE, status: "failed", error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 });

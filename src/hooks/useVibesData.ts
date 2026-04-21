@@ -136,7 +136,10 @@ export function useVibesHistory(modelId: string | undefined, period: string, ran
     queryFn: async () => {
       const now = new Date();
       let since: Date;
-      if (range === "24h") {
+      if (period === "daily") {
+        const days = range === "7d" ? 6 : 29;
+        since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - days));
+      } else if (range === "24h") {
         since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
       } else if (range === "7d") {
         since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -231,7 +234,8 @@ export function usePrefetchModelDetail() {
       queryKey: ["vibes-history", modelId, "daily", "30d"],
       staleTime: 60_000,
       queryFn: async () => {
-        const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        const now = new Date();
+        const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 29)).toISOString();
         const { data } = await supabase
           .from("vibes_scores")
           .select("*")

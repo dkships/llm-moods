@@ -3,10 +3,11 @@ import {
   applyScoreSmoothing,
   computeScore,
   DEFAULT_MIN_POSTS,
+  getPacificDayWindow,
   getPreviousDailyScore,
-  getUtcDayWindow,
   type ScoreResult,
 } from "../_shared/vibes-scoring.ts";
+import { internalOnlyResponse, isInternalServiceRequest } from "../_shared/runtime.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -16,6 +17,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -30,14 +32,14 @@ Deno.serve(async (req) => {
     }
 
     const now = new Date();
-    const dailyWindow = getUtcDayWindow(now);
+    const dailyWindow = getPacificDayWindow(now);
 
     const summary: Record<string, any> = {};
 
     for (const model of models) {
       const modelSummary: any = { daily: null, hourly: null };
 
-      // --- Daily aggregation (UTC calendar day) ---
+      // --- Daily aggregation (Pacific-local calendar day) ---
       const { data: dailyPosts } = await supabase
         .from("scraped_posts")
         .select("sentiment, complaint_category, confidence, score, content_type, source")

@@ -43,6 +43,18 @@ export function formatTimeAgo(dateStr: string): string {
   return `${days}d ago`;
 }
 
+export function getPacificDateLabel(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "America/Los_Angeles",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+
+  const lookup = (type: "year" | "month" | "day") => parts.find((part) => part.type === type)?.value ?? "00";
+  return `${lookup("year")}-${lookup("month")}-${lookup("day")}`;
+}
+
 export function formatSourceDisplay(source: string): { emoji: string; label: string } {
   if (source === "reddit") return { emoji: "🟠", label: "Reddit" };
   if (source === "hackernews") return { emoji: "🟡", label: "Hacker News" };

@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   applyScoreSmoothing,
   computeScore,
+  getMatchingWindow,
+  getPacificDayWindow,
   getPreviousDailyScore,
   getUtcDayWindow,
 } from "../../supabase/functions/_shared/vibes-scoring";
@@ -16,6 +18,35 @@ describe("vibes scoring helpers", () => {
       rangeStart: "2026-04-18T00:00:00.000Z",
       rangeEnd: "2026-04-19T00:00:00.000Z",
       label: "2026-04-18",
+      timeZone: "UTC",
+    });
+  });
+
+  it("builds Pacific-local daily windows from local midnight boundaries", () => {
+    const window = getPacificDayWindow(new Date("2026-04-18T15:42:10.000Z"));
+
+    expect(window).toEqual({
+      periodStart: "2026-04-18T07:00:00.000Z",
+      rangeStart: "2026-04-18T07:00:00.000Z",
+      rangeEnd: "2026-04-19T07:00:00.000Z",
+      label: "2026-04-18",
+      timeZone: "America/Los_Angeles",
+    });
+  });
+
+  it("matches coordinated scrape windows in Pacific time", () => {
+    const matched = getMatchingWindow(
+      new Date("2026-04-18T21:00:00.000Z"),
+      "America/Los_Angeles",
+      ["05:00", "14:00", "21:00"],
+    );
+
+    expect(matched).toEqual({
+      label: "afternoon",
+      time: "14:00",
+      localDate: "2026-04-18",
+      localTime: "14:00",
+      timeZone: "America/Los_Angeles",
     });
   });
 

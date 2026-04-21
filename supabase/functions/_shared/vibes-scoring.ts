@@ -24,28 +24,169 @@ export interface DailyScoreSeedRow {
   score: number;
 }
 
-export interface UtcDayWindow {
+export interface TimeZoneDayWindow {
   periodStart: string;
   rangeStart: string;
   rangeEnd: string;
   label: string;
+  timeZone: string;
 }
 
 export const DEFAULT_MIN_POSTS = 5;
+export const PACIFIC_TIMEZONE = "America/Los_Angeles";
 
-export function getUtcDayWindow(date: Date): UtcDayWindow {
-  const dayStart = new Date(Date.UTC(
-    date.getUTCFullYear(),
-    date.getUTCMonth(),
-    date.getUTCDate(),
-  ));
-  const dayEnd = new Date(dayStart.getTime() + 24 * 60 * 60 * 1000);
+const PARTS_CACHE = new Map<string, Intl.DateTimeFormat>();
+
+function pad2(value: number): string {
+  return String(value).padStart(2, "0");
+}
+
+function getPartsFormatter(timeZone: string): Intl.DateTimeFormat {
+  const cacheKey = `${timeZone}:parts`;
+  const cached = PARTS_CACHE.get(cacheKey);
+  if (cached) return cached;
+
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+  });
+
+  PARTS_CACHE.set(cacheKey, formatter);
+  return formatter;
+}
+
+function getTimeZoneParts(date: Date, timeZone: string) {
+  const parts = getPartsFormatter(timeZone).formatToParts(date);
+
+  const lookup = (type: Intl.DateTimeFormatPartTypes): number => {
+    const part = parts.find((entry) => entry.type === type)?.value;
+    if (!part) throw new Error(`Missing ${type} for timezone ${timeZone}`);
+    return Number(part);
+  };
 
   return {
-    periodStart: dayStart.toISOString(),
-    rangeStart: dayStart.toISOString(),
-    rangeEnd: dayEnd.toISOString(),
-    label: dayStart.toISOString().slice(0, 10),
+    year: lookup("year"),
+    month: lookup("month"),
+    day: lookup("day"),
+    hour: lookup("hour"),
+    minute: lookup("minute"),
+    second: lookup("second"),
+  };
+}
+
+export function getLocalDateLabel(date: Date, timeZone: string): string {
+  const parts = getTimeZoneParts(date, timeZone);
+  return `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
+}
+
+function addDaysToDateLabel(label: string, days: number): string {
+  const [year, month, day] = label.split("-").map(Number);
+  const shifted = new Date(Date.UTC(year, month - 1, day + days));
+  return shifted.toISOString().slice(0, 10);
+}
+
+function getTimeZoneOffsetMs(date: Date, timeZone: string): number {
+  const parts = getTimeZoneParts(date, timeZone);
+  const asUtc = Date.UTC(
+    parts.year,
+    parts.month - 1,
+    parts.day,
+    parts.hour,
+    parts.minute,
+    parts.second,
+  );
+  return asUtc - date.getTime();
+}
+
+export function getUtcInstantForLocalTime(
+  label: string,
+  time: string,
+  timeZone: string,
+): Date {
+  const [year, month, day] = label.split("-").map(Number);
+  const [hour, minute] = time.split(":").map(Number);
+  const utcBase = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+
+  let guess = utcBase;
+  for (let i = 0; i < 4; i++) {
+    const offsetMs = getTimeZoneOffsetMs(new Date(guess), timeZone);
+    const nextGuess = utcBase - offsetMs;
+    if (nextGuess === guess) break;
+    guess = nextGuess;
+  }
+
+  return new Date(guess);
+}
+
+export function getTimeZoneDayWindow(date: Date, timeZone: string): TimeZoneDayWindow {
+  const label = getLocalDateLabel(date, timeZone);
+  const nextLabel = addDaysToDateLabel(label, 1);
+  const rangeStart = getUtcInstantForLocalTime(label, "00:00", timeZone);
+  const rangeEnd = getUtcInstantForLocalTime(nextLabel, "00:00", timeZone);
+
+  return {
+    periodStart: rangeStart.toISOString(),
+    rangeStart: rangeStart.toISOString(),
+    rangeEnd: rangeEnd.toISOString(),
+    label,
+    timeZone,
+  };
+}
+
+export function getUtcDayWindow(date: Date): TimeZoneDayWindow {
+  return getTimeZoneDayWindow(date, "UTC");
+}
+
+export function getPacificDayWindow(date: Date): TimeZoneDayWindow {
+  return getTimeZoneDayWindow(date, PACIFIC_TIMEZONE);
+}
+
+export interface CoordinatedWindow {
+  label: string;
+  time: string;
+}
+
+export interface MatchingWindow extends CoordinatedWindow {
+  localDate: string;
+  localTime: string;
+  timeZone: string;
+}
+
+export function normalizeWindowTimes(windowTimes: string[]): CoordinatedWindow[] {
+  const uniqueTimes = Array.from(new Set(windowTimes))
+    .filter((value) => /^\d{2}:\d{2}$/.test(value))
+    .sort();
+
+  const fallbackLabels = ["morning", "afternoon", "evening"];
+  return uniqueTimes.map((time, index) => ({
+    time,
+    label: fallbackLabels[index] ?? `window_${index + 1}`,
+  }));
+}
+
+export function getMatchingWindow(
+  date: Date,
+  timeZone: string,
+  windowTimes: string[],
+): MatchingWindow | null {
+  const parts = getTimeZoneParts(date, timeZone);
+  const localTime = `${pad2(parts.hour)}:${pad2(parts.minute)}`;
+  const windows = normalizeWindowTimes(windowTimes);
+  const matched = windows.find((window) => window.time === localTime);
+
+  if (!matched) return null;
+
+  return {
+    ...matched,
+    localDate: `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`,
+    localTime,
+    timeZone,
   };
 }
 

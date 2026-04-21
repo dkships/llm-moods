@@ -114,7 +114,7 @@ export async function logToErrorLog(supabase: any, functionName: string, msg: st
   try { await supabase.from("error_log").insert({ function_name: functionName, error_message: msg, context: ctx || null }); } catch (e) { console.error("logToErrorLog failed:", msg, e); }
 }
 
-export async function triggerAggregateVibes(supabase: any, source: string) {
+export async function triggerAggregateVibes(supabase: any, source: string, payload: Record<string, unknown> = {}) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) return;
@@ -126,7 +126,7 @@ export async function triggerAggregateVibes(supabase: any, source: string) {
         Authorization: `Bearer ${serviceRoleKey}`,
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({ source }),
+      body: JSON.stringify({ source, ...payload }),
     });
 
     if (!res.ok) {
@@ -146,4 +146,23 @@ export async function triggerAggregateVibes(supabase: any, source: string) {
       "aggregate-trigger",
     );
   }
+}
+
+export async function upsertScrapedPost(
+  supabase: any,
+  payload: Record<string, unknown>,
+): Promise<{ inserted: boolean; error: string | null }> {
+  const { data, error } = await supabase
+    .from("scraped_posts")
+    .upsert(payload, { onConflict: "source_url,model_id", ignoreDuplicates: true })
+    .select("id");
+
+  if (error) {
+    return { inserted: false, error: error.message };
+  }
+
+  return {
+    inserted: Array.isArray(data) && data.length > 0,
+    error: null,
+  };
 }

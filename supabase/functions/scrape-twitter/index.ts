@@ -1,9 +1,41 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
 import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "../_shared/taxonomy.ts";
-import { corsHeaders, KeywordEntry, loadKeywords, matchModels, meetsMinLength, loadRecentTitleKeys, isDuplicate, logToErrorLog, triggerAggregateVibes } from "../_shared/utils.ts";
+import {
+  createRunRecord,
+  deriveRunMetrics,
+  getConfigBoolean,
+  getConfigNumber,
+  getConfigValue,
+  getConfigValues,
+  internalOnlyResponse,
+  isInternalServiceRequest,
+  isUniqueViolation,
+  loadScraperConfig,
+  readJsonBody,
+  type RunRecordRow,
+  updateRunRecord,
+} from "../_shared/runtime.ts";
+import {
+  corsHeaders,
+  type KeywordEntry,
+  loadKeywords,
+  matchModels,
+  meetsMinLength,
+  loadRecentTitleKeys,
+  isDuplicate,
+  logToErrorLog,
+  triggerAggregateVibes,
+  upsertScrapedPost,
+} from "../_shared/utils.ts";
 
-function delay(ms: number) { return new Promise(r => setTimeout(r, ms)); }
+const SOURCE = "scrape-twitter";
+const DEFAULT_SEARCH_TERMS = [
+  `("claude" OR "claude ai" OR "claude code" OR anthropic) lang:en -filter:retweets`,
+  `("chatgpt" OR "chat gpt" OR "openai gpt" OR openai) lang:en -filter:retweets`,
+  `("gemini" OR "google gemini" OR "gemini ai") lang:en -filter:retweets`,
+  `("grok" OR "grok ai" OR "xai grok") lang:en -filter:retweets`,
+];
 
 const GROK_SEARCH_PROMPT = `Search X/Twitter for recent posts (last 24 hours) about these AI models: Claude, ChatGPT, GPT-4, GPT-4o, Gemini, Grok.
 
@@ -24,7 +56,26 @@ For EACH relevant post found, classify it and return a JSON array. Each element:
 Skip posts that are just news, funding announcements, tutorials, or opinions about AI in general.
 Return ONLY the JSON array, no other text.`;
 
-// ─── Apify path ───────────────────────────────────────────────────────────────
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function buildTwitterSummary(backend: "apify" | "grok") {
+  return {
+    source: SOURCE,
+    backend,
+    apify_items_fetched: 0,
+    posts_found: 0,
+    filtered_candidates: 0,
+    classified: 0,
+    net_new_rows: 0,
+    duplicate_conflicts: 0,
+    irrelevant: 0,
+    dedupSkipped: 0,
+    contentSkipped: 0,
+    errors: [] as string[],
+  };
+}
 
 async function runApifyPath(
   supabase: any,
@@ -33,31 +84,18 @@ async function runApifyPath(
   keywords: KeywordEntry[],
   existingUrls: Set<string>,
   titleKeys: Set<string>,
-  lovableApiKey: string,
+  geminiApiKey: string,
+  config: Record<string, string[]>,
 ) {
-  const summary = {
-    fetched: 0, filtered: 0, classified: 0, inserted: 0, irrelevant: 0,
-    langSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[],
-    backend: "apify" as const,
-  };
-
-  // Step 1 — Start actor run
-  const startUrl = `https://api.apify.com/v2/acts/apidojo~tweet-scraper/runs?token=${apifyToken}`;
-  const yesterday = new Date(Date.now() - 24 * 3600000).toISOString().split("T")[0];
-  const today = new Date().toISOString().split("T")[0];
+  const summary = buildTwitterSummary("apify");
+  const searchTerms = getConfigValues(config, "search_term");
   const apifyInput = {
-    searchTerms: [
-      "Claude AI", "ChatGPT", "Gemini AI", "Grok AI",
-    ],
-    maxItems: 50,
-    sort: "Latest",
-    tweetLanguage: "en",
-    includeSearchTerms: true,
-    start: yesterday,
-    end: today,
+    searchTerms: searchTerms.length > 0 ? searchTerms : DEFAULT_SEARCH_TERMS,
+    sort: getConfigValue(config, "sort_mode", "Latest"),
+    maxItems: getConfigNumber(config, "max_items", 50),
   };
 
-  const startRes = await fetch(startUrl, {
+  const startRes = await fetch(`https://api.apify.com/v2/acts/apidojo~tweet-scraper/runs?token=${apifyToken}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(apifyInput),
@@ -65,29 +103,31 @@ async function runApifyPath(
 
   if (!startRes.ok) {
     const errorText = await startRes.text().catch(() => "unknown");
-    await logToErrorLog(supabase, "scrape-twitter", `Apify start failed HTTP ${startRes.status}: ${errorText.slice(0, 500)}`, "apify-error");
-    // Treat quota/billing errors as a graceful skip so the orchestrator doesn't report a failure
+    await logToErrorLog(supabase, SOURCE, `Apify start failed HTTP ${startRes.status}: ${errorText.slice(0, 500)}`, "apify-error");
     if (startRes.status === 402 || startRes.status === 403) {
-      summary.errors.push(`Apify quota exceeded (HTTP ${startRes.status})`);
-      return summary;
+      return {
+        ...summary,
+        status: "skipped",
+        skipped: true,
+        reason: `quota_or_auth_${startRes.status}`,
+        errors: [`Apify quota/auth error (HTTP ${startRes.status})`],
+      };
     }
     throw new Error(`Apify start returned ${startRes.status}`);
   }
 
   const runData = await startRes.json();
-  const runId = runData.data?.id;
+  const apifyRunId = runData.data?.id;
   const datasetId = runData.data?.defaultDatasetId;
-  if (!runId || !datasetId) {
-    await logToErrorLog(supabase, "scrape-twitter", "No runId/datasetId from Apify", "apify-error");
+  if (!apifyRunId || !datasetId) {
+    await logToErrorLog(supabase, SOURCE, "No runId/datasetId from Apify", "apify-error");
     throw new Error("Missing runId from Apify");
   }
 
-  // Step 2 — Poll status (10s intervals, max 18 polls = 3 min)
-  const maxPolls = 18;
   let runStatus = "";
-  for (let i = 0; i < maxPolls; i++) {
+  for (let i = 0; i < 18; i++) {
     await delay(10000);
-    const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+    const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${apifyToken}`);
     if (!statusRes.ok) continue;
     const statusData = await statusRes.json();
     runStatus = statusData.data?.status || "";
@@ -95,89 +135,107 @@ async function runApifyPath(
   }
 
   if (!["SUCCEEDED", "ABORTED"].includes(runStatus)) {
-    // Fetch run details to get the actual error message
     let errorDetail = "";
     try {
-      const detailRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+      const detailRes = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${apifyToken}`);
       if (detailRes.ok) {
         const detailData = await detailRes.json();
         errorDetail = detailData.data?.statusMessage || detailData.data?.exitCode || "";
       }
     } catch {}
-    await logToErrorLog(supabase, "scrape-twitter", `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
-    summary.errors.push(`Apify run ${runStatus || "TIMEOUT"}: ${errorDetail}`);
-    return summary;
+    await logToErrorLog(supabase, SOURCE, `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
+    return {
+      ...summary,
+      errors: [`Apify run ${runStatus || "TIMEOUT"}: ${errorDetail}`],
+    };
   }
 
-  // Step 3 — Fetch dataset items
   const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json`);
   if (!datasetRes.ok) throw new Error("Failed to fetch Apify dataset");
 
   const rawItems = await datasetRes.json();
   if (!Array.isArray(rawItems)) throw new Error("Invalid dataset response");
 
-  // Filter items that have text content (handles both actor output formats)
   const items = rawItems.filter((item: any) => item.text || item.full_text);
-  await logToErrorLog(supabase, "scrape-twitter", `Apify raw=${rawItems.length} tweets=${items.length}`, "apify-debug");
+  summary.apify_items_fetched = rawItems.length;
+  summary.posts_found = items.length;
+  await logToErrorLog(supabase, SOURCE, `Apify raw=${rawItems.length} tweets=${items.length}`, "apify-debug");
 
   const cutoff = new Date(Date.now() - 24 * 3600000);
-  summary.fetched = items.length;
-
-  // Pass 1: collect candidates
-  const candidates: { text: string; matchedSlugs: string[]; sourceUrl: string; title: string; createdAt: string; engagementScore: number }[] = [];
+  const candidates: {
+    text: string;
+    matchedSlugs: string[];
+    sourceUrl: string;
+    title: string;
+    createdAt: string;
+    engagementScore: number;
+  }[] = [];
   const unmatchedSamples: string[] = [];
+
   for (const tweet of items) {
-    // Skip retweets (handle both field naming conventions)
     if (tweet.isRetweet || tweet.is_retweet) continue;
 
-    // Parse tweet date (handle both camelCase and snake_case actor formats)
     const createdAt = new Date(tweet.created_at || tweet.createdAt);
-    if (isNaN(createdAt.getTime()) || createdAt < cutoff) continue;
+    if (Number.isNaN(createdAt.getTime()) || createdAt < cutoff) continue;
 
     const text = (tweet.text || tweet.full_text || "").slice(0, 2000);
     if (!text) continue;
-
-    if (!meetsMinLength(text, "")) { summary.contentSkipped++; continue; }
+    if (!meetsMinLength(text, "")) {
+      summary.contentSkipped++;
+      continue;
+    }
 
     const matchedSlugs = matchModels(text, keywords);
     if (matchedSlugs.length === 0) {
       if (unmatchedSamples.length < 5) unmatchedSamples.push(text.slice(0, 120));
       continue;
     }
-    summary.filtered++;
+    summary.filtered_candidates++;
 
-    // Build source URL
     const screenName = tweet.username || tweet.user?.screen_name || tweet.screen_name || tweet.author?.userName || "";
     const sourceUrl = tweet.url || (screenName && tweet.id
       ? `https://x.com/${screenName}/status/${tweet.id}`
       : "");
-    if (!sourceUrl || existingUrls.has(sourceUrl)) { summary.dedupSkipped++; continue; }
+    if (!sourceUrl || existingUrls.has(sourceUrl)) {
+      summary.dedupSkipped++;
+      continue;
+    }
 
-    let allDuped = true;
     const title = text.slice(0, 500);
+    let allDuped = true;
     for (const slug of matchedSlugs) {
       const modelId = modelMap[slug];
-      if (modelId && !isDuplicate(titleKeys, title, modelId)) { allDuped = false; break; }
+      if (modelId && !isDuplicate(titleKeys, title, modelId)) {
+        allDuped = false;
+        break;
+      }
     }
-    if (allDuped) { summary.dedupSkipped++; continue; }
+    if (allDuped) {
+      summary.dedupSkipped++;
+      continue;
+    }
 
-    candidates.push({ text, matchedSlugs, sourceUrl, title, createdAt: createdAt.toISOString(), engagementScore: (tweet.favorite_count || tweet.likeCount || 0) + (tweet.retweet_count || tweet.retweetCount || 0) });
+    candidates.push({
+      text,
+      matchedSlugs,
+      sourceUrl,
+      title,
+      createdAt: createdAt.toISOString(),
+      engagementScore: (tweet.favorite_count || tweet.likeCount || 0) + (tweet.retweet_count || tweet.retweetCount || 0),
+    });
   }
 
-  // Diagnostic: log unmatched tweets so we can see what's failing keyword match
   if (unmatchedSamples.length > 0) {
-    await logToErrorLog(supabase, "scrape-twitter", `Unmatched tweets (${unmatchedSamples.length} samples): ${unmatchedSamples.join(" | ")}`, "match-debug");
+    await logToErrorLog(supabase, SOURCE, `Unmatched tweets (${unmatchedSamples.length} samples): ${unmatchedSamples.join(" | ")}`, "match-debug");
   }
 
-  // Pass 2: batch classify
   const twitterLogError = async (msg: string, ctx?: string) => {
-    await logToErrorLog(supabase, "scrape-twitter", msg, ctx || "classify");
+    await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
   };
-  const classifications = await classifyBatch(candidates.map(c => c.text), lovableApiKey, 25, twitterLogError);
+  const classifications = await classifyBatch(candidates.map((candidate) => candidate.text), geminiApiKey, 25, twitterLogError);
   summary.classified = classifications.length;
-  summary.irrelevant = classifications.filter(c => !c.relevant).length;
+  summary.irrelevant = classifications.filter((classification) => !classification.relevant).length;
 
-  // Pass 2.5: targeted classification for each matched model.
   const targetedItems: { idx: number; slug: string }[] = [];
   for (let i = 0; i < candidates.length; i++) {
     if (!classifications[i].relevant) continue;
@@ -187,46 +245,60 @@ async function runApifyPath(
   }
   const targetedResults = targetedItems.length > 0
     ? await classifyBatchTargeted(
-        targetedItems.map(item => ({ text: candidates[item.idx].text, targetModel: item.slug })),
-        lovableApiKey, 25, twitterLogError
-      )
+      targetedItems.map((item) => ({ text: candidates[item.idx].text, targetModel: item.slug })),
+      geminiApiKey,
+      25,
+      twitterLogError,
+    )
     : [];
   const targetedMap = new Map<string, typeof classifications[0]>();
-  targetedItems.forEach((item, j) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[j]));
+  targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
 
-  // Pass 3: insert
   for (let i = 0; i < candidates.length; i++) {
-    const classification = classifications[i];
-    if (!classification.relevant) continue;
-    const c = candidates[i];
+    const baseClassification = classifications[i];
+    if (!baseClassification.relevant) continue;
+    const candidate = candidates[i];
 
-    for (const slug of c.matchedSlugs) {
-      const cls = targetedMap.get(`${i}:${slug}`) || classification;
-      if (!cls.relevant) continue;
+    for (const slug of candidate.matchedSlugs) {
+      const classification = targetedMap.get(`${i}:${slug}`) || baseClassification;
+      if (!classification.relevant) continue;
       const modelId = modelMap[slug];
-      if (!modelId || isDuplicate(titleKeys, c.title, modelId)) continue;
-      const { error } = await supabase.from("scraped_posts").upsert({
-        model_id: modelId, source: "twitter", source_url: c.sourceUrl,
-        title: c.title.slice(0, 120), content: c.text.slice(0, 2000),
-        sentiment: cls.sentiment, complaint_category: cls.complaint_category,
-        praise_category: cls.praise_category,
-        confidence: cls.confidence, content_type: "title_only",
-        score: c.engagementScore,
-        posted_at: c.createdAt,
-        original_language: cls.language || null, translated_content: cls.english_translation || null,
-      }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
-      if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
-        summary.inserted++;
-        existingUrls.add(c.sourceUrl);
-        titleKeys.add(`${modelId}:${c.title.slice(0, 80).toLowerCase()}`);
+      if (!modelId || isDuplicate(titleKeys, candidate.title, modelId)) continue;
+
+      const upsertResult = await upsertScrapedPost(supabase, {
+        model_id: modelId,
+        source: "twitter",
+        source_url: candidate.sourceUrl,
+        title: candidate.title.slice(0, 120),
+        content: candidate.text.slice(0, 2000),
+        sentiment: classification.sentiment,
+        complaint_category: classification.complaint_category,
+        praise_category: classification.praise_category,
+        confidence: classification.confidence,
+        content_type: "title_only",
+        score: candidate.engagementScore,
+        posted_at: candidate.createdAt,
+        original_language: classification.language || null,
+        translated_content: classification.english_translation || null,
+      });
+
+      if (upsertResult.error) {
+        summary.errors.push(`Insert: ${upsertResult.error}`);
+        continue;
+      }
+
+      if (upsertResult.inserted) {
+        summary.net_new_rows++;
+        existingUrls.add(candidate.sourceUrl);
+        titleKeys.add(`${modelId}:${candidate.title.slice(0, 80).toLowerCase()}`);
+      } else {
+        summary.duplicate_conflicts++;
       }
     }
   }
 
   return summary;
 }
-
-// ─── Grok path (fallback) ─────────────────────────────────────────────────────
 
 async function runGrokPath(
   supabase: any,
@@ -236,12 +308,7 @@ async function runGrokPath(
   existingUrls: Set<string>,
   titleKeys: Set<string>,
 ) {
-  const summary = {
-    fetched: 0, filtered: 0, classified: 0, inserted: 0, irrelevant: 0,
-    langSkipped: 0, dedupSkipped: 0, contentSkipped: 0, errors: [] as string[],
-    backend: "grok" as const,
-  };
-
+  const summary = buildTwitterSummary("grok");
   const now = new Date();
   const yesterday = new Date(now.getTime() - 24 * 3600000);
 
@@ -264,85 +331,106 @@ async function runGrokPath(
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => "unknown");
-    await logToErrorLog(supabase, "scrape-twitter", `Grok API HTTP ${res.status}: ${errorText.slice(0, 500)}`, "grok-error");
+    await logToErrorLog(supabase, SOURCE, `Grok API HTTP ${res.status}: ${errorText.slice(0, 500)}`, "grok-error");
     throw new Error(`Grok API returned ${res.status}`);
   }
 
   const data = await res.json();
-
-  // Extract JSON array from Grok response
   let posts: any[] = [];
-  const outputItems = data.output || [];
-  for (const item of outputItems) {
+  for (const item of data.output || []) {
     if (item.type !== "message") continue;
     for (const content of item.content || []) {
       if (content.type !== "output_text") continue;
       const text = content.text || "";
       const jsonMatch = text.match(/\[[\s\S]*\]/);
       if (jsonMatch) {
-        try { posts = JSON.parse(jsonMatch[0]); } catch {}
+        try {
+          posts = JSON.parse(jsonMatch[0]);
+        } catch {}
       }
     }
   }
 
-  summary.fetched = posts.length;
+  summary.posts_found = posts.length;
 
   for (const post of posts) {
     if (!post.text || !post.tweet_url) continue;
 
     const text = post.text.slice(0, 2000);
     const sourceUrl = post.tweet_url;
+    if (existingUrls.has(sourceUrl)) {
+      summary.dedupSkipped++;
+      continue;
+    }
 
-    if (existingUrls.has(sourceUrl)) { summary.dedupSkipped++; continue; }
-
-    // Use Grok's model field to match, but also run keyword matching for model_id resolution
     const matchedSlugs = matchModels(text, keywords);
-    // If Grok identified a model but keywords didn't match, try the Grok model field
     if (matchedSlugs.length === 0 && post.model) {
       const grokSlug = post.model.toLowerCase();
       if (modelMap[grokSlug]) matchedSlugs.push(grokSlug);
     }
     if (matchedSlugs.length === 0) continue;
-    summary.filtered++;
+    summary.filtered_candidates++;
 
     const title = text.slice(0, 500);
     let allDuped = true;
     for (const slug of matchedSlugs) {
       const modelId = modelMap[slug];
-      if (modelId && !isDuplicate(titleKeys, title, modelId)) { allDuped = false; break; }
+      if (modelId && !isDuplicate(titleKeys, title, modelId)) {
+        allDuped = false;
+        break;
+      }
     }
-    if (allDuped) { summary.dedupSkipped++; continue; }
+    if (allDuped) {
+      summary.dedupSkipped++;
+      continue;
+    }
 
-    // Grok already classified — validate against allowed values before inserting
     const sentiment = normalizeSentiment(post.sentiment);
-    if (!sentiment) { summary.irrelevant++; continue; }
+    if (!sentiment) {
+      summary.irrelevant++;
+      continue;
+    }
     summary.classified++;
 
     const complaint = sentiment === "negative" ? normalizeComplaintCategory(post.complaint_category) : null;
     const praise = sentiment === "positive" ? normalizePraiseCategory(post.praise_category) : null;
     const confidence = typeof post.confidence === "number" && post.confidence >= 0 && post.confidence <= 1
-      ? post.confidence : 0.5;
+      ? post.confidence
+      : 0.5;
     const postedAt = post.posted_at ? new Date(post.posted_at).toISOString() : new Date().toISOString();
 
-    // TODO: Add targeted classification for multi-model posts when Grok path is activated
     for (const slug of matchedSlugs) {
       const modelId = modelMap[slug];
       if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
-      const { error } = await supabase.from("scraped_posts").upsert({
-        model_id: modelId, source: "twitter", source_url: sourceUrl,
-        title: title.slice(0, 120), content: text.slice(0, 2000),
-        sentiment, complaint_category: complaint,
+
+      const upsertResult = await upsertScrapedPost(supabase, {
+        model_id: modelId,
+        source: "twitter",
+        source_url: sourceUrl,
+        title: title.slice(0, 120),
+        content: text.slice(0, 2000),
+        sentiment,
+        complaint_category: complaint,
         praise_category: praise,
         confidence,
         content_type: "title_only",
-        score: 0, // Grok doesn't provide engagement metrics
+        score: 0,
         posted_at: postedAt,
-        original_language: null, translated_content: null,
-      }, { onConflict: "source_url,model_id", ignoreDuplicates: true });
-      if (error) { summary.errors.push(`Insert: ${error.message}`); } else {
-        summary.inserted++;
+        original_language: null,
+        translated_content: null,
+      });
+
+      if (upsertResult.error) {
+        summary.errors.push(`Insert: ${upsertResult.error}`);
+        continue;
+      }
+
+      if (upsertResult.inserted) {
+        summary.net_new_rows++;
         existingUrls.add(sourceUrl);
         titleKeys.add(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
+      } else {
+        summary.duplicate_conflicts++;
       }
     }
   }
@@ -350,69 +438,157 @@ async function runGrokPath(
   return summary;
 }
 
-// ─── Main handler ─────────────────────────────────────────────────────────────
-
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  const body = await readJsonBody(req);
+  let runRecord: RunRecordRow | null = null;
 
   try {
+    const config = await loadScraperConfig(supabase, SOURCE);
+    if (!getConfigBoolean(config, "enabled", true)) {
+      return new Response(JSON.stringify({
+        source: SOURCE,
+        status: "skipped",
+        skipped: true,
+        reason: "disabled",
+        errors: [],
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const startedAt = new Date().toISOString();
+    const { data: startedRun, error: runError } = await createRunRecord(supabase, {
+      source: SOURCE,
+      run_kind: "scraper",
+      status: "running",
+      parent_run_id: typeof body.parent_run_id === "string" ? body.parent_run_id : null,
+      triggered_by: body.orchestrated ? "orchestrator" : "manual",
+      window_label: typeof body.window_label === "string" ? body.window_label : null,
+      window_local_date: typeof body.window_local_date === "string" ? body.window_local_date : null,
+      timezone: typeof body.timezone === "string" ? body.timezone : null,
+      started_at: startedAt,
+    });
+
+    if (runError) {
+      if (isUniqueViolation(runError)) {
+        return new Response(JSON.stringify({
+          source: SOURCE,
+          status: "skipped",
+          skipped: true,
+          reason: "already_running",
+          errors: [],
+        }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      throw runError;
+    }
+    runRecord = startedRun;
+
     const apifyToken = Deno.env.get("APIFY_API_TOKEN");
     const xaiApiKey = Deno.env.get("XAI_API_KEY");
-
     if (!apifyToken && !xaiApiKey) {
-      return new Response(
-        JSON.stringify({ skipped: true, reason: "No X credentials (set APIFY_API_TOKEN or XAI_API_KEY)" }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      await updateRunRecord(supabase, runRecord.id, {
+        status: "skipped",
+        errors: ["No X credentials (set APIFY_API_TOKEN or XAI_API_KEY)"],
+        metadata: { reason: "no_credentials" },
+        completed_at: new Date().toISOString(),
+      });
+      return new Response(JSON.stringify({
+        source: SOURCE,
+        status: "skipped",
+        skipped: true,
+        reason: "no_credentials",
+        errors: ["No X credentials (set APIFY_API_TOKEN or XAI_API_KEY)"],
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    const lovableApiKey = Deno.env.get("GEMINI_API_KEY");
-    if (apifyToken && !lovableApiKey) {
-      await logToErrorLog(supabase, "scrape-twitter", "GEMINI_API_KEY not set — required for Apify path sentiment classification", "config-error");
-      return new Response(
-        JSON.stringify({ error: "GEMINI_API_KEY not configured (required for Apify path)" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+    if (apifyToken && !geminiApiKey) {
+      await logToErrorLog(supabase, SOURCE, "GEMINI_API_KEY not set — required for Apify path sentiment classification", "config-error");
+      throw new Error("GEMINI_API_KEY not configured (required for Apify path)");
     }
 
-    await logToErrorLog(supabase, "scrape-twitter", "Twitter scraper started", "health-check");
+    await logToErrorLog(supabase, SOURCE, "Twitter scraper started", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
-
-    // Diagnostic: log keyword coverage per model
-    const kwBySlug: Record<string, number> = {};
-    for (const k of keywords) { kwBySlug[k.model_slug] = (kwBySlug[k.model_slug] || 0) + 1; }
-    await logToErrorLog(supabase, "scrape-twitter", `Keywords loaded: ${keywords.length} total, by model: ${JSON.stringify(kwBySlug)}`, "keyword-debug");
+    const keywordCounts: Record<string, number> = {};
+    for (const keyword of keywords) {
+      keywordCounts[keyword.model_slug] = (keywordCounts[keyword.model_slug] || 0) + 1;
+    }
+    await logToErrorLog(supabase, SOURCE, `Keywords loaded: ${keywords.length} total, by model: ${JSON.stringify(keywordCounts)}`, "keyword-debug");
 
     const { data: existingData } = await supabase
-      .from("scraped_posts").select("source_url").eq("source", "twitter").limit(10000);
-    const existingUrls = new Set((existingData || []).map((e: any) => e.source_url).filter(Boolean));
+      .from("scraped_posts")
+      .select("source_url")
+      .eq("source", "twitter")
+      .limit(10000);
+    const existingUrls = new Set((existingData || []).map((entry: any) => entry.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
-    let summary;
-    if (apifyToken) {
-      summary = await runApifyPath(supabase, apifyToken, modelMap, keywords, existingUrls, titleKeys, lovableApiKey!);
-    } else {
-      summary = await runGrokPath(supabase, xaiApiKey!, modelMap, keywords, existingUrls, titleKeys);
-    }
+    const summary = apifyToken
+      ? await runApifyPath(supabase, apifyToken, modelMap, keywords, existingUrls, titleKeys, geminiApiKey!, config)
+      : await runGrokPath(supabase, xaiApiKey!, modelMap, keywords, existingUrls, titleKeys);
+
+    const derived = deriveRunMetrics(summary);
+    const completedAt = new Date().toISOString();
+    await updateRunRecord(supabase, runRecord.id, {
+      status: derived.status,
+      posts_found: derived.posts_found,
+      posts_classified: derived.posts_classified,
+      apify_items_fetched: derived.apify_items_fetched,
+      filtered_candidates: derived.filtered_candidates,
+      net_new_rows: derived.net_new_rows,
+      duplicate_conflicts: derived.duplicate_conflicts,
+      errors: derived.errors,
+      metadata: {
+        backend: summary.backend,
+        irrelevant: summary.irrelevant,
+        dedup_skipped: summary.dedupSkipped,
+        content_skipped: summary.contentSkipped,
+        skipped_reason: (summary as any).reason ?? null,
+      },
+      completed_at: completedAt,
+    });
 
     await logToErrorLog(
       supabase,
-      "scrape-twitter",
-      `Completed (${summary.backend}): fetched=${summary.fetched} filtered=${summary.filtered} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.inserted} dedupSkipped=${summary.dedupSkipped}`,
+      SOURCE,
+      `Completed (${summary.backend}): fetched=${summary.posts_found} filtered=${summary.filtered_candidates} classified=${summary.classified} inserted=${summary.net_new_rows} duplicateConflicts=${summary.duplicate_conflicts}`,
       "summary",
     );
-    await triggerAggregateVibes(supabase, "scrape-twitter");
 
-    return new Response(JSON.stringify(summary, null, 2), {
+    const responseBody = {
+      ...summary,
+      status: derived.status,
+      posts_classified: derived.posts_classified,
+    };
+
+    if (!body.orchestrated && derived.status !== "skipped") {
+      await triggerAggregateVibes(supabase, SOURCE, { reason: "standalone_run" });
+    }
+
+    return new Response(JSON.stringify(responseBody, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (e) {
-    const msg = e instanceof Error ? e.message : "Unknown";
-    await logToErrorLog(supabase, "scrape-twitter", msg, "top-level error");
-    return new Response(JSON.stringify({ error: msg }), {
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "Unknown";
+    await logToErrorLog(supabase, SOURCE, message, "top-level error");
+    if (runRecord) {
+      await updateRunRecord(supabase, runRecord.id, {
+        status: "failed",
+        errors: [message],
+        metadata: { error: message },
+        completed_at: new Date().toISOString(),
+      });
+    }
+    return new Response(JSON.stringify({ source: SOURCE, status: "failed", error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -2,9 +2,12 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import {
   applyScoreSmoothing,
   computeScore,
-  getUtcDayWindow,
+  getLocalDateLabel,
+  getPacificDayWindow,
+  PACIFIC_TIMEZONE,
   type ScoreResult,
 } from "../_shared/vibes-scoring.ts";
+import { internalOnlyResponse, isInternalServiceRequest, readJsonBody } from "../_shared/runtime.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -39,12 +42,12 @@ async function upsertScore(supabase: any, modelId: string, period: string, perio
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
   try {
-    let body: any = {};
-    try { body = await req.json(); } catch {}
+    const body = await readJsonBody(req);
 
     const daysBack = body.days_back ?? 30;
     const minPosts = body.min_posts ?? 5;
@@ -63,16 +66,18 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Build array of UTC calendar days
+    // Build array of Pacific-local calendar days
     const now = new Date();
-    const days: Date[] = [];
+    const todayLabel = getLocalDateLabel(now, PACIFIC_TIMEZONE);
+    const [year, month, day] = todayLabel.split("-").map(Number);
+    const dayWindows = [];
     for (let d = daysBack; d >= 0; d--) {
-      const day = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - d));
-      days.push(day);
+      const anchor = new Date(Date.UTC(year, month - 1, day - d, 12));
+      dayWindows.push(getPacificDayWindow(anchor));
     }
 
-    const rangeStart = days[0].toISOString();
-    const rangeEnd = days[days.length - 1].toISOString();
+    const rangeStart = dayWindows[0].periodStart;
+    const rangeEnd = dayWindows[dayWindows.length - 1].rangeEnd;
 
     const summary: Record<string, { days_processed: number; days_skipped: number; scores: { date: string; score: number; posts: number }[] }> = {};
 
@@ -87,7 +92,7 @@ Deno.serve(async (req) => {
           .eq("model_id", model.id)
           .eq("period", "daily")
           .gte("period_start", rangeStart)
-          .lte("period_start", rangeEnd);
+          .lt("period_start", rangeEnd);
       }
 
       // Get seed score: the most recent daily score BEFORE the range
@@ -104,10 +109,9 @@ Deno.serve(async (req) => {
       let previousScore: number | null = seedRow?.score ?? null;
       let consecutiveEmpty = 0;
 
-      for (const day of days) {
-        const dayWindow = getUtcDayWindow(day);
+      for (const dayWindow of dayWindows) {
 
-        // Get all posts for this calendar day
+        // Get all posts for this Pacific-local calendar day
         const { data: posts } = await supabase
           .from("scraped_posts")
           .select("sentiment, complaint_category, confidence, score, content_type, source")
