@@ -492,7 +492,7 @@ Deno.serve(async (req) => {
     const apifyToken = Deno.env.get("APIFY_API_TOKEN");
     const xaiApiKey = Deno.env.get("XAI_API_KEY");
     if (!apifyToken && !xaiApiKey) {
-      await updateRunRecord(supabase, runRecord.id, {
+      await updateRunRecord(supabase, runRecord!.id, {
         status: "skipped",
         errors: ["No X credentials (set APIFY_API_TOKEN or XAI_API_KEY)"],
         metadata: { reason: "no_credentials" },
@@ -538,7 +538,7 @@ Deno.serve(async (req) => {
 
     const derived = deriveRunMetrics(summary);
     const completedAt = new Date().toISOString();
-    await updateRunRecord(supabase, runRecord.id, {
+    await updateRunRecord(supabase, runRecord!.id, {
       status: derived.status,
       posts_found: derived.posts_found,
       posts_classified: derived.posts_classified,
@@ -581,7 +581,7 @@ Deno.serve(async (req) => {
     const message = error instanceof Error ? error.message : "Unknown";
     await logToErrorLog(supabase, SOURCE, message, "top-level error");
     if (runRecord) {
-      await updateRunRecord(supabase, runRecord.id, {
+      await updateRunRecord(supabase, runRecord!.id, {
         status: "failed",
         errors: [message],
         metadata: { error: message },

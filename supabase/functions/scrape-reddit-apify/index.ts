@@ -140,7 +140,7 @@ Deno.serve(async (req) => {
           reason: `quota_or_auth_${startRes.status}`,
           errors: [`Apify quota/auth error (HTTP ${startRes.status})`],
         };
-        await updateRunRecord(supabase, runRecord.id, {
+        await updateRunRecord(supabase, runRecord!.id, {
           status: "skipped",
           errors: skipped.errors,
           metadata: { reason: skipped.reason },
@@ -343,7 +343,7 @@ Deno.serve(async (req) => {
 
     const derived = deriveRunMetrics(summary);
     const completedAt = new Date().toISOString();
-    await updateRunRecord(supabase, runRecord.id, {
+    await updateRunRecord(supabase, runRecord!.id, {
       status: derived.status,
       posts_found: derived.posts_found,
       posts_classified: derived.posts_classified,
@@ -386,7 +386,7 @@ Deno.serve(async (req) => {
     const message = error instanceof Error ? error.message : "Unknown";
     await logToErrorLog(supabase, SOURCE, message, "top-level error");
     if (runRecord) {
-      await updateRunRecord(supabase, runRecord.id, {
+      await updateRunRecord(supabase, runRecord!.id, {
         status: "failed",
         errors: [message],
         metadata: { error: message },
