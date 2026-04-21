@@ -191,36 +191,77 @@ export type Database = {
       }
       scraper_runs: {
         Row: {
+          apify_items_fetched: number
           completed_at: string | null
+          duplicate_conflicts: number
           errors: string[] | null
+          filtered_candidates: number
           id: string
+          metadata: Json
+          net_new_rows: number
+          parent_run_id: string | null
           posts_classified: number | null
           posts_found: number | null
+          run_kind: string
           source: string
           started_at: string
           status: string
+          timezone: string | null
+          triggered_by: string | null
+          window_label: string | null
+          window_local_date: string | null
         }
         Insert: {
+          apify_items_fetched?: number
           completed_at?: string | null
+          duplicate_conflicts?: number
           errors?: string[] | null
+          filtered_candidates?: number
           id?: string
+          metadata?: Json
+          net_new_rows?: number
+          parent_run_id?: string | null
           posts_classified?: number | null
           posts_found?: number | null
+          run_kind?: string
           source: string
           started_at?: string
           status?: string
+          timezone?: string | null
+          triggered_by?: string | null
+          window_label?: string | null
+          window_local_date?: string | null
         }
         Update: {
+          apify_items_fetched?: number
           completed_at?: string | null
+          duplicate_conflicts?: number
           errors?: string[] | null
+          filtered_candidates?: number
           id?: string
+          metadata?: Json
+          net_new_rows?: number
+          parent_run_id?: string | null
           posts_classified?: number | null
           posts_found?: number | null
+          run_kind?: string
           source?: string
           started_at?: string
           status?: string
+          timezone?: string | null
+          triggered_by?: string | null
+          window_label?: string | null
+          window_local_date?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "scraper_runs_parent_run_id_fkey"
+            columns: ["parent_run_id"]
+            isOneToOne: false
+            referencedRelation: "scraper_runs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       vibes_scores: {
         Row: {
@@ -296,6 +337,31 @@ export type Database = {
           previous_score: number
           top_complaint: string
           total_posts: number
+        }[]
+      }
+      get_scraper_monitor_runs: {
+        Args: { limit_count?: number }
+        Returns: {
+          apify_items_fetched: number
+          completed_at: string
+          duplicate_conflicts: number
+          duration_seconds: number
+          errors: string[]
+          filtered_candidates: number
+          id: string
+          metadata: Json
+          net_new_rows: number
+          parent_run_id: string
+          posts_classified: number
+          posts_found: number
+          run_kind: string
+          source: string
+          started_at: string
+          status: string
+          timezone: string
+          triggered_by: string
+          window_label: string
+          window_local_date: string
         }[]
       }
       get_source_breakdown: {
