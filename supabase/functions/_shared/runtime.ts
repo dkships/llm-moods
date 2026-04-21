@@ -181,7 +181,7 @@ export async function createRunRecord(
   supabase: any,
   input: RunRecordInput,
 ): Promise<{ data: RunRecordRow | null; error: any }> {
-  return await supabase
+  const result = await supabase
     .from("scraper_runs")
     .insert({
       source: input.source,
@@ -205,6 +205,16 @@ export async function createRunRecord(
     })
     .select("id, source, status, run_kind, window_label, window_local_date")
     .maybeSingle();
+  return result as { data: RunRecordRow | null; error: any };
+}
+
+// Helper used by callers that have already verified `error` is null —
+// asserts that data is present and returns a non-null row.
+export function assertRunRecord(record: RunRecordRow | null): RunRecordRow {
+  if (!record) {
+    throw new Error("createRunRecord returned no row");
+  }
+  return record;
 }
 
 export async function updateRunRecord(
