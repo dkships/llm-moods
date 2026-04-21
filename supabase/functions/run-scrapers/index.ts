@@ -257,7 +257,7 @@ async function handleNightlyReaggregate(
   });
 
   const status = result.ok ? "success" : "failed";
-  await updateRunRecord(supabase, startedRun.id, {
+  await updateRunRecord(supabase, startedRun!.id, {
     status,
     errors: result.ok ? [] : [`HTTP ${result.status}: ${result.text.slice(0, 500)}`],
     metadata: {
