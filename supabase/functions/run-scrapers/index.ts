@@ -357,7 +357,7 @@ Deno.serve(async (req) => {
 
   const scraperPayload = {
     orchestrated: true,
-    parent_run_id: startedRun.id,
+    parent_run_id: startedRun!.id,
     window_label: activeWindow.label,
     window_local_date: activeWindow.localDate,
     timezone: timeZone,
@@ -394,7 +394,7 @@ Deno.serve(async (req) => {
     finalStatus = "partial";
   }
 
-  await finalizeOrchestratorRun(supabase, startedRun.id, finalStatus, results, {
+  await finalizeOrchestratorRun(supabase, startedRun!.id, finalStatus, results, {
     mode: "scrape_window",
     window_time: activeWindow.time,
     aggregate_status: aggregate.status,
