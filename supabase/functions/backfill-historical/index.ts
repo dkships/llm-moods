@@ -1,6 +1,7 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
 import { loadKeywords, matchModels } from "../_shared/utils.ts";
+import { isInternalServiceRequest, internalOnlyResponse } from "../_shared/runtime.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -60,6 +61,8 @@ const GH_REPOS: { owner: string; repo: string; defaultSlug: string | null }[] = 
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 
