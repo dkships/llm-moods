@@ -313,9 +313,10 @@ const ModelDetail = () => {
           {/* Main Content: Two Columns */}
           <section className="container pb-12">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column — Chart */}
+            {/* Left Column — Chart + Official Status stacked */}
+            <div className="lg:col-span-2 space-y-6">
             <motion.div
-              className="lg:col-span-2 glass rounded-xl p-6 self-start"
+              className="glass rounded-xl p-6"
               initial={{ opacity: 0, y: 16 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.1, duration: 0.45 }}
@@ -378,13 +379,11 @@ const ModelDetail = () => {
               )}
             </motion.div>
 
-            {/* Left Column — Official Status (under the chart) */}
-            <div className="lg:col-span-2 lg:order-3">
               <StatusCard modelSlug={slug ?? ""} />
             </div>
 
             {/* Right Column — Complaints + Sources */}
-            <div className="space-y-6 lg:order-2">
+            <div className="space-y-6">
               <motion.div
                 className="glass rounded-xl p-6"
                 initial={{ opacity: 0, y: 16 }}
