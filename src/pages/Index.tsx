@@ -178,7 +178,7 @@ const Index = () => {
                   {
                     Icon: Brain,
                     title: "Classify",
-                    body: "Each post sentiment-labeled by Gemini 3.1 Flash-Lite into 12 complaint categories.",
+                    body: "Each post sentiment-labeled by Gemini 2.5 Flash into 12 complaint categories.",
                   },
                   {
                     Icon: LineChart,

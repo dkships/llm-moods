@@ -197,7 +197,7 @@ const ClaudeApril2026Body = () => (
       statistical floor.
     </p>
     <p>
-      The classifier itself is one of the tracked models. Sentiment runs through Gemini 3.1 Flash-Lite,
+      The classifier itself is one of the tracked models. Sentiment runs through Gemini 2.5 Flash,
       classifying posts about Gemini's main competitor.
       <sup id="ref-1">
         <a href="#note-1" aria-label="See footnote 1">
@@ -231,7 +231,7 @@ const ClaudeApril2026Body = () => (
       a daily 0–100 score per model.
     </p>
     <p>
-      Each post is classified for sentiment and complaint category by Gemini 3.1 Flash-Lite via the Google AI
+      Each post is classified for sentiment and complaint category by Gemini 2.5 Flash via the Google AI
       API, in batches of 25. Multi-model posts use a per-model targeted prompt so a sentence like "DeepSeek
       fixed Gemini's mess" scores correctly for each model. The daily score is volume-weighted negative-vs-
       positive on a 0–100 scale.
@@ -269,7 +269,7 @@ const ClaudeApril2026Body = () => (
       >
         [1]
       </a>{" "}
-      Self-bias risk on the classifier. Gemini 3.1 Flash-Lite is the model performing classification and is
+      Self-bias risk on the classifier. Gemini 2.5 Flash is the model performing classification and is
       also one of the four tracked models. We have no second-model validation harness yet. Mitigating evidence:
       across the windows examined, Claude often outscored Gemini, the opposite of what classifier bias toward
       Gemini would produce. The risk is structural, and disclosing it is the obligation; spot-checking it is

@@ -79,7 +79,7 @@ const HowLlmVibesClassifiesSentimentBody = () => (
 
     <h2>How sentiment gets classified</h2>
     <p>
-      Every relevant post is sent to <strong>Gemini 3.1 Flash-Lite</strong> via the Google AI API in batches of
+      Every relevant post is sent to <strong>Gemini 2.5 Flash</strong> via the Google AI API in batches of
       25. The classifier returns six fields per post: <code>relevant</code>, <code>sentiment</code> (positive /
       negative / neutral), <code>complaint_category</code> (one of 12 if negative), <code>praise_category</code>{" "}
       (one of 10 if positive), <code>confidence</code> (0.0–1.0), and a translation if the post is non-English.
@@ -169,7 +169,7 @@ score = round((effective_positive / total_weight) × 100)`}</code>
     <h2>What this analysis assumes</h2>
     <p>Three caveats that anyone reading the dashboard should know.</p>
     <p>
-      The classifier vendor is one of the tracked models. Gemini 3.1 Flash-Lite classifies posts about Gemini's
+      The classifier vendor is one of the tracked models. Gemini 2.5 Flash classifies posts about Gemini's
       competitors. There is no evidence of bias in the data (Claude often scores higher than Gemini in the
       windows we've examined, the opposite of what classifier bias toward Gemini would produce), but the
       structural risk is real. We do not yet have a second-model validation harness.
