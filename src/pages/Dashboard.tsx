@@ -69,7 +69,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
 
           {/* Sparkline — lazy loaded */}
           {m.sparkline.length > 1 && (
-            <div className="mt-4 h-12" aria-hidden="true">
+            <div className="mt-4 h-12 cursor-pointer" aria-hidden="true">
               <Suspense fallback={<div className="h-12 animate-pulse rounded bg-secondary/40" />}>
                 <LazySparkline data={m.sparkline} accent={vibe.color} />
               </Suspense>

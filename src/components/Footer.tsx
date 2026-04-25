@@ -27,7 +27,7 @@ const Footer = () => (
         href="https://github.com/dkships/llm-moods"
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 rounded-md text-sm font-mono text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="inline-flex items-center gap-1.5 rounded-md text-sm font-mono text-foreground underline underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         <GitHubIcon className="h-3.5 w-3.5" />
         Open Source — Contribute on GitHub
