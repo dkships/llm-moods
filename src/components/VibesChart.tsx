@@ -1,4 +1,4 @@
-import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, ReferenceLine } from "recharts";
+import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, ReferenceLine, ReferenceArea } from "recharts";
 import { memo } from "react";
 
 // Theme colors — mapped from CSS variables (Recharts needs raw strings)
@@ -9,13 +9,23 @@ const CHART_COLORS = {
   referenceLine: "hsl(220 10% 25%)",    // between --border and --muted-foreground
 } as const;
 
+export interface ChartEventMarker {
+  /** X-axis label where the event starts (must match a `day` value in chartData). */
+  startLabel: string;
+  /** X-axis label where the event ends. If equal to startLabel, renders as a single line. */
+  endLabel?: string;
+  color: string;
+  title: string;
+}
+
 interface VibesChartProps {
   chartData: { day: string; score: number | null }[];
   accent: string;
   timeRange: string;
+  events?: ChartEventMarker[];
 }
 
-const VibesChart = memo(({ chartData, accent, timeRange }: VibesChartProps) => (
+const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesChartProps) => (
   <ResponsiveContainer width="100%" height="100%">
     <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 0, left: 0 }}>
       <XAxis
@@ -45,6 +55,35 @@ const VibesChart = memo(({ chartData, accent, timeRange }: VibesChartProps) => (
         itemStyle={{ color: accent }}
       />
       <ReferenceLine y={50} stroke={CHART_COLORS.referenceLine} strokeDasharray="4 4" />
+      {events.map((event, i) => {
+        const isRange = event.endLabel && event.endLabel !== event.startLabel;
+        if (isRange) {
+          return (
+            <ReferenceArea
+              key={`evt-${i}`}
+              x1={event.startLabel}
+              x2={event.endLabel}
+              y1={20}
+              y2={100}
+              fill={event.color}
+              fillOpacity={0.08}
+              stroke={event.color}
+              strokeOpacity={0.35}
+              ifOverflow="visible"
+            />
+          );
+        }
+        return (
+          <ReferenceLine
+            key={`evt-${i}`}
+            x={event.startLabel}
+            stroke={event.color}
+            strokeDasharray="3 3"
+            strokeOpacity={0.7}
+            ifOverflow="visible"
+          />
+        );
+      })}
       <Line
         type="monotone"
         dataKey="score"

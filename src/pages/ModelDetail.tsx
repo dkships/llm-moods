@@ -13,6 +13,9 @@ import {
   useModelDetail, useVibesHistory, useComplaintBreakdown,
   useSourceBreakdown, useModelPosts, useModelsWithLatestVibes,
 } from "@/hooks/useVibesData";
+import { getEventsForModel, getEventColor } from "@/data/vendor-events";
+import type { ChartEventMarker } from "@/components/VibesChart";
+import { detectProductSurface } from "@/lib/product-surface";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import {
   getPacificDateLabel, getVibeStatus, fadeUp, formatComplaintLabel, SOURCE_LABELS,
@@ -28,6 +31,7 @@ const TIME_RANGES = ["24h", "7d", "30d"] as const;
 const ModelDetail = () => {
   const { slug } = useParams<{ slug: string }>();
   const [timeRange, setTimeRange] = useState<typeof TIME_RANGES[number]>("30d");
+  const [surfaceFilter, setSurfaceFilter] = useState<string>("all");
 
   const { data: model, isLoading: modelLoading } = useModelDetail(slug);
   const { data: allModels } = useModelsWithLatestVibes();
@@ -45,6 +49,43 @@ const ModelDetail = () => {
   const vibe = getVibeStatus(latestScore);
   const VibeIcon = vibe.icon;
   const accent = model?.accent_color || "#888";
+
+  // Lexical product-surface tagging on recent posts. Same regex map applies to all four
+  // tracked models — see src/lib/product-surface.ts for per-model patterns.
+  const postsWithSurface = (recentPosts || []).map((post) => ({
+    post,
+    surface: detectProductSurface(slug ?? "", `${post.title || ""} ${post.content || ""}`),
+  }));
+
+  const surfaceCounts = new Map<string, number>();
+  for (const { surface } of postsWithSurface) {
+    if (!surface) continue;
+    surfaceCounts.set(surface.label, (surfaceCounts.get(surface.label) ?? 0) + 1);
+  }
+  const availableSurfaceLabels = Array.from(surfaceCounts.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([label]) => label);
+
+  const filteredPostsWithSurface = surfaceFilter === "all"
+    ? postsWithSurface
+    : postsWithSurface.filter(({ surface }) => surface?.label === surfaceFilter);
+
+  // Surface distribution among negative posts in the loaded recent window.
+  const negativeBySurface = new Map<string, number>();
+  let totalNegativePosts = 0;
+  for (const { post, surface } of postsWithSurface) {
+    if (post.sentiment !== "negative") continue;
+    totalNegativePosts++;
+    const key = surface?.label ?? "Unknown";
+    negativeBySurface.set(key, (negativeBySurface.get(key) ?? 0) + 1);
+  }
+  const negativeSurfaceRows = Array.from(negativeBySurface.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([label, count]) => ({
+      label,
+      count,
+      pct: totalNegativePosts > 0 ? Math.round((count / totalNegativePosts) * 100) : 0,
+    }));
 
   useHead({
     title: model ? `${model.name} Vibes — LLM Vibes` : "Loading — LLM Vibes",
@@ -88,12 +129,13 @@ const ModelDetail = () => {
     );
   }
 
-  const chartData = (() => {
+  const { chartData, dateLabels } = (() => {
     const history = vibesHistory || [];
-    if (history.length === 0) return [];
+    const emptyLabels: Record<string, string> = {};
+    if (history.length === 0) return { chartData: [] as { day: string; score: number | null }[], dateLabels: emptyLabels };
 
     if (timeRange === "24h") {
-      return history.map((v, i, arr) => {
+      const data = history.map((v, i, arr) => {
         const date = new Date(v.period_start);
         const now = new Date();
         const isLast = i === arr.length - 1;
@@ -109,6 +151,7 @@ const ModelDetail = () => {
         }
         return { day: label, score: v.score };
       });
+      return { chartData: data, dateLabels: emptyLabels };
     }
 
     // For 7d/30d: build a complete date range so gaps are visible.
@@ -123,6 +166,7 @@ const ModelDetail = () => {
     const now = new Date();
     const todayPacific = getPacificDateLabel(now);
     const result: { day: string; score: number | null }[] = [];
+    const labels: Record<string, string> = {};
     for (let i = days - 1; i >= 0; i--) {
       const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
       const key = d.toISOString().slice(0, 10);
@@ -130,8 +174,57 @@ const ModelDetail = () => {
         ? "Today"
         : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
       result.push({ day: label, score: scoresByDate.get(key) ?? null });
+      labels[key] = label;
     }
-    return result;
+    return { chartData: result, dateLabels: labels };
+  })();
+
+  const chartEvents: ChartEventMarker[] = (() => {
+    if (timeRange === "24h") return [];
+    const visibleKeys = Object.keys(dateLabels);
+    if (visibleKeys.length === 0) return [];
+    const minKey = visibleKeys[0];
+    const maxKey = visibleKeys[visibleKeys.length - 1];
+
+    const findLabelOnOrAfter = (iso: string): string | null => {
+      if (iso < minKey) return dateLabels[minKey];
+      if (iso > maxKey) return null;
+      if (dateLabels[iso]) return dateLabels[iso];
+      // Fall through to the nearest later key (handles missing days)
+      for (const k of visibleKeys) {
+        if (k >= iso) return dateLabels[k];
+      }
+      return null;
+    };
+    const findLabelOnOrBefore = (iso: string): string | null => {
+      if (iso > maxKey) return dateLabels[maxKey];
+      if (iso < minKey) return null;
+      if (dateLabels[iso]) return dateLabels[iso];
+      for (let i = visibleKeys.length - 1; i >= 0; i--) {
+        if (visibleKeys[i] <= iso) return dateLabels[visibleKeys[i]];
+      }
+      return null;
+    };
+
+    const markers: ChartEventMarker[] = [];
+    for (const event of getEventsForModel(slug)) {
+      const startIso = event.eventDate;
+      const endIso = event.eventEndDate ?? event.eventDate;
+      // Skip events whose entire range falls outside the visible window.
+      if (endIso < minKey || startIso > maxKey) continue;
+
+      const startLabel = findLabelOnOrAfter(startIso);
+      const endLabel = findLabelOnOrBefore(endIso);
+      if (!startLabel || !endLabel) continue;
+
+      markers.push({
+        startLabel,
+        endLabel: startLabel === endLabel ? undefined : endLabel,
+        color: getEventColor(event.eventType),
+        title: event.title,
+      });
+    }
+    return markers;
   })();
 
   return (
@@ -205,7 +298,7 @@ const ModelDetail = () => {
                   </p>
                   <div className="h-64">
                     <Suspense fallback={<div className="h-64 animate-pulse rounded bg-secondary/40" />}>
-                      <LazyVibesChart chartData={chartData} accent={accent} timeRange={timeRange} />
+                      <LazyVibesChart chartData={chartData} accent={accent} timeRange={timeRange} events={chartEvents} />
                     </Suspense>
                   </div>
                   <div className="mt-4 flex gap-2">
@@ -225,6 +318,26 @@ const ModelDetail = () => {
                       </button>
                     ))}
                   </div>
+                  {chartEvents.length > 0 && (
+                    <div className="mt-4 border-t border-border/40 pt-3">
+                      <p className="mb-2 font-mono text-xs text-foreground/65">Known events on this chart</p>
+                      <ul className="space-y-1">
+                        {chartEvents.map((evt, i) => (
+                          <li key={`legend-${i}`} className="flex items-center gap-2 text-xs">
+                            <span
+                              className="inline-block h-2 w-3 shrink-0 rounded-sm"
+                              style={{ background: evt.color, opacity: 0.7 }}
+                              aria-hidden="true"
+                            />
+                            <span className="text-foreground/80">{evt.title}</span>
+                            <span className="font-mono text-foreground/50">
+                              {evt.startLabel}{evt.endLabel ? ` → ${evt.endLabel}` : ""}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
                 </>
               )}
             </motion.div>
@@ -237,6 +350,38 @@ const ModelDetail = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.2, duration: 0.45 }}
               >
+                {negativeSurfaceRows.length > 0 && (
+                  <div className="mb-5 border-b border-border/40 pb-4">
+                    <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-foreground/65">
+                      Negative posts by surface
+                    </h3>
+                    <div className="flex h-2 w-full overflow-hidden rounded-full bg-secondary">
+                      {negativeSurfaceRows.map((row, i) => (
+                        <div
+                          key={row.label}
+                          className="h-full"
+                          style={{
+                            width: `${row.pct}%`,
+                            background: accent,
+                            opacity: 0.85 - i * 0.18,
+                          }}
+                          title={`${row.label}: ${row.count} (${row.pct}%)`}
+                        />
+                      ))}
+                    </div>
+                    <ul className="mt-2 space-y-0.5">
+                      {negativeSurfaceRows.map((row) => (
+                        <li
+                          key={row.label}
+                          className="flex justify-between font-mono text-xs text-foreground/70"
+                        >
+                          <span>{row.label}</span>
+                          <span>{row.pct}%</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
                 <h2 className="text-lg font-semibold text-foreground mb-4">Complaint Breakdown</h2>
                 {complaintsError ? (
                   <p className="text-sm text-muted-foreground" role="status" aria-live="polite">Failed to load data</p>
@@ -308,10 +453,41 @@ const ModelDetail = () => {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.4 }}
-              className="text-xl font-bold text-foreground mb-6"
+              className="text-xl font-bold text-foreground mb-3"
             >
               Recent Posts about {model.name}
             </motion.h2>
+            {availableSurfaceLabels.length > 0 && (
+              <div className="mb-6 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSurfaceFilter("all")}
+                  aria-pressed={surfaceFilter === "all"}
+                  className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
+                    surfaceFilter === "all"
+                      ? "border-primary/30 bg-primary/15 text-primary"
+                      : "border-border text-foreground/70 hover:bg-secondary/50 hover:text-foreground"
+                  }`}
+                >
+                  All ({postsWithSurface.length})
+                </button>
+                {availableSurfaceLabels.map((label) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setSurfaceFilter(label)}
+                    aria-pressed={surfaceFilter === label}
+                    className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
+                      surfaceFilter === label
+                        ? "border-primary/30 bg-primary/15 text-primary"
+                        : "border-border text-foreground/70 hover:bg-secondary/50 hover:text-foreground"
+                    }`}
+                  >
+                    {label} ({surfaceCounts.get(label) ?? 0})
+                  </button>
+                ))}
+              </div>
+            )}
 
             {postsError ? (
               <p className="py-8 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
@@ -321,9 +497,13 @@ const ModelDetail = () => {
               <div className="space-y-3" role="status" aria-live="polite">
                 {Array.from({ length: 5 }).map((_, i) => <ChatterSkeleton key={i} />)}
               </div>
+            ) : filteredPostsWithSurface.length === 0 && surfaceFilter !== "all" ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No recent posts match the {surfaceFilter} filter. Try another surface.
+              </p>
             ) : (
               <div className="space-y-3">
-                {(recentPosts || []).map((post, i) => {
+                {filteredPostsWithSurface.map(({ post, surface }, i) => {
                   const s = SENTIMENT_STYLES[post.sentiment || "neutral"];
                   const src = formatSourceDisplay(post.source);
                   const className = `glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${post.sentiment === "positive" ? "border-l-emerald-500" : post.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"} transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${post.source_url ? "cursor-pointer hover:brightness-125 hover:border-border/60" : ""}`;
@@ -332,6 +512,15 @@ const ModelDetail = () => {
                       <span className="text-xs font-mono text-foreground px-2 py-0.5 rounded bg-secondary border border-border shrink-0">
                         {src.emoji} {src.label}
                       </span>
+                      {surface && (
+                        <span
+                          className="text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0"
+                          style={{ borderColor: `${accent}55`, color: accent, background: `${accent}15` }}
+                          title="Detected from post text"
+                        >
+                          {surface.label}
+                        </span>
+                      )}
                       <p className="text-sm text-foreground flex-1 leading-relaxed line-clamp-2">
                         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
                         {post.original_language && (
