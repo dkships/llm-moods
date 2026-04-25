@@ -87,6 +87,7 @@ const ResearchPostPage = () => {
     title: post ? `${post.title} — LLM Vibes` : "Research — LLM Vibes",
     description: post?.summary,
     url: post ? `/research/${post.slug}` : undefined,
+    ogImage: post?.ogImage,
     jsonLd,
   });
 

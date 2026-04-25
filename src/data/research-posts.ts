@@ -52,6 +52,8 @@ export interface ResearchPost {
   faq?: ResearchPostFAQ[];
   /** Optional companion dataset for download + Dataset JSON-LD */
   dataset?: ResearchPostDataset;
+  /** Optional path-relative URL to a 1200x630 OG card image */
+  ogImage?: string;
 }
 
 const claudeApril2026Body = `## The 28-day gap
@@ -308,6 +310,7 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     tags: ["claude", "anthropic", "postmortem", "incident", "case-study"],
     relatedModelSlug: "claude",
     body: claudeApril2026Body,
+    ogImage: "/research/claude-april-2026/og.png",
     faq: [
       {
         question: "What did Anthropic's April 23 postmortem disclose?",
@@ -343,6 +346,7 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     author: "David Kelly",
     tags: ["methodology"],
     body: methodologyBody,
+    ogImage: "/research/how-llm-vibes-classifies-sentiment/og.png",
     faq: [
       {
         question: "Which platforms does LLM Vibes scrape?",
@@ -375,6 +379,7 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     author: "David Kelly",
     tags: ["cross-model", "case-study", "claude", "chatgpt", "gemini", "grok"],
     body: crossModelBody,
+    ogImage: "/research/cross-model-deltas-march-april-2026/og.png",
     faq: [
       {
         question: "Why didn't the absolute score show Claude was the worst model in the window?",

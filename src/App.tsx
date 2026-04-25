@@ -11,11 +11,15 @@ const ResearchIndex = lazy(() => import("./pages/ResearchIndex"));
 const ResearchPost = lazy(() => import("./pages/ResearchPost"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
-// Admin pages are dev-only — production bundles physically exclude the lazy
-// import below thanks to Vite tree-shaking on the `import.meta.env.DEV` flag.
-// See AGENTS.md: public route inventory stays fixed to /, /dashboard, /model/:slug, *.
+// Admin / generator pages are dev-only — production bundles physically exclude
+// the lazy import below thanks to Vite tree-shaking on the `import.meta.env.DEV`
+// flag. See AGENTS.md: public route inventory stays fixed to /, /dashboard,
+// /model/:slug, /research, /research/:slug, *.
 const ScraperMonitor = import.meta.env.DEV
   ? lazy(() => import("./pages/ScraperMonitor"))
+  : null;
+const OgPreview = import.meta.env.DEV
+  ? lazy(() => import("./pages/OgPreview"))
   : null;
 
 const queryClient = new QueryClient();
@@ -52,6 +56,9 @@ const AnimatedRoutes = () => {
           <Route path="/research/:slug" element={<Suspense fallback={<PageFallback />}><ResearchPost /></Suspense>} />
           {ScraperMonitor && (
             <Route path="/admin/scrapers" element={<Suspense fallback={<PageFallback />}><ScraperMonitor /></Suspense>} />
+          )}
+          {OgPreview && (
+            <Route path="/og/:slug" element={<Suspense fallback={<PageFallback />}><OgPreview /></Suspense>} />
           )}
           <Route path="*" element={<Suspense fallback={<PageFallback />}><NotFound /></Suspense>} />
         </Routes>

@@ -5,6 +5,12 @@ interface HeadConfig {
   description?: string;
   url?: string;
   /**
+   * Per-route og:image override. Pass a path-relative or absolute URL.
+   * Path-relative values are joined to BASE_URL so the meta tag always
+   * carries an absolute URL (Twitter and Facebook scrapers require it).
+   */
+  ogImage?: string;
+  /**
    * Optional JSON-LD structured data block. Injected into a single
    * <script id="page-json-ld" type="application/ld+json"> tag in the
    * document head. Cleared automatically on routes that don't pass one.
@@ -15,6 +21,7 @@ interface HeadConfig {
 const BASE_URL = "https://llmvibes.ai";
 const DEFAULT_DESCRIPTION =
   "Track community sentiment for Claude, ChatGPT, Gemini, and Grok. Is your AI having a bad day? Find out instantly.";
+const DEFAULT_OG_IMAGE = "https://llmvibes.ai/og-image.png";
 
 const JSON_LD_ID = "page-json-ld";
 
@@ -45,10 +52,17 @@ function setJsonLd(data: Record<string, unknown> | undefined) {
   document.head.appendChild(script);
 }
 
-const useHead = ({ title, description, url, jsonLd }: HeadConfig) => {
+function resolveOgImage(image?: string): string {
+  if (!image) return DEFAULT_OG_IMAGE;
+  if (image.startsWith("http://") || image.startsWith("https://")) return image;
+  return `${BASE_URL}${image.startsWith("/") ? image : `/${image}`}`;
+}
+
+const useHead = ({ title, description, url, ogImage, jsonLd }: HeadConfig) => {
   useEffect(() => {
     const desc = description ?? DEFAULT_DESCRIPTION;
     const fullUrl = url ? `${BASE_URL}${url}` : BASE_URL;
+    const fullOgImage = resolveOgImage(ogImage);
 
     document.title = title;
 
@@ -56,12 +70,14 @@ const useHead = ({ title, description, url, jsonLd }: HeadConfig) => {
     setMetaContent('meta[property="og:title"]', title);
     setMetaContent('meta[property="og:description"]', desc);
     setMetaContent('meta[property="og:url"]', fullUrl);
+    setMetaContent('meta[property="og:image"]', fullOgImage);
     setMetaContent('meta[name="twitter:title"]', title);
     setMetaContent('meta[name="twitter:description"]', desc);
+    setMetaContent('meta[name="twitter:image"]', fullOgImage);
 
     setLinkHref('link[rel="canonical"]', fullUrl);
     setJsonLd(jsonLd);
-  }, [title, description, url, jsonLd]);
+  }, [title, description, url, ogImage, jsonLd]);
 };
 
 export default useHead;
