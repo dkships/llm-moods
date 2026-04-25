@@ -339,6 +339,16 @@ export type Database = {
           total_posts: number
         }[]
       }
+      get_recent_errors: {
+        Args: { hours_back?: number }
+        Returns: {
+          context: string
+          error_count: number
+          function_name: string
+          last_seen: string
+          sample_message: string
+        }[]
+      }
       get_scraper_monitor_runs: {
         Args: { limit_count?: number }
         Returns: {
