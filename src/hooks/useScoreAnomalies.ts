@@ -81,8 +81,9 @@ export function useScoreAnomalies(options: UseScoreAnomaliesOptions = {}) {
       watchThreshold,
       breachThreshold,
     ],
-    refetchInterval: 60_000,
-    staleTime: 60_000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
+    staleTime: 5 * 60 * 1000,
     queryFn: async () => {
       const totalDays = recentDays + lookbackDays + 1;
       const since = new Date(Date.now() - totalDays * 24 * 60 * 60 * 1000).toISOString();
@@ -94,7 +95,7 @@ export function useScoreAnomalies(options: UseScoreAnomaliesOptions = {}) {
           .eq("period", "daily")
           .gte("period_start", since)
           .order("period_start", { ascending: true })
-          .limit(2000),
+          .limit(200),
         supabase.from("models").select("id, slug, name, accent_color"),
       ]);
 

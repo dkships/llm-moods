@@ -19,8 +19,9 @@ interface TrendingItem {
 function useTrendingComplaints() {
   return useQuery({
     queryKey: ["trending-complaints"],
-    staleTime: 60_000,
-    refetchInterval: 120_000,
+    staleTime: 5 * 60 * 1000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_trending_complaints");
       if (error) throw error;

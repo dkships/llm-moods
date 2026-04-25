@@ -397,18 +397,23 @@ const ModelDetail = () => {
                       Negative posts by surface
                     </h3>
                     <div className="flex h-2 w-full overflow-hidden rounded-full bg-secondary">
-                      {negativeSurfaceRows.map((row, i) => (
-                        <div
-                          key={row.label}
-                          className="h-full"
-                          style={{
-                            width: `${row.pct}%`,
-                            background: accent,
-                            opacity: 0.85 - i * 0.18,
-                          }}
-                          title={`${row.label}: ${row.count} (${row.pct}%)`}
-                        />
-                      ))}
+                      {negativeSurfaceRows.map((row, i) => {
+                        // Fixed opacity ramp so 5+ surfaces stay legible.
+                        // Index 0 is the largest segment, leading the bar.
+                        const ramp = [0.85, 0.65, 0.45, 0.3, 0.2];
+                        return (
+                          <div
+                            key={row.label}
+                            className="h-full"
+                            style={{
+                              width: `${row.pct}%`,
+                              background: accent,
+                              opacity: ramp[Math.min(i, ramp.length - 1)],
+                            }}
+                            title={`${row.label}: ${row.count} (${row.pct}%)`}
+                          />
+                        );
+                      })}
                     </div>
                     <ul className="mt-2 space-y-0.5">
                       {negativeSurfaceRows.map((row) => (

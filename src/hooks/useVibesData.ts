@@ -42,7 +42,8 @@ export interface ModelWithVibes {
 export function useModelsWithLatestVibes() {
   return useQuery<ModelWithVibes[]>({
     queryKey: ["models-with-vibes"],
-    refetchInterval: 60_000,
+    refetchInterval: 5 * 60 * 1000,
+    refetchIntervalInBackground: false,
     staleTime: 60_000,
     queryFn: async () => {
       const { data: landing, error: lErr } = await supabase.rpc("get_landing_vibes");

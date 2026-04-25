@@ -169,17 +169,17 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
           {data?.message ?? "No public status feed published by this vendor."}
         </p>
       ) : data.events.length === 0 ? (
-        <div className="mt-4 flex items-center gap-2 text-sm text-foreground/85">
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-          <span>
-            All operational over the last 30 days
-            {data.fetchedAt && (
-              <span className="ml-2 text-xs text-muted-foreground font-mono">
-                checked {formatTimeAgo(data.fetchedAt)}
-              </span>
-            )}
-          </span>
-        </div>
+        <>
+          <div className="mt-4 flex items-center gap-2 text-sm text-foreground/85">
+            <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>All operational over the last 30 days</span>
+          </div>
+          {data.fetchedAt && (
+            <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-muted-foreground">
+              Last checked {formatTimeAgo(data.fetchedAt)}
+            </p>
+          )}
+        </>
       ) : (
         <>
           <ul className="mt-4">

@@ -242,7 +242,7 @@ const Dashboard = () => {
           {/* Model Cards */}
           <section className="container pb-12">
             {modelsLoading ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2" role="status" aria-live="polite">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" role="status" aria-live="polite">
                 {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
               </div>
             ) : modelsError ? (
@@ -254,7 +254,7 @@ const Dashboard = () => {
                 initial="hidden"
                 animate="visible"
                 variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-                className="grid grid-cols-1 gap-4 md:grid-cols-2"
+                className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
               >
                 {(models || []).map((m, i) => (
                   <ModelCard key={m.id} m={m} i={i} onHover={handleHover} />

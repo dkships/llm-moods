@@ -11,6 +11,12 @@ const NavBar = () => {
   const { pathname } = useLocation();
   const showResearchLink = RESEARCH_POSTS.length > 0;
   const isResearchActive = pathname === "/research" || pathname.startsWith("/research/");
+  const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/model/");
+
+  const navLinkClass = (active: boolean) =>
+    `rounded-md px-2 py-1 font-mono text-xs uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+      active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
+    }`;
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
@@ -24,16 +30,12 @@ const NavBar = () => {
         >
           🌊 LLM <span className="text-primary">Vibes</span>
         </Link>
-        <div className="flex items-center gap-4 sm:gap-5">
+        <div className="flex items-center gap-3 sm:gap-5">
+          <Link to="/dashboard" className={navLinkClass(isDashboardActive)}>
+            Dashboard
+          </Link>
           {showResearchLink && (
-            <Link
-              to="/research"
-              className={`rounded-md px-2 py-1 font-mono text-xs uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                isResearchActive
-                  ? "bg-primary/10 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
+            <Link to="/research" className={navLinkClass(isResearchActive)}>
               Research
             </Link>
           )}

@@ -8,10 +8,13 @@ const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY |
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
+// Public read-only dashboard. No auth flows touch the client, so disable
+// session persistence + auto-refresh so the auth-js + storage code paths
+// never fire. Keeps the Supabase chunk smaller and removes localStorage
+// reads on every page load.
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
-    storage: localStorage,
-    persistSession: true,
-    autoRefreshToken: true,
+    persistSession: false,
+    autoRefreshToken: false,
   }
 });

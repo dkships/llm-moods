@@ -4,12 +4,12 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, MotionConfig } from "framer-motion";
 import { lazy, Suspense, useEffect } from "react";
 import Index from "./pages/Index";
+import NotFound from "./pages/NotFound";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ModelDetail = lazy(() => import("./pages/ModelDetail"));
 const ResearchIndex = lazy(() => import("./pages/ResearchIndex"));
 const ResearchPost = lazy(() => import("./pages/ResearchPost"));
-const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Admin / generator pages are dev-only — production bundles physically exclude
 // the lazy import below thanks to Vite tree-shaking on the `import.meta.env.DEV`
@@ -22,7 +22,15 @@ const OgPreview = import.meta.env.DEV
   ? lazy(() => import("./pages/OgPreview"))
   : null;
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Live scores update at most every few hours; skip the default
+      // refetch-on-focus that would hot-fetch every tab focus.
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 const PageFallback = () => (
   <div className="min-h-screen bg-background">
@@ -60,7 +68,7 @@ const AnimatedRoutes = () => {
           {OgPreview && (
             <Route path="/og/:slug" element={<Suspense fallback={<PageFallback />}><OgPreview /></Suspense>} />
           )}
-          <Route path="*" element={<Suspense fallback={<PageFallback />}><NotFound /></Suspense>} />
+          <Route path="*" element={<NotFound />} />
         </Routes>
       </AnimatePresence>
     </>
