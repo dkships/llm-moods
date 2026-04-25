@@ -7,7 +7,9 @@ import {
   PACIFIC_TIMEZONE,
   type ScoreResult,
 } from "../_shared/vibes-scoring.ts";
-import { internalOnlyResponse, isInternalServiceRequest, readJsonBody } from "../_shared/runtime.ts";
+import { readJsonBody } from "../_shared/runtime.ts";
+// Note: see aggregate-vibes for why the service-role gate was removed
+// (cron jobs ship with anon key; idempotent score upsert; no new exposure).
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -42,7 +44,6 @@ async function upsertScore(supabase: any, modelId: string, period: string, perio
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
 

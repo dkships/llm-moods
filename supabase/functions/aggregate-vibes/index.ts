@@ -7,7 +7,11 @@ import {
   getPreviousDailyScore,
   type ScoreResult,
 } from "../_shared/vibes-scoring.ts";
-import { internalOnlyResponse, isInternalServiceRequest } from "../_shared/runtime.ts";
+// Note: prior versions gated this on isInternalServiceRequest. Removed
+// 2026-04-25 because every pg_cron job here ships with the anon key, which
+// silently 403'd. The function only reads anon-readable scraped_posts and
+// upserts idempotent score rows using the service role from Deno.env, so
+// removing the caller-side gate doesn't expose anything new.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,7 +21,6 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
