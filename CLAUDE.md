@@ -38,8 +38,11 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 
 - `/` — Landing page (hero + model preview grid)
 - `/dashboard` — All models with scores, trends, sparklines, chatter feed
-- `/model/:slug` — Model detail (history chart, complaint/source breakdown, posts)
-- `/admin/scrapers` — Scraper run monitor (public, no auth)
+- `/model/:slug` — Model detail (history chart, complaint/source breakdown, posts, vendor events overlay, recent-incident card, official status card with anomaly correlation, surface-tagged recent posts)
+- `/research` — Research index (long-form articles index)
+- `/research/:slug` — Research article (live embedded charts via `chart-model` markdown sentinel; first article ships with CSV download + Dataset JSON-LD)
+- `/admin/scrapers` — Scraper run monitor + score anomalies panel. **Dev-only** (gated on `import.meta.env.DEV`; production bundles physically exclude the chunk).
+- `/og/:slug` — Dev-only OG card preview at fixed 1200×630 for capturing per-article share images.
 
 ## Database Schema
 
@@ -57,7 +60,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 
 ## Scrapers (Edge Functions)
 
-Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances), Lemmy (public API, 2 instances). Orchestrated by `run-scrapers` (batches of 3, cron `0 6,14,22 * * *` — 3x/day at 6AM, 2PM, 10PM UTC). Dormant scraper directories (Lobsters, Discourse, Dev.to, Stack Overflow, Medium, GitHub) still exist but are not in the orchestrator — kept for Lovable file structure compatibility.
+Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances), Lemmy (public API, 2 instances). Orchestrated by `run-scrapers` (batches of 3). pg_cron schedules the orchestrator hourly (cron `0 * * * *`) but the orchestrator only does a real fetch on three Pacific-time windows per day (05:00, 14:00, 21:00) — the other 21 hourly invocations return `{"status":"skipped","reason":"outside_window"}` in milliseconds. The hourly trigger landed on Apr 22 2026 (`supabase/migrations/20260422120000_schedule_run_scrapers_hourly.sql`); before that the orchestrator code shipped without a schedule for 17 days. Dormant scraper directories (Lobsters, Discourse, Dev.to, Stack Overflow, Medium, GitHub) still exist but are not in the orchestrator — kept for Lovable file structure compatibility.
 
 Shared utilities (keyword matching, dedup, error logging) are in `_shared/utils.ts` — scrapers import from there instead of duplicating code.
 
@@ -70,6 +73,15 @@ Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`)
 **Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input (4 terms, maxItems 50). Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Apify budget: $29/month, used for Reddit and Twitter.
 
 **Tracked models:** Claude, ChatGPT, Gemini, Grok (DeepSeek and Perplexity were removed 2026-03-21).
+
+## Frontend patterns added in 2026
+
+- **Vendor events overlay on charts:** `src/data/vendor-events.ts` exports `VENDOR_EVENTS[]` (typed-TS, frontend-only). `VibesChart` accepts an optional `events` prop and renders Recharts `<ReferenceArea>` / `<ReferenceLine>` for each one. Used to mark Anthropic / OpenAI / Google / xAI bug windows, model launches, and postmortems.
+- **Per-model product surface tagging:** `src/lib/product-surface.ts` carries a per-model regex map (e.g. Claude → Claude Code / Claude.ai / API / SDK). Display-only — applied client-side to recent posts; no schema change.
+- **Anomaly detection:** `src/hooks/useScoreAnomalies.ts` runs a 14-day rolling z-score in the browser over `vibes_scores`. Surfaced in the dev-only `/admin/scrapers` Anomalies panel and cross-referenced against Official Status events on `/model/:slug` via `src/lib/status-correlation.ts`.
+- **Official Status integration:** `supabase/functions/fetch-vendor-status` parses Anthropic + OpenAI Atom feeds and Google Cloud incidents.json, returns the last 30 days. `useVendorStatus()` + `<StatusCard />` render the result in the left column under the chart for all four model pages. xAI shows a "no public status feed" empty state.
+- **Research articles:** `src/data/research-posts.ts` carries typed-TS `ResearchPost` entries with markdown bodies. The body's ```chart-model``` fenced code block is intercepted by `src/components/research/EmbeddedModelChart.tsx` and replaced with a live model chart. Article + Dataset JSON-LD emitted via the extended `useHead.jsonLd` field.
+- **OG image generator:** `src/pages/OgPreview.tsx` (dev-only `/og/:slug`) renders a 1200×630 card; we capture screenshots into `public/research/<slug>/og.png` and reference via `ResearchPost.ogImage`.
 
 **Edge Function deployment:** Pushing to `main` triggers Lovable auto-sync for frontend. Edge Functions require a Lovable-side redeploy — prompt Lovable to sync from GitHub and redeploy the affected functions. Do not use `supabase` CLI (no independent Supabase account exists).
 

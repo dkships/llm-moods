@@ -47,17 +47,6 @@ const ResearchPostPage = () => {
 
     const graph: Record<string, unknown>[] = [article];
 
-    if (post.faq && post.faq.length > 0) {
-      graph.push({
-        "@type": "FAQPage",
-        mainEntity: post.faq.map((q) => ({
-          "@type": "Question",
-          name: q.question,
-          acceptedAnswer: { "@type": "Answer", text: q.answer },
-        })),
-      });
-    }
-
     if (post.dataset) {
       graph.push({
         "@type": "Dataset",
@@ -205,21 +194,6 @@ const ResearchPostPage = () => {
                 </ReactMarkdown>
               </div>
 
-              {post.faq && post.faq.length > 0 && (
-                <section className="mt-12 border-t border-border pt-8">
-                  <h2 className="mb-6 font-display text-2xl font-bold text-foreground">
-                    Frequently asked
-                  </h2>
-                  <ul className="space-y-5">
-                    {post.faq.map((q) => (
-                      <li key={q.question} className="rounded-lg border border-border bg-card/40 p-5">
-                        <p className="font-display font-semibold text-foreground">{q.question}</p>
-                        <p className="mt-2 text-sm text-foreground/80 leading-relaxed">{q.answer}</p>
-                      </li>
-                    ))}
-                  </ul>
-                </section>
-              )}
             </motion.div>
           </article>
         </main>

@@ -12,11 +12,6 @@ export type ResearchTag =
   | "case-study"
   | "cross-model";
 
-export interface ResearchPostFAQ {
-  question: string;
-  answer: string;
-}
-
 /**
  * Metadata for a downloadable dataset companion to the article.
  * Surfaced in-body as a download link and emitted as schema.org Dataset
@@ -48,8 +43,6 @@ export interface ResearchPost {
   relatedModelSlug?: ModelSlug;
   /** Full markdown body */
   body: string;
-  /** Optional FAQ for FAQPage JSON-LD */
-  faq?: ResearchPostFAQ[];
   /** Optional companion dataset for download + Dataset JSON-LD */
   dataset?: ResearchPostDataset;
   /** Optional path-relative URL to a 1200x630 OG card image */
@@ -58,9 +51,9 @@ export interface ResearchPost {
 
 const claudeApril2026Body = `## The 28-day gap
 
-On March 26, 2026, Anthropic shipped a thinking-cache regression into Claude Sonnet 4.6 and Opus 4.6. The same day, an LLM Vibes scraper logged a [Bluesky post](https://bsky.app/profile/tetrac-official.bsky.social/post/3mhxg72ka722t) from \`@tetrac-official.bsky.social\` that read, in full: "Restart session, clear conversations, clear claude md, give it specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf." Anthropic [confirmed the bug 28 days later](https://www.anthropic.com/engineering/april-23-postmortem), on April 23. We caught the grumbling on day zero. We just couldn't tell you so in real time.
+On March 26, 2026, Anthropic shipped a thinking-cache regression into Claude Sonnet 4.6 and Opus 4.6. The same day, an LLM Vibes scraper logged a [Bluesky post](https://bsky.app/profile/tetrac-official.bsky.social/post/3mhxg72ka722t) from \`@tetrac-official.bsky.social\` that read, in full: "Restart session, clear conversations, clear claude md, give it specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf." Anthropic [confirmed the bug 28 days later](https://www.anthropic.com/engineering/april-23-postmortem), on April 23. We logged the grumbling on day zero. We just couldn't tell you so in real time.
 
-This piece is the receipts: what our data shows, where it lined up with Anthropic's postmortem, and where it didn't.
+This piece is the receipts. What our data shows, where it lined up with Anthropic's postmortem, and where it didn't.
 
 \`\`\`chart-model
 claude
@@ -69,7 +62,7 @@ claude
 
 ## The match-up
 
-Anthropic's [April 23 engineering postmortem](https://www.anthropic.com/engineering/april-23-postmortem) named three bugs that ran between March 4 and April 20. Each one maps directly onto a complaint category our classifier was already tagging.
+Anthropic's [April 23 engineering postmortem](https://www.anthropic.com/engineering/april-23-postmortem) named three bugs that ran between March 4 and April 20. Each one maps onto a complaint category our classifier was already tagging.
 
 | Bug | Anthropic window | Stated symptom | LLM Vibes complaint tag | First captured signal |
 |---|---|---|---|---|
@@ -77,7 +70,7 @@ Anthropic's [April 23 engineering postmortem](https://www.anthropic.com/engineer
 | Thinking-cache dropped every turn | Mar 26 – Apr 10 | "Forgetful, repetitive, odd tool choices; usage limits drained faster" | \`context_window\`, \`lazy_responses\`, \`general_drop\` | **Mar 26, same-day** |
 | ≤25-word verbosity system prompt | Apr 16 – Apr 20 | ~3% coding-quality drop | \`coding_quality\`, \`general_drop\` | Apr 16, same-day |
 
-For two of three bugs, our scrapers logged matching user-language complaints on the day the bug shipped. The mainstream tech press cycle — VentureBeat, Fortune, Simon Willison, The Register, The Decoder — landed between April 13 and April 24. The cleanest single fingerprint was the cache bug: Anthropic specifically called out faster usage-limit drain, and we had a \`context_window\` spike on March 27, one day after deployment.
+For two of three bugs, our scrapers logged matching user-language complaints on the day the bug shipped. The mainstream tech press cycle (VentureBeat, Fortune, Simon Willison, The Register, The Decoder) landed between April 13 and April 24. The clearest match was the cache bug. Anthropic specifically called out faster usage-limit drain, and we had a \`context_window\` spike on March 27, one day after deployment.
 
 ## The receipts
 
@@ -95,35 +88,35 @@ These are verbatim posts pulled from the \`scraped_posts\` table, paired with An
 >
 > — [@mkalkere on X](https://x.com/mkalkere/status/2038404677000216624), **2026-03-29 23:55 UTC**
 
-The first quote is the cleanest. Bug 2 — the thinking-cache regression — shipped on March 26. The post was captured on March 26. The user is comparing Claude's behavior to a model two generations old. Our classifier tagged it \`general_drop\` and \`lazy_responses\`, both of which are the categories Anthropic later mapped to "forgetful and repetitive."
+The first quote is the most direct. Bug 2, the thinking-cache regression, shipped on March 26. The post was captured on March 26. The user is comparing Claude's behavior to a model two generations old. Our classifier tagged it \`general_drop\` and \`lazy_responses\`, the categories Anthropic later mapped to "forgetful and repetitive."
 
-The second quote is the token-drain symptom that Anthropic explicitly admitted to in the postmortem, captured 24 hours after deployment. The user describes the cache bug's exact mechanism in plain English without knowing what it was. The third quote shows the issue spreading into the paid Claude Max tier within three days, well before any tech outlet had filed copy on it.
+The second quote is the token-drain symptom Anthropic admitted to in the postmortem, captured 24 hours after deployment. The user describes the cache bug's exact mechanism in plain English without knowing what it was. The third quote shows the issue spreading into the paid Claude Max tier within three days, well before any tech outlet had filed copy on it.
 
 ## What we got right
 
-The same-day capture on March 26 was real. So was the March 27 token-drain spike: our \`context_window\` complaint volume jumps on exactly the day Anthropic later said the cache bug began burning quota. That kind of one-day match between an internal engineering change and an external sentiment pattern is the case for tools like ours existing at all.
+Same-day capture on March 26. Same-day capture on the March 27 token-drain spike: our \`context_window\` complaint volume jumped on the day Anthropic later said the cache bug began burning quota. A one-day match between an internal engineering change and an external sentiment pattern is the case for tools like ours existing at all.
 
-The cross-model isolation also held up. During the cache-bug window (March 26 – April 10), Claude scored 48.2, ChatGPT 31.1, Gemini 36.9, Grok 32.6 — Claude was still ahead in absolute terms. The signal was in the *delta from each model's own February baseline*. Claude dropped 24 points. ChatGPT dropped 33, Gemini 36. Then between April 11 and April 15, every other tracked model held flat or rose while Claude alone fell another 14 points to 34. That isolation is the cleanest evidence we have that the issue was Claude-specific, not a vendor-wide vibe shift.
+The cross-model isolation also held up. During the cache-bug window (March 26 – April 10), Claude scored 48.2, ChatGPT 31.1, Gemini 36.9, Grok 32.6. Claude was still ahead in absolute terms. The signal was in the *delta from each model's own February baseline*. Claude dropped 24 points. ChatGPT dropped 33. Gemini dropped 36. Then between April 11 and April 15, every other tracked model held flat or rose while Claude alone fell another 14 points to 34. That isolation is the strongest evidence we have that the issue was Claude-specific rather than industry-wide.
 
 ## What we got wrong
 
-Three things, and they're worth naming because the post-fix dip is currently the lowest score on Claude's chart, which would mislead anyone reading the dashboard cold.
+Three things, listed because the post-fix dip is currently the lowest score on Claude's chart and that misleads anyone reading the dashboard cold.
 
-The April 11–15 trough — score 34, the lowest single-window number on Claude's history — landed *after* Anthropic fixed the cache bug on April 10 and *before* the verbosity-prompt bug on April 16. That window is press-cycle echo, not silent-bug detection. The Register published on April 13, VentureBeat and Hacker News followed shortly after, and our scrapers captured the resulting wave of "Claude is broken" posts — many of them from users whose actual issues had already been fixed. The dashboard looks more like an early-grumble detector than a clean leading indicator.
+The April 11–15 trough (score 34, the lowest single-window number on Claude's history) landed *after* Anthropic fixed the cache bug on April 10 and *before* the verbosity-prompt bug on April 16. That window is press-cycle echo, not silent-bug detection. The Register published on April 13, VentureBeat and Hacker News followed, and our scrapers captured the resulting wave of "Claude is broken" posts. Many of those came from users whose actual issues had already been fixed. The dashboard looks more like an early-grumble detector than a clean leading indicator.
 
 The February 19 – March 7 volume gap is on us. The scraper orchestrator code shipped on March 9 but had no cron schedule until April 22. For 17 of the 35 days when Bug 1 was silently active in production, our scrapers ran only on manual triggers. We had no operational alarm telling us post volume had collapsed. That means the "Feb 15–18 baseline" is four days of meaningful data, not a robust statistical floor.
 
-The classifier itself is one of the tracked models. Sentiment runs through Gemini 3.1 Flash-Lite, classifying posts about Gemini's main competitor. There is no evidence of bias in this dataset and the directional movement is consistent across complaint categories and sources, but the structural risk is real and we have no validation harness yet to spot-check.
+The classifier itself is one of the tracked models. Sentiment runs through Gemini 3.1 Flash-Lite, classifying posts about Gemini's main competitor.[^1] There is no evidence of bias in this dataset, and the directional movement is consistent across complaint categories and sources, but the structural risk is real and we have no validation harness yet to spot-check.
 
 ## What this changes
 
-When SaaS reliability mattered enough, third-party status pages and observability tools — StatusGator, Downdetector, Datadog's third-party monitors — emerged because vendor-published uptime numbers turned out to be a conflict of interest. Frontier-model quality is now in roughly the same position. Anthropic's postmortem is unusually candid by industry standards, but it took 28 days, multiple Hacker News threads, and an international press cycle to produce. The user-side signal was visible the day the bug shipped.
+When SaaS reliability mattered enough, third-party status pages and observability tools (StatusGator, Downdetector, Datadog's third-party monitors) emerged because vendor-published uptime numbers turned out to be a conflict of interest. Frontier-model quality is now in roughly the same position. Anthropic's postmortem is unusually candid by industry standards, but it took 28 days, multiple Hacker News threads, and an international press cycle to produce. The user-side signal was visible the day the bug shipped.
 
-The argument is not that LLM Vibes is correct and Anthropic is wrong. We share a classifier vendor with our subjects, our scrapers are imperfect, and our lowest score landed on the wrong week. The argument is that AI accountability needs *more* sources of telemetry that don't sit inside the lab's CI pipeline. We're one of them. There should be five.
+The argument is not that LLM Vibes is correct and Anthropic is wrong. We share a classifier vendor with our subjects, our scrapers are imperfect, and our lowest score landed on the wrong week. The argument is that AI accountability needs more sources of telemetry that don't sit inside the lab's CI pipeline. We're one of them. There should be five.
 
 ## Methodology
 
-LLM Vibes scrapes posts about four LLM models — Claude, ChatGPT, Gemini, Grok — across six social platforms: Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (5 instances), and Lemmy (2 instances). The orchestrator runs once an hour and the scoring pipeline aggregates a daily 0–100 score per model.
+LLM Vibes scrapes posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across six social platforms: Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (5 instances), and Lemmy (2 instances). The orchestrator runs once an hour and the scoring pipeline aggregates a daily 0–100 score per model.
 
 Each post is classified for sentiment and complaint category by Gemini 3.1 Flash-Lite via the Google AI API, in batches of 25. Multi-model posts use a per-model targeted prompt so a sentence like "DeepSeek fixed Gemini's mess" scores correctly for each model. The daily score is volume-weighted negative-vs-positive on a 0–100 scale.
 
@@ -131,39 +124,38 @@ The numbers in this article come from the \`vibes_scores\` and \`scraped_posts\`
 
 ## What you can do next
 
-See the [live Claude chart](/model/claude) — the three Anthropic bug bands are now overlaid on the score history, with annotation arrows on March 26 and April 11.
+See the [live Claude chart](/model/claude). The three Anthropic bug bands are overlaid on the score history, with annotation arrows on March 26 and April 11.
 
 [Read or fork the source on GitHub](https://github.com/dkships/llm-moods). The classifier prompt, the scraper config, and the anomaly-detection logic are all in \`supabase/functions/_shared/\`.
 
 The next incident write-up will go out within 24 hours of the next ≥3σ score drop on any tracked model. Watch the [dashboard](/dashboard) or follow the [GitHub repo](https://github.com/dkships/llm-moods).
+
+## Notes
+
+[^1]: Self-bias risk on the classifier. Gemini 3.1 Flash-Lite is the model performing classification and is also one of the four tracked models. We have no second-model validation harness yet. Mitigating evidence: across the windows examined, Claude often outscored Gemini, the opposite of what classifier bias toward Gemini would produce. The risk is structural, and disclosing it is the obligation; spot-checking it is the next build item.
 `;
 
 const methodologyBody = `## Why a methodology post
 
-LLM Vibes is two things at once: a public sentiment dashboard and an argument that frontier-model accountability needs telemetry that doesn't sit inside a vendor's CI pipeline. The dashboard only carries the argument if the methodology is legible. This post walks through the full pipeline — what we scrape, how we score it, how we flag anomalies, and which failure modes we've documented but not yet solved.
+LLM Vibes is two things at once: a public sentiment dashboard, and an argument that frontier-model accountability needs telemetry that doesn't sit inside a vendor's CI pipeline. The dashboard only carries the argument if the methodology is legible. This post walks through the full pipeline: what we scrape, how we score it, how we flag anomalies, and which failure modes we've documented but not yet solved.
 
-If you want to verify any of this against the source: every script, query, and prompt referenced here lives in the [public repository](https://github.com/dkships/llm-moods). The classifier prompt is in \`supabase/functions/_shared/classifier.ts\`. The scoring math is in \`supabase/functions/_shared/vibes-scoring.ts\`.
+If you want to verify any of this against the source, every script, query, and prompt referenced here lives in the [public repository](https://github.com/dkships/llm-moods). The classifier prompt is in \`supabase/functions/_shared/classifier.ts\`. The scoring math is in \`supabase/functions/_shared/vibes-scoring.ts\`.
 
 ## What gets scraped
 
-Six platforms, six edge functions, one orchestrator. The active set:
+Six platforms, six edge functions, one orchestrator.
 
-- **Reddit** via the Apify \`trudax~reddit-scraper-lite\` actor, pulling from five subreddits (r/ClaudeAI, r/ChatGPT, r/LocalLLaMA, r/GoogleGemini, r/artificial), 40 posts per run.
-- **Hacker News** via the Algolia API, free and rate-friendly.
-- **Bluesky** via the AT Protocol with an authenticated handle.
-- **Twitter / X** via the Apify \`apidojo~tweet-scraper\` actor, four search terms, 50 posts per run.
-- **Mastodon** via the public API across five instances.
-- **Lemmy** via the public API across two instances.
+Reddit comes from the Apify \`trudax~reddit-scraper-lite\` actor, pulling 40 posts per run from five subreddits (r/ClaudeAI, r/ChatGPT, r/LocalLLaMA, r/GoogleGemini, r/artificial). Hacker News uses the Algolia API, free and rate-friendly. Bluesky uses the AT Protocol with an authenticated handle. Twitter/X uses the Apify \`apidojo~tweet-scraper\` actor, four search terms, 50 posts per run. Mastodon uses the public API across five instances. Lemmy uses the public API across two instances.
 
-A coordinator function (\`run-scrapers\`) fires each scraper in batches of three. The scheduling lives in Supabase \`pg_cron\` and runs hourly, but the orchestrator only does a real fetch on three Pacific-time windows per day (05:00, 14:00, 21:00). On the other 21 hourly invocations it returns \`{"status":"skipped","reason":"outside_window"}\` in milliseconds, which keeps the cron column legible without burning Apify credits.
+A coordinator function (\`run-scrapers\`) fires each scraper in batches of three. The schedule lives in Supabase \`pg_cron\` and runs hourly, but the orchestrator only does a real fetch on three Pacific-time windows per day (05:00, 14:00, 21:00). On the other 21 hourly invocations it returns \`{"status":"skipped","reason":"outside_window"}\` in milliseconds, which keeps the cron column legible without burning Apify credits.
 
-The hourly trigger landed on April 22, 2026. Before that, the orchestrator code shipped without a cron schedule for 17 days — a real operational gap that's documented in [our retrospective](https://github.com/dkships/llm-moods/blob/main/docs/llm-vibes-retrospective-april-2026.md).
+The hourly trigger landed on April 22, 2026. Before that, the orchestrator code shipped without a cron schedule for 17 days. That gap is documented in [our retrospective](https://github.com/dkships/llm-moods/blob/main/docs/llm-vibes-retrospective-april-2026.md).
 
 ## How posts get attributed to a model
 
-Two-stage matching, both deterministic. First, lexical: a list of keywords per model (\`Claude\`, \`Sonnet\`, \`Opus\`, \`Haiku\`, \`ChatGPT\`, \`GPT-5\`, etc.) loaded from the \`model_keywords\` table at runtime. Tier-1 keywords match outright. Tier-2 keywords (\`gpt\`, \`openai\`) only match in the presence of explicit context words and not when the post mentions local-model markers (\`gpt-oss\`, \`ollama\`, \`huggingface.co/openai/gpt-oss\`) — that disambiguation alone removed a meaningful share of false ChatGPT attributions to self-hosted runs.
+Two-stage matching, both deterministic. First, lexical: a list of keywords per model (\`Claude\`, \`Sonnet\`, \`Opus\`, \`Haiku\`, \`ChatGPT\`, \`GPT-5\`, etc.) loaded from the \`model_keywords\` table at runtime. Tier-1 keywords match outright. Tier-2 keywords (\`gpt\`, \`openai\`) only match in the presence of explicit context words, and not when the post mentions local-model markers (\`gpt-oss\`, \`ollama\`, \`huggingface.co/openai/gpt-oss\`). That disambiguation alone removed a meaningful share of false ChatGPT attributions to self-hosted runs.
 
-Second, source-aware: each Reddit post inherits a hint from its subreddit (r/ClaudeAI implies Claude). The hint augments but doesn't override the keyword match — multi-model posts can still attribute to multiple models simultaneously.
+Second, source-aware: each Reddit post inherits a hint from its subreddit (r/ClaudeAI implies Claude). The hint augments but doesn't override the keyword match. Multi-model posts can still attribute to multiple models simultaneously.
 
 A single post can match multiple models. When it does, downstream classification uses a per-model targeted prompt so a sentence like *"DeepSeek fixed Gemini's mess"* scores positive for DeepSeek and negative for Gemini independently. There are two classifier prompts in the codebase: a single-model batch prompt for posts that match one slug, and a targeted batch prompt for posts that match more than one.
 
@@ -171,7 +163,7 @@ A single post can match multiple models. When it does, downstream classification
 
 Every relevant post is sent to **Gemini 3.1 Flash-Lite** via the Google AI API in batches of 25. The classifier returns six fields per post: \`relevant\`, \`sentiment\` (positive / negative / neutral), \`complaint_category\` (one of 12 if negative), \`praise_category\` (one of 10 if positive), \`confidence\` (0.0–1.0), and a translation if the post is non-English.
 
-The 12 complaint categories are: \`lazy_responses\`, \`hallucinations\`, \`refusals\`, \`coding_quality\`, \`speed\`, \`general_drop\`, \`pricing_value\`, \`censorship\`, \`context_window\`, \`api_reliability\`, \`multimodal_quality\`, and \`reasoning\`. They are deliberately coarse; a public dashboard rewards stable category labels readers can recognize over time.
+The 12 complaint categories are: \`lazy_responses\`, \`hallucinations\`, \`refusals\`, \`coding_quality\`, \`speed\`, \`general_drop\`, \`pricing_value\`, \`censorship\`, \`context_window\`, \`api_reliability\`, \`multimodal_quality\`, and \`reasoning\`. They are deliberately coarse. A public dashboard rewards stable category labels readers can recognize over time.
 
 Non-English posts are translated by the same prompt and stored alongside the original. Original-language text stays in \`content\`; the translation goes into \`translated_content\`. The detected ISO code goes into \`original_language\`. There is no separate translation API call.
 
@@ -188,7 +180,7 @@ content_multiplier = 0.6 if title-only else 1.0
 
 Eligibility means \`confidence >= 0.65\`. Below that floor the classifier says it's a weak signal; we drop it.
 
-Each source (\`reddit\`, \`bluesky\`, \`twitter\`, etc.) is then capped at no more than 50% of total weight. If Bluesky alone produces enough volume to dominate a day's score, the cap rescales it down. This is the single most important guardrail against sentiment shifts that come from one platform's local culture rather than a real model-quality change.
+Each source (\`reddit\`, \`bluesky\`, \`twitter\`, etc.) is then capped at no more than 50% of total weight. If Bluesky alone produces enough volume to dominate a day's score, the cap rescales it down. This is the most important guardrail against sentiment shifts that come from one platform's local culture rather than a real model-quality change.
 
 After capping, the per-day score is:
 
@@ -214,26 +206,28 @@ The thresholds:
 - \`|z| ≥ 2\` → **watch** (≈5% false-positive rate)
 - otherwise → normal, hidden
 
-Rows where the baseline window has fewer than 7 days of data are skipped — the stddev is too noisy to be useful. Today's anomaly view is admin-only at \`/admin/scrapers\` (gated to dev builds via \`import.meta.env.DEV\` so production bundles physically exclude the route).
+Rows where the baseline window has fewer than 7 days of data are skipped. The stddev is too noisy to be useful. Today's anomaly view is admin-only at \`/admin/scrapers\` (gated to dev builds via \`import.meta.env.DEV\` so production bundles physically exclude the route).
 
-The same anomaly stream feeds the **status-correlation** chip on each model's [Official Status](/model/claude) card. When a vendor publishes a status incident, we cross-reference its date against any breach or watch anomalies for that model within ±2 days and surface the match inline.
+The same anomaly stream feeds the status-correlation chip on each model's [Official Status](/model/claude) card. When a vendor publishes a status incident, we cross-reference its date against any breach or watch anomalies for that model within ±2 days and surface the match inline.
 
-## What we know we got wrong
+## What this analysis assumes
 
-Three things, named explicitly:
+Three caveats that anyone reading the dashboard should know.
 
-1. **The classifier vendor is one of the tracked models.** Gemini 3.1 Flash-Lite classifies posts about Gemini's competitors. There is no evidence of bias in the data — Claude often scores *higher* than Gemini in the windows we've examined, opposite of what classifier bias would produce — but the structural risk is real. We do not yet have a second-model validation harness.
-2. **Volume gaps.** The Feb 19 – Mar 7, 2026 gap (no scheduled cron, manual triggers only) means our pre-bug baseline for the [Claude April 2026 incident](/research/claude-april-2026) is four days, not a robust statistical floor.
-3. **The score lags.** Press-cycle echo can drag a model's score *below* the bug-period score, as it did for Claude on April 11–15 (lowest score, post-fix). The retrospective is honest about that. The next post in this section is the [cross-model deltas](/research/cross-model-deltas-march-april-2026) view, which makes the lag pattern visible.
+The classifier vendor is one of the tracked models. Gemini 3.1 Flash-Lite classifies posts about Gemini's competitors. There is no evidence of bias in the data (Claude often scores higher than Gemini in the windows we've examined, the opposite of what classifier bias toward Gemini would produce), but the structural risk is real. We do not yet have a second-model validation harness.
+
+Volume gaps are part of the record. The Feb 19 – Mar 7, 2026 gap (no scheduled cron, manual triggers only) means our pre-bug baseline for the [Claude April 2026 incident](/research/claude-april-2026) is four days, not a robust statistical floor.
+
+The score lags. Press-cycle echo can drag a model's score below the bug-period score, as it did for Claude on April 11–15 (lowest score, post-fix). The retrospective documents that. The companion piece on [cross-model deltas](/research/cross-model-deltas-march-april-2026) makes the lag pattern visible.
 
 The repo is MIT-licensed. Read it, fork it, run it against your own scraper sources, file a PR if you have a better classifier prompt.
 `;
 
 const crossModelBody = `## Reading absolute scores will mislead you
 
-The single most common misread of a multi-model dashboard like LLM Vibes is comparing two model scores at a single point in time. *"Claude is 48, ChatGPT is 31, so Claude is better."* That number says less than it looks like.
+The most common misread of a multi-model dashboard like LLM Vibes is comparing two model scores at a single point in time. *"Claude is 48, ChatGPT is 31, so Claude is better."* That number says less than it looks like.
 
-What it actually says is: at this moment, in the population of posts we scraped, the volume-weighted positive share for Claude is higher than for ChatGPT. Models attract different audiences with different complaint cultures. Reddit's r/ChatGPT runs hotter than r/ClaudeAI on any given day. A snapshot doesn't tell you whether a model is improving, regressing, or steady-state — only the **delta from its own baseline** does that.
+What it actually says is: at this moment, in the population of posts we scraped, the volume-weighted positive share for Claude is higher than for ChatGPT. Models attract different audiences with different complaint cultures. Reddit's r/ChatGPT runs hotter than r/ClaudeAI on any given day. A snapshot doesn't tell you whether a model is improving, regressing, or holding steady. Only the delta from its own baseline does that.
 
 This is the lesson the [March–April 2026 Claude incident](/research/claude-april-2026) made unmissable.
 
@@ -255,7 +249,7 @@ gemini
 grok
 \`\`\`
 
-These are live charts, not snapshots. Each one shows the model's own daily score against its own history. The chart for Claude is shaded with the three Anthropic-confirmed bug windows. The other three are not shaded because their vendors have not published comparable postmortems for the same period.
+These are live charts, not snapshots. Each one shows the model's own daily score against its own history. The Claude chart is shaded with the three Anthropic-confirmed bug windows. The other three are not shaded because their vendors have not published comparable postmortems for the same period.
 
 ## The numbers that matter
 
@@ -276,27 +270,31 @@ That's the inverted shape: the model that was actually broken (Claude, per Anthr
 
 Three reasons.
 
-**Cohort drift.** Each model has a different audience mix. ChatGPT pulls in heavy mainstream traffic from Reddit and Twitter; Claude pulls in a more developer-skewed cohort that's both more demanding and more vocal. The volume-weighted score reflects both quality and audience tolerance. Comparing baselines to themselves removes the audience-tolerance variable.
+Cohort drift. Each model has a different audience mix. ChatGPT pulls in heavy mainstream traffic from Reddit and Twitter; Claude pulls in a more developer-skewed cohort that's more demanding and more vocal. The volume-weighted score reflects both quality and audience tolerance. Comparing baselines to themselves removes the audience-tolerance variable.
 
-**Press-cycle echo.** When a story goes mainstream — VentureBeat, Fortune, Hacker News, The Register — the wave of "X is broken" posts arrives *after* the fix. Our scrapers pick up the echo. A naive absolute-score reading flags the post-fix week as worse than the actual-fix week. A delta-from-baseline reading shows the press wave as a smaller deviation than the silent bug period was.
+Press-cycle echo. When a story goes mainstream (VentureBeat, Fortune, Hacker News, The Register), the wave of "X is broken" posts arrives *after* the fix. Our scrapers pick up the echo. A naive absolute-score reading flags the post-fix week as worse than the actual-fix week. A delta-from-baseline reading shows the press wave as a smaller deviation than the silent bug period was.
 
-**Vendor-wide trends.** When all four models drop together, that's industry sentiment, not model quality. Aggregating across the whole tracked set gives you a baseline of baselines: if Claude's delta is −24 while the average across other vendors is −34, Claude is actually doing *better* than the industry trend, even when its absolute number is also down.
+Vendor-wide trends. When all four models drop together, that's industry sentiment, not model quality. Aggregating across the whole tracked set gives you a baseline of baselines: if Claude's delta is −24 while the average across other vendors is −34, Claude is actually doing better than the industry trend, even when its absolute number is also down.
 
 ## How to read the dashboard
 
-Three rules I'd commit to memory:
+Three rules worth committing to memory.
 
-1. **Compare a model to itself, not to other models, when judging quality changes.** Each model card on [the dashboard](/dashboard) shows yesterday's delta in the trend pill — that's the right metric for "is X getting worse?"
-2. **Watch for divergence from the cross-model average.** If three of four tracked models go down by the same magnitude in the same week, the news is industry-wide. If one model's delta is meaningfully larger, that one is the story.
-3. **Treat a single ≥2σ daily deviation as a watch flag, not a verdict.** The [admin Anomalies panel](/admin/scrapers) (dev-only) surfaces these automatically. The first day of a regression is rarely the strongest signal — it's the *sustained* drop over multiple days that matches what a real engineering bug looks like in user behavior.
+1. Compare a model to itself, not to other models, when judging quality changes. Each model card on [the dashboard](/dashboard) shows yesterday's delta in the trend pill. That's the right metric for "is X getting worse?"
+2. Watch for divergence from the cross-model average. If three of four tracked models go down by the same magnitude in the same week, the news is industry-wide. If one model's delta is meaningfully larger, that one is the story.
+3. Treat a single ≥2σ daily deviation as a watch flag, not a verdict. The [admin Anomalies panel](/admin/scrapers) (dev-only) surfaces these automatically. A first-day regression is rarely the strongest signal. Sustained multi-day drops match what a real engineering bug looks like in user behavior.
 
 ## What this means for the next incident
 
-When the next Claude / GPT / Gemini / Grok regression happens — and it will — the early signal won't be that one model dropped. The early signal will be that one model's *delta from its baseline* is several points larger than the cross-model median for the same week.
+When the next Claude, GPT, Gemini, or Grok regression happens (and it will), the early signal won't be that one model dropped. The early signal will be that one model's *delta from its baseline* is several points larger than the cross-model median for the same week.
 
 That comparison currently requires eyeballing four charts. The next iteration of LLM Vibes should compute it explicitly: a "delta divergence" metric per model per day, surfaced as a new anomaly type. That's not built yet. If you want to read the data yourself in the meantime, the [public CSV](/research/claude-april-2026/data.csv) for the Claude case study has the raw scores; the other three models' scores are queryable via the public Supabase REST endpoint exposed in the repository.
 
-The lesson from March 2026 wasn't that LLM Vibes caught Claude breaking — it was that we caught it by reading deltas, not by reading the leaderboard. Build the same instinct into how you read the dashboard.
+## Caveats
+
+The Feb baseline numbers in the table above (~72, ~64, ~73, ~65) are approximate. The Feb 19 – Mar 7 scraper-volume gap means each model's pre-bug baseline rests on roughly four days of meaningful data, not a statistically robust window. The relative ordering is solid; the precise baseline values are the weakest part of the table.
+
+The lesson from March 2026 was not that LLM Vibes caught Claude breaking. It was that we caught it by reading deltas instead of the leaderboard. Build the same instinct into how you read the dashboard.
 `;
 
 export const RESEARCH_POSTS: ResearchPost[] = [
@@ -311,23 +309,6 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     relatedModelSlug: "claude",
     body: claudeApril2026Body,
     ogImage: "/research/claude-april-2026/og.png",
-    faq: [
-      {
-        question: "What did Anthropic's April 23 postmortem disclose?",
-        answer:
-          "Three engineering bugs that degraded Claude Code between March 4 and April 20, 2026: a default reasoning-effort change (Mar 4–Apr 7), a thinking-cache regression that dropped reasoning every turn instead of once (Mar 26–Apr 10), and a system prompt that capped responses at 25 words (Apr 16–Apr 20).",
-      },
-      {
-        question: "When did LLM Vibes first detect user complaints about the bugs?",
-        answer:
-          "Our scrapers logged a Bluesky post on March 26, 2026 — the same day Anthropic shipped the thinking-cache bug — comparing Claude's behavior to a model two generations old. Token-drain complaints on Reddit followed 24 hours later.",
-      },
-      {
-        question: "Did LLM Vibes claim Claude was broken before Anthropic admitted it?",
-        answer:
-          "No. We captured user complaints in real time but did not flag a quality regression to readers. The dashboard's lowest Claude score landed in the post-fix press-cycle echo on April 11–15, not during the silent bug period. The article is honest about that limitation.",
-      },
-    ],
     dataset: {
       label: "Daily LLM Vibes scores · Feb 15 – Apr 24, 2026 (CSV)",
       path: "/research/claude-april-2026/data.csv",
@@ -347,28 +328,6 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     tags: ["methodology"],
     body: methodologyBody,
     ogImage: "/research/how-llm-vibes-classifies-sentiment/og.png",
-    faq: [
-      {
-        question: "Which platforms does LLM Vibes scrape?",
-        answer:
-          "Six active sources: Reddit (Apify trudax actor on five subreddits), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter / X (Apify apidojo actor), Mastodon (five public instances), and Lemmy (two public instances). The scraper code is in supabase/functions/scrape-* in the public repository.",
-      },
-      {
-        question: "How is the daily 0–100 score computed?",
-        answer:
-          "Each post gets a weight of confidence × log(engagement + 1) × content_multiplier. Weights are capped so no single source contributes more than 50% of the day's total. Score = (positive_weight + 0.3 × neutral_weight) / total_weight × 100. Empty days default to 50, the visual midpoint.",
-      },
-      {
-        question: "What are the 12 complaint categories?",
-        answer:
-          "lazy_responses, hallucinations, refusals, coding_quality, speed, general_drop, pricing_value, censorship, context_window, api_reliability, multimodal_quality, reasoning. Categories are deliberately coarse so labels stay stable across months.",
-      },
-      {
-        question: "What's the biggest known weakness of the methodology?",
-        answer:
-          "The classifier is Gemini 3.1 Flash-Lite, which is also one of the tracked models. There is no evidence of bias in the data — Claude has often scored higher than Gemini in the same windows — but a second-model validation harness is the most-requested next step.",
-      },
-    ],
   },
   {
     slug: "cross-model-deltas-march-april-2026",
@@ -380,23 +339,6 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     tags: ["cross-model", "case-study", "claude", "chatgpt", "gemini", "grok"],
     body: crossModelBody,
     ogImage: "/research/cross-model-deltas-march-april-2026/og.png",
-    faq: [
-      {
-        question: "Why didn't the absolute score show Claude was the worst model in the window?",
-        answer:
-          "Each model attracts a different audience with different complaint norms. Claude's developer-skewed cohort is more vocal, but its weighted score still ran ahead of ChatGPT's and Gemini's in absolute terms. The signal of regression came from comparing each model to its own February baseline: Claude's delta was −24, ChatGPT's was −33, Gemini's was −36.",
-      },
-      {
-        question: "What's the right way to read the dashboard for quality changes?",
-        answer:
-          "Compare a model to itself over time, not to other models at a single point. The trend pill on each dashboard card shows yesterday's delta. The Anomalies panel surfaces ≥2σ deviations from the trailing 14-day baseline. A single bad day is rarely the strongest signal — sustained multi-day drops match what real engineering regressions look like in user behavior.",
-      },
-      {
-        question: "What's a 'delta divergence' metric and is it shipped?",
-        answer:
-          "Not yet. It would compute each model's z-score against the cross-model median for the same day, surfacing model-specific regressions even when the whole industry is trending down. The data is already in the public dataset; the metric is documented in this post and parked in the project backlog.",
-      },
-    ],
   },
 ];
 

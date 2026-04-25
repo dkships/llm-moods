@@ -23,8 +23,8 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 - Shared scraper utilities in `supabase/functions/_shared/utils.ts`
 
 ## Public App Guardrails
-- Public route inventory is fixed to `/`, `/dashboard`, `/model/:slug`, and `*` (404)
-- `src/pages/ScraperMonitor.tsx` is intentionally internal and not routed in the public app
+- Public route inventory is fixed to `/`, `/dashboard`, `/model/:slug`, `/research`, `/research/:slug`, and `*` (404)
+- Dev-only routes (gated on `import.meta.env.DEV` so production bundles physically exclude them): `/admin/scrapers` (scraper monitor + anomalies panel), `/og/:slug` (OG card generator)
 - Public complaint taxonomy must flow through `src/shared/public-taxonomy.ts`; do not hardcode labels or aliases in page components
 - Unknown complaint categories must be filtered or shown as `Other` — never expose raw backend taxonomy strings in the UI
 - Public freshness states use three buckets only: fresh, lagging, stale. Preserve the copy and semantics in `DataFreshnessIndicator`
@@ -41,4 +41,4 @@ See `~/.agents/AGENTS.md`. For llm-moods: sources = code and model API responses
 
 ## Maintenance
 - Owner: David Kelly
-- Last Updated: 2026-04-18
+- Last Updated: 2026-04-25
