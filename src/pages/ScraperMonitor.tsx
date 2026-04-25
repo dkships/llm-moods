@@ -31,12 +31,40 @@ interface MonitorRun {
   metadata: Record<string, unknown> | null;
 }
 
+interface RecentError {
+  function_name: string;
+  context: string | null;
+  error_count: number;
+  last_seen: string;
+  sample_message: string | null;
+}
+
 interface MonitorRpcClient {
-  rpc: (
+  rpc: ((
     fn: "get_scraper_monitor_runs",
     args: { limit_count: number },
-  ) => Promise<{ data: MonitorRun[] | null; error: { message: string } | null }>;
+  ) => Promise<{ data: MonitorRun[] | null; error: { message: string } | null }>) &
+    ((
+      fn: "get_recent_errors",
+      args: { hours_back: number },
+    ) => Promise<{ data: RecentError[] | null; error: { message: string } | null }>);
 }
+
+// Contexts logged to error_log that aren't actually errors — completion
+// summaries, debug breadcrumbs, retry-attempt notices. These are useful in
+// raw error_log inspection but noise on the dashboard.
+const NON_ERROR_CONTEXTS = new Set(["summary", "match-debug"]);
+
+// Classifier failure contexts — the canonical "classifier just stopped
+// producing useful output" signal we want to surface separately. Includes
+// API errors AND parse errors AND exhausted-retry events.
+const CLASSIFIER_ERROR_CONTEXTS = new Set([
+  "classify-error",
+  "classify-parse-error",
+  "classify-exception",
+  "batch-classify-error",
+  "batch-classify-parse",
+]);
 
 function statusBadge(status: string) {
   if (status === "success") return "text-primary bg-primary/10 border-primary/20";
@@ -76,6 +104,27 @@ const ScraperMonitor = () => {
     },
   });
 
+  const { data: rawErrors, isLoading: errorsLoading } = useQuery({
+    queryKey: ["recent-errors"],
+    refetchInterval: 60_000,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as unknown as MonitorRpcClient).rpc("get_recent_errors", { hours_back: 24 });
+      if (error) throw error;
+      return (data || []) as RecentError[];
+    },
+  });
+  const recentErrors = (rawErrors ?? []).filter(
+    (e) => !NON_ERROR_CONTEXTS.has(e.context ?? "") && !(e.context ?? "").endsWith("-retry"),
+  );
+  const classifierErrorCount = recentErrors
+    .filter((e) => CLASSIFIER_ERROR_CONTEXTS.has(e.context ?? ""))
+    .reduce((sum, e) => sum + Number(e.error_count), 0);
+  const classifierStatus =
+    classifierErrorCount === 0 ? "ok" :
+    classifierErrorCount > 50 ? "breach" :
+    classifierErrorCount > 10 ? "watch" : "ok";
+
   const { data: anomalies, isLoading: anomaliesLoading } = useScoreAnomalies();
   const surfacedAnomalies = (anomalies ?? []).filter((a) => a.severity !== "normal");
 
@@ -104,13 +153,31 @@ const ScraperMonitor = () => {
             Window runs and scraper-level summaries. Refreshes every 30s.
           </p>
 
-          <div className="mb-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
             {summaryCards.map((card) => (
               <div key={card.label} className="glass rounded-lg p-4">
                 <p className="font-mono text-xs text-muted-foreground">{card.label}</p>
                 <p className="text-xl font-bold text-foreground">{card.value}</p>
               </div>
             ))}
+          </div>
+
+          <div
+            className={`mb-8 rounded-lg border px-4 py-3 font-mono text-xs ${
+              classifierStatus === "breach"
+                ? "border-destructive/30 bg-destructive/10 text-destructive"
+                : classifierStatus === "watch"
+                ? "border-yellow-400/30 bg-yellow-400/10 text-yellow-400"
+                : "border-border bg-secondary/30 text-muted-foreground"
+            }`}
+            role="status"
+          >
+            Classifier health (24h):{" "}
+            <span className="font-semibold">{errorsLoading ? "—" : classifierErrorCount}</span>{" "}
+            API/parse failures across all scrapers.
+            {classifierStatus === "breach" && " — investigate Gemini quota or model rotation."}
+            {classifierStatus === "watch" && " — elevated error rate, monitor."}
+            {classifierStatus === "ok" && classifierErrorCount === 0 && " — clean."}
           </div>
 
           <h2 className="mb-3 text-lg font-semibold text-foreground">Score Anomalies</h2>
@@ -249,6 +316,58 @@ const ScraperMonitor = () => {
                       </td>
                     </tr>
                   ))
+                )}
+              </tbody>
+            </table>
+          </div>
+
+          <h2 className="mb-3 text-lg font-semibold text-foreground">Recent Pipeline Errors</h2>
+          <p className="mb-3 font-mono text-xs text-muted-foreground">
+            Aggregated <code>error_log</code> entries from the last 24h. Excludes completion summaries, debug breadcrumbs, and retry-attempt notices.
+          </p>
+          <div className="glass mb-8 overflow-x-auto rounded-xl">
+            <table className="min-w-[900px] w-full text-sm">
+              <thead>
+                <tr className="border-b border-border font-mono text-xs text-muted-foreground">
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Function</th>
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Context</th>
+                  <th className="px-4 py-3 text-right whitespace-nowrap">Count</th>
+                  <th className="px-4 py-3 text-right whitespace-nowrap">Last seen</th>
+                  <th className="px-4 py-3 text-left">Sample message</th>
+                </tr>
+              </thead>
+              <tbody>
+                {errorsLoading ? (
+                  <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">Loading...</td></tr>
+                ) : recentErrors.length === 0 ? (
+                  <tr><td colSpan={5} className="px-4 py-6 text-center text-muted-foreground">No errors in the last 24h.</td></tr>
+                ) : (
+                  recentErrors.map((e) => {
+                    const isClassifierFailure = CLASSIFIER_ERROR_CONTEXTS.has(e.context ?? "");
+                    return (
+                      <tr key={`${e.function_name}-${e.context}`} className="border-b border-border/50 hover:bg-secondary/20">
+                        <td className="px-4 py-3 font-mono text-foreground">{e.function_name}</td>
+                        <td className="px-4 py-3 font-mono text-xs">
+                          <span
+                            className={`inline-block rounded-full border px-2 py-0.5 ${
+                              isClassifierFailure
+                                ? "text-destructive bg-destructive/10 border-destructive/20"
+                                : "text-muted-foreground bg-secondary/40 border-border"
+                            }`}
+                          >
+                            {e.context ?? "—"}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{e.error_count}</td>
+                        <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground">
+                          {formatTimeAgo(e.last_seen)}
+                        </td>
+                        <td className="max-w-[420px] truncate px-4 py-3 text-xs text-muted-foreground" title={e.sample_message ?? ""}>
+                          {e.sample_message ?? "—"}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
             </table>
