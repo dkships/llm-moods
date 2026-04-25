@@ -7,6 +7,8 @@ import Index from "./pages/Index";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ModelDetail = lazy(() => import("./pages/ModelDetail"));
+const ResearchIndex = lazy(() => import("./pages/ResearchIndex"));
+const ResearchPost = lazy(() => import("./pages/ResearchPost"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 // Admin pages are dev-only — production bundles physically exclude the lazy
@@ -46,6 +48,8 @@ const AnimatedRoutes = () => {
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
           <Route path="/model/:slug" element={<Suspense fallback={<PageFallback />}><ModelDetail /></Suspense>} />
+          <Route path="/research" element={<Suspense fallback={<PageFallback />}><ResearchIndex /></Suspense>} />
+          <Route path="/research/:slug" element={<Suspense fallback={<PageFallback />}><ResearchPost /></Suspense>} />
           {ScraperMonitor && (
             <Route path="/admin/scrapers" element={<Suspense fallback={<PageFallback />}><ScraperMonitor /></Suspense>} />
           )}

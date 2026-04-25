@@ -1,4 +1,5 @@
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
+import { RESEARCH_POSTS } from "@/data/research-posts";
 
 const GitHubIcon = ({ className }: { className?: string }) => (
   <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
@@ -6,29 +7,49 @@ const GitHubIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const NavBar = () => (
-  <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
-    <a href="#main-content" className="skip-link">
-      Skip to main content
-    </a>
-    <div className="container flex h-16 items-center justify-between">
-      <Link
-        to="/"
-        className="rounded-md font-display text-lg font-bold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        🌊 LLM <span className="text-primary">Vibes</span>
-      </Link>
-      <a
-        href="https://github.com/dkships/llm-moods"
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="GitHub repository"
-        className="rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      >
-        <GitHubIcon className="h-5 w-5" />
+const NavBar = () => {
+  const { pathname } = useLocation();
+  const showResearchLink = RESEARCH_POSTS.length > 0;
+  const isResearchActive = pathname === "/research" || pathname.startsWith("/research/");
+
+  return (
+    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+      <a href="#main-content" className="skip-link">
+        Skip to main content
       </a>
-    </div>
-  </header>
-);
+      <div className="container flex h-16 items-center justify-between">
+        <Link
+          to="/"
+          className="rounded-md font-display text-lg font-bold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        >
+          🌊 LLM <span className="text-primary">Vibes</span>
+        </Link>
+        <div className="flex items-center gap-4 sm:gap-5">
+          {showResearchLink && (
+            <Link
+              to="/research"
+              className={`rounded-md px-2 py-1 font-mono text-xs uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                isResearchActive
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              Research
+            </Link>
+          )}
+          <a
+            href="https://github.com/dkships/llm-moods"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub repository"
+            className="rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          >
+            <GitHubIcon className="h-5 w-5" />
+          </a>
+        </div>
+      </div>
+    </header>
+  );
+};
 
 export default NavBar;
