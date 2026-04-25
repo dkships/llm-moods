@@ -7,6 +7,7 @@ import Index from "./pages/Index";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ModelDetail = lazy(() => import("./pages/ModelDetail"));
+const ScraperMonitor = lazy(() => import("./pages/ScraperMonitor"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient();
@@ -39,6 +40,7 @@ const AnimatedRoutes = () => {
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
           <Route path="/model/:slug" element={<Suspense fallback={<PageFallback />}><ModelDetail /></Suspense>} />
+          <Route path="/admin/scrapers" element={<Suspense fallback={<PageFallback />}><ScraperMonitor /></Suspense>} />
           <Route path="*" element={<Suspense fallback={<PageFallback />}><NotFound /></Suspense>} />
         </Routes>
       </AnimatePresence>
