@@ -64,12 +64,12 @@ const CrossModelDeltasBody = () => (
           <tr>
             <td>Claude</td>
             <td>48.2</td>
-            <td>72.4</td>
+            <td>71.0</td>
             <td>
-              <strong>−24</strong>
+              <strong>−23</strong>
             </td>
             <td>
-              <strong>34</strong>
+              <strong>33</strong>
             </td>
           </tr>
           <tr>
@@ -79,7 +79,7 @@ const CrossModelDeltasBody = () => (
             <td>
               <strong>−50</strong>
             </td>
-            <td>48</td>
+            <td>49</td>
           </tr>
           <tr>
             <td>Gemini</td>
@@ -88,14 +88,14 @@ const CrossModelDeltasBody = () => (
             <td>
               <strong>−39</strong>
             </td>
-            <td>42</td>
+            <td>38</td>
           </tr>
           <tr>
             <td>Grok</td>
-            <td>32.6</td>
+            <td>33.6</td>
             <td>48.4</td>
             <td>
-              <strong>−16</strong>
+              <strong>−15</strong>
             </td>
             <td>24</td>
           </tr>
@@ -104,14 +104,14 @@ const CrossModelDeltasBody = () => (
     </div>
     <p>
       Claude held the highest absolute score in this window. It also had the smallest meaningful drop from its
-      own February baseline of any well-trafficked model. Three of the four models — ChatGPT, Gemini, Grok — had
-      larger or comparable drops in absolute terms. By either reading, Claude looked fine.
+      own February baseline of any well-trafficked model. ChatGPT and Gemini dropped much further from their
+      baselines. By either reading, Claude looked fine.
     </p>
     <p>
-      The signal was in the post-fix shape, not the bug-window depth. ChatGPT and Gemini recovered toward their
-      baselines after Anthropic confirmed the fix on April 10. Claude kept sliding (48 → 34). That recovery
-      divergence is what identifies Claude as the actually-broken model — not the depth of any single number,
-      and not the delta-from-baseline during the breakage.
+      The signal was in the post-fix shape. ChatGPT recovered toward its baseline (31 → 49) after Anthropic
+      confirmed the fix on April 10. Gemini stayed flat (37 → 38). Claude kept sliding (48 → 33). That recovery
+      divergence is what identifies Claude as the actually-broken model, not the depth of any single number or
+      the delta-from-baseline during the breakage.
     </p>
 
     <h2>Why the recovery shape matters more than the bug-window delta</h2>
@@ -133,8 +133,8 @@ const CrossModelDeltasBody = () => (
     </p>
     <p>
       Vendor-wide trends. When all four models drop together during the same week, that's industry sentiment,
-      not a single model's quality. The cross-vendor median delta during the bug window was around −37. Claude's
-      −24 is well inside that band. The bug-window deltas alone do not single Claude out. Only the recovery
+      not a single model's quality. The cross-vendor median delta during the bug window was around −31. Claude's
+      −23 is well inside that band. The bug-window deltas alone do not single Claude out. Only the recovery
       column does.
     </p>
 
@@ -178,7 +178,7 @@ const CrossModelDeltasBody = () => (
 
     <h2>Caveats</h2>
     <p>
-      The Feb baseline numbers in the table above (72.4, 80.6, 76.0, 48.4) come from approximately four days of
+      The Feb baseline numbers in the table above (71.0, 80.6, 76.0, 48.4) come from approximately four days of
       meaningful pre-bug coverage (Feb 15–18). The Feb 19 – Mar 7 scraper-volume gap erased the rest of
       February. Each baseline therefore carries roughly ±3 points of sampling noise. The deltas are accurate
       to the underlying data; the baselines themselves are the weakest part of the table.

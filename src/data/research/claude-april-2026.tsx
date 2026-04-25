@@ -99,7 +99,7 @@ const ClaudeApril2026Body = () => (
       For two of three bugs, our scrapers logged matching user-language complaints on the day the bug shipped.
       The mainstream tech press cycle (VentureBeat, Fortune, Simon Willison, The Register, The Decoder) landed
       between April 13 and April 24. The clearest match was the cache bug. Anthropic specifically called out
-      faster usage-limit drain, and we had a <code>context_window</code> spike on March 27, one day after
+      faster usage-limit drain, and we had an <code>api_reliability</code> spike on March 27, one day after
       deployment.
     </p>
 
@@ -161,19 +161,19 @@ const ClaudeApril2026Body = () => (
     <h2>What we got right</h2>
     <p>
       Same-day capture on March 26. Same-day capture on the March 27 token-drain spike: our{" "}
-      <code>context_window</code> complaint volume jumped on the day Anthropic later said the cache bug began
+      <code>api_reliability</code> complaint volume jumped on the day Anthropic later said the cache bug began
       burning quota. A one-day match between an internal engineering change and an external sentiment pattern is
       the case for tools like ours existing at all.
     </p>
     <p>
       The cross-model isolation also held up, but not in the way the bug-window numbers alone would tell you.
       During the cache-bug window (March 26 – April 10), Claude scored 48.2, ChatGPT 31.1, Gemini 36.9, Grok
-      32.6. Claude was still ahead in absolute terms. Bug-window deltas don't differentiate it either: Claude
-      dropped 24, ChatGPT dropped 50, Gemini dropped 39, Grok dropped 16. By that read, ChatGPT looked far
+      33.6. Claude was still ahead in absolute terms. Bug-window deltas don't differentiate it either: Claude
+      dropped 23, ChatGPT dropped 50, Gemini dropped 39, Grok dropped 15. By that read, ChatGPT looked far
       worse than Claude. The signal that singled Claude out is the <em>post-fix recovery shape</em>. Between
-      April 11 and April 15, ChatGPT and Gemini moved back toward their baselines while Claude alone fell
-      another 14 points to 34. That post-fix divergence is the strongest evidence we have that the underlying
-      issue was Claude-specific rather than the press cycle hitting every model.
+      April 11 and April 15, ChatGPT moved back toward its baseline (31 → 49) while Gemini stayed flat
+      (37 → 38) and Claude fell another 15 points to 33. That post-fix divergence is the strongest evidence we
+      have that the underlying issue was Claude-specific rather than the press cycle hitting every model.
     </p>
 
     <h2>What we got wrong</h2>
@@ -182,7 +182,7 @@ const ClaudeApril2026Body = () => (
       misleads anyone reading the dashboard cold.
     </p>
     <p>
-      The April 11–15 trough (score 34, the lowest single-window number on Claude's history) landed{" "}
+      The April 11–15 trough (score 33, the lowest single-window number on Claude's history) landed{" "}
       <em>after</em> Anthropic fixed the cache bug on April 10 and <em>before</em> the verbosity-prompt bug on
       April 16. That window is press-cycle echo, not silent-bug detection. The Register published on April 13,
       VentureBeat and Hacker News followed, and our scrapers captured the resulting wave of "Claude is broken"
@@ -191,9 +191,10 @@ const ClaudeApril2026Body = () => (
     </p>
     <p>
       The February 19 – March 7 volume gap is on us. The scraper orchestrator code shipped on March 9 but had
-      no cron schedule until April 22. For 17 of the 35 days when Bug 1 was silently active in production, our
-      scrapers ran only on manual triggers. We had no operational alarm telling us post volume had collapsed.
-      That means the "Feb 15–18 baseline" is four days of meaningful data, not a robust statistical floor.
+      no cron schedule until April 22. For 14 of the 35 days when Bug 1 was silently active in production, our
+      scrapers captured fewer than 10 Claude posts per day. We had no operational alarm telling us post volume
+      had collapsed. That means the "Feb 15–18 baseline" is four days of meaningful data, not a robust
+      statistical floor.
     </p>
     <p>
       The classifier itself is one of the tracked models. Sentiment runs through Gemini 3.1 Flash-Lite,

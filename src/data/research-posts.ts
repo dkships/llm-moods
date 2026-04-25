@@ -58,9 +58,9 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     slug: "claude-april-2026",
     title: "We Caught Claude's March Slide 28 Days Before Anthropic Confirmed It",
     publishedAt: "2026-04-25",
-    updatedAt: "2026-04-26",
+    updatedAt: "2026-04-25",
     summary:
-      "Independent sentiment data caught Claude Code grumbling on March 26, the day Anthropic shipped the cache bug — 28 days before the postmortem.",
+      "Independent sentiment data caught Claude Code grumbling on March 26, the day Anthropic shipped the cache bug. 28 days before the postmortem.",
     author: "David Kelly",
     tags: ["claude", "anthropic", "postmortem", "incident", "case-study"],
     relatedModelSlug: "claude",
@@ -88,9 +88,9 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     slug: "cross-model-deltas-march-april-2026",
     title: "When One AI Cracks: Cross-Model Sentiment, March–April 2026",
     publishedAt: "2026-04-25",
-    updatedAt: "2026-04-26",
+    updatedAt: "2026-04-25",
     summary:
-      "Comparing absolute scores or even bug-window deltas across LLM Vibes models can mislead you. What actually caught Claude's March 2026 regression was the post-fix recovery shape — three models climbed back, one didn't.",
+      "Comparing absolute scores or even bug-window deltas across LLM Vibes models can mislead you. What actually caught Claude's March 2026 regression was the post-fix recovery shape: ChatGPT recovered, Gemini stayed flat, Claude kept sliding.",
     author: "David Kelly",
     tags: ["cross-model", "case-study", "claude", "chatgpt", "gemini", "grok"],
     ogImage: "/research/cross-model-deltas-march-april-2026/og.png",
