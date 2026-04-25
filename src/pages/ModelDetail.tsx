@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { TrendingUp, TrendingDown, ArrowLeft, ExternalLink } from "lucide-react";
+import { TrendingUp, TrendingDown, ArrowLeft, ArrowRight, BookOpen, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import {
   useSourceBreakdown, useModelPosts, useModelsWithLatestVibes,
 } from "@/hooks/useVibesData";
 import { getEventsForModel, getEventColor } from "@/data/vendor-events";
+import { getResearchPostsForModel } from "@/data/research-posts";
 import type { ChartEventMarker } from "@/components/VibesChart";
 import { detectProductSurface } from "@/lib/product-surface";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
@@ -273,6 +274,40 @@ const ModelDetail = () => {
               </div>
             </motion.div>
           </section>
+
+          {/* Recent incident analysis — only when a research post references this model */}
+          {(() => {
+            const relatedPosts = getResearchPostsForModel(slug ?? "");
+            if (relatedPosts.length === 0) return null;
+            const featured = relatedPosts[0];
+            return (
+              <section className="container pb-6">
+                <Link
+                  to={`/research/${featured.slug}`}
+                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  aria-label={`Read research analysis: ${featured.title}`}
+                >
+                  <motion.article
+                    initial={{ opacity: 0, y: 12 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.05, duration: 0.4 }}
+                    className="glass flex items-center gap-4 rounded-xl border-l-2 border-l-primary p-5 transition-colors hover:bg-secondary/30 sm:gap-5"
+                  >
+                    <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+                    <div className="min-w-0 flex-1">
+                      <p className="font-mono text-xs uppercase tracking-wide text-foreground/65">
+                        Recent incident analysis
+                      </p>
+                      <p className="mt-1 truncate font-display text-sm font-semibold text-foreground sm:text-base">
+                        {featured.title}
+                      </p>
+                    </div>
+                    <ArrowRight className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  </motion.article>
+                </Link>
+              </section>
+            );
+          })()}
 
           {/* Main Content: Two Columns */}
           <section className="container pb-12">
