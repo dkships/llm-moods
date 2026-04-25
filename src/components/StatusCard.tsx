@@ -1,11 +1,13 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import { motion } from "framer-motion";
-import { ExternalLink, CheckCircle2, AlertCircle } from "lucide-react";
+import { ExternalLink, CheckCircle2, AlertCircle, ArrowLeftRight } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BarsSkeleton } from "@/components/Skeletons";
-import { useVendorStatus, type VendorStatusEvent, type StatusSeverity } from "@/hooks/useVendorStatus";
+import { useVendorStatus, type StatusSeverity } from "@/hooks/useVendorStatus";
+import { useScoreAnomalies } from "@/hooks/useScoreAnomalies";
 import { VENDOR_BY_MODEL, type ModelSlug } from "@/data/vendor-events";
 import { formatTimeAgo } from "@/lib/vibes";
+import { correlateStatusWithAnomalies, type CorrelatedStatusEvent } from "@/lib/status-correlation";
 
 interface StatusCardProps {
   modelSlug: string;
@@ -46,13 +48,19 @@ function severityLabel(severity: StatusSeverity): string {
   }
 }
 
-const StatusEventRow = memo(({ event }: { event: VendorStatusEvent }) => {
-  const date = new Date(event.updatedAt);
-  const dateLabel = date.toLocaleDateString("en-US", {
+function formatAnomalyDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     timeZone: "UTC",
   });
+}
+
+const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
+  const dateLabel = formatAnomalyDate(event.updatedAt);
+  const topCorrelations = event.correlatedAnomalies.slice(0, 2);
+  const remainingCount = event.correlatedAnomalies.length - topCorrelations.length;
+
   return (
     <li className="flex items-start justify-between gap-3 py-3 border-b border-border/40 last:border-b-0">
       <div className="min-w-0 flex-1">
@@ -67,6 +75,29 @@ const StatusEventRow = memo(({ event }: { event: VendorStatusEvent }) => {
           <span className="font-mono text-xs text-muted-foreground">{dateLabel}</span>
         </div>
         <p className="mt-1.5 text-sm text-foreground/90 leading-snug">{event.title}</p>
+        {topCorrelations.length > 0 && (
+          <ul className="mt-2 space-y-1" aria-label="Correlated LLM Vibes anomalies">
+            {topCorrelations.map((a) => (
+              <li
+                key={`${a.modelSlug}-${a.periodStart}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-2 py-0.5 font-mono text-[10px] text-foreground/80 mr-1.5"
+              >
+                <ArrowLeftRight className="h-3 w-3 text-primary" aria-hidden="true" />
+                <span>
+                  Our {formatAnomalyDate(a.periodStart)} {a.severity}
+                </span>
+                <span className={a.z < 0 ? "text-destructive" : "text-primary"}>
+                  z={a.z >= 0 ? "+" : ""}{a.z.toFixed(1)}
+                </span>
+              </li>
+            ))}
+            {remainingCount > 0 && (
+              <span className="font-mono text-[10px] text-muted-foreground">
+                +{remainingCount} more
+              </span>
+            )}
+          </ul>
+        )}
       </div>
       {event.url && (
         <a
@@ -88,8 +119,14 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
   const slug = modelSlug as ModelSlug;
   const vendor = VENDOR_BY_MODEL[slug];
   const { data, isLoading, isError } = useVendorStatus(vendor);
+  const { data: anomalies } = useScoreAnomalies();
 
   const vendorName = VENDOR_LABEL[vendor] ?? vendor;
+
+  const correlatedEvents = useMemo(() => {
+    if (!data?.events?.length) return [];
+    return correlateStatusWithAnomalies(data.events, anomalies ?? [], modelSlug);
+  }, [data?.events, anomalies, modelSlug]);
 
   return (
     <motion.section
@@ -146,7 +183,7 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
       ) : (
         <>
           <ul className="mt-4">
-            {data.events.slice(0, 5).map((event) => (
+            {correlatedEvents.slice(0, 5).map((event) => (
               <StatusEventRow key={event.id} event={event} />
             ))}
           </ul>
