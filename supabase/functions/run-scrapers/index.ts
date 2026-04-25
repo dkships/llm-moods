@@ -50,30 +50,49 @@ interface ScraperResult {
   body: any;
 }
 
-async function invokeFunction(name: string, payload: Record<string, unknown>): Promise<InvocationResult> {
-  const response = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+// Per-scraper wall-clock budget. Recent successful Bluesky / Reddit-Apify /
+// Lemmy runs complete in 60-180s; 120s catches genuine hangs (which left
+// "running" rows for hours both 05:00 PDT and 14:00 PDT today) while letting
+// normal slow runs finish. AbortError throws back to runScraper's catch
+// block (line ~121), which records status="failed" and lets Promise.all
+// progress so the orchestrator finalizes cleanly.
+const INVOKE_TIMEOUT_MS = 120_000;
 
-  const text = await response.text().catch(() => "");
-  let body: any = {};
+async function invokeFunction(
+  name: string,
+  payload: Record<string, unknown>,
+  timeoutMs: number = INVOKE_TIMEOUT_MS,
+): Promise<InvocationResult> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
-    body = text ? JSON.parse(text) : {};
-  } catch {
-    body = {};
-  }
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
 
-  return {
-    ok: response.ok,
-    status: response.status,
-    text,
-    body,
-  };
+    const text = await response.text().catch(() => "");
+    let body: any = {};
+    try {
+      body = text ? JSON.parse(text) : {};
+    } catch {
+      body = {};
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      text,
+      body,
+    };
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function runScraper(
@@ -166,8 +185,11 @@ async function findActiveRun(supabase: any) {
 }
 
 async function aggregateWithRetry(payload: Record<string, unknown>) {
+  // Aggregate-vibes runs 4 models × (daily + 24 hourly) queries — give it a
+  // longer budget than the per-scraper default so a slow but healthy run
+  // doesn't get cut off mid-loop.
   for (let attempt = 1; attempt <= 3; attempt++) {
-    const result = await invokeFunction("aggregate-vibes", payload);
+    const result = await invokeFunction("aggregate-vibes", payload, 240_000);
     if (result.ok) {
       return { status: "success", attempts: attempt, response: result.body };
     }
@@ -249,12 +271,14 @@ async function handleNightlyReaggregate(
     throw startError;
   }
 
+  // Reaggregate over 30 days — much heavier than aggregate-vibes; allow up
+  // to 6 minutes before aborting.
   const result = await invokeFunction("reaggregate-vibes", {
     days_back: 30,
     min_posts: 5,
     dry_run: false,
     source: "run-scrapers",
-  });
+  }, 360_000);
 
   const status = result.ok ? "success" : "failed";
   await updateRunRecord(supabase, startedRun!.id, {
