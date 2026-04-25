@@ -17,6 +17,7 @@ import { getEventsForModel, getEventColor } from "@/data/vendor-events";
 import { getResearchPostsForModel } from "@/data/research-posts";
 import type { ChartEventMarker } from "@/components/VibesChart";
 import { detectProductSurface } from "@/lib/product-surface";
+import StatusCard from "@/components/StatusCard";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import {
   getPacificDateLabel, getVibeStatus, fadeUp, formatComplaintLabel, SOURCE_LABELS,
@@ -377,8 +378,13 @@ const ModelDetail = () => {
               )}
             </motion.div>
 
+            {/* Left Column — Official Status (under the chart) */}
+            <div className="lg:col-span-2 lg:order-3">
+              <StatusCard modelSlug={slug ?? ""} />
+            </div>
+
             {/* Right Column — Complaints + Sources */}
-            <div className="space-y-6">
+            <div className="space-y-6 lg:order-2">
               <motion.div
                 className="glass rounded-xl p-6"
                 initial={{ opacity: 0, y: 16 }}
