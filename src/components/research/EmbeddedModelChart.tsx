@@ -1,8 +1,6 @@
-import { lazy, Suspense, useMemo } from "react";
+import { lazy, Suspense } from "react";
 import { useModelDetail, useVibesHistory } from "@/hooks/useVibesData";
-import { getEventsForModel, getEventColor } from "@/data/vendor-events";
-import { getPacificDateLabel } from "@/lib/vibes";
-import type { ChartEventMarker } from "@/components/VibesChart";
+import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
@@ -23,81 +21,8 @@ const EmbeddedModelChart = ({ modelSlug }: EmbeddedModelChartProps) => {
 
   const accent = model?.accent_color || "#888";
 
-  const { chartData, dateLabels } = useMemo(() => {
-    const history = vibesHistory || [];
-    const emptyLabels: Record<string, string> = {};
-    if (history.length === 0) {
-      return { chartData: [] as { day: string; score: number | null }[], dateLabels: emptyLabels };
-    }
-
-    const scoresByDate = new Map<string, number>();
-    for (const v of history) {
-      const key = new Date(v.period_start).toISOString().slice(0, 10);
-      scoresByDate.set(key, v.score);
-    }
-
-    const days = 30;
-    const now = new Date();
-    const todayPacific = getPacificDateLabel(now);
-    const result: { day: string; score: number | null }[] = [];
-    const labels: Record<string, string> = {};
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
-      const key = d.toISOString().slice(0, 10);
-      const label =
-        key === todayPacific
-          ? "Today"
-          : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-      result.push({ day: label, score: scoresByDate.get(key) ?? null });
-      labels[key] = label;
-    }
-    return { chartData: result, dateLabels: labels };
-  }, [vibesHistory]);
-
-  const chartEvents: ChartEventMarker[] = useMemo(() => {
-    const visibleKeys = Object.keys(dateLabels);
-    if (visibleKeys.length === 0) return [];
-    const minKey = visibleKeys[0];
-    const maxKey = visibleKeys[visibleKeys.length - 1];
-
-    const findLabelOnOrAfter = (iso: string): string | null => {
-      if (iso < minKey) return dateLabels[minKey];
-      if (iso > maxKey) return null;
-      if (dateLabels[iso]) return dateLabels[iso];
-      for (const k of visibleKeys) {
-        if (k >= iso) return dateLabels[k];
-      }
-      return null;
-    };
-    const findLabelOnOrBefore = (iso: string): string | null => {
-      if (iso > maxKey) return dateLabels[maxKey];
-      if (iso < minKey) return null;
-      if (dateLabels[iso]) return dateLabels[iso];
-      for (let i = visibleKeys.length - 1; i >= 0; i--) {
-        if (visibleKeys[i] <= iso) return dateLabels[visibleKeys[i]];
-      }
-      return null;
-    };
-
-    const markers: ChartEventMarker[] = [];
-    for (const event of getEventsForModel(modelSlug)) {
-      const startIso = event.eventDate;
-      const endIso = event.eventEndDate ?? event.eventDate;
-      if (endIso < minKey || startIso > maxKey) continue;
-
-      const startLabel = findLabelOnOrAfter(startIso);
-      const endLabel = findLabelOnOrBefore(endIso);
-      if (!startLabel || !endLabel) continue;
-
-      markers.push({
-        startLabel,
-        endLabel: startLabel === endLabel ? undefined : endLabel,
-        color: getEventColor(event.eventType),
-        title: event.title,
-      });
-    }
-    return markers;
-  }, [dateLabels, modelSlug]);
+  const { chartData, dateLabels } = useDailyChartData(vibesHistory, 30);
+  const chartEvents = useChartEvents(modelSlug, dateLabels);
 
   if (isError) {
     return (

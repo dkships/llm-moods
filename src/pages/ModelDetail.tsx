@@ -13,14 +13,13 @@ import {
   useModelDetail, useVibesHistory, useComplaintBreakdown,
   useSourceBreakdown, useModelPosts, useModelsWithLatestVibes,
 } from "@/hooks/useVibesData";
-import { getEventsForModel, getEventColor } from "@/data/vendor-events";
 import { getResearchPostsForModel } from "@/data/research-posts";
-import type { ChartEventMarker } from "@/components/VibesChart";
 import { detectProductSurface } from "@/lib/product-surface";
 import StatusCard from "@/components/StatusCard";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
+import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
-  getPacificDateLabel, getVibeStatus, fadeUp, formatComplaintLabel, SOURCE_LABELS,
+  getVibeStatus, fadeUp, formatComplaintLabel, SOURCE_LABELS,
   SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
@@ -143,102 +142,34 @@ const ModelDetail = () => {
     );
   }
 
-  const { chartData, dateLabels } = (() => {
+  const dailyChart = useDailyChartData(vibesHistory, timeRange === "7d" ? 7 : 30);
+  const dailyEvents = useChartEvents(slug ?? "", dailyChart.dateLabels);
+
+  // The 24h hourly path uses different label semantics ("3pm", "Now") and has
+  // no event overlay — so we keep its derivation inline rather than forcing it
+  // through the daily hook.
+  const { chartData, chartEvents } = (() => {
+    if (timeRange !== "24h") {
+      return { chartData: dailyChart.chartData, chartEvents: dailyEvents };
+    }
     const history = vibesHistory || [];
-    const emptyLabels: Record<string, string> = {};
-    if (history.length === 0) return { chartData: [] as { day: string; score: number | null }[], dateLabels: emptyLabels };
-
-    if (timeRange === "24h") {
-      const data = history.map((v, i, arr) => {
-        const date = new Date(v.period_start);
-        const now = new Date();
-        const isLast = i === arr.length - 1;
-        const isRecent = isLast && (now.getTime() - date.getTime()) < 2 * 60 * 60 * 1000;
-        let label: string;
-        if (isRecent) {
-          label = "Now";
-        } else {
-          const h = date.getHours();
-          const suffix = h >= 12 ? "pm" : "am";
-          const h12 = h % 12 || 12;
-          label = `${h12}${suffix}`;
-        }
-        return { day: label, score: v.score };
-      });
-      return { chartData: data, dateLabels: emptyLabels };
-    }
-
-    // For 7d/30d: build a complete date range so gaps are visible.
-    // Daily period_start values represent Pacific-local days stored as UTC instants.
-    const scoresByDate = new Map<string, number>();
-    for (const v of history) {
-      const key = new Date(v.period_start).toISOString().slice(0, 10);
-      scoresByDate.set(key, v.score);
-    }
-
-    const days = timeRange === "7d" ? 7 : 30;
-    const now = new Date();
-    const todayPacific = getPacificDateLabel(now);
-    const result: { day: string; score: number | null }[] = [];
-    const labels: Record<string, string> = {};
-    for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
-      const key = d.toISOString().slice(0, 10);
-      const label = key === todayPacific
-        ? "Today"
-        : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-      result.push({ day: label, score: scoresByDate.get(key) ?? null });
-      labels[key] = label;
-    }
-    return { chartData: result, dateLabels: labels };
-  })();
-
-  const chartEvents: ChartEventMarker[] = (() => {
-    if (timeRange === "24h") return [];
-    const visibleKeys = Object.keys(dateLabels);
-    if (visibleKeys.length === 0) return [];
-    const minKey = visibleKeys[0];
-    const maxKey = visibleKeys[visibleKeys.length - 1];
-
-    const findLabelOnOrAfter = (iso: string): string | null => {
-      if (iso < minKey) return dateLabels[minKey];
-      if (iso > maxKey) return null;
-      if (dateLabels[iso]) return dateLabels[iso];
-      // Fall through to the nearest later key (handles missing days)
-      for (const k of visibleKeys) {
-        if (k >= iso) return dateLabels[k];
+    const data = history.map((v, i, arr) => {
+      const date = new Date(v.period_start);
+      const now = new Date();
+      const isLast = i === arr.length - 1;
+      const isRecent = isLast && (now.getTime() - date.getTime()) < 2 * 60 * 60 * 1000;
+      let label: string;
+      if (isRecent) {
+        label = "Now";
+      } else {
+        const h = date.getHours();
+        const suffix = h >= 12 ? "pm" : "am";
+        const h12 = h % 12 || 12;
+        label = `${h12}${suffix}`;
       }
-      return null;
-    };
-    const findLabelOnOrBefore = (iso: string): string | null => {
-      if (iso > maxKey) return dateLabels[maxKey];
-      if (iso < minKey) return null;
-      if (dateLabels[iso]) return dateLabels[iso];
-      for (let i = visibleKeys.length - 1; i >= 0; i--) {
-        if (visibleKeys[i] <= iso) return dateLabels[visibleKeys[i]];
-      }
-      return null;
-    };
-
-    const markers: ChartEventMarker[] = [];
-    for (const event of getEventsForModel(slug)) {
-      const startIso = event.eventDate;
-      const endIso = event.eventEndDate ?? event.eventDate;
-      // Skip events whose entire range falls outside the visible window.
-      if (endIso < minKey || startIso > maxKey) continue;
-
-      const startLabel = findLabelOnOrAfter(startIso);
-      const endLabel = findLabelOnOrBefore(endIso);
-      if (!startLabel || !endLabel) continue;
-
-      markers.push({
-        startLabel,
-        endLabel: startLabel === endLabel ? undefined : endLabel,
-        color: getEventColor(event.eventType),
-        title: event.title,
-      });
-    }
-    return markers;
+      return { day: label, score: v.score };
+    });
+    return { chartData: data, chartEvents: [] as ReturnType<typeof useChartEvents> };
   })();
 
   return (
@@ -602,7 +533,12 @@ const ModelDetail = () => {
                           {s.label}
                         </Badge>
                         {post.posted_at && (
-                          <span className="text-xs text-foreground font-mono">{formatTimeAgo(post.posted_at)}</span>
+                          <span
+                            className="text-xs text-foreground font-mono"
+                            title={`Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}`}
+                          >
+                            {formatTimeAgo(post.posted_at)}
+                          </span>
                         )}
                         {post.source_url && <ExternalLink className="h-3 w-3 text-foreground/50 shrink-0" />}
                       </div>

@@ -31,7 +31,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 | State | TanStack React Query 5.83 |
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Edge Functions | 18 Deno functions (6 active scrapers + utilities; dormant scraper dirs kept for Lovable) |
+| Edge Functions | 12 Deno functions (6 active scrapers + utilities) |
 | Sentiment AI | Gemini 2.5 Flash via Google AI API (batch classification, 25 posts/call) |
 
 ## Key Routes
@@ -60,7 +60,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 
 ## Scrapers (Edge Functions)
 
-Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances), Lemmy (public API, 2 instances). Orchestrated by `run-scrapers` (batches of 3). pg_cron schedules the orchestrator hourly (cron `0 * * * *`) but the orchestrator only does a real fetch on three Pacific-time windows per day (05:00, 14:00, 21:00) — the other 21 hourly invocations return `{"status":"skipped","reason":"outside_window"}` in milliseconds. The hourly trigger landed on Apr 22 2026 (`supabase/migrations/20260422120000_schedule_run_scrapers_hourly.sql`); before that the orchestrator code shipped without a schedule for 17 days. Dormant scraper directories (Lobsters, Discourse, Dev.to, Stack Overflow, Medium, GitHub) still exist but are not in the orchestrator — kept for Lovable file structure compatibility.
+Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances), Lemmy (public API, 2 instances). Orchestrated by `run-scrapers` (batches of 3). pg_cron schedules the orchestrator hourly (cron `0 * * * *`) but the orchestrator only does a real fetch on three Pacific-time windows per day (05:00, 14:00, 21:00) — the other 21 hourly invocations return `{"status":"skipped","reason":"outside_window"}` in milliseconds. The hourly trigger landed on Apr 22 2026 (`supabase/migrations/20260422120000_schedule_run_scrapers_hourly.sql`); before that the orchestrator code shipped without a schedule for 17 days.
 
 Shared utilities (keyword matching, dedup, error logging) are in `_shared/utils.ts` — scrapers import from there instead of duplicating code.
 
@@ -98,7 +98,7 @@ Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`)
 - `APIFY_API_TOKEN`, `BSKY_HANDLE`, `BSKY_APP_PASSWORD`
 - `MASTODON_URL`, `MASTODON_TOKEN`
 - `DISCOURSE_INSTANCE`, `DISCOURSE_API_KEY`, `GITHUB_TOKEN`
-- Dormant (for removed scrapers): `LEMMY_INSTANCE_URL`, `MEDIUM_TOKEN`
+- Dormant (for removed scrapers): `LEMMY_INSTANCE_URL`
 
 **Security notes:**
 - Repo is **public** on GitHub — never commit service role keys, API tokens, or passwords

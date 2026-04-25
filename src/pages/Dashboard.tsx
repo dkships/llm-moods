@@ -145,7 +145,14 @@ const ChatterPost = memo(({ post, i }: { post: RecentChatterPost; i: number }) =
         <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
           {s.label}
         </Badge>
-        {post.posted_at && <span className="text-xs text-foreground font-mono">{formatTimeAgo(post.posted_at)}</span>}
+        {post.posted_at && (
+          <span
+            className="text-xs text-foreground font-mono"
+            title={`Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}`}
+          >
+            {formatTimeAgo(post.posted_at)}
+          </span>
+        )}
         {sourceUrl && <ExternalLink className="h-3 w-3 text-foreground/50 shrink-0" />}
       </div>
     </>
