@@ -74,7 +74,11 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
 LandingModelCard.displayName = "LandingModelCard";
 
 const Index = () => {
-  useHead({ title: "LLM Vibes — Is Your AI Having a Bad Day?", url: "/" });
+  useHead({
+    title: "LLM Vibes — Is Your AI Having a Bad Day?",
+    description: "Track community sentiment for Claude, ChatGPT, Gemini, and Grok. Is your AI having a bad day?",
+    url: "/",
+  });
   const { data: models, isLoading, isError } = useModelsWithLatestVibes();
   const prefetch = usePrefetchModelDetail();
 

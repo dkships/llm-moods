@@ -98,13 +98,13 @@
   }
 
   .skip-link {
-    @apply absolute left-4 top-4 z-[60] rounded-md bg-background px-3 py-2 text-sm font-mono text-foreground shadow-lg ring-2 ring-ring ring-offset-2 ring-offset-background;
-    transform: translateY(-200%);
-    transition: transform 0.2s ease;
+    @apply absolute left-4 z-[60] rounded-md bg-background px-3 py-2 text-sm font-mono text-foreground shadow-lg ring-2 ring-ring ring-offset-2 ring-offset-background;
+    top: -100vh;
+    transition: top 0.2s ease;
   }
 
   .skip-link:focus {
-    transform: translateY(0);
+    top: 1rem;
   }
 }
 

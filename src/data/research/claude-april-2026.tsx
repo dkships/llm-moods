@@ -260,7 +260,7 @@ const ClaudeApril2026Body = () => (
     </p>
 
     <h2 id="notes">Notes</h2>
-    <p id="note-1" className="text-sm text-foreground/80">
+    <p id="note-1" className="scroll-mt-24 text-sm text-foreground/80">
       <a
         href="#ref-1"
         className="font-bold no-underline hover:underline"
