@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, MessageSquare, Zap, ExternalLink } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, MessageSquare, Zap, ExternalLink } from "lucide-react";
 import { memo, useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -80,11 +80,23 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
             <div className="flex items-center gap-1.5">
               {m.trend.direction === "up" ? (
                 <TrendingUp className="h-3.5 w-3.5 text-primary" />
-              ) : (
+              ) : m.trend.direction === "down" ? (
                 <TrendingDown className="h-3.5 w-3.5 text-red-200" />
+              ) : (
+                <Minus className="h-3.5 w-3.5 text-muted-foreground" />
               )}
-              <span className={m.trend.direction === "up" ? "text-primary" : "text-red-200"}>
-                {m.trend.direction === "up" ? "up" : "down"} {m.trend.pts} pts from yesterday
+              <span
+                className={
+                  m.trend.direction === "up"
+                    ? "text-primary"
+                    : m.trend.direction === "down"
+                    ? "text-red-200"
+                    : "text-muted-foreground"
+                }
+              >
+                {m.trend.direction === "flat"
+                  ? "no change from yesterday"
+                  : `${m.trend.direction === "up" ? "up" : "down"} ${m.trend.pts} pts from yesterday`}
               </span>
             </div>
             <span className="text-foreground/70">Recent volume: {(m.totalPosts || 0).toLocaleString()} posts (7d)</span>

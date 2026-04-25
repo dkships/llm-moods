@@ -32,7 +32,7 @@ export interface ModelWithVibes {
   accent_color: string | null;
   latestScore: number;
   vibe: number;
-  trend: { direction: "up" | "down"; pts: number };
+  trend: { direction: "up" | "down" | "flat"; pts: number };
   sparkline: number[];
   topComplaint: string | null;
   totalPosts: number;
@@ -71,7 +71,10 @@ export function useModelsWithLatestVibes() {
           accent_color: m.accent_color,
           latestScore: m.latest_score ?? 50,
           vibe: m.latest_score ?? 50,
-          trend: { direction: trendPts >= 0 ? "up" : "down", pts: Math.abs(trendPts) },
+          trend: {
+            direction: trendPts > 0 ? "up" : trendPts < 0 ? "down" : "flat",
+            pts: Math.abs(trendPts),
+          },
           sparkline,
           topComplaint,
           totalPosts: m.total_posts ?? 0,

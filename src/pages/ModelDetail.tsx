@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { TrendingUp, TrendingDown, ArrowLeft, ArrowRight, BookOpen, ExternalLink } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowLeft, ArrowRight, BookOpen, ExternalLink } from "lucide-react";
 import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -205,11 +205,23 @@ const ModelDetail = () => {
                 <div className="flex items-center gap-2 pb-2">
                   {trend.direction === "up" ? (
                     <TrendingUp className="h-4 w-4 text-primary" />
-                  ) : (
+                  ) : trend.direction === "down" ? (
                     <TrendingDown className="h-4 w-4 text-red-200" />
+                  ) : (
+                    <Minus className="h-4 w-4 text-muted-foreground" />
                   )}
-                  <span className={`text-sm font-mono ${trend.direction === "up" ? "text-primary" : "text-red-200"}`}>
-                    {trend.direction === "up" ? "up" : "down"} {trend.pts} pts from yesterday
+                  <span
+                    className={`text-sm font-mono ${
+                      trend.direction === "up"
+                        ? "text-primary"
+                        : trend.direction === "down"
+                        ? "text-red-200"
+                        : "text-muted-foreground"
+                    }`}
+                  >
+                    {trend.direction === "flat"
+                      ? "no change from yesterday"
+                      : `${trend.direction === "up" ? "up" : "down"} ${trend.pts} pts from yesterday`}
                   </span>
                 </div>
               </div>
