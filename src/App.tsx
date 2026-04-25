@@ -7,8 +7,14 @@ import Index from "./pages/Index";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ModelDetail = lazy(() => import("./pages/ModelDetail"));
-const ScraperMonitor = lazy(() => import("./pages/ScraperMonitor"));
 const NotFound = lazy(() => import("./pages/NotFound"));
+
+// Admin pages are dev-only — production bundles physically exclude the lazy
+// import below thanks to Vite tree-shaking on the `import.meta.env.DEV` flag.
+// See AGENTS.md: public route inventory stays fixed to /, /dashboard, /model/:slug, *.
+const ScraperMonitor = import.meta.env.DEV
+  ? lazy(() => import("./pages/ScraperMonitor"))
+  : null;
 
 const queryClient = new QueryClient();
 
@@ -40,7 +46,9 @@ const AnimatedRoutes = () => {
           <Route path="/" element={<Index />} />
           <Route path="/dashboard" element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
           <Route path="/model/:slug" element={<Suspense fallback={<PageFallback />}><ModelDetail /></Suspense>} />
-          <Route path="/admin/scrapers" element={<Suspense fallback={<PageFallback />}><ScraperMonitor /></Suspense>} />
+          {ScraperMonitor && (
+            <Route path="/admin/scrapers" element={<Suspense fallback={<PageFallback />}><ScraperMonitor /></Suspense>} />
+          )}
           <Route path="*" element={<Suspense fallback={<PageFallback />}><NotFound /></Suspense>} />
         </Routes>
       </AnimatePresence>

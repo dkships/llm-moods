@@ -161,6 +161,27 @@ export function useVibesHistory(modelId: string | undefined, period: string, ran
   });
 }
 
+// Two raw DB categories can normalize to the same public key (e.g. `reliability`
+// and `api_reliability` both collapse to `api_reliability`). Aggregate counts
+// by normalized key before computing percentages, otherwise React sees
+// duplicate keys when the breakdown is rendered.
+function aggregateComplaintBreakdown(rows: { category: string | null; count: number | string | bigint | null }[]): ComplaintBreakdownItem[] {
+  const totals = new Map<string, number>();
+  for (const row of rows) {
+    const cat = normalizePublicComplaintCategory(row.category);
+    if (!cat) continue;
+    totals.set(cat, (totals.get(cat) ?? 0) + Number(row.count ?? 0));
+  }
+  const total = Array.from(totals.values()).reduce((sum, v) => sum + v, 0);
+  return Array.from(totals.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([category, count]) => ({
+      category,
+      count,
+      pct: total > 0 ? Math.round((count / total) * 100) : 0,
+    }));
+}
+
 export function useComplaintBreakdown(modelId: string | undefined) {
   return useQuery<ComplaintBreakdownItem[]>({
     queryKey: ["complaint-breakdown", modelId],
@@ -169,21 +190,7 @@ export function useComplaintBreakdown(modelId: string | undefined) {
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId! });
       if (error) throw error;
-
-      const normalizedRows = (data || [])
-        .map((row) => ({
-          category: normalizePublicComplaintCategory(row.category),
-          count: Number(row.count),
-        }))
-        .filter((row): row is { category: NonNullable<typeof row.category>; count: number } => row.category !== null);
-
-      const total = normalizedRows.reduce((sum, row) => sum + row.count, 0);
-
-      return normalizedRows.map((row) => ({
-        category: row.category,
-        count: row.count,
-        pct: total > 0 ? Math.round((row.count / total) * 100) : 0,
-      }));
+      return aggregateComplaintBreakdown(data || []);
     },
   });
 }
@@ -253,20 +260,7 @@ export function usePrefetchModelDetail() {
       staleTime: 60_000,
       queryFn: async () => {
         const { data } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId });
-        const normalizedRows = (data || [])
-          .map((row) => ({
-            category: normalizePublicComplaintCategory(row.category),
-            count: Number(row.count),
-          }))
-          .filter((row): row is { category: NonNullable<typeof row.category>; count: number } => row.category !== null);
-
-        const total = normalizedRows.reduce((sum, row) => sum + row.count, 0);
-
-        return normalizedRows.map((row) => ({
-          category: row.category,
-          count: row.count,
-          pct: total > 0 ? Math.round((row.count / total) * 100) : 0,
-        }));
+        return aggregateComplaintBreakdown(data || []);
       },
     });
   }, [queryClient]);
