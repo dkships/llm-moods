@@ -1,6 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Download } from "lucide-react";
 import { useMemo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -29,7 +29,6 @@ const ResearchPostPage = () => {
     if (!post) return undefined;
     const url = `https://llmvibes.ai/research/${post.slug}`;
     const article: Record<string, unknown> = {
-      "@context": "https://schema.org",
       "@type": "Article",
       headline: post.title,
       description: post.summary,
@@ -45,23 +44,43 @@ const ResearchPostPage = () => {
       },
       keywords: post.tags.join(", "),
     };
-    if (!post.faq || post.faq.length === 0) {
-      return article;
+
+    const graph: Record<string, unknown>[] = [article];
+
+    if (post.faq && post.faq.length > 0) {
+      graph.push({
+        "@type": "FAQPage",
+        mainEntity: post.faq.map((q) => ({
+          "@type": "Question",
+          name: q.question,
+          acceptedAnswer: { "@type": "Answer", text: q.answer },
+        })),
+      });
     }
-    return {
-      "@context": "https://schema.org",
-      "@graph": [
-        article,
-        {
-          "@type": "FAQPage",
-          mainEntity: post.faq.map((q) => ({
-            "@type": "Question",
-            name: q.question,
-            acceptedAnswer: { "@type": "Answer", text: q.answer },
-          })),
-        },
-      ],
-    };
+
+    if (post.dataset) {
+      graph.push({
+        "@type": "Dataset",
+        name: post.dataset.label,
+        description: post.dataset.description,
+        url,
+        datePublished: post.dataset.publishedAt,
+        license: post.dataset.license === "MIT" ? "https://opensource.org/licenses/MIT" : post.dataset.license,
+        creator: { "@type": "Organization", name: "LLM Vibes", url: "https://llmvibes.ai" },
+        distribution: [
+          {
+            "@type": "DataDownload",
+            encodingFormat: "text/csv",
+            contentUrl: `https://llmvibes.ai${post.dataset.path}`,
+          },
+        ],
+      });
+    }
+
+    if (graph.length === 1) {
+      return { "@context": "https://schema.org", ...article };
+    }
+    return { "@context": "https://schema.org", "@graph": graph };
   }, [post]);
 
   useHead({
@@ -114,6 +133,17 @@ const ResearchPostPage = () => {
                     </Badge>
                   ))}
                 </div>
+                {post.dataset && (
+                  <a
+                    href={post.dataset.path}
+                    download
+                    className="mt-5 inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 font-mono text-xs text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    aria-label={`Download ${post.dataset.label}`}
+                  >
+                    <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                    {post.dataset.label}
+                  </a>
+                )}
               </header>
 
               <div className="prose prose-invert prose-headings:font-display prose-headings:font-bold prose-h2:mt-10 prose-h2:text-2xl prose-h3:text-lg prose-p:text-foreground/85 prose-p:leading-relaxed prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-strong:text-foreground prose-code:text-primary prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-l-primary prose-blockquote:bg-secondary/30 prose-blockquote:rounded-r-lg prose-blockquote:py-3 prose-blockquote:px-5 prose-blockquote:not-italic prose-blockquote:text-foreground/90 prose-table:font-mono prose-table:text-sm prose-th:text-foreground prose-td:text-foreground/80 max-w-none">
@@ -121,7 +151,7 @@ const ResearchPostPage = () => {
                   remarkPlugins={[remarkGfm]}
                   components={{
                     code: ({ className, children, ...rest }) => {
-                      const language = /language-(\w+)/.exec(className || "")?.[1];
+                      const language = /language-([\w-]+)/.exec(className || "")?.[1];
                       if (language === "chart-model") {
                         const modelSlug = String(children).trim();
                         return <EmbeddedModelChart modelSlug={modelSlug} />;
