@@ -2,15 +2,13 @@ import { useParams, Link } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Download } from "lucide-react";
 import { useMemo } from "react";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
 import { Badge } from "@/components/ui/badge";
 import { getResearchPost } from "@/data/research-posts";
-import EmbeddedModelChart from "@/components/research/EmbeddedModelChart";
+import { getResearchBody } from "@/data/research-bodies";
 import NotFound from "@/pages/NotFound";
 
 const formatDate = (iso: string) =>
@@ -24,6 +22,7 @@ const formatDate = (iso: string) =>
 const ResearchPostPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const post = slug ? getResearchPost(slug) : undefined;
+  const Body = slug ? getResearchBody(slug) : undefined;
 
   const jsonLd = useMemo(() => {
     if (!post) return undefined;
@@ -80,7 +79,7 @@ const ResearchPostPage = () => {
     jsonLd,
   });
 
-  if (!post) {
+  if (!post || !Body) {
     return <NotFound />;
   }
 
@@ -136,62 +135,8 @@ const ResearchPostPage = () => {
                 )}
               </header>
 
-              <div className="prose prose-invert prose-headings:font-display prose-headings:font-bold prose-h2:mt-10 prose-h2:text-2xl prose-h3:text-lg prose-p:text-foreground/85 prose-p:leading-relaxed prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-strong:text-foreground prose-code:text-primary prose-code:before:content-none prose-code:after:content-none prose-blockquote:border-l-primary prose-blockquote:bg-secondary/30 prose-blockquote:rounded-r-lg prose-blockquote:py-3 prose-blockquote:px-5 prose-blockquote:not-italic prose-blockquote:text-foreground/90 prose-table:font-mono prose-table:text-sm prose-th:text-foreground prose-td:text-foreground/80 max-w-none">
-                <ReactMarkdown
-                  remarkPlugins={[remarkGfm]}
-                  components={{
-                    code: ({ className, children, ...rest }) => {
-                      const language = /language-([\w-]+)/.exec(className || "")?.[1];
-                      if (language === "chart-model") {
-                        const modelSlug = String(children).trim();
-                        return <EmbeddedModelChart modelSlug={modelSlug} />;
-                      }
-                      const isInline = !className;
-                      if (isInline) {
-                        return (
-                          <code
-                            className="rounded bg-secondary/60 px-1.5 py-0.5 font-mono text-[0.85em]"
-                            {...rest}
-                          >
-                            {children}
-                          </code>
-                        );
-                      }
-                      return (
-                        <code className={`block ${className ?? ""}`} {...rest}>
-                          {children}
-                        </code>
-                      );
-                    },
-                    pre: ({ children }) => (
-                      <pre className="overflow-x-auto rounded-lg bg-secondary/60 p-4 font-mono text-sm">
-                        {children}
-                      </pre>
-                    ),
-                    table: ({ children }) => (
-                      <div className="my-6 overflow-x-auto rounded-lg border border-border">
-                        <table className="w-full">{children}</table>
-                      </div>
-                    ),
-                    a: ({ href, children, ...rest }) => {
-                      const isExternal = href?.startsWith("http");
-                      if (isExternal) {
-                        return (
-                          <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>
-                            {children}
-                          </a>
-                        );
-                      }
-                      return (
-                        <Link to={href ?? "#"} {...rest}>
-                          {children}
-                        </Link>
-                      );
-                    },
-                  }}
-                >
-                  {post.body}
-                </ReactMarkdown>
+              <div className="prose prose-invert prose-headings:font-display prose-headings:font-bold prose-h2:mt-10 prose-h2:text-2xl prose-h3:text-lg prose-p:text-foreground/85 prose-p:leading-relaxed prose-a:text-primary prose-a:no-underline hover:prose-a:underline prose-strong:text-foreground prose-code:text-primary prose-code:before:content-none prose-code:after:content-none prose-code:bg-secondary/60 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.85em] prose-pre:bg-secondary/60 prose-pre:overflow-x-auto prose-pre:rounded-lg prose-pre:p-4 prose-pre:font-mono prose-pre:text-sm prose-blockquote:border-l-primary prose-blockquote:bg-secondary/30 prose-blockquote:rounded-r-lg prose-blockquote:py-3 prose-blockquote:px-5 prose-blockquote:not-italic prose-blockquote:text-foreground/90 prose-table:font-mono prose-table:text-sm prose-th:text-foreground prose-td:text-foreground/80 max-w-none">
+                <Body />
               </div>
 
             </motion.div>
