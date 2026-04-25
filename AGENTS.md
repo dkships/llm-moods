@@ -27,7 +27,7 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 - Dev-only routes (gated on `import.meta.env.DEV` so production bundles physically exclude them): `/admin/scrapers` (scraper monitor + anomalies panel), `/og/:slug` (OG card generator)
 - Public complaint taxonomy must flow through `src/shared/public-taxonomy.ts`; do not hardcode labels or aliases in page components
 - Unknown complaint categories must be filtered or shown as `Other` — never expose raw backend taxonomy strings in the UI
-- Public freshness states use three buckets only: fresh, lagging, stale. Preserve the copy and semantics in `DataFreshnessIndicator`
+- Public freshness display uses a single calm state showing "Updated &lt;relative time&gt;". Threshold-based status colors and pulse animation were deliberately removed — the dashboard does not surface freshness as a quality-of-service signal
 - Public pages must keep a skip link, `main#main-content`, visible keyboard focus styles, and reduced-motion support
 - Keep the dark-only public theme contract in `src/index.css` unless a deliberate theming project changes it end-to-end
 

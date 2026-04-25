@@ -16,8 +16,6 @@ const DataFreshnessIndicator = memo(({ lastUpdated }: DataFreshnessIndicatorProp
   if (!lastUpdated) return null;
 
   const lastUpdatedDate = new Date(lastUpdated);
-  const diffMs = Date.now() - new Date(lastUpdated).getTime();
-  const diffHours = diffMs / (1000 * 60 * 60);
   const absoluteTimestamp = Number.isNaN(lastUpdatedDate.getTime())
     ? lastUpdated
     : new Intl.DateTimeFormat("en-US", {
@@ -25,32 +23,16 @@ const DataFreshnessIndicator = memo(({ lastUpdated }: DataFreshnessIndicatorProp
       timeStyle: "short",
     }).format(lastUpdatedDate);
 
-  let colorClass = "text-foreground/70";
-  let dotClass = "bg-primary/50";
-  let text = `Scores updated ${formatTimeAgo(lastUpdated)}`;
-  if (diffHours > 24) {
-    colorClass = "text-red-200";
-    dotClass = "bg-red-300";
-    text = `Scores are stale: last updated ${formatTimeAgo(lastUpdated)}`;
-  } else if (diffHours > 6) {
-    colorClass = "text-yellow-400";
-    dotClass = "bg-yellow-400";
-    text = `Scores lagging: last updated ${formatTimeAgo(lastUpdated)}`;
-  } else if (diffHours > 1) {
-    colorClass = "text-yellow-300";
-    dotClass = "bg-yellow-300";
-  }
-
   return (
     <span
-      className={`inline-flex items-center gap-1.5 text-xs sm:text-[11px] font-mono ${colorClass}`}
+      className="inline-flex items-center gap-1.5 text-xs sm:text-[11px] font-mono text-foreground/65"
       role="status"
       aria-live="polite"
       aria-atomic="true"
       title={`Last updated ${absoluteTimestamp}`}
     >
-      <span className={`h-1.5 w-1.5 rounded-full ${dotClass} ${diffHours <= 1 ? "animate-pulse" : ""}`} />
-      {text}
+      <span className="h-1.5 w-1.5 rounded-full bg-foreground/40" />
+      Updated {formatTimeAgo(lastUpdated)}
     </span>
   );
 });
