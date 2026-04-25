@@ -25,7 +25,27 @@ interface VibesChartProps {
   events?: ChartEventMarker[];
 }
 
-const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesChartProps) => (
+function computeYDomain(data: { score: number | null }[]): [number, number] {
+  // Auto-scale around the visible data with a 5-point pad and snap to multiples of 5.
+  // Always cap to [0, 100] since scores can never exceed that range.
+  const scores = data.map((d) => d.score).filter((v): v is number => typeof v === "number");
+  if (scores.length === 0) return [20, 100];
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  const lo = Math.max(0, Math.floor((min - 5) / 5) * 5);
+  const hi = Math.min(100, Math.ceil((max + 5) / 5) * 5);
+  // Keep at least a 30-point span so a flat day doesn't crush the line.
+  if (hi - lo < 30) {
+    const mid = (hi + lo) / 2;
+    return [Math.max(0, Math.round((mid - 15) / 5) * 5), Math.min(100, Math.round((mid + 15) / 5) * 5)];
+  }
+  return [lo, hi];
+}
+
+const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesChartProps) => {
+  const [yMin, yMax] = computeYDomain(chartData);
+  const showMidlineRef = yMin <= 50 && yMax >= 50;
+  return (
   <ResponsiveContainer width="100%" height="100%">
     <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 0, left: 0 }}>
       <XAxis
@@ -37,7 +57,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
         padding={{ left: 10, right: 10 }}
       />
       <YAxis
-        domain={[20, 100]}
+        domain={[yMin, yMax]}
         tick={{ fill: CHART_COLORS.mutedForeground, fontSize: 10 }}
         axisLine={false}
         tickLine={false}
@@ -54,7 +74,9 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
         labelStyle={{ color: CHART_COLORS.mutedForeground }}
         itemStyle={{ color: accent }}
       />
-      <ReferenceLine y={50} stroke={CHART_COLORS.referenceLine} strokeDasharray="4 4" />
+      {showMidlineRef && (
+        <ReferenceLine y={50} stroke={CHART_COLORS.referenceLine} strokeDasharray="4 4" />
+      )}
       {events.map((event, i) => {
         const isRange = event.endLabel && event.endLabel !== event.startLabel;
         if (isRange) {
@@ -63,8 +85,8 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
               key={`evt-${i}`}
               x1={event.startLabel}
               x2={event.endLabel}
-              y1={20}
-              y2={100}
+              y1={yMin}
+              y2={yMax}
               fill={event.color}
               fillOpacity={0.08}
               stroke={event.color}
@@ -95,7 +117,8 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
       />
     </LineChart>
   </ResponsiveContainer>
-));
+  );
+});
 VibesChart.displayName = "VibesChart";
 
 export default VibesChart;

@@ -299,7 +299,7 @@ const ModelDetail = () => {
                       <p className="font-mono text-xs uppercase tracking-wide text-foreground/65">
                         Recent incident analysis
                       </p>
-                      <p className="mt-1 truncate font-display text-sm font-semibold text-foreground sm:text-base">
+                      <p className="mt-1 font-display text-sm font-semibold text-foreground sm:truncate sm:text-base">
                         {featured.title}
                       </p>
                     </div>
@@ -504,12 +504,16 @@ const ModelDetail = () => {
               Recent Posts about {model.name}
             </motion.h2>
             {availableSurfaceLabels.length > 0 && (
-              <div className="mb-6 flex flex-wrap gap-2">
+              <div
+                className="mb-6 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+                role="group"
+                aria-label="Filter recent posts by product surface"
+              >
                 <button
                   type="button"
                   onClick={() => setSurfaceFilter("all")}
                   aria-pressed={surfaceFilter === "all"}
-                  className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
+                  className={`shrink-0 rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
                     surfaceFilter === "all"
                       ? "border-primary/30 bg-primary/15 text-primary"
                       : "border-border text-foreground/70 hover:bg-secondary/50 hover:text-foreground"
@@ -523,7 +527,7 @@ const ModelDetail = () => {
                     type="button"
                     onClick={() => setSurfaceFilter(label)}
                     aria-pressed={surfaceFilter === label}
-                    className={`rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
+                    className={`shrink-0 rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
                       surfaceFilter === label
                         ? "border-primary/30 bg-primary/15 text-primary"
                         : "border-border text-foreground/70 hover:bg-secondary/50 hover:text-foreground"

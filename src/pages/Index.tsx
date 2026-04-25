@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Minus, Monitor, Brain, CheckCircle, ArrowRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowRight } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { memo, useCallback, forwardRef } from "react";
@@ -17,23 +17,7 @@ const GitHubIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const HOW_IT_WORKS = [
-  {
-    icon: Monitor,
-    title: "We Scrape",
-    description: "We automatically scan Reddit, Bluesky, Mastodon, X, and more for recent chatter about AI models.",
-  },
-  {
-    icon: Brain,
-    title: "We Analyze",
-    description: "AI-powered sentiment analysis categorizes complaints by type and severity.",
-  },
-  {
-    icon: CheckCircle,
-    title: "You Check",
-    description: "Check the latest vibe snapshots at a glance. No voting needed — the data speaks for itself.",
-  },
-];
+const PLATFORM_COUNT = 6;
 
 const TrendIcon = forwardRef<SVGSVGElement, { trend: string }>(({ trend, ...props }, ref) => {
   if (trend === "up") return <TrendingUp ref={ref} className="h-4 w-4 text-primary" {...props} />;
@@ -104,8 +88,8 @@ const Index = () => {
         <NavBar />
         <main id="main-content" tabIndex={-1} className="scroll-mt-24">
           {/* Hero */}
-          <section className="container pt-24 sm:pt-32 pb-16 relative">
-            <div className="absolute top-1/2 left-1/4 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[400px] rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.10)_0%,_transparent_70%)] pointer-events-none" />
+          <section className="container pt-12 sm:pt-20 pb-10 relative overflow-hidden">
+            <div className="absolute -top-24 right-[-10%] w-[520px] h-[520px] rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.12)_0%,_transparent_65%)] pointer-events-none" />
             <motion.div
               className="max-w-3xl relative"
               initial="hidden"
@@ -171,33 +155,28 @@ const Index = () => {
             )}
           </section>
 
-          {/* How It Works */}
+          {/* Stat strip */}
           <section className="border-y border-border bg-card/40">
-            <div className="container py-24">
-              <motion.h2
-                initial={{ opacity: 0, y: 16 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5 }}
-                className="text-center text-2xl sm:text-3xl font-bold text-foreground mb-16"
-              >
-                How it works
-              </motion.h2>
+            <div className="container py-12 sm:py-16">
               <motion.div
                 initial="hidden"
-                animate="visible"
-                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
-                className="grid grid-cols-1 sm:grid-cols-3 gap-8"
+                whileInView="visible"
+                viewport={{ once: true, margin: "-40px" }}
+                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
+                className="grid grid-cols-2 gap-6 sm:gap-8 sm:grid-cols-4"
               >
-                {HOW_IT_WORKS.map((step, i) => (
-                  <motion.div key={step.title} variants={fadeUp} custom={i} className="text-center">
-                    <div className="mx-auto mb-5 flex h-14 w-14 items-center justify-center rounded-xl bg-primary/10 border border-primary/20">
-                      <step.icon className="h-6 w-6 text-primary" />
-                    </div>
-                    <h3 className="font-display text-lg font-semibold text-foreground">{step.title}</h3>
-                    <p className="mt-2 text-sm text-foreground/70 leading-relaxed max-w-xs mx-auto">
-                      {step.description}
-                    </p>
+                {[
+                  { label: "Models tracked", value: (models?.length ?? 4).toString() },
+                  { label: "Platforms scraped", value: PLATFORM_COUNT.toString() },
+                  {
+                    label: "Posts in 7 days",
+                    value: ((models || []).reduce((sum, m) => sum + (m.totalPosts || 0), 0) || 0).toLocaleString(),
+                  },
+                  { label: "Score range", value: "0–100" },
+                ].map((stat, i) => (
+                  <motion.div key={stat.label} variants={fadeUp} custom={i} className="text-center sm:text-left">
+                    <p className="font-display text-3xl sm:text-4xl font-bold text-foreground">{stat.value}</p>
+                    <p className="mt-1 font-mono text-xs uppercase tracking-wide text-foreground/65">{stat.label}</p>
                   </motion.div>
                 ))}
               </motion.div>

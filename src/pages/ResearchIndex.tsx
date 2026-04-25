@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight, Rss } from "lucide-react";
+import { Rss } from "lucide-react";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
@@ -67,41 +67,56 @@ const ResearchIndex = () => {
               variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
               className="grid grid-cols-1 gap-4 md:grid-cols-2"
             >
-              {posts.map((post, i) => (
-                <Link
-                  key={post.slug}
-                  to={`/research/${post.slug}`}
-                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  <motion.article
-                    variants={fadeUp}
-                    custom={i}
-                    className="glass h-full rounded-xl p-6 transition-all duration-300 hover:-translate-y-1"
+              {posts.map((post, i) => {
+                const isFeatured = i === 0;
+                return (
+                  <Link
+                    key={post.slug}
+                    to={`/research/${post.slug}`}
+                    className={`block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                      isFeatured ? "md:col-span-2" : ""
+                    }`}
                   >
-                    <p className="font-mono text-xs uppercase tracking-wide text-foreground/65">
-                      {formatDate(post.publishedAt)}
-                    </p>
-                    <h2 className="mt-2 font-display text-xl font-bold text-foreground">
-                      {post.title}
-                    </h2>
-                    <p className="mt-3 text-sm text-foreground/75 leading-relaxed">{post.summary}</p>
-                    <div className="mt-4 flex flex-wrap items-center gap-2">
-                      {post.tags.slice(0, 3).map((tag) => (
-                        <Badge
-                          key={tag}
-                          variant="outline"
-                          className="text-[10px] font-mono uppercase tracking-wide"
-                        >
-                          {tag}
-                        </Badge>
-                      ))}
-                    </div>
-                    <div className="mt-5 inline-flex items-center gap-1.5 text-xs font-mono text-primary">
-                      Read analysis <ArrowRight className="h-3.5 w-3.5" />
-                    </div>
-                  </motion.article>
-                </Link>
-              ))}
+                    <motion.article
+                      variants={fadeUp}
+                      custom={i}
+                      className={`glass h-full rounded-xl p-6 transition-all duration-300 hover:-translate-y-1 ${
+                        isFeatured ? "border-l-2 border-l-primary sm:p-8" : ""
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <p className="font-mono text-xs uppercase tracking-wide text-foreground/65">
+                          {formatDate(post.publishedAt)}
+                        </p>
+                        {isFeatured && (
+                          <span className="font-mono text-[10px] uppercase tracking-wide text-primary">
+                            Latest
+                          </span>
+                        )}
+                      </div>
+                      <h2
+                        className={`mt-2 font-display font-bold text-foreground ${
+                          isFeatured ? "text-2xl sm:text-3xl" : "text-xl"
+                        }`}
+                      >
+                        {post.title}
+                      </h2>
+                      <p className="mt-3 text-sm text-foreground/75 leading-relaxed">{post.summary}</p>
+                      <div className="mt-4 flex flex-wrap items-center gap-2">
+                        {post.tags.slice(0, 3).map((tag) => (
+                          <Badge
+                            key={tag}
+                            variant="outline"
+                            className="text-[10px] font-mono uppercase tracking-wide"
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </motion.article>
+                  </Link>
+                );
+              })}
             </motion.div>
           </section>
         </main>
