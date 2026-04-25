@@ -166,12 +166,14 @@ const ClaudeApril2026Body = () => (
       the case for tools like ours existing at all.
     </p>
     <p>
-      The cross-model isolation also held up. During the cache-bug window (March 26 – April 10), Claude scored
-      48.2, ChatGPT 31.1, Gemini 36.9, Grok 32.6. Claude was still ahead in absolute terms. The signal was in
-      the <em>delta from each model's own February baseline</em>. Claude dropped 24 points. ChatGPT dropped 33.
-      Gemini dropped 36. Then between April 11 and April 15, every other tracked model held flat or rose while
-      Claude alone fell another 14 points to 34. That isolation is the strongest evidence we have that the
-      issue was Claude-specific rather than industry-wide.
+      The cross-model isolation also held up, but not in the way the bug-window numbers alone would tell you.
+      During the cache-bug window (March 26 – April 10), Claude scored 48.2, ChatGPT 31.1, Gemini 36.9, Grok
+      32.6. Claude was still ahead in absolute terms. Bug-window deltas don't differentiate it either: Claude
+      dropped 24, ChatGPT dropped 50, Gemini dropped 39, Grok dropped 16. By that read, ChatGPT looked far
+      worse than Claude. The signal that singled Claude out is the <em>post-fix recovery shape</em>. Between
+      April 11 and April 15, ChatGPT and Gemini moved back toward their baselines while Claude alone fell
+      another 14 points to 34. That post-fix divergence is the strongest evidence we have that the underlying
+      issue was Claude-specific rather than the press cycle hitting every model.
     </p>
 
     <h2>What we got wrong</h2>

@@ -64,7 +64,7 @@ const CrossModelDeltasBody = () => (
           <tr>
             <td>Claude</td>
             <td>48.2</td>
-            <td>~72</td>
+            <td>72.4</td>
             <td>
               <strong>−24</strong>
             </td>
@@ -75,27 +75,27 @@ const CrossModelDeltasBody = () => (
           <tr>
             <td>ChatGPT</td>
             <td>31.1</td>
-            <td>~64</td>
+            <td>80.6</td>
             <td>
-              <strong>−33</strong>
+              <strong>−50</strong>
             </td>
             <td>48</td>
           </tr>
           <tr>
             <td>Gemini</td>
             <td>36.9</td>
-            <td>~73</td>
+            <td>76.0</td>
             <td>
-              <strong>−36</strong>
+              <strong>−39</strong>
             </td>
             <td>42</td>
           </tr>
           <tr>
             <td>Grok</td>
             <td>32.6</td>
-            <td>~65</td>
+            <td>48.4</td>
             <td>
-              <strong>−33</strong>
+              <strong>−16</strong>
             </td>
             <td>24</td>
           </tr>
@@ -103,83 +103,91 @@ const CrossModelDeltasBody = () => (
       </table>
     </div>
     <p>
-      Claude was the highest absolute score in this window. It also had the smallest delta from its own February
-      baseline, and the only post-fix trough that dropped <em>below</em> its bug-window score. ChatGPT, Gemini,
-      and Grok all had larger absolute drops but recovered faster.
+      Claude held the highest absolute score in this window. It also had the smallest meaningful drop from its
+      own February baseline of any well-trafficked model. Three of the four models — ChatGPT, Gemini, Grok — had
+      larger or comparable drops in absolute terms. By either reading, Claude looked fine.
     </p>
     <p>
-      That's the inverted shape: the model that was actually broken (Claude, per Anthropic's own postmortem) had
-      the <em>best</em> absolute score during the breakage and the <em>worst</em> relative score after it was
-      fixed. Reading absolute scores would have told you Claude was fine. Reading deltas tells you the truth.
+      The signal was in the post-fix shape, not the bug-window depth. ChatGPT and Gemini recovered toward their
+      baselines after Anthropic confirmed the fix on April 10. Claude kept sliding (48 → 34). That recovery
+      divergence is what identifies Claude as the actually-broken model — not the depth of any single number,
+      and not the delta-from-baseline during the breakage.
     </p>
 
-    <h2>Why deltas catch what absolute scores miss</h2>
+    <h2>Why the recovery shape matters more than the bug-window delta</h2>
     <p>Three reasons.</p>
     <p>
       Cohort drift. Each model has a different audience mix. ChatGPT pulls in heavy mainstream traffic from
       Reddit and Twitter; Claude pulls in a more developer-skewed cohort that's more demanding and more vocal.
-      The volume-weighted score reflects both quality and audience tolerance. Comparing baselines to themselves
-      removes the audience-tolerance variable.
+      The volume-weighted score reflects both quality and audience tolerance. Bug-window deltas alone can't
+      separate "the underlying model regressed" from "an audience that complains more loudly than usual got an
+      excuse to do it" — both produce the same drop.
     </p>
     <p>
       Press-cycle echo. When a story goes mainstream (VentureBeat, Fortune, Hacker News, The Register), the wave
-      of "X is broken" posts arrives <em>after</em> the fix. Our scrapers pick up the echo. A naive
-      absolute-score reading flags the post-fix week as worse than the actual-fix week. A delta-from-baseline
-      reading shows the press wave as a smaller deviation than the silent bug period was.
+      of "X is broken" posts arrives <em>after</em> the fix. Our scrapers pick up that echo for every model
+      visible in the news cycle. The interesting question isn't who showed up in the press wave — it's who
+      <em> kept</em> sliding through it. A model whose post-fix score recovers toward baseline (ChatGPT,
+      Gemini) is a model where the press-cycle posts are stale complaints. A model whose post-fix score keeps
+      falling (Claude) is a model where the underlying complaints are still arriving.
     </p>
     <p>
-      Vendor-wide trends. When all four models drop together, that's industry sentiment, not model quality.
-      Aggregating across the whole tracked set gives you a baseline of baselines: if Claude's delta is −24 while
-      the average across other vendors is −34, Claude is actually doing better than the industry trend, even
-      when its absolute number is also down.
+      Vendor-wide trends. When all four models drop together during the same week, that's industry sentiment,
+      not a single model's quality. The cross-vendor median delta during the bug window was around −37. Claude's
+      −24 is well inside that band. The bug-window deltas alone do not single Claude out. Only the recovery
+      column does.
     </p>
 
     <h2>How to read the dashboard</h2>
     <p>Three rules worth committing to memory.</p>
     <ol>
       <li>
-        Compare a model to itself, not to other models, when judging quality changes. Each model card on{" "}
+        Compare a model to itself across time, not to other models on the same day. Each model card on{" "}
         <a href="/dashboard">the dashboard</a> shows yesterday's delta in the trend pill. That's the right
-        metric for "is X getting worse?"
+        first-pass metric for "is X getting worse?"
       </li>
       <li>
-        Watch for divergence from the cross-model average. If three of four tracked models go down by the same
-        magnitude in the same week, the news is industry-wide. If one model's delta is meaningfully larger, that
-        one is the story.
+        After a known regression and fix, watch the recovery column, not the trough. If three models trend
+        upward and one stays flat or falls, the flat one is the model whose underlying issue isn't actually
+        resolved — regardless of which had the deepest absolute drop or the largest bug-window delta.
       </li>
       <li>
         Treat a single ≥2σ daily deviation as a watch flag, not a verdict. The{" "}
         <a href="/admin/scrapers">admin Anomalies panel</a> (dev-only) surfaces these automatically. A first-day
-        regression is rarely the strongest signal. Sustained multi-day drops match what a real engineering bug
-        looks like in user behavior.
+        regression is rarely the strongest signal. Sustained multi-day drops, especially through and after
+        a confirmed fix, match what a real engineering bug looks like in user behavior.
       </li>
     </ol>
 
     <h2>What this means for the next incident</h2>
     <p>
-      When the next Claude, GPT, Gemini, or Grok regression happens (and it will), the early signal won't be
-      that one model dropped. The early signal will be that one model's <em>delta from its baseline</em> is
-      several points larger than the cross-model median for the same week.
+      When the next Claude, GPT, Gemini, or Grok regression happens (and it will), the early signal will not
+      be a single model's drop and probably won't even be its delta from baseline. Industry-wide news cycles
+      pull every visible model down at the same time. The signal that one model is actually still degraded —
+      and not just absorbing a press wave — is post-recovery divergence: most models climb back; one doesn't.
     </p>
     <p>
-      That comparison currently requires eyeballing four charts. The next iteration of LLM Vibes should compute
-      it explicitly: a "delta divergence" metric per model per day, surfaced as a new anomaly type. That's not
-      built yet. If you want to read the data yourself in the meantime, the{" "}
+      That comparison currently requires eyeballing four charts side by side. The next iteration of LLM Vibes
+      should compute it explicitly: a "post-fix recovery shape" metric per model that flags when a vendor's
+      score continues to fall while peers recover. That's not built yet. If you want to read the data yourself
+      in the meantime, the{" "}
       <a href="/research/claude-april-2026/data.csv">public CSV</a> for the Claude case study has the raw
-      scores; the other three models' scores are queryable via the public Supabase REST endpoint exposed in the
-      repository.
+      scores; the other three models' scores are queryable via the public Supabase REST endpoint exposed in
+      the repository.
     </p>
 
     <h2>Caveats</h2>
     <p>
-      The Feb baseline numbers in the table above (~72, ~64, ~73, ~65) are approximate. The Feb 19 – Mar 7
-      scraper-volume gap means each model's pre-bug baseline rests on roughly four days of meaningful data, not
-      a statistically robust window. The relative ordering is solid; the precise baseline values are the
-      weakest part of the table.
+      The Feb baseline numbers in the table above (72.4, 80.6, 76.0, 48.4) come from approximately four days of
+      meaningful pre-bug coverage (Feb 15–18). The Feb 19 – Mar 7 scraper-volume gap erased the rest of
+      February. Each baseline therefore carries roughly ±3 points of sampling noise. The deltas are accurate
+      to the underlying data; the baselines themselves are the weakest part of the table.
     </p>
     <p>
-      The lesson from March 2026 was not that LLM Vibes caught Claude breaking. It was that we caught it by
-      reading deltas instead of the leaderboard. Build the same instinct into how you read the dashboard.
+      The lesson from March 2026 isn't that LLM Vibes caught Claude breaking from the leaderboard or even from
+      the bug-window delta. We caught it by watching what happened after Anthropic said it was fixed — and by
+      noticing that one model's score didn't behave like the other three. Build the same instinct into how
+      you read the dashboard.
     </p>
   </>
 );
