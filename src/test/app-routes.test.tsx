@@ -68,10 +68,14 @@ const mockModels = [
     latestScore: 59,
     vibe: 59,
     trend: { direction: "up" as const, pts: 13 },
-    sparkline: [52, 59],
+    sparkline: [
+      { score: 52, isCarryForward: false },
+      { score: 59, isCarryForward: false },
+    ],
     topComplaint: "reasoning",
     totalPosts: 328,
     lastUpdated: "2026-04-18T10:00:00.000Z",
+    isLatestCarryForward: false,
   },
   {
     id: "claude-id",
@@ -81,10 +85,14 @@ const mockModels = [
     latestScore: 50,
     vibe: 50,
     trend: { direction: "down" as const, pts: 3 },
-    sparkline: [53, 50],
+    sparkline: [
+      { score: 53, isCarryForward: false },
+      { score: 50, isCarryForward: false },
+    ],
     topComplaint: "general_drop",
     totalPosts: 281,
     lastUpdated: "2026-04-18T10:00:00.000Z",
+    isLatestCarryForward: false,
   },
 ];
 

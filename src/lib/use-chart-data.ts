@@ -6,11 +6,16 @@ import type { ChartEventMarker } from "@/components/VibesChart";
 export interface VibesHistoryRow {
   period_start: string;
   score: number;
+  total_posts?: number | null;
 }
 
 export interface DailyChartPoint {
   day: string;
   score: number | null;
+  /** Marks days where the aggregator carried yesterday's score forward
+   * because zero posts were scraped. Renders distinctly so a stale point
+   * isn't read as a real measurement. */
+  isCarryForward?: boolean;
 }
 
 export interface DailyChartData {
@@ -35,10 +40,10 @@ export function useDailyChartData(
     const emptyLabels: Record<string, string> = {};
     if (rows.length === 0) return { chartData: [], dateLabels: emptyLabels };
 
-    const scoresByDate = new Map<string, number>();
+    const rowByDate = new Map<string, VibesHistoryRow>();
     for (const v of rows) {
       const key = new Date(v.period_start).toISOString().slice(0, 10);
-      scoresByDate.set(key, v.score);
+      rowByDate.set(key, v);
     }
 
     const now = new Date();
@@ -52,7 +57,12 @@ export function useDailyChartData(
         key === todayPacific
           ? "Today"
           : d.toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
-      result.push({ day: label, score: scoresByDate.get(key) ?? null });
+      const row = rowByDate.get(key);
+      result.push({
+        day: label,
+        score: row?.score ?? null,
+        isCarryForward: row != null && row.total_posts === 0,
+      });
       labels[key] = label;
     }
     return { chartData: result, dateLabels: labels };

@@ -78,7 +78,9 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
             <div className="flex items-center gap-1.5">
-              {m.trend.direction === "up" ? (
+              {m.isLatestCarryForward ? (
+                <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+              ) : m.trend.direction === "up" ? (
                 <TrendingUp className="h-3.5 w-3.5 text-primary" />
               ) : m.trend.direction === "down" ? (
                 <TrendingDown className="h-3.5 w-3.5 text-red-200" />
@@ -87,14 +89,18 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
               )}
               <span
                 className={
-                  m.trend.direction === "up"
+                  m.isLatestCarryForward
+                    ? "text-muted-foreground"
+                    : m.trend.direction === "up"
                     ? "text-primary"
                     : m.trend.direction === "down"
                     ? "text-red-200"
                     : "text-muted-foreground"
                 }
               >
-                {m.trend.direction === "flat"
+                {m.isLatestCarryForward
+                  ? "no new posts today"
+                  : m.trend.direction === "flat"
                   ? "no change from yesterday"
                   : `${m.trend.direction === "up" ? "up" : "down"} ${m.trend.pts} pts from yesterday`}
               </span>

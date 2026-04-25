@@ -203,7 +203,9 @@ const ModelDetail = () => {
               <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
                 <p className="text-5xl sm:text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-foreground/65 ml-1">/ 100</span></p>
                 <div className="flex items-center gap-2 pb-2">
-                  {trend.direction === "up" ? (
+                  {enriched?.isLatestCarryForward ? (
+                    <Minus className="h-4 w-4 text-muted-foreground" />
+                  ) : trend.direction === "up" ? (
                     <TrendingUp className="h-4 w-4 text-primary" />
                   ) : trend.direction === "down" ? (
                     <TrendingDown className="h-4 w-4 text-red-200" />
@@ -212,14 +214,18 @@ const ModelDetail = () => {
                   )}
                   <span
                     className={`text-sm font-mono ${
-                      trend.direction === "up"
+                      enriched?.isLatestCarryForward
+                        ? "text-muted-foreground"
+                        : trend.direction === "up"
                         ? "text-primary"
                         : trend.direction === "down"
                         ? "text-red-200"
                         : "text-muted-foreground"
                     }`}
                   >
-                    {trend.direction === "flat"
+                    {enriched?.isLatestCarryForward
+                      ? "no new posts today — score carried forward"
+                      : trend.direction === "flat"
                       ? "no change from yesterday"
                       : `${trend.direction === "up" ? "up" : "down"} ${trend.pts} pts from yesterday`}
                   </span>
@@ -385,7 +391,8 @@ const ModelDetail = () => {
                     </ul>
                   </div>
                 )}
-                <h2 className="text-lg font-semibold text-foreground mb-4">Complaint Breakdown</h2>
+                <h2 className="text-lg font-semibold text-foreground mb-1">Complaint Breakdown</h2>
+                <p className="text-xs text-foreground/65 font-mono mb-4">Last 30 days</p>
                 {complaintsError ? (
                   <p className="text-sm text-muted-foreground" role="status" aria-live="polite">Failed to load data</p>
                 ) : complaintsLoading ? (
@@ -418,8 +425,8 @@ const ModelDetail = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: 0.3, duration: 0.45 }}
               >
-                <h2 className="text-lg font-semibold text-foreground mb-4">Sources</h2>
-                <p className="text-xs text-foreground/65 font-mono mb-4">Share of recent posts over the last 30 days</p>
+                <h2 className="text-lg font-semibold text-foreground mb-1">Sources</h2>
+                <p className="text-xs text-foreground/65 font-mono mb-4">Share of posts (all-time)</p>
                 {sourcesError ? (
                   <p className="text-sm text-muted-foreground" role="status" aria-live="polite">Failed to load data</p>
                 ) : sourcesLoading ? (

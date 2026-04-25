@@ -3,11 +3,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { useCallback } from "react";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizePublicComplaintCategory } from "@/shared/public-taxonomy";
+import { getPacificDayWindowSince } from "@/lib/pacific-day";
 
 type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Returns"][number];
-type SparklineRow = Database["public"]["Functions"]["get_sparkline_scores"]["Returns"][number];
 type ScrapedPostRow = Database["public"]["Tables"]["scraped_posts"]["Row"];
 type ModelRow = Database["public"]["Tables"]["models"]["Row"];
+
+export interface SparklinePoint {
+  score: number;
+  isCarryForward: boolean;
+}
 
 export interface ComplaintBreakdownItem {
   category: string;
@@ -33,10 +38,13 @@ export interface ModelWithVibes {
   latestScore: number;
   vibe: number;
   trend: { direction: "up" | "down" | "flat"; pts: number };
-  sparkline: number[];
+  sparkline: SparklinePoint[];
   topComplaint: string | null;
   totalPosts: number;
   lastUpdated: string | null;
+  /** Latest daily row had zero scraped posts — score is carried forward from
+   * the previous day. UI should soften the trend chip and mark the chart point. */
+  isLatestCarryForward: boolean;
 }
 
 export function useModelsWithLatestVibes() {
@@ -49,18 +57,35 @@ export function useModelsWithLatestVibes() {
       const { data: landing, error: lErr } = await supabase.rpc("get_landing_vibes");
       if (lErr) throw lErr;
 
-      const { data: sparklines, error: sErr } = await supabase.rpc("get_sparkline_scores");
+      // Pull the last 10 daily vibes_scores rows per model directly so we can
+      // surface total_posts alongside the score — get_sparkline_scores doesn't
+      // return total_posts, and we need it to flag carry-forward days.
+      const sinceISO = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+      const { data: sparkRows, error: sErr } = await supabase
+        .from("vibes_scores")
+        .select("model_id, period_start, score, total_posts")
+        .eq("period", "daily")
+        .gte("period_start", sinceISO)
+        .order("period_start", { ascending: true });
       if (sErr) throw sErr;
 
-      const sparkMap = new Map<string, number[]>();
-      (sparklines || []).forEach((s: SparklineRow) => {
-        const arr = sparkMap.get(s.model_id) || [];
-        arr.push(s.score);
-        sparkMap.set(s.model_id, arr);
-      });
+      const sparkByModel = new Map<string, Array<{ score: number; total_posts: number | null }>>();
+      for (const row of sparkRows || []) {
+        const arr = sparkByModel.get(row.model_id) ?? [];
+        arr.push({ score: row.score, total_posts: row.total_posts });
+        sparkByModel.set(row.model_id, arr);
+      }
 
       return (landing || []).map((m: LandingVibesRow): ModelWithVibes => {
-        const sparkline = sparkMap.get(m.model_id) || [];
+        const allRows = sparkByModel.get(m.model_id) ?? [];
+        const recent = allRows.slice(-7);
+        const sparkline: SparklinePoint[] = recent.map((r) => ({
+          score: r.score,
+          isCarryForward: r.total_posts === 0,
+        }));
+        const latestRow = recent[recent.length - 1];
+        const isLatestCarryForward = latestRow ? latestRow.total_posts === 0 : false;
+
         const trendPts = m.previous_score != null ? m.latest_score - m.previous_score : 0;
         const topComplaint = normalizePublicComplaintCategory(m.top_complaint);
 
@@ -79,6 +104,7 @@ export function useModelsWithLatestVibes() {
           topComplaint,
           totalPosts: m.total_posts ?? 0,
           lastUpdated: m.last_updated ?? null,
+          isLatestCarryForward,
         };
       });
     },
@@ -139,16 +165,16 @@ export function useVibesHistory(modelId: string | undefined, period: string, ran
     staleTime: 60_000,
     queryFn: async () => {
       const now = new Date();
-      let since: Date;
+      let sinceISO: string;
       if (period === "daily") {
-        const days = range === "7d" ? 6 : 29;
-        since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - days));
+        const daysBack = range === "7d" ? 6 : 29;
+        sinceISO = getPacificDayWindowSince(daysBack, now);
       } else if (range === "24h") {
-        since = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+        sinceISO = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
       } else if (range === "7d") {
-        since = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        sinceISO = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
       } else {
-        since = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+        sinceISO = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
       }
 
       const { data, error } = await supabase
@@ -156,7 +182,7 @@ export function useVibesHistory(modelId: string | undefined, period: string, ran
         .select("*")
         .eq("model_id", modelId!)
         .eq("period", period)
-        .gte("period_start", since.toISOString())
+        .gte("period_start", sinceISO)
         .order("period_start", { ascending: true })
         .limit(90);
       if (error) throw error;
@@ -218,16 +244,24 @@ export function useSourceBreakdown(modelId: string | undefined) {
   });
 }
 
+// Header copy on /model/:slug claims "recent posts over the last 7 days", so
+// the feed below it must respect the same window. Without this filter, a
+// quiet model could surface posts weeks old and look mismatched against the
+// 7-day post count in the header.
+const RECENT_POSTS_WINDOW_DAYS = 7;
+
 export function useModelPosts(modelId: string | undefined, limit = 25, enabled = true) {
   return useQuery<ScrapedPostRow[]>({
     queryKey: ["model-posts", modelId, limit],
     enabled: !!modelId && enabled,
     staleTime: 60_000,
     queryFn: async () => {
+      const sinceISO = new Date(Date.now() - RECENT_POSTS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
         .from("scraped_posts")
         .select("*")
         .eq("model_id", modelId!)
+        .gte("posted_at", sinceISO)
         .order("posted_at", { ascending: false })
         .limit(limit);
       if (error) throw error;
@@ -245,14 +279,13 @@ export function usePrefetchModelDetail() {
       queryKey: ["vibes-history", modelId, "daily", "30d"],
       staleTime: 60_000,
       queryFn: async () => {
-        const now = new Date();
-        const since = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - 29)).toISOString();
+        const sinceISO = getPacificDayWindowSince(29);
         const { data } = await supabase
           .from("vibes_scores")
           .select("*")
           .eq("model_id", modelId)
           .eq("period", "daily")
-          .gte("period_start", since)
+          .gte("period_start", sinceISO)
           .order("period_start", { ascending: true })
           .limit(90);
         return data || [];
@@ -286,10 +319,12 @@ export function usePrefetchModelDetail() {
       queryKey: ["model-posts", modelId, 25],
       staleTime: 60_000,
       queryFn: async () => {
+        const sinceISO = new Date(Date.now() - RECENT_POSTS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
         const { data } = await supabase
           .from("scraped_posts")
           .select("*")
           .eq("model_id", modelId)
+          .gte("posted_at", sinceISO)
           .order("posted_at", { ascending: false })
           .limit(25);
         return (data || []) as ScrapedPostRow[];

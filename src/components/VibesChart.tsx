@@ -18,8 +18,14 @@ export interface ChartEventMarker {
   title: string;
 }
 
+export interface VibesChartDatum {
+  day: string;
+  score: number | null;
+  isCarryForward?: boolean;
+}
+
 interface VibesChartProps {
-  chartData: { day: string; score: number | null }[];
+  chartData: VibesChartDatum[];
   accent: string;
   timeRange: string;
   events?: ChartEventMarker[];
@@ -41,6 +47,63 @@ function computeYDomain(data: { score: number | null }[]): [number, number] {
   }
   return [lo, hi];
 }
+
+interface CarryForwardTooltipProps {
+  active?: boolean;
+  payload?: Array<{ payload: VibesChartDatum; value: number | null }>;
+  label?: string;
+  accent: string;
+}
+
+const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardTooltipProps) => {
+  if (!active || !payload || payload.length === 0) return null;
+  const datum = payload[0].payload;
+  if (datum.score == null) return null;
+  return (
+    <div
+      style={{
+        background: CHART_COLORS.card,
+        border: `1px solid ${CHART_COLORS.border}`,
+        borderRadius: 8,
+        padding: "6px 10px",
+        fontSize: 12,
+        fontFamily: "JetBrains Mono, monospace",
+      }}
+    >
+      <p style={{ color: CHART_COLORS.mutedForeground, margin: 0 }}>{label}</p>
+      <p style={{ color: accent, margin: "2px 0 0" }}>score: {datum.score}</p>
+      {datum.isCarryForward && (
+        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 10, margin: "4px 0 0" }}>
+          Carry-forward — 0 posts scraped
+        </p>
+      )}
+    </div>
+  );
+};
+
+interface CarryForwardDotProps {
+  cx?: number;
+  cy?: number;
+  payload?: VibesChartDatum;
+  accent: string;
+}
+
+const CarryForwardDot = ({ cx, cy, payload, accent }: CarryForwardDotProps) => {
+  if (cx == null || cy == null || !payload?.isCarryForward || payload.score == null) {
+    return null;
+  }
+  return (
+    <circle
+      cx={cx}
+      cy={cy}
+      r={4}
+      fill={CHART_COLORS.card}
+      stroke={accent}
+      strokeWidth={1.5}
+      strokeDasharray="2 2"
+    />
+  );
+};
 
 const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesChartProps) => {
   const [yMin, yMax] = computeYDomain(chartData);
@@ -64,15 +127,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
         width={30}
       />
       <Tooltip
-        contentStyle={{
-          background: CHART_COLORS.card,
-          border: `1px solid ${CHART_COLORS.border}`,
-          borderRadius: 8,
-          fontSize: 12,
-          fontFamily: "JetBrains Mono, monospace",
-        }}
-        labelStyle={{ color: CHART_COLORS.mutedForeground }}
-        itemStyle={{ color: accent }}
+        content={(props) => <CarryForwardTooltip {...(props as CarryForwardTooltipProps)} accent={accent} />}
       />
       {showMidlineRef && (
         <ReferenceLine y={50} stroke={CHART_COLORS.referenceLine} strokeDasharray="4 4" />
@@ -111,7 +166,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
         dataKey="score"
         stroke={accent}
         strokeWidth={2.5}
-        dot={false}
+        dot={(props) => <CarryForwardDot {...(props as CarryForwardDotProps)} accent={accent} />}
         activeDot={{ r: 4, fill: accent, strokeWidth: 0 }}
         connectNulls={false}
       />
