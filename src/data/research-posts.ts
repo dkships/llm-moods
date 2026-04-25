@@ -69,14 +69,14 @@ export const RESEARCH_POSTS: ResearchPost[] = [
       path: "/research/claude-april-2026/data.csv",
       description:
         "Daily volume-weighted sentiment score (0–100) per tracked model with positive / negative / neutral counts and top-complaint label. Source for every chart and number in this analysis.",
-      publishedAt: "2026-04-26",
+      publishedAt: "2026-04-25",
       license: "MIT",
     },
   },
   {
     slug: "how-llm-vibes-classifies-sentiment",
     title: "How LLM Vibes Classifies Sentiment",
-    publishedAt: "2026-04-26",
+    publishedAt: "2026-04-25",
     summary:
       "The full pipeline from scraper to score. Six platforms, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we've documented but not yet solved.",
     author: "David Kelly",
@@ -86,7 +86,7 @@ export const RESEARCH_POSTS: ResearchPost[] = [
   {
     slug: "cross-model-deltas-march-april-2026",
     title: "When One AI Cracks: Cross-Model Sentiment, March–April 2026",
-    publishedAt: "2026-04-26",
+    publishedAt: "2026-04-25",
     summary:
       "Comparing absolute scores across LLM Vibes models will mislead you. Comparing each model's delta from its own baseline is what caught Claude's March 2026 regression.",
     author: "David Kelly",

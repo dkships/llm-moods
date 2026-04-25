@@ -54,10 +54,10 @@ const CrossModelDeltasBody = () => (
         <thead>
           <tr>
             <th>Model</th>
-            <th>Mar 26 – Apr 10 score</th>
-            <th>Feb baseline</th>
-            <th>Delta from baseline</th>
-            <th>Press-cycle echo (Apr 11–15)</th>
+            <th className="whitespace-nowrap">Mar 26 – Apr 10 score</th>
+            <th className="whitespace-nowrap">Feb baseline</th>
+            <th className="whitespace-nowrap">Delta from baseline</th>
+            <th className="whitespace-nowrap">Press-cycle echo (Apr 11–15)</th>
           </tr>
         </thead>
         <tbody>

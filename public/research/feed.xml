@@ -6,30 +6,7 @@
     <atom:link href="https://llmvibes.ai/research/feed.xml" rel="self" type="application/rss+xml" />
     <description>Independent analysis of AI model quality and incidents from the LLM Vibes data set.</description>
     <language>en-us</language>
-    <lastBuildDate>Sun, 26 Apr 2026 12:00:00 GMT</lastBuildDate>
-    <item>
-      <title>How LLM Vibes Classifies Sentiment</title>
-      <link>https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</link>
-      <guid isPermaLink="true">https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</guid>
-      <description>The full pipeline from scraper to score. Six platforms, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we&apos;ve documented but not yet solved.</description>
-      <author>noreply@llmvibes.ai (David Kelly)</author>
-      <pubDate>Sun, 26 Apr 2026 12:00:00 GMT</pubDate>
-      <category>methodology</category>
-    </item>
-    <item>
-      <title>When One AI Cracks: Cross-Model Sentiment, March–April 2026</title>
-      <link>https://llmvibes.ai/research/cross-model-deltas-march-april-2026</link>
-      <guid isPermaLink="true">https://llmvibes.ai/research/cross-model-deltas-march-april-2026</guid>
-      <description>Comparing absolute scores across LLM Vibes models will mislead you. Comparing each model&apos;s delta from its own baseline is what caught Claude&apos;s March 2026 regression.</description>
-      <author>noreply@llmvibes.ai (David Kelly)</author>
-      <pubDate>Sun, 26 Apr 2026 12:00:00 GMT</pubDate>
-      <category>cross-model</category>
-      <category>case-study</category>
-      <category>claude</category>
-      <category>chatgpt</category>
-      <category>gemini</category>
-      <category>grok</category>
-    </item>
+    <lastBuildDate>Sat, 25 Apr 2026 12:00:00 GMT</lastBuildDate>
     <item>
       <title>We Caught Claude&apos;s March Slide 28 Days Before Anthropic Confirmed It</title>
       <link>https://llmvibes.ai/research/claude-april-2026</link>
@@ -42,6 +19,29 @@
       <category>postmortem</category>
       <category>incident</category>
       <category>case-study</category>
+    </item>
+    <item>
+      <title>How LLM Vibes Classifies Sentiment</title>
+      <link>https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</link>
+      <guid isPermaLink="true">https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</guid>
+      <description>The full pipeline from scraper to score. Six platforms, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we&apos;ve documented but not yet solved.</description>
+      <author>noreply@llmvibes.ai (David Kelly)</author>
+      <pubDate>Sat, 25 Apr 2026 12:00:00 GMT</pubDate>
+      <category>methodology</category>
+    </item>
+    <item>
+      <title>When One AI Cracks: Cross-Model Sentiment, March–April 2026</title>
+      <link>https://llmvibes.ai/research/cross-model-deltas-march-april-2026</link>
+      <guid isPermaLink="true">https://llmvibes.ai/research/cross-model-deltas-march-april-2026</guid>
+      <description>Comparing absolute scores across LLM Vibes models will mislead you. Comparing each model&apos;s delta from its own baseline is what caught Claude&apos;s March 2026 regression.</description>
+      <author>noreply@llmvibes.ai (David Kelly)</author>
+      <pubDate>Sat, 25 Apr 2026 12:00:00 GMT</pubDate>
+      <category>cross-model</category>
+      <category>case-study</category>
+      <category>claude</category>
+      <category>chatgpt</category>
+      <category>gemini</category>
+      <category>grok</category>
     </item>
   </channel>
 </rss>

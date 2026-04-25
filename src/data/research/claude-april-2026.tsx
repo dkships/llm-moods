@@ -56,16 +56,16 @@ const ClaudeApril2026Body = () => (
         <thead>
           <tr>
             <th>Bug</th>
-            <th>Anthropic window</th>
+            <th className="whitespace-nowrap">Anthropic window</th>
             <th>Stated symptom</th>
             <th>LLM Vibes complaint tag</th>
-            <th>First captured signal</th>
+            <th className="whitespace-nowrap">First captured signal</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>Reasoning default high → medium</td>
-            <td>Mar 4 – Apr 7</td>
+            <td className="whitespace-nowrap">Mar 4 – Apr 7</td>
             <td>"Less intelligent"</td>
             <td>
               <code>reasoning</code>, <code>general_drop</code>
@@ -74,23 +74,23 @@ const ClaudeApril2026Body = () => (
           </tr>
           <tr>
             <td>Thinking-cache dropped every turn</td>
-            <td>Mar 26 – Apr 10</td>
+            <td className="whitespace-nowrap">Mar 26 – Apr 10</td>
             <td>"Forgetful, repetitive, odd tool choices; usage limits drained faster"</td>
             <td>
               <code>context_window</code>, <code>lazy_responses</code>, <code>general_drop</code>
             </td>
-            <td>
+            <td className="whitespace-nowrap">
               <strong>Mar 26, same-day</strong>
             </td>
           </tr>
           <tr>
             <td>≤25-word verbosity system prompt</td>
-            <td>Apr 16 – Apr 20</td>
+            <td className="whitespace-nowrap">Apr 16 – Apr 20</td>
             <td>~3% coding-quality drop</td>
             <td>
               <code>coding_quality</code>, <code>general_drop</code>
             </td>
-            <td>Apr 16, same-day</td>
+            <td className="whitespace-nowrap">Apr 16, same-day</td>
           </tr>
         </tbody>
       </table>
@@ -196,7 +196,7 @@ const ClaudeApril2026Body = () => (
     <p>
       The classifier itself is one of the tracked models. Sentiment runs through Gemini 3.1 Flash-Lite,
       classifying posts about Gemini's main competitor.
-      <sup>
+      <sup id="ref-1">
         <a href="#note-1" aria-label="See footnote 1">
           [1]
         </a>
@@ -259,11 +259,18 @@ const ClaudeApril2026Body = () => (
 
     <h2 id="notes">Notes</h2>
     <p id="note-1" className="text-sm text-foreground/80">
-      <strong>[1]</strong> Self-bias risk on the classifier. Gemini 3.1 Flash-Lite is the model performing
-      classification and is also one of the four tracked models. We have no second-model validation harness
-      yet. Mitigating evidence: across the windows examined, Claude often outscored Gemini, the opposite of
-      what classifier bias toward Gemini would produce. The risk is structural, and disclosing it is the
-      obligation; spot-checking it is the next build item.
+      <a
+        href="#ref-1"
+        className="font-bold no-underline hover:underline"
+        aria-label="Back to reference"
+      >
+        [1]
+      </a>{" "}
+      Self-bias risk on the classifier. Gemini 3.1 Flash-Lite is the model performing classification and is
+      also one of the four tracked models. We have no second-model validation harness yet. Mitigating evidence:
+      across the windows examined, Claude often outscored Gemini, the opposite of what classifier bias toward
+      Gemini would produce. The risk is structural, and disclosing it is the obligation; spot-checking it is
+      the next build item.
     </p>
   </>
 );
