@@ -57,8 +57,17 @@ function decodeXmlEntities(text: string): string {
     .replace(/&amp;/g, "&");
 }
 
+/**
+ * Unwrap <![CDATA[...]]> sections so their inner text isn't stripped by
+ * the subsequent HTML-tag remover. OpenAI's Atom feed wraps every title
+ * and summary in CDATA; Anthropic's does not.
+ */
+function unwrapCdata(text: string): string {
+  return text.replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, "$1");
+}
+
 function stripHtml(html: string): string {
-  return html
+  return unwrapCdata(html)
     .replace(/<[^>]+>/g, "")
     .replace(/\s+/g, " ")
     .trim();
