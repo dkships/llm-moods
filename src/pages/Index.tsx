@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Minus, ArrowRight } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowRight, Radar, Brain, LineChart } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { memo, useCallback, forwardRef } from "react";
@@ -155,7 +155,7 @@ const Index = () => {
             )}
           </section>
 
-          {/* Stat strip */}
+          {/* How it works */}
           <section className="border-y border-border bg-card/40">
             <div className="container py-12 sm:py-16">
               <motion.div
@@ -163,20 +163,29 @@ const Index = () => {
                 whileInView="visible"
                 viewport={{ once: true, margin: "-40px" }}
                 variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-                className="grid grid-cols-2 gap-6 sm:gap-8 sm:grid-cols-4"
+                className="grid grid-cols-1 gap-8 sm:gap-10 md:grid-cols-3"
               >
                 {[
-                  { label: "Models tracked", value: (models?.length ?? 4).toString() },
-                  { label: "Platforms scraped", value: PLATFORM_COUNT.toString() },
                   {
-                    label: "Posts in 7 days",
-                    value: ((models || []).reduce((sum, m) => sum + (m.totalPosts || 0), 0) || 0).toLocaleString(),
+                    Icon: Radar,
+                    title: "Scrape",
+                    body: `${PLATFORM_COUNT} social platforms checked throughout the day — Reddit, Hacker News, Bluesky, X/Twitter, Mastodon, Lemmy.`,
                   },
-                  { label: "Score range", value: "0–100" },
-                ].map((stat, i) => (
-                  <motion.div key={stat.label} variants={fadeUp} custom={i} className="text-center sm:text-left">
-                    <p className="font-display text-3xl sm:text-4xl font-bold text-foreground">{stat.value}</p>
-                    <p className="mt-1 font-mono text-xs uppercase tracking-wide text-foreground/65">{stat.label}</p>
+                  {
+                    Icon: Brain,
+                    title: "Classify",
+                    body: "Each post sentiment-labeled by Gemini 3.1 Flash-Lite into 12 complaint categories.",
+                  },
+                  {
+                    Icon: LineChart,
+                    title: "Score",
+                    body: "Volume-weighted into a 0–100 daily vibe per model. Higher means happier users.",
+                  },
+                ].map((step, i) => (
+                  <motion.div key={step.title} variants={fadeUp} custom={i} className="text-center sm:text-left">
+                    <step.Icon className="h-7 w-7 text-primary mb-3 mx-auto sm:mx-0" aria-hidden="true" />
+                    <p className="font-display text-lg font-semibold text-foreground">{step.title}</p>
+                    <p className="mt-2 text-sm text-foreground/75 leading-relaxed">{step.body}</p>
                   </motion.div>
                 ))}
               </motion.div>
