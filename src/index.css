@@ -111,11 +111,12 @@
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background rounded-sm;
   }
 
-  /* Recharts SVG content sets its own cursor; force it to inherit when its
-     ancestor (e.g., the dashboard model card sparkline wrapper) opts in. */
-  .cursor-pointer svg,
-  .cursor-pointer svg * {
-    cursor: inherit;
+  /* Recharts injects `cursor: default` as an inline style on .recharts-wrapper,
+     which beats class rules without !important. Force inherit when the chart
+     sits inside an opt-in clickable ancestor (e.g., the dashboard sparkline). */
+  .cursor-pointer .recharts-wrapper,
+  .cursor-pointer .recharts-wrapper * {
+    cursor: inherit !important;
   }
 }
 
