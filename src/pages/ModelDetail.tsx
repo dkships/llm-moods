@@ -35,8 +35,20 @@ const ModelDetail = () => {
   const [timeRange, setTimeRange] = useState<typeof TIME_RANGES[number]>("30d");
   const [surfaceFilter, setSurfaceFilter] = useState<string>("all");
 
-  const { data: model, isLoading: modelLoading } = useModelDetail(slug);
+  const { data: fetchedModel, isLoading: modelLoading } = useModelDetail(slug);
   const { data: allModels } = useModelsWithLatestVibes();
+  const enriched = allModels?.find((m) => m.slug === slug);
+
+  // Synthesize a model from the dashboard cache while useModelDetail is in flight.
+  // This eliminates the full-page skeleton stutter on Dashboard → ModelDetail
+  // navigation; the dedicated query still resolves and replaces this when it lands.
+  const model = fetchedModel ?? (enriched ? {
+    id: enriched.id,
+    name: enriched.name,
+    slug: enriched.slug,
+    accent_color: enriched.accent_color,
+  } as typeof fetchedModel : null);
+
   const period = timeRange === "24h" ? "hourly" : "daily";
   const { data: vibesHistory, isLoading: historyLoading, isError: historyError } = useVibesHistory(model?.id, period, timeRange);
   const { data: complaints, isLoading: complaintsLoading, isError: complaintsError } = useComplaintBreakdown(model?.id);
@@ -44,7 +56,7 @@ const ModelDetail = () => {
 
   const { data: recentPosts, isLoading: postsLoading, isError: postsError } = useModelPosts(model?.id, 25);
 
-  const enriched = allModels?.find((m) => m.slug === slug);
+
   const latestScore = enriched?.latestScore ?? 50;
   const trend = enriched?.trend ?? { direction: "up" as const, pts: 0 };
   const totalPosts = enriched?.totalPosts ?? 0;
@@ -97,7 +109,7 @@ const ModelDetail = () => {
     url: slug ? `/model/${slug}` : undefined,
   });
 
-  if (modelLoading) {
+  if (!model && modelLoading) {
     return (
       <PageTransition>
         <div className="min-h-screen bg-background">

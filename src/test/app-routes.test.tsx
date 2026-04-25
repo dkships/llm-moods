@@ -170,7 +170,7 @@ describe("public app routes", () => {
 
     expect(await screen.findByRole("heading", { name: /current vibes/i })).toBeInTheDocument();
     const freshnessStatus = screen.getAllByRole("status").find((element) =>
-      /scores (updated|lagging|are stale)/i.test(element.textContent || ""),
+      /^updated\b/i.test(element.textContent || ""),
     );
     expect(freshnessStatus).toBeDefined();
     expect(screen.getByRole("heading", { name: /recent community chatter/i })).toBeInTheDocument();

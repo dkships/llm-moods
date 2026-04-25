@@ -264,5 +264,33 @@ export function usePrefetchModelDetail() {
         return aggregateComplaintBreakdown(data || []);
       },
     });
+
+    queryClient.prefetchQuery({
+      queryKey: ["source-breakdown", modelId],
+      staleTime: 60_000,
+      queryFn: async () => {
+        const { data } = await supabase.rpc("get_source_breakdown", { p_model_id: modelId });
+        const total = (data || []).reduce((sum: number, row) => sum + Number(row.count), 0);
+        return (data || []).map((row) => ({
+          source: row.source,
+          count: Number(row.count),
+          pct: total > 0 ? Math.round((Number(row.count) / total) * 100) : 0,
+        }));
+      },
+    });
+
+    queryClient.prefetchQuery({
+      queryKey: ["model-posts", modelId, 25],
+      staleTime: 60_000,
+      queryFn: async () => {
+        const { data } = await supabase
+          .from("scraped_posts")
+          .select("*")
+          .eq("model_id", modelId)
+          .order("posted_at", { ascending: false })
+          .limit(25);
+        return (data || []) as ScrapedPostRow[];
+      },
+    });
   }, [queryClient]);
 }
