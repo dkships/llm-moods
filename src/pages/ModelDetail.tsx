@@ -108,6 +108,12 @@ const ModelDetail = () => {
     url: slug ? `/model/${slug}` : undefined,
   });
 
+  // Daily chart hooks must run unconditionally (above any early-return) to
+  // satisfy the rules of hooks. The values are unused on the loading/not-found
+  // paths but the calls themselves still have to happen each render.
+  const dailyChart = useDailyChartData(vibesHistory, timeRange === "7d" ? 7 : 30);
+  const dailyEvents = useChartEvents(slug ?? "", dailyChart.dateLabels);
+
   if (!model && modelLoading) {
     return (
       <PageTransition>
@@ -141,9 +147,6 @@ const ModelDetail = () => {
       </PageTransition>
     );
   }
-
-  const dailyChart = useDailyChartData(vibesHistory, timeRange === "7d" ? 7 : 30);
-  const dailyEvents = useChartEvents(slug ?? "", dailyChart.dateLabels);
 
   // The 24h hourly path uses different label semantics ("3pm", "Now") and has
   // no event overlay — so we keep its derivation inline rather than forcing it
