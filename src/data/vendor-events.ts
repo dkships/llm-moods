@@ -23,7 +23,7 @@ export interface VendorEvent {
   notes?: string;
 }
 
-const VENDOR_BY_MODEL: Record<ModelSlug, Vendor> = {
+export const VENDOR_BY_MODEL: Record<ModelSlug, Vendor> = {
   claude: "anthropic",
   chatgpt: "openai",
   gemini: "google",
