@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
+import { ArrowRight, Rss } from "lucide-react";
 import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
@@ -41,10 +41,22 @@ const ResearchIndex = () => {
         <main id="main-content" tabIndex={-1} className="scroll-mt-24">
           <section className="container pt-10 pb-8">
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-              <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Research</h1>
-              <p className="mt-2 text-sm text-foreground/70 font-mono">
-                Independent analysis of AI model quality, sourced from the LLM Vibes data set.
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Research</h1>
+                  <p className="mt-2 text-sm text-foreground/70 font-mono">
+                    Independent analysis of AI model quality, sourced from the LLM Vibes data set.
+                  </p>
+                </div>
+                <a
+                  href="/research/feed.xml"
+                  className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 font-mono text-xs uppercase tracking-wide text-muted-foreground transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  aria-label="Subscribe to the LLM Vibes Research RSS feed"
+                >
+                  <Rss className="h-3.5 w-3.5" aria-hidden="true" />
+                  RSS
+                </a>
+              </div>
             </motion.div>
           </section>
 
