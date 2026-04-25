@@ -32,7 +32,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
 | Edge Functions | 18 Deno functions (6 active scrapers + utilities; dormant scraper dirs kept for Lovable) |
-| Sentiment AI | Gemini 3.1 Flash-Lite via Google AI API (batch classification, 25 posts/call) |
+| Sentiment AI | Gemini 2.5 Flash via Google AI API (batch classification, 25 posts/call) |
 
 ## Key Routes
 
@@ -64,7 +64,7 @@ Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Api
 
 Shared utilities (keyword matching, dedup, error logging) are in `_shared/utils.ts` — scrapers import from there instead of duplicating code.
 
-Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-3.1-flash-lite-preview`. Single-model posts use `classifyBatch()` (25 posts/call). Multi-model posts (mentioning 2+ models) use `classifyBatchTargeted()` for per-model sentiment — e.g., "DeepSeek fixed Gemini's mess" is negative for Gemini, positive for DeepSeek. Both functions are in `_shared/classifier.ts`. Classifier has 429 retry logic (3 attempts with exponential backoff) and 2s inter-batch delay. Non-English posts are translated to English by the classifier prompt (no extra API calls); original text stored in `content`, translation in `translated_content`, language code in `original_language`. Known limitation: Gemini classifies posts about itself (potential self-bias). Gemini free tier is ~1,000 RPD (resets midnight Pacific Time). At 3x/day with ~24 calls/run (~72 calls/day including targeted batches) — well within limits.
+Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-2.5-flash` (stable GA — moved off `gemini-3.1-flash-lite-preview` on 2026-04-25 after Google rotated the preview snapshot to a more conservative version that flagged 100% of posts as irrelevant). Single-model posts use `classifyBatch()` (25 posts/call). Multi-model posts (mentioning 2+ models) use `classifyBatchTargeted()` for per-model sentiment — e.g., "DeepSeek fixed Gemini's mess" is negative for Gemini, positive for DeepSeek. Both functions are in `_shared/classifier.ts`. Classifier has 429 retry logic (3 attempts with exponential backoff) and 2s inter-batch delay. Non-English posts are translated to English by the classifier prompt (no extra API calls); original text stored in `content`, translation in `translated_content`, language code in `original_language`. Known limitation: Gemini classifies posts about itself (potential self-bias). Gemini free tier is ~1,000 RPD (resets midnight Pacific Time). At 3x/day with ~24 calls/run (~72 calls/day including targeted batches) — well within limits.
 
 `reclassify-posts` edge function supports `?mode=multi_model` to find and fix historical multi-model posts with identical sentiment. Run `reaggregate-vibes` after to recalculate scores.
 

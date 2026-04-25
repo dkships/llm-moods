@@ -6,7 +6,7 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 ## Tech Stack
 - React 18 + TypeScript + Vite (SWC) + shadcn/ui + Tailwind + Recharts
 - Supabase (PostgreSQL + Edge Functions)
-- Sentiment: Gemini 3.1 Flash-Lite via Google AI API (batch classification)
+- Sentiment: Gemini 2.5 Flash via Google AI API (batch classification)
 - Scrapers (6 active): Reddit (Apify), HN, Bluesky, Twitter/X (Apify), Mastodon, Lemmy
 
 ## Scope And Boundaries
