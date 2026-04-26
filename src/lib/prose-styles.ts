@@ -9,9 +9,11 @@
 export const PROSE_CLASS_NAME = [
   "prose prose-invert max-w-none",
   // headings
-  "prose-headings:font-display prose-headings:font-bold prose-h2:mt-10 prose-h2:text-2xl prose-h3:text-lg",
-  // paragraphs
-  "prose-p:text-foreground/85 prose-p:leading-relaxed",
+  "prose-headings:font-display prose-headings:font-bold",
+  "prose-h2:mt-10 prose-h2:text-2xl prose-h2:tracking-tight",
+  "prose-h3:mt-6 prose-h3:text-xl",
+  // paragraphs — bumped for reading rhythm
+  "prose-p:text-text-secondary prose-p:text-[17px] prose-p:leading-[1.7]",
   // inline links
   "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
   "prose-strong:text-foreground",
@@ -27,5 +29,5 @@ export const PROSE_CLASS_NAME = [
   // tables (Phase 6A)
   "prose-table:font-mono prose-table:text-sm prose-table:border-collapse",
   "prose-th:bg-secondary/40 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-th:text-foreground",
-  "prose-td:border-t prose-td:border-border prose-td:px-3 prose-td:py-2 prose-td:text-foreground/80",
+  "prose-td:border-t prose-td:border-border prose-td:px-3 prose-td:py-2 prose-td:text-text-secondary",
 ].join(" ");
