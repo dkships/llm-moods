@@ -426,7 +426,7 @@ const ModelDetail = () => {
                 transition={{ delay: 0.3, duration: 0.45 }}
               >
                 <h2 className="text-lg font-semibold text-foreground mb-1">Sources</h2>
-                <p className="text-xs text-foreground/65 font-mono mb-4">Share of posts (all-time)</p>
+                <p className="text-xs text-foreground/65 font-mono mb-4">Share of posts over the last 30 days</p>
                 {sourcesError ? (
                   <p className="text-sm text-muted-foreground" role="status" aria-live="polite">Failed to load data</p>
                 ) : sourcesLoading ? (
