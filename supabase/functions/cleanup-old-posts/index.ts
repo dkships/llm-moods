@@ -1,5 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { isInternalServiceRequest, internalOnlyResponse } from "../_shared/runtime.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -7,10 +6,12 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+// No auth gate: pg_cron triggers this weekly with the anon key (matching the
+// run-scrapers pattern). Operation is idempotent — deletes scraped_posts
+// older than 90 days and error_log entries older than 14 days. An attacker
+// hitting this endpoint can't escalate beyond a bounded no-op cleanup.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);

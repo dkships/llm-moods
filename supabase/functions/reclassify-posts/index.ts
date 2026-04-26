@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { isInternalServiceRequest, internalOnlyResponse } from "../_shared/runtime.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,6 +10,12 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // reclassify-posts hits the paid Gemini API on every call. The repo is
+  // public, so the anon key is too — without this gate, anyone can drain
+  // our quota. Invoke only via service-role headers (Lovable SQL prompt or
+  // an internal edge fn), never from the browser.
+  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const apiKey = Deno.env.get("GEMINI_API_KEY")!;
