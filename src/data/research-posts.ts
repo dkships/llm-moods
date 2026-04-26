@@ -102,5 +102,7 @@ export function getResearchPost(slug: string): ResearchPost | undefined {
 }
 
 export function getResearchPostsForModel(modelSlug: string): ResearchPost[] {
-  return RESEARCH_POSTS.filter((post) => post.relatedModelSlug === modelSlug);
+  return RESEARCH_POSTS
+    .filter((post) => post.relatedModelSlug === modelSlug)
+    .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
 }

@@ -77,10 +77,6 @@
     text-shadow: 0 0 20px hsl(var(--glow) / 0.4), 0 0 60px hsl(var(--glow) / 0.15);
   }
 
-  .glow-border {
-    box-shadow: 0 0 12px hsl(var(--glow) / 0.15), inset 0 0 12px hsl(var(--glow) / 0.05);
-  }
-
   .glass {
     @apply bg-card/60 backdrop-blur-xl border border-border;
   }

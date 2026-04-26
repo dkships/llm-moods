@@ -315,6 +315,10 @@ const Dashboard = () => {
               <div className="space-y-3" role="status" aria-live="polite">
                 {Array.from({ length: 6 }).map((_, i) => <ChatterSkeleton key={i} />)}
               </div>
+            ) : (chatterData?.pages ?? []).flatMap((page) => page).length === 0 ? (
+              <p className="py-8 text-center text-sm text-muted-foreground">
+                No posts in the last 7 days.
+              </p>
             ) : (
               <div className="space-y-3">
                 {(chatterData?.pages ?? []).flatMap((page) => page).map((post, i) => (
