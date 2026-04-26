@@ -1,10 +1,13 @@
 import { TrendingUp, TrendingDown, Minus, MessageSquare, Zap, ExternalLink } from "lucide-react";
 import { memo, useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
-import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
+import PageHeader from "@/components/PageHeader";
+import SectionHeader from "@/components/SectionHeader";
+import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -16,18 +19,20 @@ import {
   type RecentChatterPost,
 } from "@/hooks/useVibesData";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
-import { getVibeStatus, fadeUp, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
+import { getVibeStatus, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities, sentimentBorderClass } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
 
-// Lazy load recharts sparkline
 const LazySparkline = lazy(() => import("@/components/Sparkline"));
 
 /** Memoized model card */
-const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }) => {
+const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }) => {
   const vibe = getVibeStatus(m.latestScore);
   const VibeIcon = vibe.icon;
   const brandColor = m.accent_color || "#888";
+
+  const trendDown = m.trend.direction === "down" && !m.isLatestCarryForward;
+  const trendUp = m.trend.direction === "up" && !m.isLatestCarryForward;
 
   return (
     <Link
@@ -35,12 +40,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
       className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       onMouseEnter={() => onHover(m.slug, m.id)}
     >
-      <motion.div
-        variants={fadeUp}
-        custom={i}
-        className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer h-full hover:-translate-y-1"
-        whileHover={{ boxShadow: `0 0 24px ${vibe.color}25, 0 8px 32px ${vibe.color}15` }}
-      >
+      <Surface size="bare" motion="fade" className="overflow-hidden h-full">
         <div className="h-1.5" style={{ background: vibe.color }} />
         <div className="p-6">
           <div className="flex items-start justify-between">
@@ -63,7 +63,7 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
                   0 = everyone's complaining, 100 = pure good vibes
                 </TooltipContent>
               </Tooltip>
-              <p className="text-xs text-foreground/65 font-mono mt-0.5">/ 100</p>
+              <p className="text-xs text-text-tertiary font-mono mt-0.5">/ 100</p>
             </div>
           </div>
 
@@ -78,59 +78,60 @@ const ModelCard = memo(({ m, i, onHover }: { m: ModelWithVibes; i: number; onHov
 
           <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
             <div className="flex items-center gap-1.5">
-              {m.isLatestCarryForward ? (
-                <Minus className="h-3.5 w-3.5 text-muted-foreground" />
-              ) : m.trend.direction === "up" ? (
+              {trendUp ? (
                 <TrendingUp className="h-3.5 w-3.5 text-primary" />
-              ) : m.trend.direction === "down" ? (
-                <TrendingDown className="h-3.5 w-3.5 text-red-200" />
+              ) : trendDown ? (
+                <TrendingDown className="h-3.5 w-3.5 text-destructive" />
               ) : (
-                <Minus className="h-3.5 w-3.5 text-muted-foreground" />
+                <Minus className="h-3.5 w-3.5 text-text-tertiary" />
               )}
               <span
                 className={
                   m.isLatestCarryForward
-                    ? "text-muted-foreground"
-                    : m.trend.direction === "up"
+                    ? "text-text-tertiary"
+                    : trendUp
                     ? "text-primary"
-                    : m.trend.direction === "down"
-                    ? "text-red-200"
-                    : "text-muted-foreground"
+                    : trendDown
+                    ? "text-destructive"
+                    : "text-text-tertiary"
                 }
               >
                 {m.isLatestCarryForward
                   ? "no new posts today"
                   : m.trend.direction === "flat"
                   ? "no change from yesterday"
-                  : `${m.trend.direction === "up" ? "up" : "down"} ${m.trend.pts} pts from yesterday`}
+                  : `${trendUp ? "up" : "down"} ${m.trend.pts} pts from yesterday`}
               </span>
             </div>
-            <span className="text-foreground/70">Recent volume: {(m.totalPosts || 0).toLocaleString()} posts (7d)</span>
+            <span className="text-text-tertiary">Recent volume: {(m.totalPosts || 0).toLocaleString()} posts (7d)</span>
           </div>
 
           {m.topComplaint && (
             <div className="mt-3 flex items-center gap-2 text-xs">
-              <Zap className="h-3.5 w-3.5 text-foreground/65" />
-              <span className="text-foreground/65">Top complaint:</span>
+              <Zap className="h-3.5 w-3.5 text-text-tertiary" />
+              <span className="text-text-tertiary">Top complaint:</span>
               <span className="text-foreground font-medium">{formatComplaintLabel(m.topComplaint)}</span>
             </div>
           )}
         </div>
-      </motion.div>
+      </Surface>
     </Link>
   );
 });
 ModelCard.displayName = "ModelCard";
 
 /** Memoized chatter post */
-const ChatterPost = memo(({ post, i }: { post: RecentChatterPost; i: number }) => {
+const ChatterPost = memo(({ post }: { post: RecentChatterPost; i: number }) => {
   const sentiment = post.sentiment || "neutral";
   const s = SENTIMENT_STYLES[sentiment];
   const src = formatSourceDisplay(post.source);
   const modelData = post.models;
-  const sentimentBorderColor = sentiment === "positive" ? "border-l-emerald-500" : sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30";
   const sourceUrl = post.source_url ?? undefined;
-  const className = `glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderColor} transition-all duration-200 hover:brightness-125 hover:border-border/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${sourceUrl ? "cursor-pointer" : ""}`;
+  const cardClasses = `flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderClass(sentiment)}`;
+  const linkClasses = sourceUrl
+    ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+    : "";
+
   const content = (
     <>
       <div className="flex items-center gap-3 shrink-0">
@@ -143,7 +144,7 @@ const ChatterPost = memo(({ post, i }: { post: RecentChatterPost; i: number }) =
         {post.original_language && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-foreground/60 bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
+              <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-text-tertiary bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
                 Translated from {post.original_language.toUpperCase()}
               </span>
             </TooltipTrigger>
@@ -165,40 +166,37 @@ const ChatterPost = memo(({ post, i }: { post: RecentChatterPost; i: number }) =
         </Badge>
         {post.posted_at && (
           <span
-            className="text-xs text-foreground font-mono"
+            className="text-xs text-text-tertiary font-mono"
             title={`Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}`}
           >
             {formatTimeAgo(post.posted_at)}
           </span>
         )}
-        {sourceUrl && <ExternalLink className="h-3 w-3 text-foreground/50 shrink-0" />}
+        {sourceUrl && <ExternalLink className="h-3 w-3 text-text-tertiary shrink-0" />}
       </div>
     </>
   );
 
   if (sourceUrl) {
     return (
-      <motion.a
-        variants={fadeUp}
-        custom={i}
-        className={className}
+      <Surface
+        as="a"
+        size="compact"
+        motion="fade"
         href={sourceUrl}
         target="_blank"
         rel="noopener noreferrer"
+        className={`${cardClasses} ${linkClasses}`.trim()}
       >
         {content}
-      </motion.a>
+      </Surface>
     );
   }
 
   return (
-    <motion.div
-      variants={fadeUp}
-      custom={i}
-      className={className}
-    >
+    <Surface size="compact" motion="fade" className={cardClasses}>
       {content}
-    </motion.div>
+    </Surface>
   );
 });
 ChatterPost.displayName = "ChatterPost";
@@ -212,7 +210,6 @@ const Dashboard = () => {
   const { data: models, isLoading: modelsLoading, isError: modelsError } = useModelsWithLatestVibes();
   const prefetch = usePrefetchModelDetail();
 
-  // Lazy load chatter when section is in view
   const chatterRef = useRef<HTMLDivElement>(null);
   const [chatterVisible, setChatterVisible] = useState(false);
   useEffect(() => {
@@ -252,16 +249,12 @@ const Dashboard = () => {
         <main id="main-content" tabIndex={-1} className="scroll-mt-24">
           {/* Page Header */}
           <section className="container pt-10 pb-8">
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-                <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Current Vibes</h1>
-                <DataFreshnessIndicator lastUpdated={latestScoreUpdate} />
-              </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1.5">
-                <p className="text-sm text-foreground/70 font-mono">{today}</p>
-              </div>
-              <p className="mt-2 text-sm text-foreground/70">Latest daily sentiment score with recent chatter from Reddit, Bluesky, Mastodon, X, and more.</p>
-            </motion.div>
+            <PageHeader
+              title="Current Vibes"
+              meta={today}
+              description="Latest daily sentiment score with recent chatter from Reddit, Hacker News, Bluesky, Mastodon, and X."
+              freshness={<DataFreshnessIndicator lastUpdated={latestScoreUpdate} />}
+            />
           </section>
 
           {/* Model Cards */}
@@ -271,20 +264,15 @@ const Dashboard = () => {
                 {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
               </div>
             ) : modelsError ? (
-              <p className="py-8 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+              <p className="py-8 text-center text-sm text-text-tertiary" role="status" aria-live="polite">
                 Failed to load data
               </p>
             ) : (
-              <motion.div
-                initial="hidden"
-                animate="visible"
-                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-                className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4"
-              >
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 animate-fade-in">
                 {(models || []).map((m, i) => (
                   <ModelCard key={m.id} m={m} i={i} onHover={handleHover} />
                 ))}
-              </motion.div>
+              </div>
             )}
           </section>
 
@@ -295,20 +283,14 @@ const Dashboard = () => {
 
           {/* Community Chatter — lazy loaded on scroll */}
           <section className="container pb-12" ref={chatterRef}>
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4 }}
-            >
-              <div className="flex items-center gap-2 mb-6">
-                <MessageSquare className="h-5 w-5 text-primary" />
-                <h2 className="text-xl font-bold text-foreground">Recent Community Chatter</h2>
-              </div>
-            </motion.div>
+            <SectionHeader
+              level="page"
+              icon={MessageSquare}
+              title="Recent Community Chatter"
+            />
 
             {chatterError ? (
-              <p className="py-8 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+              <p className="py-8 text-center text-sm text-text-tertiary" role="status" aria-live="polite">
                 Failed to load data
               </p>
             ) : !chatterVisible || chatterLoading ? (
@@ -316,7 +298,7 @@ const Dashboard = () => {
                 {Array.from({ length: 6 }).map((_, i) => <ChatterSkeleton key={i} />)}
               </div>
             ) : (chatterData?.pages ?? []).flatMap((page) => page).length === 0 ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
+              <p className="py-8 text-center text-sm text-text-tertiary">
                 No posts in the last 7 days.
               </p>
             ) : (
@@ -329,14 +311,16 @@ const Dashboard = () => {
 
             {hasNextPage && (
               <div className="mt-6 flex justify-center">
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
                   aria-label="Load more community posts"
-                  className="rounded-lg border border-border bg-secondary/50 px-5 py-2 text-xs font-mono text-foreground/70 transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                  className="font-mono text-xs"
                 >
-                  {isFetchingNextPage ? "Loading..." : "Load more"}
-                </button>
+                  {isFetchingNextPage ? "Loading…" : "Load more"}
+                </Button>
               </div>
             )}
           </section>

@@ -15,7 +15,7 @@ const NavBar = () => {
 
   const navLinkClass = (active: boolean) =>
     `rounded-md px-2 py-1 font-mono text-xs uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-      active ? "bg-primary/10 text-primary" : "text-muted-foreground hover:text-foreground"
+      active ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-foreground"
     }`;
 
   return (
@@ -26,7 +26,7 @@ const NavBar = () => {
       <div className="container flex h-16 items-center justify-between">
         <Link
           to="/"
-          className="rounded-md font-display text-lg font-bold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="rounded-md font-display text-base font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           🌊 LLM <span className="text-primary">Vibes</span>
         </Link>
@@ -44,7 +44,7 @@ const NavBar = () => {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub repository"
-            className="rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="rounded-md text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <GitHubIcon className="h-5 w-5" />
           </a>

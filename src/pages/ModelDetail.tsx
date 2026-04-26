@@ -1,12 +1,14 @@
 import { useParams, Link } from "react-router-dom";
 import { TrendingUp, TrendingDown, Minus, ArrowLeft, ArrowRight, BookOpen, ExternalLink } from "lucide-react";
-import { motion } from "framer-motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState, lazy, Suspense } from "react";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
+import Surface from "@/components/Surface";
+import SectionHeader from "@/components/SectionHeader";
+import FilterChip from "@/components/FilterChip";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import {
@@ -19,12 +21,12 @@ import StatusCard from "@/components/StatusCard";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
-  getVibeStatus, fadeUp, formatComplaintLabel, SOURCE_LABELS,
+  getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
   SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
+  sentimentBorderClass,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
-// Lazy load the heavy chart component
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
 const TIME_RANGES = ["24h", "7d", "30d"] as const;
@@ -175,69 +177,66 @@ const ModelDetail = () => {
     return { chartData: data, chartEvents: [] as ReturnType<typeof useChartEvents> };
   })();
 
+  const trendDown = !enriched?.isLatestCarryForward && trend.direction === "down";
+  const trendUp = !enriched?.isLatestCarryForward && trend.direction === "up";
+
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
         <NavBar />
         <main id="main-content" tabIndex={-1} className="scroll-mt-24">
           {/* Model Header */}
-          <section className="container pt-10 pb-8">
-            <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4 }}>
-              <Link
-                to="/dashboard"
-                className="mb-6 inline-flex items-center gap-1.5 rounded-md text-sm text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
-              </Link>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-1.5 rounded-full" style={{ background: accent }} />
-                  <h1 className="text-3xl sm:text-4xl font-bold text-foreground">{model.name}</h1>
-                </div>
-                <div className="flex items-center gap-2">
-                  <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
-                  <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
-                </div>
+          <section className="container pt-10 pb-8 animate-fade-in">
+            <Link
+              to="/dashboard"
+              className="mb-6 inline-flex items-center gap-1.5 rounded-md text-sm text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Dashboard
+            </Link>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-1.5 rounded-full" style={{ background: accent }} />
+                <h1 className="text-3xl sm:text-4xl font-bold text-foreground">{model.name}</h1>
               </div>
-              <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
-                <p className="text-5xl sm:text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-foreground/65 ml-1">/ 100</span></p>
-                <div className="flex items-center gap-2 pb-2">
-                  {enriched?.isLatestCarryForward ? (
-                    <Minus className="h-4 w-4 text-muted-foreground" />
-                  ) : trend.direction === "up" ? (
-                    <TrendingUp className="h-4 w-4 text-primary" />
-                  ) : trend.direction === "down" ? (
-                    <TrendingDown className="h-4 w-4 text-red-200" />
-                  ) : (
-                    <Minus className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span
-                    className={`text-sm font-mono ${
-                      enriched?.isLatestCarryForward
-                        ? "text-muted-foreground"
-                        : trend.direction === "up"
-                        ? "text-primary"
-                        : trend.direction === "down"
-                        ? "text-red-200"
-                        : "text-muted-foreground"
-                    }`}
-                  >
-                    {enriched?.isLatestCarryForward
-                      ? "no new posts today — score carried forward"
-                      : trend.direction === "flat"
-                      ? "no change from yesterday"
-                      : `${trend.direction === "up" ? "up" : "down"} ${trend.pts} pts from yesterday`}
-                  </span>
-                </div>
+              <div className="flex items-center gap-2">
+                <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
+                <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
               </div>
-              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-                <p className="text-sm text-foreground/70 font-mono">
-                  Latest daily score with {totalPosts.toLocaleString()} recent posts over the last 7 days across Reddit, Bluesky, X, Mastodon, and more.
-                </p>
-                <DataFreshnessIndicator lastUpdated={enriched?.lastUpdated ?? null} />
+            </div>
+            <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
+              <p className="text-5xl sm:text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-text-tertiary ml-1">/ 100</span></p>
+              <div className="flex items-center gap-2 pb-2">
+                {trendUp ? (
+                  <TrendingUp className="h-4 w-4 text-primary" />
+                ) : trendDown ? (
+                  <TrendingDown className="h-4 w-4 text-destructive" />
+                ) : (
+                  <Minus className="h-4 w-4 text-text-tertiary" />
+                )}
+                <span
+                  className={`text-sm font-mono ${
+                    trendUp
+                      ? "text-primary"
+                      : trendDown
+                      ? "text-destructive"
+                      : "text-text-tertiary"
+                  }`}
+                >
+                  {enriched?.isLatestCarryForward
+                    ? "no new posts today — score carried forward"
+                    : trend.direction === "flat"
+                    ? "no change from yesterday"
+                    : `${trendUp ? "up" : "down"} ${trend.pts} pts from yesterday`}
+                </span>
               </div>
-            </motion.div>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <p className="text-sm text-text-tertiary font-mono">
+                Latest daily score with {totalPosts.toLocaleString()} recent posts over the last 7 days across Reddit, Hacker News, Bluesky, Mastodon, and X.
+              </p>
+              <DataFreshnessIndicator lastUpdated={enriched?.lastUpdated ?? null} />
+            </div>
           </section>
 
           {/* Recent incident analysis — only when a research post references this model */}
@@ -252,15 +251,16 @@ const ModelDetail = () => {
                   className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   aria-label={`Read research analysis: ${featured.title}`}
                 >
-                  <motion.article
-                    initial={{ opacity: 0, y: 12 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05, duration: 0.4 }}
-                    className="glass flex items-center gap-4 rounded-xl border-l-2 border-l-primary p-5 transition-colors hover:bg-secondary/30 sm:gap-5"
+                  <Surface
+                    as="article"
+                    size="tight"
+                    tone="accent"
+                    motion="fade"
+                    className="flex items-center gap-4 sm:gap-5"
                   >
                     <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                     <div className="min-w-0 flex-1">
-                      <p className="font-mono text-xs uppercase tracking-wide text-foreground/65">
+                      <p className="font-mono text-xs uppercase tracking-wide text-text-tertiary">
                         Recent incident analysis
                       </p>
                       <p className="mt-1 font-display text-sm font-semibold text-foreground sm:truncate sm:text-base">
@@ -268,7 +268,7 @@ const ModelDetail = () => {
                       </p>
                     </div>
                     <ArrowRight className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                  </motion.article>
+                  </Surface>
                 </Link>
               </section>
             );
@@ -277,92 +277,76 @@ const ModelDetail = () => {
           {/* Main Content: Two Columns */}
           <section className="container pb-12">
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Left Column — Chart + Official Status stacked */}
-            <div className="lg:col-span-2 space-y-6">
-            <motion.div
-              className="glass rounded-xl p-6"
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.1, duration: 0.45 }}
-            >
-              {historyError ? (
-                <p className="py-8 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
-                  Failed to load data
-                </p>
-              ) : historyLoading ? (
-                <ChartSkeleton />
-              ) : (
-                <>
-                  <h2 className="text-lg font-semibold text-foreground mb-1">Vibes Over Time</h2>
-                  <p className="text-xs text-foreground/70 font-mono mb-4">
-                    {timeRange === "24h" ? "Hourly" : "Daily"} vibes score
-                  </p>
-                  <div className="h-64">
-                    <Suspense fallback={<div className="h-64 animate-pulse rounded bg-secondary/40" />}>
-                      <LazyVibesChart chartData={chartData} accent={accent} timeRange={timeRange} events={chartEvents} />
-                    </Suspense>
-                  </div>
-                  <div className="mt-4 flex gap-2">
-                    {TIME_RANGES.map((r) => (
-                      <button
-                        key={r}
-                        onClick={() => setTimeRange(r)}
-                        title={`Show ${r}`}
-                        aria-pressed={timeRange === r}
-                        className={`px-3 py-1.5 rounded-md text-xs font-mono transition-colors ${
-                          timeRange === r
-                            ? "bg-primary/15 text-primary border border-primary/30"
-                            : "text-foreground/70 hover:text-foreground hover:bg-secondary/50"
-                        }`}
-                      >
-                        {r}
-                      </button>
-                    ))}
-                  </div>
-                  {chartEvents.length > 0 && (
-                    <div className="mt-4 border-t border-border/40 pt-3">
-                      <p className="mb-2 font-mono text-xs text-foreground/65">Known events on this chart</p>
-                      <ul className="space-y-1">
-                        {chartEvents.map((evt, i) => (
-                          <li key={`legend-${i}`} className="flex items-center gap-2 text-xs">
-                            <span
-                              className="inline-block h-2 w-3 shrink-0 rounded-sm"
-                              style={{ background: evt.color, opacity: 0.7 }}
-                              aria-hidden="true"
-                            />
-                            <span className="text-foreground/80">{evt.title}</span>
-                            <span className="font-mono text-foreground/50">
-                              {evt.startLabel}{evt.endLabel ? ` → ${evt.endLabel}` : ""}
-                            </span>
-                          </li>
+              {/* Left Column — Chart + Official Status stacked */}
+              <div className="lg:col-span-2 space-y-6">
+                <Surface motion="fade">
+                  {historyError ? (
+                    <p className="py-8 text-center text-sm text-text-tertiary" role="status" aria-live="polite">
+                      Failed to load data
+                    </p>
+                  ) : historyLoading ? (
+                    <ChartSkeleton />
+                  ) : (
+                    <>
+                      <SectionHeader
+                        title="Vibes Over Time"
+                        meta={timeRange === "24h" ? "Hourly vibes score" : "Daily vibes score"}
+                      />
+                      <div className="h-64">
+                        <Suspense fallback={<div className="h-64 animate-pulse rounded bg-secondary/40" />}>
+                          <LazyVibesChart chartData={chartData} accent={accent} timeRange={timeRange} events={chartEvents} />
+                        </Suspense>
+                      </div>
+                      <div className="mt-4 flex gap-2">
+                        {TIME_RANGES.map((r) => (
+                          <FilterChip
+                            key={r}
+                            variant="rect"
+                            pressed={timeRange === r}
+                            onClick={() => setTimeRange(r)}
+                            title={`Show ${r}`}
+                          >
+                            {r}
+                          </FilterChip>
                         ))}
-                      </ul>
-                    </div>
+                      </div>
+                      {chartEvents.length > 0 && (
+                        <div className="mt-4 border-t border-border/40 pt-3">
+                          <p className="mb-2 font-mono text-xs text-text-tertiary">Known events on this chart</p>
+                          <ul className="space-y-1">
+                            {chartEvents.map((evt, i) => (
+                              <li key={`legend-${i}`} className="flex items-center gap-2 text-xs">
+                                <span
+                                  className="inline-block h-2 w-3 shrink-0 rounded-sm"
+                                  style={{ background: evt.color, opacity: 0.7 }}
+                                  aria-hidden="true"
+                                />
+                                <span className="text-text-secondary">{evt.title}</span>
+                                <span className="font-mono text-text-tertiary">
+                                  {evt.startLabel}{evt.endLabel ? ` → ${evt.endLabel}` : ""}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </>
                   )}
-                </>
-              )}
-            </motion.div>
+                </Surface>
 
-              <StatusCard modelSlug={slug ?? ""} />
-            </div>
+                <StatusCard modelSlug={slug ?? ""} />
+              </div>
 
-            {/* Right Column — Complaints + Sources */}
-            <div className="space-y-6">
-              <motion.div
-                className="glass rounded-xl p-6"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.45 }}
-              >
+              {/* Right Column — Negative-by-surface (conditional) + Complaints + Sources */}
+              <div className="space-y-6">
                 {negativeSurfaceRows.length > 0 && (
-                  <div className="mb-5 border-b border-border/40 pb-4">
-                    <h3 className="mb-2 font-mono text-xs uppercase tracking-wide text-foreground/65">
-                      Negative posts by surface
-                    </h3>
+                  <Surface motion="fade">
+                    <SectionHeader
+                      title="Negative posts by surface"
+                      meta="Last 30 days"
+                    />
                     <div className="flex h-2 w-full overflow-hidden rounded-full bg-secondary">
                       {negativeSurfaceRows.map((row, i) => {
-                        // Fixed opacity ramp so 5+ surfaces stay legible.
-                        // Index 0 is the largest segment, leading the bar.
                         const ramp = [0.85, 0.65, 0.45, 0.3, 0.2];
                         return (
                           <div
@@ -382,129 +366,110 @@ const ModelDetail = () => {
                       {negativeSurfaceRows.map((row) => (
                         <li
                           key={row.label}
-                          className="flex justify-between font-mono text-xs text-foreground/70"
+                          className="flex justify-between font-mono text-xs text-text-tertiary"
                         >
                           <span>{row.label}</span>
                           <span>{row.pct}%</span>
                         </li>
                       ))}
                     </ul>
-                  </div>
+                  </Surface>
                 )}
-                <h2 className="text-lg font-semibold text-foreground mb-1">Complaint Breakdown</h2>
-                <p className="text-xs text-foreground/65 font-mono mb-4">Last 30 days</p>
-                {complaintsError ? (
-                  <p className="text-sm text-muted-foreground" role="status" aria-live="polite">Failed to load data</p>
-                ) : complaintsLoading ? (
-                  <BarsSkeleton count={5} />
-                ) : complaints && complaints.length > 0 ? (
-                  <div className="space-y-3">
-                    {complaints.map((c) => (
-                      <div key={c.category}>
-                        <div className="flex justify-between text-xs font-mono mb-1">
-                          <span className="text-foreground/70">{formatComplaintLabel(c.category)}</span>
-                          <span className="text-foreground">{c.pct}%</span>
-                        </div>
-                        <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${c.pct}%`, background: accent }}
-                          />
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No complaint data yet</p>
-                )}
-              </motion.div>
 
-              <motion.div
-                className="glass rounded-xl p-6"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3, duration: 0.45 }}
-              >
-                <h2 className="text-lg font-semibold text-foreground mb-1">Sources</h2>
-                <p className="text-xs text-foreground/65 font-mono mb-4">Share of posts over the last 30 days</p>
-                {sourcesError ? (
-                  <p className="text-sm text-muted-foreground" role="status" aria-live="polite">Failed to load data</p>
-                ) : sourcesLoading ? (
-                  <BarsSkeleton count={3} />
-                ) : sources && sources.filter((s) => s.pct > 0).length > 0 ? (
-                  <div className="space-y-3">
-                    {sources.filter((s) => s.pct > 0).map((s) => (
-                      <div key={s.source}>
-                        <div className="flex justify-between text-xs font-mono mb-1">
-                          <span className="text-foreground/70">{SOURCE_LABELS[s.source] || s.source}</span>
-                          <span className="text-foreground">{s.pct}%</span>
+                <Surface motion="fade">
+                  <SectionHeader title="Complaint Breakdown" meta="Last 30 days" />
+                  {complaintsError ? (
+                    <p className="text-sm text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
+                  ) : complaintsLoading ? (
+                    <BarsSkeleton count={5} />
+                  ) : complaints && complaints.length > 0 ? (
+                    <div className="space-y-3">
+                      {complaints.map((c) => (
+                        <div key={c.category}>
+                          <div className="flex justify-between text-xs font-mono mb-1">
+                            <span className="text-text-tertiary">{formatComplaintLabel(c.category)}</span>
+                            <span className="text-foreground">{c.pct}%</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${c.pct}%`, background: accent }}
+                            />
+                          </div>
                         </div>
-                        <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all duration-500"
-                            style={{ width: `${s.pct}%`, background: accent, opacity: 0.7 }}
-                          />
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-text-tertiary">No complaint data yet</p>
+                  )}
+                </Surface>
+
+                <Surface motion="fade">
+                  <SectionHeader title="Sources" meta="Share of posts over the last 30 days" />
+                  {sourcesError ? (
+                    <p className="text-sm text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
+                  ) : sourcesLoading ? (
+                    <BarsSkeleton count={3} />
+                  ) : sources && sources.filter((s) => s.pct > 0).length > 0 ? (
+                    <div className="space-y-3">
+                      {sources.filter((s) => s.pct > 0).map((s) => (
+                        <div key={s.source}>
+                          <div className="flex justify-between text-xs font-mono mb-1">
+                            <span className="text-text-tertiary">{SOURCE_LABELS[s.source] || s.source}</span>
+                            <span className="text-foreground">{s.pct}%</span>
+                          </div>
+                          <div className="h-2 rounded-full bg-secondary overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{ width: `${s.pct}%`, background: accent, opacity: 0.7 }}
+                            />
+                          </div>
                         </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">No source data yet</p>
-                )}
-              </motion.div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-text-tertiary">No source data yet</p>
+                  )}
+                </Surface>
+              </div>
             </div>
-          </div>
           </section>
 
-          {/* Recent Posts — lazy loaded on scroll */}
+          {/* Recent Posts */}
           <section className="container pb-12">
-            <motion.h2
-              initial={{ opacity: 0, y: 12 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.4 }}
-              className="text-xl font-bold text-foreground mb-3"
-            >
-              Recent Posts about {model.name}
-            </motion.h2>
+            <SectionHeader
+              level="page"
+              title={`Recent Posts about ${model.name}`}
+              className="mb-3"
+            />
             {availableSurfaceLabels.length > 0 && (
               <div
                 className="mb-6 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
                 role="group"
                 aria-label="Filter recent posts by product surface"
               >
-                <button
-                  type="button"
+                <FilterChip
+                  variant="pill"
+                  pressed={surfaceFilter === "all"}
                   onClick={() => setSurfaceFilter("all")}
-                  aria-pressed={surfaceFilter === "all"}
-                  className={`shrink-0 rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
-                    surfaceFilter === "all"
-                      ? "border-primary/30 bg-primary/15 text-primary"
-                      : "border-border text-foreground/70 hover:bg-secondary/50 hover:text-foreground"
-                  }`}
                 >
                   All ({postsWithSurface.length})
-                </button>
+                </FilterChip>
                 {availableSurfaceLabels.map((label) => (
-                  <button
+                  <FilterChip
                     key={label}
-                    type="button"
+                    variant="pill"
+                    pressed={surfaceFilter === label}
                     onClick={() => setSurfaceFilter(label)}
-                    aria-pressed={surfaceFilter === label}
-                    className={`shrink-0 rounded-full border px-3 py-1 font-mono text-xs transition-colors ${
-                      surfaceFilter === label
-                        ? "border-primary/30 bg-primary/15 text-primary"
-                        : "border-border text-foreground/70 hover:bg-secondary/50 hover:text-foreground"
-                    }`}
                   >
                     {label} ({surfaceCounts.get(label) ?? 0})
-                  </button>
+                  </FilterChip>
                 ))}
               </div>
             )}
 
             {postsError ? (
-              <p className="py-8 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+              <p className="py-8 text-center text-sm text-text-tertiary" role="status" aria-live="polite">
                 Failed to load data
               </p>
             ) : postsLoading ? (
@@ -512,35 +477,40 @@ const ModelDetail = () => {
                 {Array.from({ length: 5 }).map((_, i) => <ChatterSkeleton key={i} />)}
               </div>
             ) : filteredPostsWithSurface.length === 0 && surfaceFilter !== "all" ? (
-              <p className="py-8 text-center text-sm text-muted-foreground">
+              <p className="py-8 text-center text-sm text-text-tertiary">
                 No recent posts match the {surfaceFilter} filter. Try another surface.
               </p>
             ) : (
               <div className="space-y-3">
-                {filteredPostsWithSurface.map(({ post, surface }, i) => {
-                  const s = SENTIMENT_STYLES[post.sentiment || "neutral"];
+                {filteredPostsWithSurface.map(({ post, surface }) => {
+                  const sentiment = post.sentiment || "neutral";
+                  const s = SENTIMENT_STYLES[sentiment];
                   const src = formatSourceDisplay(post.source);
-                  const className = `glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${post.sentiment === "positive" ? "border-l-emerald-500" : post.sentiment === "negative" ? "border-l-red-500" : "border-l-muted-foreground/30"} transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${post.source_url ? "cursor-pointer hover:brightness-125 hover:border-border/60" : ""}`;
+                  const cardClasses = `flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderClass(sentiment)}`;
+                  const linkClasses = post.source_url
+                    ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    : "";
+
                   const content = (
                     <>
                       <span className="text-xs font-mono text-foreground px-2 py-0.5 rounded bg-secondary border border-border shrink-0">
                         {src.emoji} {src.label}
                       </span>
                       {surface && (
-                        <span
-                          className="text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0"
-                          style={{ borderColor: `${accent}55`, color: accent, background: `${accent}15` }}
+                        <Badge
+                          variant="outline"
+                          className="text-[10px] font-mono px-1.5 py-0 shrink-0 text-text-tertiary border-border bg-secondary/40"
                           title="Detected from post text"
                         >
                           {surface.label}
-                        </span>
+                        </Badge>
                       )}
                       <p className="text-sm text-foreground flex-1 leading-relaxed line-clamp-2">
                         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
                         {post.original_language && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-foreground/60 bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
+                              <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-text-tertiary bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
                                 Translated from {post.original_language.toUpperCase()}
                               </span>
                             </TooltipTrigger>
@@ -556,38 +526,39 @@ const ModelDetail = () => {
                         </Badge>
                         {post.posted_at && (
                           <span
-                            className="text-xs text-foreground font-mono"
+                            className="text-xs text-text-tertiary font-mono"
                             title={`Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}`}
                           >
                             {formatTimeAgo(post.posted_at)}
                           </span>
                         )}
-                        {post.source_url && <ExternalLink className="h-3 w-3 text-foreground/50 shrink-0" />}
+                        {post.source_url && <ExternalLink className="h-3 w-3 text-text-tertiary shrink-0" />}
                       </div>
                     </>
                   );
 
                   return post.source_url ? (
-                    <motion.a
+                    <Surface
                       key={post.id}
-                      variants={fadeUp}
-                      custom={i}
-                      className={className}
+                      as="a"
+                      size="compact"
+                      motion="fade"
                       href={post.source_url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      className={`${cardClasses} ${linkClasses}`.trim()}
                     >
                       {content}
-                    </motion.a>
+                    </Surface>
                   ) : (
-                    <motion.div
+                    <Surface
                       key={post.id}
-                      variants={fadeUp}
-                      custom={i}
-                      className={className}
+                      size="compact"
+                      motion="fade"
+                      className={cardClasses}
                     >
                       {content}
-                    </motion.div>
+                    </Surface>
                   );
                 })}
               </div>

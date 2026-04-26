@@ -8,29 +8,29 @@ const GitHubIcon = ({ className }: { className?: string }) => (
 
 const Footer = () => (
   <footer className="border-t border-border">
-    <div className="container flex flex-col items-center gap-3 py-8">
-      <p className="text-sm text-foreground/70 font-mono">
-        Built for the AI-obsessed. LLM Vibes 2026.
-      </p>
-      <p className="text-sm text-foreground/70 font-mono">
-        Made with <Heart className="inline h-3.5 w-3.5 text-destructive fill-destructive" /> by{" "}
+    <div className="container flex flex-wrap items-center justify-center gap-x-3 gap-y-2 py-6 text-xs text-text-tertiary">
+      <span>Built for the AI-obsessed. LLM Vibes 2026.</span>
+      <span aria-hidden="true">·</span>
+      <span className="inline-flex items-center gap-1">
+        Made with <Heart className="inline h-3 w-3 text-destructive fill-destructive" /> by{" "}
         <a
           href="https://dmkthinks.org"
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-md text-foreground underline underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="ml-0.5 rounded-md text-foreground underline underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           David Kelly
         </a>
-      </p>
+      </span>
+      <span aria-hidden="true">·</span>
       <a
         href="https://github.com/dkships/llm-moods"
         target="_blank"
         rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 rounded-md text-sm font-mono text-foreground underline underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="inline-flex items-center gap-1.5 rounded-md font-mono text-foreground underline underline-offset-2 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
-        <GitHubIcon className="h-3.5 w-3.5" />
-        Open Source — Contribute on GitHub
+        <GitHubIcon className="h-3 w-3" />
+        Open Source on GitHub
       </a>
     </div>
   </footer>

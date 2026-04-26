@@ -57,6 +57,14 @@ export default {
         surface: "hsl(var(--surface))",
         "surface-hover": "hsl(var(--surface-hover))",
         glow: "hsl(var(--glow))",
+        warning: {
+          DEFAULT: "hsl(var(--warning))",
+          foreground: "hsl(0 0% 98%)",
+        },
+        // Semantic muted text. text-foreground = primary; secondary/tertiary
+        // are the only two muted levels permitted in new code.
+        "text-secondary": "hsl(var(--foreground) / 0.78)",
+        "text-tertiary": "hsl(var(--foreground) / 0.58)",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -86,11 +94,16 @@ export default {
           "0%, 100%": { opacity: "0.4" },
           "50%": { opacity: "1" },
         },
+        "fade-in": {
+          from: { opacity: "0", transform: "translateY(8px)" },
+          to: { opacity: "1", transform: "translateY(0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
         "pulse-glow": "pulse-glow 2s ease-in-out infinite",
+        "fade-in": "fade-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both",
       },
     },
   },
