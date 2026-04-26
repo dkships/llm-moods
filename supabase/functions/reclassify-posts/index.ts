@@ -1,6 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
-import { isInternalServiceRequest, internalOnlyResponse } from "../_shared/runtime.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,8 +9,6 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-
-  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const apiKey = Deno.env.get("GEMINI_API_KEY")!;
