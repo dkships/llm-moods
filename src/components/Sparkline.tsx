@@ -15,13 +15,19 @@ interface CarryForwardDotProps {
   cx?: number;
   cy?: number;
   payload?: { score: number; isCarryForward: boolean };
-  accent: string;
+  index?: number;
 }
 
-const CarryForwardDot = ({ cx, cy, payload, accent }: CarryForwardDotProps) => {
-  if (cx == null || cy == null || !payload?.isCarryForward) return null;
+// Recharts hands a synthetic `key` as a real prop and expects each returned
+// element to carry its own key. Apply it directly to the SVG element to
+// avoid React's key-in-spread and missing-key warnings.
+const renderCarryForwardDot = (accent: string) => (props: CarryForwardDotProps) => {
+  const { cx, cy, payload, index } = props;
+  const dotKey = `spark-${index ?? 0}`;
+  if (cx == null || cy == null || !payload?.isCarryForward) return <g key={dotKey} />;
   return (
     <circle
+      key={dotKey}
       cx={cx}
       cy={cy}
       r={2.5}
@@ -42,7 +48,7 @@ const Sparkline = memo(({ data, accent }: SparklineProps) => (
         dataKey="score"
         stroke={accent}
         strokeWidth={2}
-        dot={(props) => <CarryForwardDot {...(props as CarryForwardDotProps)} accent={accent} />}
+        dot={renderCarryForwardDot(accent)}
       />
     </LineChart>
   </ResponsiveContainer>

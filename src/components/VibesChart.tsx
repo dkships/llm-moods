@@ -85,15 +85,22 @@ interface CarryForwardDotProps {
   cx?: number;
   cy?: number;
   payload?: VibesChartDatum;
-  accent: string;
+  index?: number;
 }
 
-const CarryForwardDot = ({ cx, cy, payload, accent }: CarryForwardDotProps) => {
+// Recharts hands a synthetic `key` to its dot renderer as a real prop and
+// also expects each returned element to carry its own key. We pluck it off
+// and apply it directly to the SVG element to avoid React's key-in-spread
+// and missing-key warnings.
+const renderCarryForwardDot = (accent: string) => (props: CarryForwardDotProps) => {
+  const { cx, cy, payload, index } = props;
+  const dotKey = `dot-${index ?? 0}`;
   if (cx == null || cy == null || !payload?.isCarryForward || payload.score == null) {
-    return null;
+    return <g key={dotKey} />;
   }
   return (
     <circle
+      key={dotKey}
       cx={cx}
       cy={cy}
       r={4}
@@ -166,7 +173,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
         dataKey="score"
         stroke={accent}
         strokeWidth={2.5}
-        dot={(props) => <CarryForwardDot {...(props as CarryForwardDotProps)} accent={accent} />}
+        dot={renderCarryForwardDot(accent)}
         activeDot={{ r: 4, fill: accent, strokeWidth: 0 }}
         connectNulls={false}
       />
