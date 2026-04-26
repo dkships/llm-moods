@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Flame, TrendingUp, TrendingDown } from "lucide-react";
-import { motion } from "framer-motion";
+import Surface from "@/components/Surface";
+import SectionHeader from "@/components/SectionHeader";
 import { formatComplaintLabel } from "@/lib/vibes";
 import { normalizePublicComplaintCategory } from "@/shared/public-taxonomy";
 
@@ -46,12 +47,12 @@ const TrendingComplaints = () => {
 
   if (isLoading) {
     return (
-      <div className="glass rounded-xl p-5 animate-pulse">
-        <div className="h-5 w-48 bg-secondary/60 rounded mb-4" />
+      <Surface size="tight" className="animate-pulse">
+        <div className="h-5 w-48 bg-secondary/50 rounded mb-4" />
         <div className="space-y-3">
           {[1, 2, 3].map((i) => <div key={i} className="h-10 bg-secondary/40 rounded" />)}
         </div>
-      </div>
+      </Surface>
     );
   }
 
@@ -64,19 +65,14 @@ const TrendingComplaints = () => {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ delay: 0.2, duration: 0.4 }}
-      className="glass rounded-xl overflow-hidden"
-    >
-      <div className="px-5 pt-5 pb-4 flex items-center gap-2">
-        <Flame className="h-4 w-4 text-destructive" />
-        <h3 className="text-sm font-semibold text-foreground">Trending Complaints</h3>
-        <span className="text-[10px] font-mono text-foreground/60 ml-auto">vs last week</span>
-      </div>
+    <Surface size="tight" motion="fade">
+      <SectionHeader
+        title="Trending Complaints"
+        icon={Flame}
+        action={<span className="font-mono text-[10px] text-text-tertiary">vs last week</span>}
+      />
 
-      <div className="max-h-[280px] overflow-y-auto scrollbar-thin px-5 pb-5 space-y-2">
+      <div className="max-h-[280px] overflow-y-auto scrollbar-thin space-y-2">
         {topMovers.map((item) => {
           const isSpike = item.pct_change > 50;
           const isUp = item.pct_change > 0;
@@ -87,16 +83,13 @@ const TrendingComplaints = () => {
               key={`${item.model_id}-${item.category}`}
               className="flex items-center gap-3 py-2 px-3 rounded-lg bg-secondary/30 border border-border/50"
             >
-              {/* Model indicator */}
               <div className="flex items-center gap-2 shrink-0 w-24">
                 <span className="h-2 w-2 rounded-full shrink-0" style={{ background: item.accent_color || "#888" }} />
                 <span className="text-xs font-mono text-foreground truncate">{item.model_name}</span>
               </div>
 
-              {/* Category */}
-              <span className="text-xs text-foreground/70 flex-1 truncate">{label}</span>
+              <span className="text-xs text-text-secondary flex-1 truncate">{label}</span>
 
-              {/* Change indicator */}
               <div className="flex items-center gap-1.5 shrink-0">
                 {isSpike && <span className="text-xs">🔥</span>}
                 {isUp ? (
@@ -105,21 +98,20 @@ const TrendingComplaints = () => {
                   <TrendingDown className="h-3 w-3 text-primary" />
                 )}
                 <span className={`text-xs font-mono font-medium ${
-                  isSpike ? "text-destructive" : isUp ? "text-destructive" : "text-primary"
+                  isUp ? "text-destructive" : "text-primary"
                 }`}>
                   {isUp ? "↑" : "↓"} {Math.abs(item.pct_change)}%
                 </span>
               </div>
 
-              {/* Volume */}
-              <span className="text-[10px] font-mono text-foreground/60 shrink-0 w-16 text-right">
+              <span className="text-[10px] font-mono text-text-tertiary shrink-0 w-16 text-right">
                 {item.this_week} posts
               </span>
             </div>
           );
         })}
       </div>
-    </motion.div>
+    </Surface>
   );
 };
 

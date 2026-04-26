@@ -1,11 +1,11 @@
 const Shimmer = ({ className = "" }: { className?: string }) => (
-  <div className={`animate-pulse rounded-lg bg-secondary/60 ${className}`} />
+  <div className={`animate-pulse rounded-lg bg-secondary/50 ${className}`} />
 );
 
 export const CardSkeleton = () => (
   <div className="glass rounded-xl overflow-hidden">
     <Shimmer className="h-1.5 rounded-none" />
-    <div className="p-5 space-y-3">
+    <div className="p-6 space-y-3">
       <Shimmer className="h-4 w-20" />
       <Shimmer className="h-5 w-32" />
       <div className="flex justify-between">

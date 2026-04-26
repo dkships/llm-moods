@@ -1,14 +1,14 @@
 import { TrendingUp, TrendingDown, Minus, ArrowRight, Radar, Brain, LineChart } from "lucide-react";
-import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
 import { memo, useCallback, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
+import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import { useModelsWithLatestVibes, usePrefetchModelDetail, type ModelWithVibes } from "@/hooks/useVibesData";
-import { getVibeStatus, fadeUp } from "@/lib/vibes";
+import { getVibeStatus } from "@/lib/vibes";
 import { CardSkeleton } from "@/components/Skeletons";
 
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -17,17 +17,17 @@ const GitHubIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
-const PLATFORM_COUNT = 6;
+const PLATFORM_COUNT = 5;
 
 const TrendIcon = forwardRef<SVGSVGElement, { trend: string }>(({ trend, ...props }, ref) => {
   if (trend === "up") return <TrendingUp ref={ref} className="h-4 w-4 text-primary" {...props} />;
   if (trend === "down") return <TrendingDown ref={ref} className="h-4 w-4 text-destructive" {...props} />;
-  return <Minus ref={ref} className="h-4 w-4 text-muted-foreground" {...props} />;
+  return <Minus ref={ref} className="h-4 w-4 text-text-tertiary" {...props} />;
 });
 TrendIcon.displayName = "TrendIcon";
 
 const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }>(
-  ({ m, i, onHover }, ref) => {
+  ({ m, onHover }, ref) => {
     const vibe = getVibeStatus(m.latestScore);
     const VibeIcon = vibe.icon;
     const brandColor = m.accent_color || "#888";
@@ -38,12 +38,7 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
         onMouseEnter={() => onHover(m.slug, m.id)}
         className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
-        <motion.div
-          variants={fadeUp}
-          custom={i}
-          className="glass rounded-xl overflow-hidden transition-all duration-300 cursor-pointer group hover:-translate-y-1 h-full"
-          whileHover={{ boxShadow: `0 0 20px ${vibe.color}20, 0 8px 30px ${vibe.color}10` }}
-        >
+        <Surface size="bare" motion="fade" className="overflow-hidden h-full">
           <div className="h-1.5" style={{ background: vibe.color }} />
           <div className="p-6">
             <div className="flex items-start justify-between">
@@ -61,12 +56,12 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
             </div>
             <div className="mt-3 flex items-center justify-between">
               <TrendIcon trend={m.trend.direction} />
-                <span className="text-xs font-mono text-foreground/70">
-                  {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts (7d)` : "Tracking"}
-                </span>
-              </div>
+              <span className="text-xs font-mono text-text-tertiary">
+                {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts (7d)` : "Tracking"}
+              </span>
+            </div>
           </div>
-        </motion.div>
+        </Surface>
       </Link>
     );
   }
@@ -94,27 +89,19 @@ const Index = () => {
           {/* Hero */}
           <section className="container pt-12 sm:pt-20 pb-10 relative overflow-hidden">
             <div className="absolute -top-24 right-[-10%] w-[520px] h-[520px] rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.12)_0%,_transparent_65%)] pointer-events-none" />
-            <motion.div
-              className="max-w-3xl relative"
-              initial="hidden"
-              animate="visible"
-              variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.12 } } }}
-            >
-              <motion.div variants={fadeUp} custom={0} className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-mono text-primary">
-                <span className="relative flex h-2 w-2">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-                  <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
-                </span>
+            <div className="max-w-3xl relative animate-fade-in">
+              <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-mono text-primary">
+                <span className="h-2 w-2 rounded-full bg-primary" />
                 Tracking {models?.length ?? "…"} models
-              </motion.div>
-              <motion.h1 variants={fadeUp} custom={1} className="text-4xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
+              </div>
+              <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
                 Is your AI having<br />
                 a <span className="text-primary glow-text">bad day</span>?
-              </motion.h1>
-              <motion.p variants={fadeUp} custom={2} className="mt-5 text-lg sm:text-xl text-foreground/70 max-w-xl leading-relaxed">
+              </h1>
+              <p className="mt-5 text-lg sm:text-xl text-text-secondary max-w-xl leading-relaxed">
                 Community sentiment for Claude, ChatGPT, Gemini, and Grok. Know when the vibes are off.
-              </motion.p>
-              <motion.div variants={fadeUp} custom={3} className="mt-8 flex flex-wrap items-center gap-4">
+              </p>
+              <div className="mt-8 flex flex-wrap items-center gap-4">
                 <Button asChild size="lg" className="font-mono text-sm gap-2 group">
                   <Link to="/dashboard">
                     Check the Vibes
@@ -125,13 +112,13 @@ const Index = () => {
                   href="https://github.com/dkships/llm-moods"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-md text-sm font-mono text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="inline-flex items-center gap-1.5 rounded-md text-sm font-mono text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <GitHubIcon className="h-4 w-4" />
                   Open Source
                 </a>
-              </motion.div>
-            </motion.div>
+              </div>
+            </div>
           </section>
 
           {/* Live Vibes Preview */}
@@ -141,39 +128,27 @@ const Index = () => {
                 {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
               </div>
             ) : isError ? (
-              <p className="py-8 text-center text-sm text-muted-foreground" role="status" aria-live="polite">
+              <p className="py-8 text-center text-sm text-text-tertiary" role="status" aria-live="polite">
                 Failed to load data
               </p>
             ) : (
-              <motion.div
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-80px" }}
-                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-                className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4"
-              >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-fade-in">
                 {(models || []).map((m, i) => (
                   <LandingModelCard key={m.id} m={m} i={i} onHover={handleHover} />
                 ))}
-              </motion.div>
+              </div>
             )}
           </section>
 
           {/* How it works */}
           <section className="border-y border-border bg-card/40">
             <div className="container py-12 sm:py-16">
-              <motion.div
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: "-40px" }}
-                variants={{ hidden: {}, visible: { transition: { staggerChildren: 0.08 } } }}
-                className="grid grid-cols-1 gap-8 sm:gap-10 md:grid-cols-3"
-              >
+              <div className="grid grid-cols-1 gap-8 sm:gap-10 md:grid-cols-3 animate-fade-in">
                 {[
                   {
                     Icon: Radar,
                     title: "Scrape",
-                    body: `${PLATFORM_COUNT} social platforms checked throughout the day — Reddit, Hacker News, Bluesky, X/Twitter, Mastodon, Lemmy.`,
+                    body: `${PLATFORM_COUNT} social platforms checked throughout the day — Reddit, Hacker News, Bluesky, X/Twitter, Mastodon.`,
                   },
                   {
                     Icon: Brain,
@@ -185,14 +160,14 @@ const Index = () => {
                     title: "Score",
                     body: "Volume-weighted into a 0–100 daily vibe per model. Higher means happier users.",
                   },
-                ].map((step, i) => (
-                  <motion.div key={step.title} variants={fadeUp} custom={i} className="text-center sm:text-left">
+                ].map((step) => (
+                  <div key={step.title} className="text-center sm:text-left">
                     <step.Icon className="h-7 w-7 text-primary mb-3 mx-auto sm:mx-0" aria-hidden="true" />
                     <p className="font-display text-lg font-semibold text-foreground">{step.title}</p>
-                    <p className="mt-2 text-sm text-foreground/75 leading-relaxed">{step.body}</p>
-                  </motion.div>
+                    <p className="mt-2 text-sm text-text-secondary leading-relaxed">{step.body}</p>
+                  </div>
                 ))}
-              </motion.div>
+              </div>
             </div>
           </section>
         </main>

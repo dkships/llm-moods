@@ -4,6 +4,23 @@ import {
   getPublicComplaintLabel,
 } from "@/shared/public-taxonomy";
 
+// Muted-text convention (apply across all public pages):
+//   text-foreground       — primary statements, headings, score numbers
+//   text-text-secondary   — body copy, default paragraph tone
+//   text-text-tertiary    — meta, captions, timestamps, "/100", filter labels
+// Avoid arbitrary `text-foreground/{60..90}` opacities in new code; route
+// through one of these three. Tokens defined in tailwind.config.ts.
+
+// Single source of truth for sentiment colors. Mirrors --primary, --warning,
+// --destructive HSL triplets in src/index.css. Recharts and inline `style`
+// consumers need raw HSL strings (not Tailwind classes), which is why a JS
+// map exists alongside the CSS vars.
+const SENTIMENT_HSL = {
+  good: "hsl(142 72% 50%)",
+  mixed: "hsl(38 92% 50%)",
+  bad: "hsl(0 70% 55%)",
+} as const;
+
 export const COMPLAINT_LABELS = PUBLIC_COMPLAINT_LABELS;
 
 export const SOURCE_LABELS: Record<string, string> = {
@@ -23,14 +40,23 @@ export const SOURCE_LABELS: Record<string, string> = {
 
 export const SENTIMENT_STYLES: Record<string, { label: string; classes: string }> = {
   positive: { label: "Positive", classes: "bg-primary/15 text-primary border-primary/20" },
-  negative: { label: "Negative", classes: "bg-red-500/20 text-white border-red-400/40" },
+  negative: { label: "Negative", classes: "bg-destructive/15 text-destructive border-destructive/30" },
   neutral: { label: "Neutral", classes: "bg-muted text-muted-foreground border-border" },
 };
 
 export function getVibeStatus(score: number) {
-  if (score <= 40) return { label: "Bad Vibes", icon: CloudLightning, color: "#EF4444" };
-  if (score <= 65) return { label: "Mixed Signals", icon: CloudSun, color: "#F59E0B" };
-  return { label: "Good Vibes", icon: Sun, color: "#10B981" };
+  if (score <= 40) return { label: "Bad Vibes", icon: CloudLightning, color: SENTIMENT_HSL.bad };
+  if (score <= 65) return { label: "Mixed Signals", icon: CloudSun, color: SENTIMENT_HSL.mixed };
+  return { label: "Good Vibes", icon: Sun, color: SENTIMENT_HSL.good };
+}
+
+// Maps a post sentiment to the unified left-border accent class. Used by
+// chatter posts and recent-posts list items so the border-color language is
+// consistent with `border-l-primary` (incident card, research featured card).
+export function sentimentBorderClass(sentiment: string | null | undefined): string {
+  if (sentiment === "positive") return "border-l-primary";
+  if (sentiment === "negative") return "border-l-destructive";
+  return "border-l-border";
 }
 
 export function formatTimeAgo(dateStr: string): string {
