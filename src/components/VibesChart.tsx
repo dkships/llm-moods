@@ -1,5 +1,6 @@
 import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, ReferenceLine, ReferenceArea } from "recharts";
 import { memo } from "react";
+import { ConfidenceChip } from "@/components/ConfidenceChip";
 
 // Theme colors — mapped from CSS variables (Recharts needs raw strings)
 const CHART_COLORS = {
@@ -22,6 +23,7 @@ export interface VibesChartDatum {
   day: string;
   score: number | null;
   isCarryForward?: boolean;
+  eligiblePosts?: number | null;
 }
 
 interface VibesChartProps {
@@ -59,6 +61,11 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
   if (!active || !payload || payload.length === 0) return null;
   const datum = payload[0].payload;
   if (datum.score == null) return null;
+  // Carry-forward days don't carry an authentic eligible-posts count; suppress
+  // the confidence chip on those (it'd always read "Preliminary" because
+  // total_posts=0 → eligible_posts=0, and we already mark them with the
+  // dashed dot + carry-forward note).
+  const showConfidence = !datum.isCarryForward && datum.eligiblePosts != null;
   return (
     <div
       style={{
@@ -72,6 +79,11 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
     >
       <p style={{ color: CHART_COLORS.mutedForeground, margin: 0 }}>{label}</p>
       <p style={{ color: accent, margin: "2px 0 0" }}>score: {datum.score}</p>
+      {showConfidence && (
+        <div style={{ marginTop: 4 }}>
+          <ConfidenceChip eligiblePosts={datum.eligiblePosts} size="sm" />
+        </div>
+      )}
       {datum.isCarryForward && (
         <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 10, margin: "4px 0 0" }}>
           Carry-forward — 0 posts scraped

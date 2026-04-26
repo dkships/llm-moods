@@ -68,7 +68,10 @@ function sampleStddev(values: number[], avg: number): number {
 export function useScoreAnomalies(options: UseScoreAnomaliesOptions = {}) {
   const recentDays = options.recentDays ?? 30;
   const lookbackDays = options.lookbackDays ?? 14;
-  const minBaselineDays = options.minBaselineDays ?? 7;
+  // 3 (was 7): lets new models or models that just emerged from a carry-forward
+  // gap surface anomalies sooner. Combined with the carry-forward exclusion
+  // below, the baseline now reflects real data only.
+  const minBaselineDays = options.minBaselineDays ?? 3;
   const watchThreshold = options.watchThreshold ?? 2;
   const breachThreshold = options.breachThreshold ?? 3;
 
@@ -135,16 +138,21 @@ export function useScoreAnomalies(options: UseScoreAnomaliesOptions = {}) {
           const baseline: number[] = [];
           for (let j = 0; j < i; j++) {
             const t = new Date(sorted[j].period_start).getTime();
-            if (t >= windowStart && t < rowTime) {
-              baseline.push(sorted[j].score);
-            }
+            if (t < windowStart || t >= rowTime) continue;
+            // Exclude carry-forward rows — they inherit yesterday's score with
+            // total_posts=0, so including them biases the baseline mean toward
+            // stale numbers and inflates |z| on the next real-data day.
+            if ((sorted[j].total_posts ?? 0) === 0) continue;
+            baseline.push(sorted[j].score);
           }
 
           if (baseline.length < minBaselineDays) continue;
 
           const avg = mean(baseline);
-          const stddev = sampleStddev(baseline, avg);
-          if (stddev === 0) continue;
+          // Floor stddev at 1.0 — a too-stable baseline (stddev<1) blows up
+          // |z| on a 3-point swing. Quiet models would otherwise flash
+          // "breach" on noise.
+          const stddev = Math.max(sampleStddev(baseline, avg), 1);
 
           const z = (row.score - avg) / stddev;
           const severity = classify(z, watchThreshold, breachThreshold);

@@ -16,13 +16,27 @@ import {
   loadRecentTitleKeys,
   isDuplicate,
   logToErrorLog,
+  logZeroDataWarning,
   triggerAggregateVibes,
   upsertScrapedPost,
 } from "../_shared/utils.ts";
 
 const SOURCE = "scrape-hackernews";
 const ALGOLIA_BASE = "https://hn.algolia.com/api/v1/search_by_date";
-const STORY_SEARCH_TERMS = ["Claude", "ChatGPT", "Gemini", "Grok", "OpenAI"];
+// HN Algolia does no sentiment-aware ranking, so equal-weight model terms
+// over-index neutral news (launches, benchmarks). Adding a few negative-leaning
+// queries roughly doubles complaint discoverability for the lowest-volume
+// models — pre-fix live data showed 0 Grok / 1 Gemini posts in 30d.
+const STORY_SEARCH_TERMS = [
+  "Claude",
+  "ChatGPT",
+  "Gemini",
+  "Grok",
+  "OpenAI",
+  "Claude hallucinates",
+  "ChatGPT dumber",
+  "Gemini fails",
+];
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -258,6 +272,7 @@ Deno.serve(async (req) => {
       `Completed: fetched=${summary.posts_found} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.net_new_rows} duplicateConflicts=${summary.duplicate_conflicts}`,
       "summary",
     );
+    await logZeroDataWarning(supabase, SOURCE, summary.posts_found);
 
     const responseBody = {
       ...summary,

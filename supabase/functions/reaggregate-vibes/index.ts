@@ -18,28 +18,21 @@ const corsHeaders = {
 };
 
 async function upsertScore(supabase: any, modelId: string, period: string, periodStart: string, result: ScoreResult) {
-  const { data: existing } = await supabase
-    .from("vibes_scores")
-    .select("id")
-    .eq("model_id", modelId)
-    .eq("period", period)
-    .eq("period_start", periodStart)
-    .maybeSingle();
-
-  const payload = {
-    score: result.score,
-    positive_count: result.positive_count,
-    negative_count: result.negative_count,
-    neutral_count: result.neutral_count,
-    total_posts: result.total_posts,
-    top_complaint: result.top_complaint,
-  };
-
-  if (existing) {
-    await supabase.from("vibes_scores").update(payload).eq("id", existing.id);
-  } else {
-    await supabase.from("vibes_scores").insert({ model_id: modelId, period, period_start: periodStart, ...payload });
-  }
+  await supabase.from("vibes_scores").upsert(
+    {
+      model_id: modelId,
+      period,
+      period_start: periodStart,
+      score: result.score,
+      positive_count: result.positive_count,
+      negative_count: result.negative_count,
+      neutral_count: result.neutral_count,
+      total_posts: result.total_posts,
+      eligible_posts: result.eligible_posts,
+      top_complaint: result.top_complaint,
+    },
+    { onConflict: "model_id,period,period_start" },
+  );
 }
 
 Deno.serve(async (req) => {

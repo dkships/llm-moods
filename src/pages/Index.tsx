@@ -7,6 +7,7 @@ import PageTransition from "@/components/PageTransition";
 import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
+import { ConfidenceChip } from "@/components/ConfidenceChip";
 import { useModelsWithLatestVibes, usePrefetchModelDetail, type ModelWithVibes } from "@/hooks/useVibesData";
 import { getVibeStatus } from "@/lib/vibes";
 import { CardSkeleton } from "@/components/Skeletons";
@@ -52,7 +53,10 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
                   <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
                 </div>
               </div>
-              <p className="text-3xl font-extrabold font-mono text-foreground leading-none">{m.latestScore}</p>
+              <div className="flex flex-col items-end gap-1.5">
+                <p className="text-3xl font-extrabold font-mono text-foreground leading-none">{m.latestScore}</p>
+                <ConfidenceChip eligiblePosts={m.eligiblePosts} size="sm" />
+              </div>
             </div>
             <div className="mt-3 flex items-center justify-between">
               <TrendIcon trend={m.trend.direction} />

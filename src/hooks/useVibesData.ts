@@ -5,13 +5,20 @@ import type { Database } from "@/integrations/supabase/types";
 import { normalizePublicComplaintCategory } from "@/shared/public-taxonomy";
 import { getPacificDayWindowSince } from "@/lib/pacific-day";
 
-type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Returns"][number];
+// `eligible_posts` ships in the migration `<ts>_score_integrity_fixes`.
+// The Supabase typegen regenerates `Database` after the migration applies,
+// at which point this LandingVibesRow will pick up the field directly. Until
+// then we widen with a manual extension so the hook compiles in either state.
+type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Returns"][number] & {
+  eligible_posts?: number | null;
+};
 type ScrapedPostRow = Database["public"]["Tables"]["scraped_posts"]["Row"];
 type ModelRow = Database["public"]["Tables"]["models"]["Row"];
 
 export interface SparklinePoint {
   score: number;
   isCarryForward: boolean;
+  eligiblePosts: number;
 }
 
 export interface ComplaintBreakdownItem {
@@ -41,6 +48,9 @@ export interface ModelWithVibes {
   sparkline: SparklinePoint[];
   topComplaint: string | null;
   totalPosts: number;
+  /** Eligible posts (confidence ≥ 0.65) backing the latest score. Drives the
+   *  confidence tier chip on dashboard cards and headers. */
+  eligiblePosts: number;
   lastUpdated: string | null;
   /** Latest daily row had zero scraped posts — score is carried forward from
    * the previous day. UI should soften the trend chip and mark the chart point. */
@@ -63,16 +73,25 @@ export function useModelsWithLatestVibes() {
       const sinceISO = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
       const { data: sparkRows, error: sErr } = await supabase
         .from("vibes_scores")
-        .select("model_id, period_start, score, total_posts")
+        // eligible_posts column added by migration 20260426230000_score_integrity_fixes;
+        // pre-backfill historic rows have NULL — coerced to 0 ("Preliminary") in the chip.
+        .select("model_id, period_start, score, total_posts, eligible_posts")
         .eq("period", "daily")
         .gte("period_start", sinceISO)
         .order("period_start", { ascending: true });
       if (sErr) throw sErr;
 
-      const sparkByModel = new Map<string, Array<{ score: number; total_posts: number | null }>>();
+      const sparkByModel = new Map<
+        string,
+        Array<{ score: number; total_posts: number | null; eligible_posts: number | null }>
+      >();
       for (const row of sparkRows || []) {
         const arr = sparkByModel.get(row.model_id) ?? [];
-        arr.push({ score: row.score, total_posts: row.total_posts });
+        arr.push({
+          score: row.score,
+          total_posts: row.total_posts,
+          eligible_posts: (row as { eligible_posts: number | null }).eligible_posts ?? null,
+        });
         sparkByModel.set(row.model_id, arr);
       }
 
@@ -82,6 +101,7 @@ export function useModelsWithLatestVibes() {
         const sparkline: SparklinePoint[] = recent.map((r) => ({
           score: r.score,
           isCarryForward: r.total_posts === 0,
+          eligiblePosts: r.eligible_posts ?? 0,
         }));
         const latestRow = recent[recent.length - 1];
         const isLatestCarryForward = latestRow ? latestRow.total_posts === 0 : false;
@@ -103,6 +123,7 @@ export function useModelsWithLatestVibes() {
           sparkline,
           topComplaint,
           totalPosts: m.total_posts ?? 0,
+          eligiblePosts: m.eligible_posts ?? 0,
           lastUpdated: m.last_updated ?? null,
           isLatestCarryForward,
         };

@@ -7,6 +7,7 @@ export interface VibesHistoryRow {
   period_start: string;
   score: number;
   total_posts?: number | null;
+  eligible_posts?: number | null;
 }
 
 export interface DailyChartPoint {
@@ -16,6 +17,9 @@ export interface DailyChartPoint {
    * because zero posts were scraped. Renders distinctly so a stale point
    * isn't read as a real measurement. */
   isCarryForward?: boolean;
+  /** Eligible posts (confidence ≥ 0.65) for this day. Null pre-backfill;
+   * confidence chip on the tooltip coerces null → 0 → "Preliminary". */
+  eligiblePosts?: number | null;
 }
 
 export interface DailyChartData {
@@ -62,6 +66,7 @@ export function useDailyChartData(
         day: label,
         score: row?.score ?? null,
         isCarryForward: row != null && row.total_posts === 0,
+        eligiblePosts: row?.eligible_posts ?? null,
       });
       labels[key] = label;
     }

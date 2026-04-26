@@ -25,6 +25,7 @@ import {
   loadRecentTitleKeys,
   isDuplicate,
   logToErrorLog,
+  logZeroDataWarning,
   triggerAggregateVibes,
   upsertScrapedPost,
 } from "../_shared/utils.ts";
@@ -567,6 +568,7 @@ Deno.serve(async (req) => {
       `Completed (${summary.backend}): fetched=${summary.posts_found} filtered=${summary.filtered_candidates} classified=${summary.classified} inserted=${summary.net_new_rows} duplicateConflicts=${summary.duplicate_conflicts}`,
       "summary",
     );
+    await logZeroDataWarning(supabase, SOURCE, summary.posts_found);
 
     const responseBody = {
       ...summary,

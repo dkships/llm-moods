@@ -114,6 +114,25 @@ export async function logToErrorLog(supabase: any, functionName: string, msg: st
   try { await supabase.from("error_log").insert({ function_name: functionName, error_message: msg, context: ctx || null }); } catch (e) { console.error("logToErrorLog failed:", msg, e); }
 }
 
+// Soft alert: logs a zero_data_warning to error_log when a scrape returns
+// suspiciously few posts. Run status stays whatever the caller derived
+// (usually `success`) — this just makes silent API failures visible in
+// the admin error feed so ops can distinguish "quiet day" from "actor broken".
+export async function logZeroDataWarning(
+  supabase: any,
+  source: string,
+  postsFound: number,
+  threshold = 5,
+) {
+  if (postsFound >= threshold) return;
+  await logToErrorLog(
+    supabase,
+    source,
+    `Zero/low data: posts_found=${postsFound} (threshold=${threshold})`,
+    "zero_data_warning",
+  );
+}
+
 export async function triggerAggregateVibes(supabase: any, source: string, payload: Record<string, unknown> = {}) {
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");

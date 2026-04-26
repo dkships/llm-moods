@@ -15,16 +15,21 @@ import {
   meetsMinLength,
   isLikelyNewsShare,
   logToErrorLog,
+  logZeroDataWarning,
   triggerAggregateVibes,
   upsertScrapedPost,
 } from "../_shared/utils.ts";
 
 const SOURCE = "scrape-mastodon";
 const MAIN_INSTANCE = "mastodon.social";
-const MAIN_HASHTAGS = ["chatgpt", "claudeai", "grok", "llm"];
+// `geminiai` / `geminipro` are essentially astrology-immune; bare `gemini` is
+// the zodiac tag (still filtered by isAstrologyPost as a belt-and-braces).
+// Live data showed Gemini = 5 posts / 30d on Mastodon vs ChatGPT = 111 — the
+// hashtag asymmetry was suppressing real Gemini complaints.
+const MAIN_HASHTAGS = ["chatgpt", "claudeai", "grok", "llm", "geminiai", "geminipro"];
 const TECH_INSTANCES = ["mastodon.online", "techhub.social", "sigmoid.social", "hachyderm.io"];
 const TECH_HASHTAGS = ["llm", "chatgpt"];
-const SEARCH_QUERIES = ["Claude AI", "ChatGPT", "GPT dumber", "Claude worse", "Gemini bad", "AI getting worse"];
+const SEARCH_QUERIES = ["Claude AI", "ChatGPT", "GPT dumber", "Claude worse", "Gemini bad", "Gemini Pro", "Grok 4", "AI getting worse"];
 const SEARCH_INSTANCE = "mastodon.social";
 const ASTROLOGY_TERMS = [
   "horoscope",
@@ -337,6 +342,7 @@ Deno.serve(async (req) => {
       `Completed: fetched=${summary.posts_found} filtered=${summary.filtered_candidates} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.net_new_rows} duplicateConflicts=${summary.duplicate_conflicts} errors=${summary.errors.length}`,
       "summary",
     );
+    await logZeroDataWarning(supabase, SOURCE, summary.posts_found);
 
     const responseBody = {
       ...summary,

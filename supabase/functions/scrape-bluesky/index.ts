@@ -17,6 +17,7 @@ import {
   loadRecentTitleKeys,
   isDuplicate,
   logToErrorLog,
+  logZeroDataWarning,
   triggerAggregateVibes,
   upsertScrapedPost,
 } from "../_shared/utils.ts";
@@ -37,7 +38,7 @@ const SEARCH_TERMS = [
   "Gemini sucks",
   "Grok worse",
   "Grok sucks",
-  "Bard AI",
+  "Grok 4 worse",
 ];
 
 async function fetchWithTimeout(
@@ -327,6 +328,7 @@ Deno.serve(async (req) => {
       `Completed: fetched=${summary.posts_found} filtered=${summary.filtered_candidates} classified=${summary.classified} irrelevant=${summary.irrelevant} inserted=${summary.net_new_rows} duplicateConflicts=${summary.duplicate_conflicts}`,
       "summary",
     );
+    await logZeroDataWarning(supabase, SOURCE, summary.posts_found);
 
     const responseBody = {
       ...summary,
