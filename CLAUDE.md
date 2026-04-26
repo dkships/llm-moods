@@ -19,6 +19,16 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 - `lovable-tagger` dev dependency is required for Lovable's visual editor — don't remove
 - Never enter API keys directly in Lovable — use Supabase Edge Function secrets or Lovable Cloud secrets
 
+### Edge function auth gates: keep them
+
+Edge functions that hit paid APIs (Gemini, Apify, etc.) MUST keep their `isInternalServiceRequest` gate. The repo and the anon key are public, so an ungated function is a public quota-burner. This came up in Phase 10B when Lovable's curl tool removed the gate from `reclassify-posts` to invoke it (the tool sends user JWT, not service-role) — Phase 11B re-added the gate after a $0.01-per-call attack vector was identified.
+
+If a one-shot reclassify or backfill is needed, run the call from Lovable's SQL prompt with explicit service-role auth (`Authorization: Bearer <service_role_key>` via `pg_net.http_post`). Do NOT remove the application-layer gate from these functions.
+
+Functions that should stay gated: `reclassify-posts`, anything else that calls Gemini/Apify or performs unbounded writes.
+
+Functions safe to leave ungated (called by pg_cron with anon key): `aggregate-vibes`, `reaggregate-vibes`, `cleanup-old-posts`, `run-scrapers`. Their operations are bounded and idempotent; an attacker hammering them can't escalate beyond what's already exposed via the public REST API.
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -57,6 +67,12 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 | `error_log` | Debug error tracking |
 
 **RPC Functions:** `get_landing_vibes()`, `get_sparkline_scores()`, `get_complaint_breakdown()`, `get_source_breakdown()`, `get_trending_complaints()`
+
+## Known reliability issues (Apr 2026)
+
+- **`run-scrapers` orchestrator never finishes.** It hits the Supabase edge-function wall-clock budget mid-run; the `cleanup-stuck-scraper-runs` cron from Phase 9B-2 marks it failed at 30min with `auto-cleanup: status=running > 30min`. Children scrapers DO complete (data flows in), but the orchestrator's status field is permanently misleading. **Don't trust orchestrator status; trust per-scraper child runs.**
+- **`aggregate-vibes-hourly` cron is back** (Phase 11C migration `20260425175022_restore_aggregate_vibes_hourly.sql`). It used to be unscheduled in favor of the orchestrator calling aggregate-vibes itself, but the orchestrator times out first. Hourly cron is the safety net; the orchestrator's call is best-effort.
+- **`scrape-reddit-apify` fails ~57%** of recent windows. The `trudax~reddit-scraper-lite` Apify actor times out or returns 0 items intermittently. Investigate before relying on Reddit-only signals.
 
 ## Scrapers (Edge Functions)
 
