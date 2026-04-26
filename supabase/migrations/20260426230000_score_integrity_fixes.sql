@@ -42,7 +42,11 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_vibes_scores_model_period_start
 ALTER TABLE vibes_scores ADD COLUMN IF NOT EXISTS eligible_posts integer;
 
 -- d) Align get_landing_vibes windows + return eligible_posts.
-CREATE OR REPLACE FUNCTION public.get_landing_vibes()
+--    DROP first because the return shape changes (eligible_posts column
+--    added) and CREATE OR REPLACE rejects return-type changes in Postgres.
+DROP FUNCTION IF EXISTS public.get_landing_vibes();
+
+CREATE FUNCTION public.get_landing_vibes()
 RETURNS TABLE (
   model_id uuid,
   model_name text,
