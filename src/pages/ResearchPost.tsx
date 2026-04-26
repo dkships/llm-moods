@@ -1,5 +1,4 @@
 import { useParams, Link } from "react-router-dom";
-import { motion } from "framer-motion";
 import { ArrowLeft, Download } from "lucide-react";
 import { useMemo } from "react";
 import NavBar from "@/components/NavBar";
@@ -90,28 +89,23 @@ const ResearchPostPage = () => {
         <NavBar />
         <main id="main-content" tabIndex={-1} className="scroll-mt-24">
           <article className="container pt-10 pb-16">
-            <motion.div
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4 }}
-              className="mx-auto max-w-3xl"
-            >
+            <div className="mx-auto max-w-3xl animate-fade-in">
               <Link
                 to="/research"
-                className="mb-6 inline-flex items-center gap-1.5 rounded-md text-sm text-foreground/70 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="mb-6 inline-flex items-center gap-1.5 rounded-md text-sm text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Research
               </Link>
 
               <header className="mb-8 border-b border-border pb-8">
-                <p className="font-mono text-xs uppercase tracking-wide text-foreground/65">
+                <p className="font-mono text-xs uppercase tracking-wide text-text-tertiary">
                   {formatDate(post.publishedAt)} · {post.author}
                 </p>
                 <h1 className="mt-3 text-3xl sm:text-4xl font-bold text-foreground">
                   {post.title}
                 </h1>
-                <p className="mt-4 text-base text-foreground/80 leading-relaxed">{post.summary}</p>
+                <p className="mt-4 text-base text-text-secondary leading-relaxed">{post.summary}</p>
                 <div className="mt-5 flex flex-wrap items-center gap-2">
                   {post.tags.map((tag) => (
                     <Badge
@@ -140,7 +134,7 @@ const ResearchPostPage = () => {
                 <Body />
               </div>
 
-            </motion.div>
+            </div>
           </article>
         </main>
         <Footer />

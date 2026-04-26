@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import Surface from "@/components/Surface";
 import { useModelDetail, useVibesHistory } from "@/hooks/useVibesData";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 
@@ -26,16 +27,16 @@ const EmbeddedModelChart = ({ modelSlug }: EmbeddedModelChartProps) => {
 
   if (isError) {
     return (
-      <div className="my-6 rounded-xl border border-border bg-secondary/20 p-6 text-center text-sm text-muted-foreground">
+      <Surface className="my-6 text-center text-sm text-text-tertiary">
         Failed to load chart data.
-      </div>
+      </Surface>
     );
   }
 
   return (
-    <div className="my-6 rounded-xl border border-border bg-card/40 p-4 sm:p-6">
+    <Surface className="my-6">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-sm font-mono uppercase tracking-wide text-muted-foreground">
+        <h3 className="font-mono text-sm uppercase tracking-wide text-text-tertiary">
           {model?.name ?? modelSlug} · daily score · last 30 days
         </h3>
       </div>
@@ -57,8 +58,8 @@ const EmbeddedModelChart = ({ modelSlug }: EmbeddedModelChartProps) => {
                 style={{ background: evt.color, opacity: 0.7 }}
                 aria-hidden="true"
               />
-              <span className="text-foreground/80">{evt.title}</span>
-              <span className="font-mono text-foreground/50">
+              <span className="text-text-secondary">{evt.title}</span>
+              <span className="font-mono text-text-tertiary">
                 {evt.startLabel}
                 {evt.endLabel ? ` → ${evt.endLabel}` : ""}
               </span>
@@ -66,7 +67,7 @@ const EmbeddedModelChart = ({ modelSlug }: EmbeddedModelChartProps) => {
           ))}
         </ul>
       )}
-    </div>
+    </Surface>
   );
 };
 
