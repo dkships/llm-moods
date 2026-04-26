@@ -15,22 +15,38 @@ const formatDate = (iso: string) =>
  *
  * Layout is fixed-pixel and sits at <main>'s top-left so a 1200x630 viewport
  * screenshot lines up exactly with the card.
+ *
+ * NOTE: This file is intentionally decoupled from the runtime CSS-var theme.
+ * Reading `hsl(var(--primary))` at capture time is fragile across viewport
+ * changes and headless DOM-to-image paths, so colors are pinned in OG_THEME
+ * below. Values match the runtime palette numerically; if the runtime theme
+ * shifts, update OG_THEME by hand and re-capture each PNG.
  */
+const OG_THEME = {
+  accentGreen: "hsl(142 71% 45%)",
+  claudeOrange: "hsl(20 90% 60%)",
+  bgTop: "#0e1115",
+  bgBottom: "#14181d",
+  text: "white",
+  textMuted: "rgba(255,255,255,0.72)",
+  textSubtle: "rgba(255,255,255,0.55)",
+  textFaint: "rgba(255,255,255,0.5)",
+  borderFaint: "rgba(255,255,255,0.18)",
+} as const;
+
 const OgPreview = () => {
   const { slug } = useParams<{ slug: string }>();
   const post = slug ? getResearchPost(slug) : undefined;
 
   if (!post) {
     return (
-      <div style={{ width: 1200, height: 630, display: "flex", alignItems: "center", justifyContent: "center", background: "#0e1115", color: "white", fontFamily: "monospace" }}>
+      <div style={{ width: 1200, height: 630, display: "flex", alignItems: "center", justifyContent: "center", background: OG_THEME.bgTop, color: OG_THEME.text, fontFamily: "monospace" }}>
         Post not found: {slug}
       </div>
     );
   }
 
-  const accentGreen = "hsl(142 71% 45%)";
-  const claudeOrange = "hsl(20 90% 60%)";
-  const accent = post.relatedModelSlug === "claude" ? claudeOrange : accentGreen;
+  const accent = post.relatedModelSlug === "claude" ? OG_THEME.claudeOrange : OG_THEME.accentGreen;
   const tags = post.tags.slice(0, 3);
 
   return (
@@ -42,8 +58,8 @@ const OgPreview = () => {
         top: 0,
         left: 0,
         background:
-          "radial-gradient(circle at 80% 20%, hsl(142 71% 45% / 0.10), transparent 55%), linear-gradient(180deg, #0e1115 0%, #14181d 100%)",
-        color: "white",
+          `radial-gradient(circle at 80% 20%, ${OG_THEME.accentGreen}1a, transparent 55%), linear-gradient(180deg, ${OG_THEME.bgTop} 0%, ${OG_THEME.bgBottom} 100%)`,
+        color: OG_THEME.text,
         fontFamily: "'Space Grotesk', system-ui, sans-serif",
         padding: 64,
         display: "flex",
@@ -58,16 +74,16 @@ const OgPreview = () => {
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <span style={{ fontSize: 36 }}>🌊</span>
           <span style={{ fontSize: 28, fontWeight: 700, letterSpacing: "-0.01em" }}>
-            LLM <span style={{ color: accentGreen }}>Vibes</span>
+            LLM <span style={{ color: OG_THEME.accentGreen }}>Vibes</span>
           </span>
           <span
             style={{
               marginLeft: 12,
               padding: "4px 10px",
               borderRadius: 999,
-              border: `1px solid ${accentGreen}55`,
-              background: `${accentGreen}1a`,
-              color: accentGreen,
+              border: `1px solid ${OG_THEME.accentGreen}55`,
+              background: `${OG_THEME.accentGreen}1a`,
+              color: OG_THEME.accentGreen,
               fontSize: 14,
               fontFamily: "'JetBrains Mono', monospace",
               letterSpacing: "0.08em",
@@ -81,7 +97,7 @@ const OgPreview = () => {
           style={{
             fontFamily: "'JetBrains Mono', monospace",
             fontSize: 18,
-            color: "rgba(255,255,255,0.5)",
+            color: OG_THEME.textFaint,
             letterSpacing: "0.02em",
           }}
         >
@@ -107,7 +123,7 @@ const OgPreview = () => {
             marginTop: 28,
             fontSize: 24,
             lineHeight: 1.45,
-            color: "rgba(255,255,255,0.72)",
+            color: OG_THEME.textMuted,
             maxWidth: 920,
           }}
         >
@@ -124,8 +140,8 @@ const OgPreview = () => {
               style={{
                 padding: "6px 14px",
                 borderRadius: 999,
-                border: "1px solid rgba(255,255,255,0.18)",
-                color: "rgba(255,255,255,0.78)",
+                border: `1px solid ${OG_THEME.borderFaint}`,
+                color: OG_THEME.textMuted,
                 fontSize: 14,
                 fontFamily: "'JetBrains Mono', monospace",
                 textTransform: "uppercase",
@@ -142,7 +158,7 @@ const OgPreview = () => {
               margin: 0,
               fontFamily: "'JetBrains Mono', monospace",
               fontSize: 16,
-              color: "rgba(255,255,255,0.55)",
+              color: OG_THEME.textSubtle,
               letterSpacing: "0.04em",
               textTransform: "uppercase",
             }}
@@ -155,7 +171,7 @@ const OgPreview = () => {
               width: 220,
               height: 6,
               borderRadius: 4,
-              background: `linear-gradient(90deg, ${accent} 0%, ${accentGreen} 100%)`,
+              background: `linear-gradient(90deg, ${accent} 0%, ${OG_THEME.accentGreen} 100%)`,
             }}
           />
         </div>
