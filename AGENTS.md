@@ -17,10 +17,12 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 - Repo is public — never commit service role keys or API tokens
 
 ## Working Rules
+- Before direct work on `main`, run `git fetch` and fast-forward when appropriate; Lovable may have pushed changes.
 - Push to `main` triggers Lovable auto-sync for frontend
 - Edge Function deploys may require a Lovable-side trigger
 - Always commit after completing work — don't leave dirty `main`
 - Shared scraper utilities in `supabase/functions/_shared/utils.ts`
+- Use `product-qa-sweep` for dashboard, public route, scraper monitor, or responsive UI verification.
 
 ## Public App Guardrails
 - Public route inventory is fixed to `/`, `/dashboard`, `/model/:slug`, `/research`, `/research/:slug`, and `*` (404)
@@ -41,4 +43,4 @@ See `~/.agents/AGENTS.md`. For llm-moods: sources = code and model API responses
 
 ## Maintenance
 - Owner: David Kelly
-- Last Updated: 2026-04-25
+- Last Updated: 2026-04-26
