@@ -7,6 +7,8 @@
  * wrapper in ResearchPost.tsx.
  */
 
+import AuthorBio from "@/components/research/AuthorBio";
+
 const ExternalLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <a href={href} target="_blank" rel="noopener noreferrer">
     {children}
@@ -23,21 +25,19 @@ const HowLlmVibesClassifiesSentimentBody = () => (
       we score it, how we flag anomalies, and which failure modes we've documented but not yet solved.
     </p>
     <p>
-      If you want to verify any of this against the source, every script, query, and prompt referenced here lives
-      in the{" "}
-      <ExternalLink href="https://github.com/dkships/llm-moods">public repository</ExternalLink>. The classifier
-      prompt is in <code>supabase/functions/_shared/classifier.ts</code>. The scoring math is in{" "}
-      <code>supabase/functions/_shared/vibes-scoring.ts</code>.
+      Every script, query, and prompt referenced here lives in the{" "}
+      <ExternalLink href="https://github.com/dkships/llm-moods">public repository</ExternalLink>. Specific paths
+      are linked inline as each component comes up.
     </p>
 
     <h2>What gets scraped</h2>
-    <p>Six platforms, six edge functions, one orchestrator.</p>
+    <p>Five platforms, five edge functions, one orchestrator.</p>
     <p>
       Reddit comes from the Apify <code>trudax~reddit-scraper-lite</code> actor, pulling 40 posts per run from
       five subreddits (r/ClaudeAI, r/ChatGPT, r/LocalLLaMA, r/GoogleGemini, r/artificial). Hacker News uses the
       Algolia API, free and rate-friendly. Bluesky uses the AT Protocol with an authenticated handle. Twitter/X
       uses the Apify <code>apidojo~tweet-scraper</code> actor, four search terms, 50 posts per run. Mastodon uses
-      the public API across five instances. Lemmy uses the public API across two instances.
+      the public API across five instances.
     </p>
     <p>
       A coordinator function (<code>run-scrapers</code>) fires each scraper in batches of three. The schedule
@@ -47,8 +47,8 @@ const HowLlmVibesClassifiesSentimentBody = () => (
       column legible without burning Apify credits.
     </p>
     <p>
-      The hourly trigger landed on April 22, 2026. Before that, the orchestrator code shipped without a cron
-      schedule for 17 days. That gap is documented in{" "}
+      The orchestrator was committed in early March 2026 but ran on manual triggers only. The hourly cron
+      schedule landed April 22, 2026. That gap is documented in{" "}
       <ExternalLink href="https://github.com/dkships/llm-moods/blob/main/docs/llm-vibes-retrospective-april-2026.md">
         our retrospective
       </ExternalLink>
@@ -186,10 +186,9 @@ score = round((effective_positive / total_weight) × 100)`}</code>
       <a href="/research/cross-model-deltas-march-april-2026">cross-model deltas</a> makes the lag pattern
       visible.
     </p>
-    <p>
-      The repo is MIT-licensed. Read it, fork it, run it against your own scraper sources, file a PR if you have
-      a better classifier prompt.
-    </p>
+    <p>The repo is MIT-licensed. Read it, fork it, file a PR if you have a better classifier prompt.</p>
+
+    <AuthorBio />
   </>
 );
 

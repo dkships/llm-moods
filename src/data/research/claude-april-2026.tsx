@@ -5,6 +5,8 @@
  */
 
 import EmbeddedModelChart from "@/components/research/EmbeddedModelChart";
+import AuthorBio from "@/components/research/AuthorBio";
+import PullQuote from "@/components/research/PullQuote";
 
 const ExternalLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <a href={href} target="_blank" rel="noopener noreferrer">
@@ -108,43 +110,28 @@ const ClaudeApril2026Body = () => (
       These are verbatim posts pulled from the <code>scraped_posts</code> table, paired with Anthropic's
       postmortem dates.
     </p>
-    <blockquote>
-      <p>
-        "Restart session, clear conversations, clear claude md, give it specific skill and working examples and
-        it's dumb af. Feels like sonnet 3.5 wtf."
-      </p>
-      <p>
-        —{" "}
-        <ExternalLink href="https://bsky.app/profile/tetrac-official.bsky.social/post/3mhxg72ka722t">
-          @tetrac-official
-        </ExternalLink>{" "}
-        on Bluesky, <strong>2026-03-26 10:42 UTC</strong>
-      </p>
-    </blockquote>
-    <blockquote>
-      <p>
-        "I just experienced something weird, and I'm not sure if it's been like this the entire time or just a
-        bug. I was having a long session with Claude Code, probably consumed about 80% of the 1M tokens (haven't
-        paying attention), I've reached 90% of the 5h tokens usage limit, and then, the 5h window has ended,
-        and right when the next window started, I noticed that it jumps straight to 27% usage..."
-      </p>
-      <p>
-        —{" "}
-        <ExternalLink href="https://www.reddit.com/r/ClaudeAI/comments/1s5hfa4/">r/ClaudeAI on Reddit</ExternalLink>
-        , <strong>2026-03-27 21:36 UTC</strong>
-      </p>
-    </blockquote>
-    <blockquote>
-      <p>
-        "Paying for Claude Max 20x and the token limits still tank mid-session on heavy coding work. If you're
-        selling a premium tier for power users, actually build for power users."
-      </p>
-      <p>
-        —{" "}
-        <ExternalLink href="https://x.com/mkalkere/status/2038404677000216624">@mkalkere on X</ExternalLink>,{" "}
-        <strong>2026-03-29 23:55 UTC</strong>
-      </p>
-    </blockquote>
+    <PullQuote
+      text="Restart session, clear conversations, clear claude md, give it specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf."
+      handle="@tetrac-official"
+      platform="Bluesky"
+      timestamp="2026-03-26 10:42 UTC"
+      href="https://bsky.app/profile/tetrac-official.bsky.social/post/3mhxg72ka722t"
+      archivedHref="https://web.archive.org/web/2026/https://bsky.app/profile/tetrac-official.bsky.social/post/3mhxg72ka722t"
+    />
+    <PullQuote
+      text="I just experienced something weird, and I'm not sure if it's been like this the entire time or just a bug. I was having a long session with Claude Code, probably consumed about 80% of the 1M tokens (haven't paying attention), I've reached 90% of the 5h tokens usage limit, and then, the 5h window has ended, and right when the next window started, I noticed that it jumps straight to 27% usage..."
+      handle="r/ClaudeAI"
+      platform="Reddit"
+      timestamp="2026-03-27 21:36 UTC"
+      href="https://www.reddit.com/r/ClaudeAI/comments/1s5hfa4/"
+    />
+    <PullQuote
+      text="Paying for Claude Max 20x and the token limits still tank mid-session on heavy coding work. If you're selling a premium tier for power users, actually build for power users."
+      handle="@mkalkere"
+      platform="X"
+      timestamp="2026-03-29 23:55 UTC"
+      href="https://x.com/mkalkere/status/2038404677000216624"
+    />
     <p>
       The first quote is the most direct. Bug 2, the thinking-cache regression, shipped on March 26. The post
       was captured on March 26. The user is comparing Claude's behavior to a model two generations old. Our
@@ -190,15 +177,15 @@ const ClaudeApril2026Body = () => (
       like an early-grumble detector than a clean leading indicator.
     </p>
     <p>
-      The February 19 – March 7 volume gap is on us. The scraper orchestrator code shipped on March 9 but had
-      no cron schedule until April 22. For 14 of the 35 days when Bug 1 was silently active in production, our
-      scrapers captured fewer than 10 Claude posts per day. We had no operational alarm telling us post volume
-      had collapsed. That means the "Feb 15–18 baseline" is four days of meaningful data, not a robust
-      statistical floor.
+      The February 19 – March 7 volume gap is on us. The scraper orchestrator was committed in early March
+      but ran on manual triggers only; the hourly cron schedule landed April 22. For 14 of the 35 days when
+      Bug 1 was silently active in production, our scrapers captured fewer than 10 Claude posts per day. We
+      had no operational alarm telling us post volume had collapsed. That means the "Feb 15–18 baseline" is
+      four days of meaningful data, not a robust statistical floor.
     </p>
     <p>
-      The classifier itself is one of the tracked models. Sentiment runs through Gemini 2.5 Flash,
-      classifying posts about Gemini's main competitor.
+      The classifier itself is one of the tracked models. Sentiment runs through Gemini 2.5 Flash, classifying
+      posts about its competitors, Claude included.
       <sup id="ref-1">
         <a href="#note-1" aria-label="See footnote 1">
           [1]
@@ -225,10 +212,10 @@ const ClaudeApril2026Body = () => (
 
     <h2>Methodology</h2>
     <p>
-      LLM Vibes scrapes posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across six social platforms:
-      Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (5
-      instances), and Lemmy (2 instances). The orchestrator runs once an hour and the scoring pipeline aggregates
-      a daily 0–100 score per model.
+      LLM Vibes scrapes posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across five social platforms:
+      Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), and Mastodon (5
+      instances). The orchestrator runs once an hour and the scoring pipeline aggregates a daily 0–100 score per
+      model.
     </p>
     <p>
       Each post is classified for sentiment and complaint category by Gemini 2.5 Flash via the Google AI
@@ -255,9 +242,8 @@ const ClaudeApril2026Body = () => (
       <code>supabase/functions/_shared/</code>.
     </p>
     <p>
-      The next incident write-up will go out within 24 hours of the next ≥3σ score drop on any tracked model.
-      Watch the <a href="/dashboard">dashboard</a> or follow the{" "}
-      <ExternalLink href="https://github.com/dkships/llm-moods">GitHub repo</ExternalLink>.
+      The next iteration of LLM Vibes will compute recovery-shape divergence as a first-class metric: a single
+      number that flags when one model keeps falling while peers recover. The repo is open; PRs welcome.
     </p>
 
     <h2 id="notes">Notes</h2>
@@ -275,6 +261,8 @@ const ClaudeApril2026Body = () => (
       Gemini would produce. The risk is structural, and disclosing it is the obligation; spot-checking it is
       the next build item.
     </p>
+
+    <AuthorBio />
   </>
 );
 

@@ -79,7 +79,7 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     title: "How LLM Vibes Classifies Sentiment",
     publishedAt: "2026-04-25",
     summary:
-      "The full pipeline from scraper to score. Six platforms, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we've documented but not yet solved.",
+      "The full pipeline from scraper to score. Five platforms, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we've documented but not yet solved.",
     author: "David Kelly",
     tags: ["methodology"],
     ogImage: "/research/how-llm-vibes-classifies-sentiment/og.png",

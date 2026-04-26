@@ -5,6 +5,7 @@
  */
 
 import EmbeddedModelChart from "@/components/research/EmbeddedModelChart";
+import AuthorBio from "@/components/research/AuthorBio";
 
 const ExternalLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <a href={href} target="_blank" rel="noopener noreferrer">
@@ -121,15 +122,15 @@ const CrossModelDeltasBody = () => (
       Reddit and Twitter; Claude pulls in a more developer-skewed cohort that's more demanding and more vocal.
       The volume-weighted score reflects both quality and audience tolerance. Bug-window deltas alone can't
       separate "the underlying model regressed" from "an audience that complains more loudly than usual got an
-      excuse to do it" — both produce the same drop.
+      excuse to do it." Both produce the same drop.
     </p>
     <p>
       Press-cycle echo. When a story goes mainstream (VentureBeat, Fortune, Hacker News, The Register), the wave
       of "X is broken" posts arrives <em>after</em> the fix. Our scrapers pick up that echo for every model
-      visible in the news cycle. The interesting question isn't who showed up in the press wave — it's who
-      <em> kept</em> sliding through it. A model whose post-fix score recovers toward baseline (ChatGPT,
-      Gemini) is a model where the press-cycle posts are stale complaints. A model whose post-fix score keeps
-      falling (Claude) is a model where the underlying complaints are still arriving.
+      visible in the news cycle. The interesting question isn't who showed up in the press wave. It's who{" "}
+      <em>kept</em> sliding through it. A model whose post-fix score recovers toward baseline (ChatGPT, Gemini)
+      is a model where the press-cycle posts are stale complaints. A model whose post-fix score keeps falling
+      (Claude) is a model where the underlying complaints are still arriving.
     </p>
     <p>
       Vendor-wide trends. When all four models drop together during the same week, that's industry sentiment,
@@ -184,11 +185,12 @@ const CrossModelDeltasBody = () => (
       to the underlying data; the baselines themselves are the weakest part of the table.
     </p>
     <p>
-      The lesson from March 2026 isn't that LLM Vibes caught Claude breaking from the leaderboard or even from
-      the bug-window delta. We caught it by watching what happened after Anthropic said it was fixed — and by
-      noticing that one model's score didn't behave like the other three. Build the same instinct into how
-      you read the dashboard.
+      The lesson from March 2026: LLM Vibes caught Claude breaking by watching what happened <em>after</em>{" "}
+      Anthropic said it was fixed. One model's score didn't behave like the other three. Build the same instinct
+      into how you read the dashboard.
     </p>
+
+    <AuthorBio />
   </>
 );
 

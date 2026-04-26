@@ -99,9 +99,19 @@ const ResearchPostPage = () => {
               </Link>
 
               <header className="mb-8 border-b border-border pb-8">
-                <p className="font-mono text-xs uppercase tracking-wide text-text-tertiary">
-                  {formatDate(post.publishedAt)} · {post.author}
-                </p>
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs uppercase tracking-wide text-text-tertiary">
+                  <span>
+                    {formatDate(post.publishedAt)} · {post.author}
+                  </span>
+                  {post.updatedAt && post.updatedAt !== post.publishedAt && (
+                    <span
+                      className="rounded-full border border-border px-2 py-0.5 text-[10px] tracking-[0.1em]"
+                      title={`Last updated ${formatDate(post.updatedAt)}`}
+                    >
+                      Updated · {formatDate(post.updatedAt)}
+                    </span>
+                  )}
+                </div>
                 <h1 className="mt-3 text-3xl sm:text-4xl font-bold text-foreground">
                   {post.title}
                 </h1>
