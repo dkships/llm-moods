@@ -266,6 +266,7 @@ export type Database = {
       vibes_scores: {
         Row: {
           created_at: string
+          eligible_posts: number | null
           id: string
           model_id: string
           negative_count: number | null
@@ -279,6 +280,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          eligible_posts?: number | null
           id?: string
           model_id: string
           negative_count?: number | null
@@ -292,6 +294,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          eligible_posts?: number | null
           id?: string
           model_id?: string
           negative_count?: number | null
@@ -329,6 +332,7 @@ export type Database = {
         Args: never
         Returns: {
           accent_color: string
+          eligible_posts: number
           last_updated: string
           latest_score: number
           model_id: string
