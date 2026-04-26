@@ -23,7 +23,15 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 
 Edge functions that hit paid APIs (Gemini, Apify, etc.) MUST keep their `isInternalServiceRequest` gate. The repo and the anon key are public, so an ungated function is a public quota-burner. This came up in Phase 10B when Lovable's curl tool removed the gate from `reclassify-posts` to invoke it (the tool sends user JWT, not service-role) — Phase 11B re-added the gate after a $0.01-per-call attack vector was identified.
 
-If a one-shot reclassify or backfill is needed, run the call from Lovable's SQL prompt with explicit service-role auth (`Authorization: Bearer <service_role_key>` via `pg_net.http_post`). Do NOT remove the application-layer gate from these functions.
+If a one-shot reclassify or backfill is needed, the supported invocation path is a **temporary helper edge function**, not raw SQL:
+
+1. Create an ephemeral edge function (slug must NOT start with underscore) that reads `SUPABASE_SERVICE_ROLE_KEY` from `Deno.env` and forwards a Bearer-authenticated POST to the gated function (e.g. `reclassify-posts?mode=multi_model`).
+2. Invoke the helper via Lovable's `curl_edge_functions` (which sends user JWT, but the helper itself uses the service-role key for the downstream call).
+3. Delete the helper from the deployed function list after the run completes.
+
+**Why not raw SQL:** `current_setting('app.settings.service_role_key', true)` returns NULL in this Supabase environment, and Vault is empty. Pg_cron jobs get away with using the anon key only because their target endpoints (`run-scrapers`, `aggregate-vibes`, `cleanup-old-posts`) are intentionally ungated. The service-role key lives only in the edge-function runtime — verified Phase 12.
+
+Do NOT remove the application-layer gate from these functions to work around invocation friction.
 
 Functions that should stay gated: `reclassify-posts`, anything else that calls Gemini/Apify or performs unbounded writes.
 
