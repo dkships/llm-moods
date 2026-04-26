@@ -164,9 +164,13 @@ Deno.serve(async (req) => {
         summary.classified += storyClassifications.length;
         summary.irrelevant += storyClassifications.filter((classification) => !classification.relevant).length;
 
+        // Phase 12 G-prime: only run targeted classifier on multi-model posts.
+        // Single-model posts use baseClassification via the existing fallback at
+        // the per-slug upsert site below.
         const targetedItems: { idx: number; slug: string }[] = [];
         for (let i = 0; i < storyCandidates.length; i++) {
           if (!storyClassifications[i].relevant) continue;
+          if (storyCandidates[i].matchedSlugs.length < 2) continue;
           for (const slug of storyCandidates[i].matchedSlugs) {
             targetedItems.push({ idx: i, slug });
           }

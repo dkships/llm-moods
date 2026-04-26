@@ -233,9 +233,16 @@ Deno.serve(async (req) => {
         summary.classified += classifications.length;
         summary.irrelevant += classifications.filter((classification) => !classification.relevant).length;
 
+        // Phase 12 G-prime: only run the targeted classifier pass on
+        // multi-model posts (matchedSlugs.length >= 2). The targeted prompt's
+        // contrast guidance only matters when there's a contrast; for single-
+        // model posts it produces the same sentiment as the base pass.
+        // The per-slug upsert site falls back to baseClassification when no
+        // targeted result is present, so single-model posts still get stored.
         const targetedItems: { idx: number; slug: string }[] = [];
         for (let index = 0; index < candidates.length; index++) {
           if (!classifications[index].relevant) continue;
+          if (candidates[index].matchedSlugs.length < 2) continue;
           for (const slug of candidates[index].matchedSlugs) {
             targetedItems.push({ idx: index, slug });
           }

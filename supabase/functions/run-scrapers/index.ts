@@ -21,7 +21,6 @@ const SCRAPERS = [
   "scrape-bluesky",
   "scrape-twitter",
   "scrape-mastodon",
-  "scrape-lemmy",
 ];
 
 const NIGHTLY_REAGGREGATE_TIME = "02:30";

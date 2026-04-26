@@ -41,7 +41,7 @@ Functions safe to leave ungated (called by pg_cron with anon key): `aggregate-vi
 | State | TanStack React Query 5.83 |
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Edge Functions | 12 Deno functions (6 active scrapers + utilities) |
+| Edge Functions | 11 Deno functions (5 active scrapers + utilities) |
 | Sentiment AI | Gemini 2.5 Flash via Google AI API (batch classification, 25 posts/call) |
 
 ## Key Routes
@@ -76,7 +76,7 @@ Functions safe to leave ungated (called by pg_cron with anon key): `aggregate-vi
 
 ## Scrapers (Edge Functions)
 
-Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances), Lemmy (public API, 2 instances). Orchestrated by `run-scrapers` (batches of 3). pg_cron schedules the orchestrator hourly (cron `0 * * * *`) but the orchestrator only does a real fetch on three Pacific-time windows per day (05:00, 14:00, 21:00) — the other 21 hourly invocations return `{"status":"skipped","reason":"outside_window"}` in milliseconds. The hourly trigger landed on Apr 22 2026 (`supabase/migrations/20260422120000_schedule_run_scrapers_hourly.sql`); before that the orchestrator code shipped without a schedule for 17 days.
+Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances). Lemmy was dropped in Phase 12 (yielded 0.4 posts/run for 18 wasted Gemini calls; mostly Reddit cross-posts). Orchestrated by `run-scrapers` (batches of 3). pg_cron schedules the orchestrator hourly (cron `0 * * * *`) but the orchestrator only does a real fetch on three Pacific-time windows per day (05:00, 14:00, 21:00) — the other 21 hourly invocations return `{"status":"skipped","reason":"outside_window"}` in milliseconds. The hourly trigger landed on Apr 22 2026 (`supabase/migrations/20260422120000_schedule_run_scrapers_hourly.sql`); before that the orchestrator code shipped without a schedule for 17 days.
 
 Shared utilities (keyword matching, dedup, error logging) are in `_shared/utils.ts` — scrapers import from there instead of duplicating code.
 
