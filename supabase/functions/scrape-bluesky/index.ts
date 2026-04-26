@@ -22,6 +22,9 @@ import {
 } from "../_shared/utils.ts";
 
 const SOURCE = "scrape-bluesky";
+// Sentiment-targeted terms balance discovery across all four tracked models.
+// Without "Gemini sucks" / "Grok worse" style queries, Bluesky's sort=latest
+// returned far fewer relevant posts for those two — see Phase 10 audit.
 const SEARCH_TERMS = [
   "Claude AI",
   "ChatGPT",
@@ -30,6 +33,11 @@ const SEARCH_TERMS = [
   "Grok AI",
   "Claude dumb",
   "ChatGPT worse",
+  "Gemini bad",
+  "Gemini sucks",
+  "Grok worse",
+  "Grok sucks",
+  "Bard AI",
 ];
 
 async function fetchWithTimeout(

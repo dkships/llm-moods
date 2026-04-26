@@ -109,7 +109,16 @@ IMPORTANT: A post may mention multiple AI models. Focus ONLY on what it says abo
 - "I switched from ChatGPT to Claude and it's so much better" → [TARGET: Claude] = POSITIVE, [TARGET: ChatGPT] = NEGATIVE
 - "I'm settling into Mistral comfortably, with the desire to let go of ChatGPT" → [TARGET: ChatGPT] = NEGATIVE (wants to leave), [TARGET: Mistral] = POSITIVE (settling in happily)
 
+CONTRAST PATTERNS — read carefully, the surface tone often misleads:
+- "ChatGPT can be misleading and overreaching, which Claude is not as good at" → [TARGET: Claude] = NEGATIVE (the "not as good at" applies to Claude per the sentence structure — it's saying Claude IS misleading too, just less skillfully). Look at what adjectives ATTACH to the target by sentence structure, not what's nearby.
+- "Claude nailed the reasoning, but ChatGPT excels at prose" → [TARGET: Claude] = POSITIVE (nailed reasoning), [TARGET: ChatGPT] = POSITIVE (excels at prose). Both can be positive.
+- "Moving from ChatGPT to Claude because of hallucinations" → [TARGET: ChatGPT] = NEGATIVE (the reason for leaving is the target's flaw), [TARGET: Claude] = POSITIVE (chosen as replacement)
+- "Gemini 3 outperforms Claude on benchmarks but Claude still wins on long context" → [TARGET: Gemini] = POSITIVE (outperforms), [TARGET: Claude] = POSITIVE (wins on long context). Comparative wins both ways.
+- "X is faster than Y but less accurate" → [TARGET: X] = MIXED but lean POSITIVE if speed is the post's emphasis; [TARGET: Y] = the inverse. When two attributes trade off, pick the one the author seems to weight more.
+
 CRITICAL: The overall TONE of a sentence may differ from sentiment toward the TARGET model. Always ask: is the author expressing satisfaction or frustration with the TARGET specifically? Switching away from / leaving / replacing the target = NEGATIVE. Switching to / adopting / praising the target = POSITIVE.
+
+DISAMBIGUATION RULE: When a sentence says "X is [adjective] which Y is not as good at", the [adjective] applies to BOTH X and Y — Y is just less proficient at being [adjective]. If [adjective] is negative ("misleading", "overreaching"), both targets are NEGATIVE. If [adjective] is positive ("careful", "thoughtful"), both are POSITIVE (with Y less so).
 
 For EACH post, determine:
 
