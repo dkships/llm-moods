@@ -4,7 +4,7 @@
 
 ## Project Overview
 
-Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 6 social platforms. Scores models 0-100 daily based on scraped post sentiment.
+Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 5 social platforms. Scores models 0-100 daily based on scraped post sentiment.
 
 **Live at:** llmvibes.ai (Lovable-hosted)
 
@@ -105,7 +105,8 @@ Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`)
 - **Anomaly detection:** `src/hooks/useScoreAnomalies.ts` runs a 14-day rolling z-score in the browser over `vibes_scores`. Surfaced in the dev-only `/admin/scrapers` Anomalies panel and cross-referenced against Official Status events on `/model/:slug` via `src/lib/status-correlation.ts`.
 - **Official Status integration:** `supabase/functions/fetch-vendor-status` parses Anthropic + OpenAI Atom feeds and Google Cloud incidents.json, returns the last 30 days. `useVendorStatus()` + `<StatusCard />` render the result in the left column under the chart for all four model pages. xAI shows a "no public status feed" empty state.
 - **Research articles:** `src/data/research-posts.ts` carries typed-TS `ResearchPost` entries with markdown bodies. The body's ```chart-model``` fenced code block is intercepted by `src/components/research/EmbeddedModelChart.tsx` and replaced with a live model chart. Article + Dataset JSON-LD emitted via the extended `useHead.jsonLd` field.
-- **OG image generator:** `src/pages/OgPreview.tsx` (dev-only `/og/:slug`) renders a 1200×630 card; we capture screenshots into `public/research/<slug>/og.png` and reference via `ResearchPost.ogImage`.
+- **OG image generator:** `src/pages/OgPreview.tsx` (dev-only `/og/:slug`) renders a 1200×630 card; we capture screenshots into `public/research/<slug>/og.png` and reference via `ResearchPost.ogImage`. Colors are pinned in a top-of-file `OG_THEME` constant — intentionally decoupled from runtime CSS vars (capture path is fragile across viewport changes); update by hand and re-capture if the runtime palette shifts.
+- **Shared design primitives (Apr 2026 polish pass, PRs #5/#7):** `src/components/Surface.tsx` is the canonical card wrapper around the `glass` utility (sizes `default | compact | tight | bare`, `tone="accent"` for the left-border highlight, `motion="fade"` opts in to `animate-fade-in`, calm `hover:border-border/80` baked in). `src/components/FilterChip.tsx` (rect or pill) replaces ad-hoc filter buttons. `src/components/SectionHeader.tsx` and `src/components/PageHeader.tsx` standardize H2/H1 markup. Use these instead of writing `glass rounded-xl p-6` inline. Sentiment colors derive from the single `SENTIMENT_HSL` constant in `src/lib/vibes.ts`; do not reintroduce hex literals or palette classes (`#EF4444`, `text-red-200`, etc.) for sentiment states. Aesthetic direction is restraint — one page-level fade per render, no per-section staggers, single calm border-color hover.
 
 **Edge Function deployment:** Pushing to `main` triggers Lovable auto-sync for frontend. Edge Functions require a Lovable-side redeploy — prompt Lovable to sync from GitHub and redeploy the affected functions. Do not use `supabase` CLI (no independent Supabase account exists).
 
@@ -146,7 +147,8 @@ npm run test         # Vitest
 - **Prefetching:** Hover on model cards prefetches detail data
 - **React Query:** 60s stale time for most queries, 30s for scraper monitor
 - **Infinite scroll:** Chatter posts (25/page cursor-based on `posted_at`)
-- **Sentiment scale:** 0-40 bad (red), 41-65 mixed (amber), 66-100 good (green)
+- **Sentiment scale:** 0-40 bad (red), 41-65 mixed (amber), 66-100 good (green) — colors flow through `SENTIMENT_HSL` in `src/lib/vibes.ts`
+- **Muted text convention:** `text-foreground` for primary statements / scores / headings, `text-text-secondary` for body, `text-text-tertiary` for meta / captions / labels. Avoid arbitrary `text-foreground/{60..90}` opacities in new code (Tailwind aliases live in `tailwind.config.ts`).
 - **Head management:** `useHead` hook (`src/hooks/useHead.ts`) sets per-route title, description, OG tags, and canonical URL by mutating existing `<head>` tags in `index.html`
 - **Sitemap:** `public/sitemap.xml` is static — update manually when adding/removing tracked models
 
