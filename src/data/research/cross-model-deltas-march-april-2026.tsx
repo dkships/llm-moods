@@ -185,6 +185,13 @@ const CrossModelDeltasBody = () => (
       to the underlying data; the baselines themselves are the weakest part of the table.
     </p>
     <p>
+      The classifier is Gemini 2.5 Flash, which scores all four models including itself. We measured the
+      self-bias risk directly in April 2026. 50 Gemini-on-Gemini posts re-classified through Claude Sonnet
+      4.6 showed 91.9% sentiment agreement and 0.13 average confidence delta. No meaningful self-bias at the
+      sentiment level. Full method and complaint-category caveats are in the{" "}
+      <a href="/research/how-llm-vibes-classifies-sentiment">methodology post</a>.
+    </p>
+    <p>
       The lesson from March 2026: LLM Vibes caught Claude breaking by watching what happened <em>after</em>{" "}
       Anthropic said it was fixed. One model's score didn't behave like the other three. Build the same instinct
       into how you read the dashboard.
