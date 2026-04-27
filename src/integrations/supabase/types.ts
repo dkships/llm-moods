@@ -14,6 +14,33 @@ export type Database = {
   }
   public: {
     Tables: {
+      api_quota_usage: {
+        Row: {
+          bucket_start: string
+          bucket_type: string
+          provider: string
+          quota_key: string
+          updated_at: string
+          used_count: number
+        }
+        Insert: {
+          bucket_start: string
+          bucket_type: string
+          provider: string
+          quota_key: string
+          updated_at?: string
+          used_count?: number
+        }
+        Update: {
+          bucket_start?: string
+          bucket_type?: string
+          provider?: string
+          quota_key?: string
+          updated_at?: string
+          used_count?: number
+        }
+        Relationships: []
+      }
       error_log: {
         Row: {
           context: string | null
@@ -263,11 +290,36 @@ export type Database = {
           },
         ]
       }
+      service_locks: {
+        Row: {
+          lock_key: string
+          locked_until: string
+          owner: string
+          updated_at: string
+        }
+        Insert: {
+          lock_key: string
+          locked_until: string
+          owner: string
+          updated_at?: string
+        }
+        Update: {
+          lock_key?: string
+          locked_until?: string
+          owner?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       vibes_scores: {
         Row: {
+          carried_from_period_start: string | null
           created_at: string
           eligible_posts: number | null
           id: string
+          input_max_created_at: string | null
+          input_max_posted_at: string | null
+          measurement_period_start: string | null
           model_id: string
           negative_count: number | null
           neutral_count: number | null
@@ -275,13 +327,19 @@ export type Database = {
           period_start: string
           positive_count: number | null
           score: number
+          score_basis_status: string
+          score_computed_at: string
           top_complaint: string | null
           total_posts: number | null
         }
         Insert: {
+          carried_from_period_start?: string | null
           created_at?: string
           eligible_posts?: number | null
           id?: string
+          input_max_created_at?: string | null
+          input_max_posted_at?: string | null
+          measurement_period_start?: string | null
           model_id: string
           negative_count?: number | null
           neutral_count?: number | null
@@ -289,13 +347,19 @@ export type Database = {
           period_start: string
           positive_count?: number | null
           score: number
+          score_basis_status?: string
+          score_computed_at?: string
           top_complaint?: string | null
           total_posts?: number | null
         }
         Update: {
+          carried_from_period_start?: string | null
           created_at?: string
           eligible_posts?: number | null
           id?: string
+          input_max_created_at?: string | null
+          input_max_posted_at?: string | null
+          measurement_period_start?: string | null
           model_id?: string
           negative_count?: number | null
           neutral_count?: number | null
@@ -303,6 +367,8 @@ export type Database = {
           period_start?: string
           positive_count?: number | null
           score?: number
+          score_basis_status?: string
+          score_computed_at?: string
           top_complaint?: string | null
           total_posts?: number | null
         }
@@ -321,6 +387,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_api_quota: {
+        Args: {
+          p_daily_limit: number
+          p_minute_limit: number
+          p_provider: string
+          p_quota_key: string
+        }
+        Returns: {
+          allowed: boolean
+          daily_used: number
+          minute_used: number
+          reason: string
+        }[]
+      }
       get_complaint_breakdown: {
         Args: { p_model_id: string }
         Returns: {
@@ -332,13 +412,24 @@ export type Database = {
         Args: never
         Returns: {
           accent_color: string
+          carried_from_period_start: string
           eligible_posts: number
           last_updated: string
+          latest_post_ingested_at: string
+          latest_post_posted_at: string
           latest_score: number
+          latest_score_eligible_posts: number
+          latest_score_total_posts: number
+          measurement_period_start: string
           model_id: string
           model_name: string
           model_slug: string
           previous_score: number
+          recent_posts_7d: number
+          score_basis_status: string
+          score_computed_at: string
+          score_period_end: string
+          score_period_start: string
           top_complaint: string
           total_posts: number
         }[]
@@ -405,6 +496,14 @@ export type Database = {
           pct_change: number
           this_week: number
         }[]
+      }
+      release_service_lock: {
+        Args: { p_lock_key: string; p_owner: string }
+        Returns: undefined
+      }
+      try_claim_service_lock: {
+        Args: { p_lock_key: string; p_owner: string; p_ttl_seconds?: number }
+        Returns: boolean
       }
     }
     Enums: {
