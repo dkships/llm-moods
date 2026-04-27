@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted, isClassifierFailure } from "../_shared/classifier.ts";
+import { abortApifyRun, apifyRunUrl, checkApifyBudget, scrubApifyRun } from "../_shared/apify-budget.ts";
 import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "../_shared/taxonomy.ts";
 import {
   createRunRecord,
@@ -26,16 +27,12 @@ import {
   isDuplicate,
   logToErrorLog,
   logZeroDataWarning,
-  triggerAggregateVibes,
   upsertScrapedPost,
 } from "../_shared/utils.ts";
 
 const SOURCE = "scrape-twitter";
 const DEFAULT_SEARCH_TERMS = [
-  `("claude" OR "claude ai" OR "claude code" OR anthropic) lang:en -filter:retweets`,
-  `("chatgpt" OR "chat gpt" OR "openai gpt" OR openai) lang:en -filter:retweets`,
-  `("gemini" OR "google gemini" OR "gemini ai") lang:en -filter:retweets`,
-  `("grok" OR "grok ai" OR "xai grok") lang:en -filter:retweets`,
+  `("claude" OR "claude ai" OR "claude code" OR anthropic OR "chatgpt" OR "chat gpt" OR "openai gpt" OR openai OR "gemini" OR "google gemini" OR "gemini ai" OR "grok" OR "grok ai" OR "xai grok") lang:en -filter:retweets`,
 ];
 
 const GROK_SEARCH_PROMPT = `Search X/Twitter for recent posts (last 24 hours) about these AI models: Claude, ChatGPT, GPT-4, GPT-4o, Gemini, Grok.
@@ -69,9 +66,11 @@ function buildTwitterSummary(backend: "apify" | "grok") {
     posts_found: 0,
     filtered_candidates: 0,
     classified: 0,
+    classification_success: 0,
     net_new_rows: 0,
     duplicate_conflicts: 0,
     irrelevant: 0,
+    classifierErrors: 0,
     dedupSkipped: 0,
     contentSkipped: 0,
     errors: [] as string[],
@@ -95,8 +94,22 @@ async function runApifyPath(
     sort: getConfigValue(config, "sort_mode", "Latest"),
     maxItems: getConfigNumber(config, "max_items", 50),
   };
+  const budget = await checkApifyBudget(apifyToken);
+  if (!budget.allowed) {
+    return {
+      ...summary,
+      status: "skipped",
+      skipped: true,
+      reason: budget.reason,
+      errors: [`Apify budget guard skipped run: ${budget.reason}`],
+      apifyBudget: budget.usage,
+    };
+  }
 
-  const startRes = await fetch(`https://api.apify.com/v2/acts/apidojo~tweet-scraper/runs?token=${apifyToken}`, {
+  const startRes = await fetch(apifyRunUrl("apidojo~tweet-scraper", apifyToken, apifyInput.maxItems, {
+    timeoutSecs: 180,
+    maxTotalChargeUsd: 0.15,
+  }), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(apifyInput),
@@ -120,27 +133,39 @@ async function runApifyPath(
   const runData = await startRes.json();
   const apifyRunId = runData.data?.id;
   const datasetId = runData.data?.defaultDatasetId;
+  (summary as any).apifyUsage = scrubApifyRun(runData.data);
   if (!apifyRunId || !datasetId) {
     await logToErrorLog(supabase, SOURCE, "No runId/datasetId from Apify", "apify-error");
     throw new Error("Missing runId from Apify");
   }
 
   let runStatus = "";
+  let terminalRunData: any = null;
   for (let i = 0; i < 18; i++) {
     await delay(10000);
     const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${apifyToken}`);
     if (!statusRes.ok) continue;
     const statusData = await statusRes.json();
     runStatus = statusData.data?.status || "";
-    if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(runStatus)) break;
+    if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(runStatus)) {
+      terminalRunData = statusData.data;
+      (summary as any).apifyUsage = scrubApifyRun(terminalRunData);
+      break;
+    }
   }
 
-  if (!["SUCCEEDED", "ABORTED"].includes(runStatus)) {
+  if (runStatus !== "SUCCEEDED") {
     let errorDetail = "";
+    if (!runStatus) {
+      const abortMetadata = await abortApifyRun(apifyToken, apifyRunId);
+      (summary as any).apifyUsage = abortMetadata ?? (summary as any).apifyUsage;
+      runStatus = "TIMED-OUT";
+    }
     try {
       const detailRes = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${apifyToken}`);
       if (detailRes.ok) {
         const detailData = await detailRes.json();
+        (summary as any).apifyUsage = scrubApifyRun(detailData.data);
         errorDetail = detailData.data?.statusMessage || detailData.data?.exitCode || "";
       }
     } catch {}
@@ -160,6 +185,8 @@ async function runApifyPath(
   const items = rawItems.filter((item: any) => item.text || item.full_text);
   summary.apify_items_fetched = rawItems.length;
   summary.posts_found = items.length;
+  (summary as any).apifyUsage = scrubApifyRun(terminalRunData);
+  (summary as any).apifyBudget = budget.usage;
   await logToErrorLog(supabase, SOURCE, `Apify raw=${rawItems.length} tweets=${items.length}`, "apify-debug");
 
   const cutoff = new Date(Date.now() - 24 * 3600000);
@@ -235,7 +262,12 @@ async function runApifyPath(
   };
   const classifications = await classifyBatch(candidates.map((candidate) => candidate.text), geminiApiKey, 25, twitterLogError);
   summary.classified = classifications.length;
-  summary.irrelevant = classifications.filter((classification) => !classification.relevant).length;
+  summary.classification_success = classifications.filter((classification) => !isClassifierFailure(classification)).length;
+  summary.classifierErrors = classifications.filter(isClassifierFailure).length;
+  summary.irrelevant = classifications.filter((classification) => !classification.relevant && !isClassifierFailure(classification)).length;
+  if (summary.classifierErrors > 0) {
+    summary.errors.push(`Classifier failed for ${summary.classifierErrors}/${classifications.length} candidates`);
+  }
 
   // Phase 12 G-prime: only run targeted classifier on multi-model posts.
   // Single-model posts use baseClassification via the existing fallback at
@@ -258,15 +290,19 @@ async function runApifyPath(
     : [];
   const targetedMap = new Map<string, typeof classifications[0]>();
   targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
+  const targetedClassifierErrors = targetedResults.filter(isClassifierFailure).length;
+  if (targetedClassifierErrors > 0) {
+    summary.errors.push(`Targeted classifier failed for ${targetedClassifierErrors}/${targetedResults.length} candidates`);
+  }
 
   for (let i = 0; i < candidates.length; i++) {
     const baseClassification = classifications[i];
-    if (!baseClassification.relevant) continue;
+    if (!baseClassification.relevant || isClassifierFailure(baseClassification)) continue;
     const candidate = candidates[i];
 
     for (const slug of candidate.matchedSlugs) {
       const classification = targetedMap.get(`${i}:${slug}`) || baseClassification;
-      if (!classification.relevant) continue;
+      if (!classification.relevant || isClassifierFailure(classification)) continue;
       const modelId = modelMap[slug];
       if (!modelId || isDuplicate(titleKeys, candidate.title, modelId)) continue;
 
@@ -402,7 +438,11 @@ async function runGrokPath(
     const confidence = typeof post.confidence === "number" && post.confidence >= 0 && post.confidence <= 1
       ? post.confidence
       : 0.5;
-    const postedAt = post.posted_at ? new Date(post.posted_at).toISOString() : new Date().toISOString();
+    if (!post.posted_at || Number.isNaN(new Date(post.posted_at).getTime())) {
+      summary.contentSkipped++;
+      continue;
+    }
+    const postedAt = new Date(post.posted_at).toISOString();
 
     for (const slug of matchedSlugs) {
       const modelId = modelMap[slug];
@@ -555,6 +595,10 @@ Deno.serve(async (req) => {
       metadata: {
         backend: summary.backend,
         irrelevant: summary.irrelevant,
+        classifier_errors: summary.classifierErrors,
+        classification_success: summary.classification_success,
+        apify_usage: (summary as any).apifyUsage ?? null,
+        apify_budget: (summary as any).apifyBudget ?? null,
         dedup_skipped: summary.dedupSkipped,
         content_skipped: summary.contentSkipped,
         skipped_reason: (summary as any).reason ?? null,
@@ -575,10 +619,6 @@ Deno.serve(async (req) => {
       status: derived.status,
       posts_classified: derived.posts_classified,
     };
-
-    if (!body.orchestrated && derived.status !== "skipped") {
-      await triggerAggregateVibes(supabase, SOURCE, { reason: "standalone_run" });
-    }
 
     return new Response(JSON.stringify(responseBody, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

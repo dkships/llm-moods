@@ -11,6 +11,17 @@ import { getPacificDayWindowSince } from "@/lib/pacific-day";
 // then we widen with a manual extension so the hook compiles in either state.
 type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Returns"][number] & {
   eligible_posts?: number | null;
+  score_computed_at?: string | null;
+  score_period_start?: string | null;
+  score_period_end?: string | null;
+  latest_score_total_posts?: number | null;
+  latest_score_eligible_posts?: number | null;
+  recent_posts_7d?: number | null;
+  latest_post_posted_at?: string | null;
+  latest_post_ingested_at?: string | null;
+  score_basis_status?: string | null;
+  measurement_period_start?: string | null;
+  carried_from_period_start?: string | null;
 };
 type ScrapedPostRow = Database["public"]["Tables"]["scraped_posts"]["Row"];
 type ModelRow = Database["public"]["Tables"]["models"]["Row"];
@@ -48,10 +59,18 @@ export interface ModelWithVibes {
   sparkline: SparklinePoint[];
   topComplaint: string | null;
   totalPosts: number;
+  latestScoreTotalPosts: number;
+  recentPosts7d: number;
   /** Eligible posts (confidence ≥ 0.65) backing the latest score. Drives the
    *  confidence tier chip on dashboard cards and headers. */
   eligiblePosts: number;
   lastUpdated: string | null;
+  scoreComputedAt: string | null;
+  scorePeriodStart: string | null;
+  scorePeriodEnd: string | null;
+  scoreBasisStatus: string;
+  measurementPeriodStart: string | null;
+  carriedFromPeriodStart: string | null;
   /** Latest daily row had zero scraped posts — score is carried forward from
    * the previous day. UI should soften the trend chip and mark the chart point. */
   isLatestCarryForward: boolean;
@@ -122,10 +141,18 @@ export function useModelsWithLatestVibes() {
           },
           sparkline,
           topComplaint,
-          totalPosts: m.total_posts ?? 0,
-          eligiblePosts: m.eligible_posts ?? 0,
-          lastUpdated: m.last_updated ?? null,
-          isLatestCarryForward,
+          totalPosts: m.recent_posts_7d ?? m.total_posts ?? 0,
+          latestScoreTotalPosts: m.latest_score_total_posts ?? 0,
+          recentPosts7d: m.recent_posts_7d ?? m.total_posts ?? 0,
+          eligiblePosts: m.latest_score_eligible_posts ?? m.eligible_posts ?? 0,
+          lastUpdated: m.score_computed_at ?? m.last_updated ?? null,
+          scoreComputedAt: m.score_computed_at ?? m.last_updated ?? null,
+          scorePeriodStart: m.score_period_start ?? null,
+          scorePeriodEnd: m.score_period_end ?? null,
+          scoreBasisStatus: m.score_basis_status ?? (isLatestCarryForward ? "carried_forward" : "measured"),
+          measurementPeriodStart: m.measurement_period_start ?? null,
+          carriedFromPeriodStart: m.carried_from_period_start ?? null,
+          isLatestCarryForward: (m.score_basis_status ?? null) === "carried_forward" || isLatestCarryForward,
         };
       });
     },

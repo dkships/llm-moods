@@ -3,6 +3,7 @@ import {
   createRunRecord,
   deriveRunMetrics,
   getConfiguredWindows,
+  isInternalServiceRequest,
   isUniqueViolation,
   loadScraperConfig,
   readJsonBody,
@@ -26,6 +27,13 @@ const SCRAPERS = [
 const NIGHTLY_REAGGREGATE_TIME = "02:30";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const SOURCE_WINDOW_TIMES: Record<string, string[]> = {
+  "scrape-hackernews": ["05:00", "11:00", "17:00", "23:00"],
+  "scrape-bluesky": ["05:00", "11:00", "17:00", "23:00"],
+  "scrape-mastodon": ["05:00", "11:00", "17:00", "23:00"],
+  "scrape-twitter": ["05:00", "14:00", "21:00"],
+  "scrape-reddit-apify": ["05:00", "14:00", "21:00"],
+};
 
 interface InvocationResult {
   ok: boolean;
@@ -49,13 +57,27 @@ interface ScraperResult {
   body: any;
 }
 
+function asStringArray(value: unknown): string[] {
+  return Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+}
+
 // Per-scraper wall-clock budget. Recent successful Bluesky / Reddit-Apify /
-// Lemmy runs complete in 60-180s; 120s catches genuine hangs (which left
-// "running" rows for hours both 05:00 PDT and 14:00 PDT today) while letting
-// normal slow runs finish. AbortError throws back to runScraper's catch
-// block (line ~121), which records status="failed" and lets Promise.all
-// progress so the orchestrator finalizes cleanly.
+// HN runs complete in 60-180s; 120s catches genuine hangs while letting normal
+// slow runs finish. AbortError throws back to runScraper's catch block, which
+// records status="failed" and lets the orchestrator finalize cleanly.
 const INVOKE_TIMEOUT_MS = 120_000;
+const INVOKE_TIMEOUT_BY_SCRAPER: Record<string, number> = {
+  "scrape-reddit-apify": 540_000,
+  "scrape-twitter": 420_000,
+};
+
+function stableWindowLabel(time: string): string {
+  return `window_${time.replace(":", "")}`;
+}
+
+function timeoutForScraper(name: string): number {
+  return INVOKE_TIMEOUT_BY_SCRAPER[name] ?? INVOKE_TIMEOUT_MS;
+}
 
 async function invokeFunction(
   name: string,
@@ -101,7 +123,7 @@ async function runScraper(
   const started_at = new Date().toISOString();
 
   try {
-    const result = await invokeFunction(name, payload);
+    const result = await invokeFunction(name, payload, timeoutForScraper(name));
     const completed_at = new Date().toISOString();
 
     if (!result.ok) {
@@ -156,13 +178,14 @@ async function runScraper(
 
 async function findExistingRun(
   supabase: any,
+  source: string,
   windowLabel: string,
   windowLocalDate: string,
 ) {
   const { data } = await supabase
     .from("scraper_runs")
     .select("id, status, started_at, metadata")
-    .eq("source", "run-scrapers")
+    .eq("source", source)
     .eq("window_label", windowLabel)
     .eq("window_local_date", windowLocalDate)
     .order("started_at", { ascending: false })
@@ -171,29 +194,16 @@ async function findExistingRun(
   return data;
 }
 
-async function findActiveRun(supabase: any) {
+async function findActiveRun(supabase: any, source = "run-scrapers") {
   const { data } = await supabase
     .from("scraper_runs")
     .select("id, status, started_at, window_label, window_local_date")
-    .eq("source", "run-scrapers")
+    .eq("source", source)
     .eq("status", "running")
     .order("started_at", { ascending: false })
     .limit(1)
     .maybeSingle();
   return data;
-}
-
-async function aggregateWithRetry(payload: Record<string, unknown>) {
-  // Aggregate-vibes runs 4 models × (daily + 24 hourly) queries — give it a
-  // longer budget than the per-scraper default so a slow but healthy run
-  // doesn't get cut off mid-loop.
-  for (let attempt = 1; attempt <= 3; attempt++) {
-    const result = await invokeFunction("aggregate-vibes", payload, 240_000);
-    if (result.ok) {
-      return { status: "success", attempts: attempt, response: result.body };
-    }
-  }
-  return { status: "failed", attempts: 3, response: null };
 }
 
 async function finalizeOrchestratorRun(
@@ -219,6 +229,25 @@ async function finalizeOrchestratorRun(
     metadata,
     completed_at: new Date().toISOString(),
   });
+}
+
+async function findExistingSourceWindow(
+  supabase: any,
+  source: string,
+  windowLabel: string,
+  windowLocalDate: string,
+) {
+  const { data } = await supabase
+    .from("scraper_runs")
+    .select("id, status, started_at, completed_at")
+    .eq("source", source)
+    .eq("run_kind", "scraper")
+    .eq("window_label", windowLabel)
+    .eq("window_local_date", windowLocalDate)
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  return data;
 }
 
 async function handleNightlyReaggregate(
@@ -258,7 +287,7 @@ async function handleNightlyReaggregate(
         };
       }
 
-      const existingRun = await findExistingRun(supabase, "nightly", nightlyWindow.localDate);
+      const existingRun = await findExistingRun(supabase, "run-scrapers", "nightly", nightlyWindow.localDate);
       if (existingRun) {
         return {
           status: "skipped",
@@ -304,6 +333,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const body = await readJsonBody(req);
+  const isInternal = isInternalServiceRequest(req);
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const config = await loadScraperConfig(supabase, "run-scrapers");
   const { timeZone, windows } = getConfiguredWindows(config);
@@ -315,10 +345,41 @@ Deno.serve(async (req) => {
     });
   }
 
+  const requestedSource = typeof body.source === "string" ? body.source : null;
+  if (requestedSource && !SCRAPERS.includes(requestedSource)) {
+    return new Response(JSON.stringify({
+      status: "failed",
+      error: "Unsupported scraper source",
+      source: requestedSource,
+    }), {
+      status: 400,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  if (!isInternal && !requestedSource) {
+    return new Response(JSON.stringify({
+      status: "failed",
+      error: "Public scraper dispatch requires a supported source",
+    }), {
+      status: 403,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+  const orchestratorSource = requestedSource ? `run-scrapers:${requestedSource}` : "run-scrapers";
+
+  const requestedWindowTimes = isInternal ? asStringArray(body.window_times) : [];
+  const defaultWindowTimes = requestedSource
+    ? SOURCE_WINDOW_TIMES[requestedSource]
+    : windows.map((window) => window.time);
+  const allowedWindowTimes = requestedWindowTimes.length > 0 ? requestedWindowTimes : defaultWindowTimes;
+  const graceMinutes = isInternal && Number.isFinite(Number(body.grace_minutes))
+    ? Math.max(0, Math.min(Number(body.grace_minutes), 30))
+    : 30;
   const activeWindow = getMatchingWindow(
     new Date(),
     timeZone,
-    windows.map((window) => window.time),
+    allowedWindowTimes,
+    graceMinutes,
   );
 
   if (!activeWindow) {
@@ -326,27 +387,34 @@ Deno.serve(async (req) => {
       status: "skipped",
       reason: "outside_window",
       timeZone,
-      allowed_windows: windows,
+      allowed_windows: allowedWindowTimes,
+      grace_minutes: graceMinutes,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
+  const windowLabel = stableWindowLabel(activeWindow.time);
 
   const { data: startedRun, error: startError } = await createRunRecord(supabase, {
-    source: "run-scrapers",
+    source: orchestratorSource,
     run_kind: "orchestrator",
     status: "running",
     triggered_by: "scheduler",
-    window_label: activeWindow.label,
+    window_label: windowLabel,
     window_local_date: activeWindow.localDate,
     timezone: timeZone,
     started_at: new Date().toISOString(),
-    metadata: { mode: "scrape_window", window_time: activeWindow.time },
+    metadata: {
+      mode: requestedSource ? "single_scraper_window" : "scrape_window",
+      window_time: activeWindow.time,
+      legacy_window_label: activeWindow.label,
+      requested_source: requestedSource,
+    },
   });
 
   if (startError) {
     if (isUniqueViolation(startError)) {
-      const activeRun = await findActiveRun(supabase);
+      const activeRun = await findActiveRun(supabase, orchestratorSource);
       if (activeRun) {
         return new Response(JSON.stringify({
           status: "skipped",
@@ -357,7 +425,7 @@ Deno.serve(async (req) => {
         });
       }
 
-      const existingRun = await findExistingRun(supabase, activeWindow.label, activeWindow.localDate);
+      const existingRun = await findExistingRun(supabase, orchestratorSource, windowLabel, activeWindow.localDate);
       if (existingRun) {
         return new Response(JSON.stringify({
           status: "skipped",
@@ -381,29 +449,39 @@ Deno.serve(async (req) => {
   const scraperPayload = {
     orchestrated: true,
     parent_run_id: startedRun!.id,
-    window_label: activeWindow.label,
+    window_label: windowLabel,
     window_local_date: activeWindow.localDate,
     timezone: timeZone,
   };
 
+  const scrapersToRun = requestedSource ? [requestedSource] : SCRAPERS;
   const results: ScraperResult[] = [];
-  for (let index = 0; index < SCRAPERS.length; index += 3) {
-    const batch = SCRAPERS.slice(index, index + 3);
-    const batchResults = await Promise.all(batch.map((scraper) => runScraper(scraper, scraperPayload)));
-    results.push(...batchResults);
+  for (const scraper of scrapersToRun) {
+    const existingRun = await findExistingSourceWindow(supabase, scraper, windowLabel, activeWindow.localDate);
+    if (existingRun && ["running", "success", "partial"].includes(existingRun.status)) {
+      results.push({
+        source: scraper,
+        status: "skipped",
+        posts_found: 0,
+        posts_classified: 0,
+        apify_items_fetched: 0,
+        filtered_candidates: 0,
+        net_new_rows: 0,
+        duplicate_conflicts: 0,
+        errors: [],
+        started_at: new Date().toISOString(),
+        completed_at: new Date().toISOString(),
+        body: { reason: "source_window_already_ran", existing_run: existingRun },
+      });
+      continue;
+    }
+    results.push(await runScraper(scraper, scraperPayload));
   }
 
   const hasUsableResults = results.some((result) => result.status === "success" || result.status === "partial");
-  const aggregate = hasUsableResults
-    ? await aggregateWithRetry({
-      source: "run-scrapers",
-      window_label: activeWindow.label,
-      window_local_date: activeWindow.localDate,
-    })
-    : { status: "skipped", attempts: 0, response: null };
 
   const summaryCounts = {
-    total_scrapers: SCRAPERS.length,
+    total_scrapers: scrapersToRun.length,
     succeeded: results.filter((result) => result.status === "success").length,
     partial: results.filter((result) => result.status === "partial").length,
     failed: results.filter((result) => result.status === "failed").length,
@@ -411,27 +489,30 @@ Deno.serve(async (req) => {
   };
 
   let finalStatus = "success";
-  if (!hasUsableResults || aggregate.status === "failed") {
+  if (!hasUsableResults && summaryCounts.skipped === scrapersToRun.length) {
+    finalStatus = "skipped";
+  } else if (!hasUsableResults) {
     finalStatus = "failed";
   } else if (summaryCounts.partial > 0 || summaryCounts.failed > 0 || summaryCounts.skipped > 0) {
     finalStatus = "partial";
   }
 
   await finalizeOrchestratorRun(supabase, startedRun!.id, finalStatus, results, {
-    mode: "scrape_window",
+    mode: requestedSource ? "single_scraper_window" : "scrape_window",
     window_time: activeWindow.time,
-    aggregate_status: aggregate.status,
-    aggregate_attempts: aggregate.attempts,
+    legacy_window_label: activeWindow.label,
+    scoring: "decoupled",
+    requested_source: requestedSource,
     ...summaryCounts,
   });
 
   const responseBody = {
     status: finalStatus,
     timeZone,
-    window_label: activeWindow.label,
+    window_label: windowLabel,
+    window_time: activeWindow.time,
     window_local_date: activeWindow.localDate,
-    aggregate: aggregate.status,
-    aggregate_attempts: aggregate.attempts,
+    scoring: "decoupled",
     ...summaryCounts,
     totals: {
       posts_found: results.reduce((sum, result) => sum + result.posts_found, 0),

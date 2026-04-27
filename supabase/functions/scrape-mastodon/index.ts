@@ -1,8 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted, isClassifierFailure } from "../_shared/classifier.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
+  internalOnlyResponse,
+  isInternalServiceRequest,
   isUniqueViolation,
   readJsonBody,
   type RunRecordRow,
@@ -14,9 +16,10 @@ import {
   matchModels,
   meetsMinLength,
   isLikelyNewsShare,
+  loadRecentTitleKeys,
+  isDuplicate,
   logToErrorLog,
   logZeroDataWarning,
-  triggerAggregateVibes,
   upsertScrapedPost,
 } from "../_shared/utils.ts";
 
@@ -85,6 +88,7 @@ interface Status {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const body = await readJsonBody(req);
@@ -131,6 +135,7 @@ Deno.serve(async (req) => {
       .eq("source", "mastodon")
       .limit(10000);
     const existingUrls = new Set((existing || []).map((entry: any) => entry.source_url).filter(Boolean));
+    const titleKeys = await loadRecentTitleKeys(supabase);
 
     const cutoff = new Date(Date.now() - 24 * 3600000);
     const summary = {
@@ -138,9 +143,11 @@ Deno.serve(async (req) => {
       posts_found: 0,
       filtered_candidates: 0,
       classified: 0,
+      classification_success: 0,
       net_new_rows: 0,
       duplicate_conflicts: 0,
       irrelevant: 0,
+      classifierErrors: 0,
       dedupSkipped: 0,
       contentSkipped: 0,
       errors: [] as string[],
@@ -219,7 +226,7 @@ Deno.serve(async (req) => {
 
     for (const [sourceUrl, status] of allStatuses) {
       const createdAt = new Date(status.created_at);
-      if (createdAt < cutoff) continue;
+      if (Number.isNaN(createdAt.getTime()) || createdAt < cutoff) continue;
 
       const content = stripHtml(status.content || "");
       if (!meetsMinLength("", content)) {
@@ -244,6 +251,19 @@ Deno.serve(async (req) => {
         continue;
       }
 
+      let allDuped = true;
+      for (const slug of matchedSlugs) {
+        const modelId = modelMap[slug];
+        if (modelId && !isDuplicate(titleKeys, content.slice(0, 120), modelId)) {
+          allDuped = false;
+          break;
+        }
+      }
+      if (allDuped) {
+        summary.dedupSkipped++;
+        continue;
+      }
+
       const score = (status.favourites_count || 0) + (status.reblogs_count || 0);
       candidates.push({ content, matchedSlugs, sourceUrl, score, postedAt: status.created_at });
     }
@@ -253,14 +273,19 @@ Deno.serve(async (req) => {
     };
     const classifications = await classifyBatch(candidates.map((candidate) => candidate.content), geminiApiKey, 25, mastodonLogError);
     summary.classified = classifications.length;
-    summary.irrelevant = classifications.filter((classification) => !classification.relevant).length;
+    summary.classification_success = classifications.filter((classification) => !isClassifierFailure(classification)).length;
+    summary.classifierErrors = classifications.filter(isClassifierFailure).length;
+    summary.irrelevant = classifications.filter((classification) => !classification.relevant && !isClassifierFailure(classification)).length;
+    if (summary.classifierErrors > 0) {
+      summary.errors.push(`Classifier failed for ${summary.classifierErrors}/${classifications.length} candidates`);
+    }
 
     // Phase 12 G-prime: only run targeted classifier on multi-model posts.
     // Single-model posts use baseClassification via the existing fallback at
     // the per-slug upsert site below.
     const targetedItems: { idx: number; slug: string }[] = [];
     for (let index = 0; index < candidates.length; index++) {
-      if (!classifications[index].relevant) continue;
+      if (!classifications[index].relevant || isClassifierFailure(classifications[index])) continue;
       if (candidates[index].matchedSlugs.length < 2) continue;
       for (const slug of candidates[index].matchedSlugs) {
         targetedItems.push({ idx: index, slug });
@@ -276,6 +301,10 @@ Deno.serve(async (req) => {
       : [];
     const targetedMap = new Map<string, typeof classifications[0]>();
     targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
+    const targetedClassifierErrors = targetedResults.filter(isClassifierFailure).length;
+    if (targetedClassifierErrors > 0) {
+      summary.errors.push(`Targeted classifier failed for ${targetedClassifierErrors}/${targetedResults.length} candidates`);
+    }
 
     for (let index = 0; index < candidates.length; index++) {
       const baseClassification = classifications[index];
@@ -284,9 +313,9 @@ Deno.serve(async (req) => {
 
       for (const slug of candidate.matchedSlugs) {
         const modelId = modelMap[slug];
-        if (!modelId) continue;
+        if (!modelId || isDuplicate(titleKeys, candidate.content.slice(0, 120), modelId)) continue;
         const classification = targetedMap.get(`${index}:${slug}`) || baseClassification;
-        if (!classification.relevant) continue;
+        if (!classification.relevant || isClassifierFailure(classification)) continue;
 
         const upsertResult = await upsertScrapedPost(supabase, {
           model_id: modelId,
@@ -313,6 +342,7 @@ Deno.serve(async (req) => {
         if (upsertResult.inserted) {
           summary.net_new_rows++;
           existingUrls.add(candidate.sourceUrl);
+          titleKeys.add(`${modelId}:${candidate.content.slice(0, 80).toLowerCase()}`);
         } else {
           summary.duplicate_conflicts++;
         }
@@ -330,6 +360,8 @@ Deno.serve(async (req) => {
       errors: derived.errors,
       metadata: {
         irrelevant: summary.irrelevant,
+        classifier_errors: summary.classifierErrors,
+        classification_success: summary.classification_success,
         dedup_skipped: summary.dedupSkipped,
         content_skipped: summary.contentSkipped,
       },
@@ -349,10 +381,6 @@ Deno.serve(async (req) => {
       status: derived.status,
       posts_classified: derived.posts_classified,
     };
-
-    if (!body.orchestrated) {
-      await triggerAggregateVibes(supabase, SOURCE, { reason: "standalone_run" });
-    }
 
     return new Response(JSON.stringify(responseBody, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

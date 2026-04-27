@@ -1,17 +1,13 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import {
-  applyScoreSmoothing,
-  computeScore,
-  DEFAULT_MIN_POSTS,
-  getPacificDayWindow,
-  getPreviousDailyScore,
-  type ScoreResult,
-} from "../_shared/vibes-scoring.ts";
-// Note: prior versions gated this on isInternalServiceRequest. Removed
-// 2026-04-25 because every pg_cron job here ships with the anon key, which
-// silently 403'd. The function only reads anon-readable scraped_posts and
-// upserts idempotent score rows using the service role from Deno.env, so
-// removing the caller-side gate doesn't expose anything new.
+  claimServiceLock,
+  refreshScores,
+  releaseServiceLock,
+  type ModelRow,
+} from "../_shared/score-refresh.ts";
+
+// Cron currently calls this function with the public anon JWT. Keep handler
+// auth compatible with pg_cron and use service-role credentials only from env.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -22,175 +18,68 @@ const corsHeaders = {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
+  const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+  let lockOwner: string | null = null;
+
   try {
-    const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-
-    await supabase.from("error_log").insert({ function_name: "aggregate-vibes", error_message: "Function started", context: "health-check" });
-
-    const { data: models } = await supabase.from("models").select("id, name, slug");
+    const { data: models, error: modelsError } = await supabase
+      .from("models")
+      .select("id, name, slug");
+    if (modelsError) throw new Error(`Failed to fetch models: ${modelsError.message}`);
     if (!models || models.length === 0) {
       return new Response(JSON.stringify({ error: "No models found" }), {
-        status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const now = new Date();
-    const dailyWindow = getPacificDayWindow(now);
-
-    const summary: Record<string, any> = {};
-
-    for (const model of models) {
-      const modelSummary: any = { daily: null, hourly: null };
-
-      // --- Daily aggregation (Pacific-local calendar day) ---
-      const { data: dailyPosts } = await supabase
-        .from("scraped_posts")
-        .select("sentiment, complaint_category, confidence, score, content_type, source")
-        .eq("model_id", model.id)
-        .gte("posted_at", dailyWindow.rangeStart)
-        .lt("posted_at", dailyWindow.rangeEnd)
-        .limit(5000);
-
-      // Get the most recent historical daily row. Exclude today's row so repeated
-      // runs do not smooth against their own already-updated output.
-      const { data: recentDailyScores } = await supabase
-        .from("vibes_scores")
-        .select("period_start, score")
-        .eq("model_id", model.id)
-        .eq("period", "daily")
-        .order("period_start", { ascending: false })
-        .limit(4);
-
-      const previousScore = getPreviousDailyScore(
-        (recentDailyScores ?? []) as { period_start: string; score: number }[],
-        dailyWindow.periodStart,
-      );
-
-      if (dailyPosts && dailyPosts.length > 0) {
-        const result = computeScore(dailyPosts);
-        result.score = applyScoreSmoothing(
-          result.score,
-          previousScore,
-          result.eligible_posts,
-          DEFAULT_MIN_POSTS,
-        );
-
-        await upsertScore(supabase, model.id, "daily", dailyWindow.periodStart, result);
-        modelSummary.daily = {
-          posts: dailyPosts.length,
-          eligible_posts: result.eligible_posts,
-          score: result.score,
-          smoothed: previousScore !== null,
-          thin_data: result.eligible_posts < DEFAULT_MIN_POSTS,
-        };
-      } else {
-        // No posts — carry forward previous score for up to 3 consecutive days
-        if (previousScore !== null) {
-          // Check how many consecutive days already carried forward
-          const { data: recentScores } = await supabase
-            .from("vibes_scores")
-            .select("period_start, total_posts")
-            .eq("model_id", model.id)
-            .eq("period", "daily")
-            .lt("period_start", dailyWindow.periodStart)
-            .order("period_start", { ascending: false })
-            .limit(3);
-
-          const consecutiveEmpty = (recentScores || [])
-            .filter((s: any) => s.total_posts === 0).length;
-
-          if (consecutiveEmpty < 3) {
-            const carryForward: ScoreResult = {
-              score: previousScore,
-              positive_count: 0,
-              negative_count: 0,
-              neutral_count: 0,
-              total_posts: 0,
-              eligible_posts: 0,
-              top_complaint: null,
-            };
-            await upsertScore(supabase, model.id, "daily", dailyWindow.periodStart, carryForward);
-            modelSummary.daily = { posts: 0, score: previousScore, carried_forward: true, consecutive_empty: consecutiveEmpty + 1 };
-          } else {
-            modelSummary.daily = { posts: 0, skipped: true, reason: "carry_forward_cap_reached" };
-          }
-        } else {
-          modelSummary.daily = { posts: 0, skipped: true };
-        }
-      }
-
-      // --- Hourly aggregation (trailing 24h) ---
-      const hourlyResults: { hour: string; posts: number; score: number }[] = [];
-      for (let h = 23; h >= 0; h--) {
-        const hStart = new Date(Date.UTC(
-          now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(),
-          now.getUTCHours() - h
-        ));
-        const hEnd = new Date(hStart.getTime() + 60 * 60 * 1000);
-
-        const { data: hPosts } = await supabase
-          .from("scraped_posts")
-          .select("sentiment, complaint_category, confidence, score, content_type, source")
-          .eq("model_id", model.id)
-          .gte("posted_at", hStart.toISOString())
-          .lt("posted_at", hEnd.toISOString())
-          .limit(5000);
-
-        if (hPosts && hPosts.length > 0) {
-          const result = computeScore(hPosts);
-          await upsertScore(supabase, model.id, "hourly", hStart.toISOString(), result);
-          hourlyResults.push({ hour: hStart.toISOString(), posts: hPosts.length, score: result.score });
-        }
-      }
-      modelSummary.hourly = hourlyResults.length > 0
-        ? { hours_with_data: hourlyResults.length, details: hourlyResults }
-        : { hours_with_data: 0 };
-
-      summary[model.slug] = modelSummary;
+    const lock = await claimServiceLock(supabase, "vibes-score-refresh", 900);
+    lockOwner = lock.owner;
+    if (!lock.claimed) {
+      return new Response(JSON.stringify({ status: "skipped", reason: "score_refresh_already_running" }), {
+        status: 202,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
-    try {
-      await supabase.from("error_log").insert({
-        function_name: "aggregate-vibes",
-        error_message: `Successfully aggregated vibes for ${models.length} models`,
-        context: JSON.stringify(summary),
-      });
-    } catch {}
+    const summary = await refreshScores(supabase, models as ModelRow[], {
+      daysBack: 2,
+      includeHourly: true,
+    });
 
-    return new Response(JSON.stringify({ aggregated: summary }, null, 2), {
+    await supabase.from("error_log").insert({
+      function_name: "aggregate-vibes",
+      error_message: `Score refresh complete: daily=${summary.daily_rows} hourly=${summary.hourly_rows}`,
+      context: JSON.stringify({
+        posts_scanned: summary.posts_scanned,
+        skipped_days: summary.skipped_days,
+        models: summary.models,
+      }),
+    });
+
+    return new Response(JSON.stringify({ status: "complete", summary }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("aggregate-vibes error:", e);
+    const message = e instanceof Error ? e.message : "Unknown";
     try {
-      const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
       await supabase.from("error_log").insert({
         function_name: "aggregate-vibes",
-        error_message: e instanceof Error ? e.message : "Unknown",
+        error_message: message,
         context: "top-level error",
       });
     } catch {}
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ error: message }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } finally {
+    if (lockOwner) {
+      try {
+        await releaseServiceLock(supabase, "vibes-score-refresh", lockOwner);
+      } catch (e) {
+        console.error("Failed to release score lock", e);
+      }
+    }
   }
 });
-
-async function upsertScore(supabase: any, modelId: string, period: string, periodStart: string, result: ScoreResult) {
-  await supabase.from("vibes_scores").upsert(
-    {
-      model_id: modelId,
-      period,
-      period_start: periodStart,
-      score: result.score,
-      positive_count: result.positive_count,
-      negative_count: result.negative_count,
-      neutral_count: result.neutral_count,
-      total_posts: result.total_posts,
-      eligible_posts: result.eligible_posts,
-      top_complaint: result.top_complaint,
-    },
-    { onConflict: "model_id,period,period_start" },
-  );
-}

@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted, isClassifierFailure } from "../_shared/classifier.ts";
+import { abortApifyRun, apifyRunUrl, checkApifyBudget, scrubApifyRun } from "../_shared/apify-budget.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
@@ -23,7 +24,6 @@ import {
   isDuplicate,
   logToErrorLog,
   logZeroDataWarning,
-  triggerAggregateVibes,
   upsertScrapedPost,
 } from "../_shared/utils.ts";
 
@@ -57,6 +57,7 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const body = await readJsonBody(req);
   let runRecord: RunRecordRow | null = null;
+  let apifyRunMetadata: Record<string, unknown> | null = null;
 
   try {
     const config = await loadScraperConfig(supabase, SOURCE);
@@ -114,17 +115,40 @@ Deno.serve(async (req) => {
     }
 
     await logToErrorLog(supabase, SOURCE, "Reddit Apify scraper started", "health-check");
+    const budget = await checkApifyBudget(apifyToken);
+    if (!budget.allowed) {
+      const skipped = {
+        source: SOURCE,
+        status: "skipped",
+        skipped: true,
+        reason: budget.reason,
+        errors: [`Apify budget guard skipped run: ${budget.reason}`],
+        apify_budget: budget.usage,
+      };
+      await updateRunRecord(supabase, runRecord!.id, {
+        status: "skipped",
+        errors: skipped.errors,
+        metadata: { reason: skipped.reason, apify_budget: budget.usage },
+        completed_at: new Date().toISOString(),
+      });
+      return new Response(JSON.stringify(skipped), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
 
     const { modelMap, keywords } = await loadKeywords(supabase);
     const startUrls = getConfigValues(config, "start_url");
     const apifyInput = {
       startUrls: (startUrls.length > 0 ? startUrls : DEFAULT_START_URLS).map((url) => ({ url })),
       skipComments: true,
-      maxItems: getConfigNumber(config, "max_items", 40),
+      maxItems: getConfigNumber(config, "max_items", 25),
       maxPostCount: getConfigNumber(config, "max_post_count", 8),
     };
 
-    const startRes = await fetch(`https://api.apify.com/v2/acts/trudax~reddit-scraper-lite/runs?token=${apifyToken}`, {
+    const startRes = await fetch(apifyRunUrl("trudax~reddit-scraper-lite", apifyToken, apifyInput.maxItems, {
+      timeoutSecs: 240,
+      maxTotalChargeUsd: 0.35,
+    }), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(apifyInput),
@@ -157,27 +181,39 @@ Deno.serve(async (req) => {
     const runData = await startRes.json();
     const apifyRunId = runData.data?.id;
     const datasetId = runData.data?.defaultDatasetId;
+    apifyRunMetadata = scrubApifyRun(runData.data);
     if (!apifyRunId || !datasetId) {
       await logToErrorLog(supabase, SOURCE, "No runId/datasetId", "apify-error");
       throw new Error("Missing runId from Apify");
     }
 
     let runStatus = "";
+    let terminalRunData: any = null;
     for (let i = 0; i < 24; i++) {
       await delay(10000);
       const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${apifyToken}`);
       if (!statusRes.ok) continue;
       const statusData = await statusRes.json();
       runStatus = statusData.data?.status || "";
-      if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(runStatus)) break;
+      if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(runStatus)) {
+        terminalRunData = statusData.data;
+        apifyRunMetadata = scrubApifyRun(terminalRunData);
+        break;
+      }
     }
 
     if (runStatus !== "SUCCEEDED") {
       let errorDetail = "";
+      if (!runStatus) {
+        const abortMetadata = await abortApifyRun(apifyToken, apifyRunId);
+        apifyRunMetadata = abortMetadata ?? apifyRunMetadata;
+        runStatus = "TIMED-OUT";
+      }
       try {
         const detailRes = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${apifyToken}`);
         if (detailRes.ok) {
           const detailData = await detailRes.json();
+          apifyRunMetadata = scrubApifyRun(detailData.data);
           errorDetail = detailData.data?.statusMessage || detailData.data?.exitCode || "";
         }
       } catch {}
@@ -211,10 +247,14 @@ Deno.serve(async (req) => {
       net_new_rows: 0,
       duplicate_conflicts: 0,
       irrelevant: 0,
+      classifierErrors: 0,
+      classification_success: 0,
       duplicateSkipped: 0,
       dedupSkipped: 0,
       contentSkipped: 0,
       errors: [] as string[],
+      apifyUsage: scrubApifyRun(terminalRunData),
+      apifyBudget: budget.usage,
     };
 
     const candidates: {
@@ -229,7 +269,7 @@ Deno.serve(async (req) => {
 
     for (const post of posts) {
       const createdAt = new Date(post.createdAt);
-      if (createdAt < cutoff) continue;
+      if (Number.isNaN(createdAt.getTime()) || createdAt < cutoff) continue;
 
       const title = post.title || "";
       const bodyText = post.body || "";
@@ -279,7 +319,12 @@ Deno.serve(async (req) => {
     };
     const classifications = await classifyBatch(candidates.map((candidate) => candidate.fullText), geminiApiKey, 25, redditLogError);
     summary.classified = classifications.length;
-    summary.irrelevant = classifications.filter((classification) => !classification.relevant).length;
+    summary.classification_success = classifications.filter((classification) => !isClassifierFailure(classification)).length;
+    summary.classifierErrors = classifications.filter(isClassifierFailure).length;
+    summary.irrelevant = classifications.filter((classification) => !classification.relevant && !isClassifierFailure(classification)).length;
+    if (summary.classifierErrors > 0) {
+      summary.errors.push(`Classifier failed for ${summary.classifierErrors}/${classifications.length} candidates`);
+    }
 
     // Phase 12 G-prime: only run targeted classifier on multi-model posts.
     // Single-model posts use baseClassification via the existing fallback at
@@ -302,15 +347,19 @@ Deno.serve(async (req) => {
       : [];
     const targetedMap = new Map<string, typeof classifications[0]>();
     targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
+    const targetedClassifierErrors = targetedResults.filter(isClassifierFailure).length;
+    if (targetedClassifierErrors > 0) {
+      summary.errors.push(`Targeted classifier failed for ${targetedClassifierErrors}/${targetedResults.length} candidates`);
+    }
 
     for (let i = 0; i < candidates.length; i++) {
       const baseClassification = classifications[i];
-      if (!baseClassification.relevant) continue;
+      if (!baseClassification.relevant || isClassifierFailure(baseClassification)) continue;
       const candidate = candidates[i];
 
       for (const slug of candidate.matchedSlugs) {
         const classification = targetedMap.get(`${i}:${slug}`) || baseClassification;
-        if (!classification.relevant) continue;
+        if (!classification.relevant || isClassifierFailure(classification)) continue;
         const modelId = modelMap[slug];
         if (!modelId || isDuplicate(titleKeys, candidate.title, modelId)) continue;
 
@@ -363,6 +412,10 @@ Deno.serve(async (req) => {
         dedup_skipped: summary.dedupSkipped,
         content_skipped: summary.contentSkipped,
         irrelevant: summary.irrelevant,
+        classifier_errors: summary.classifierErrors,
+        classification_success: summary.classification_success,
+        apify_usage: summary.apifyUsage,
+        apify_budget: summary.apifyBudget,
       },
       completed_at: completedAt,
     });
@@ -381,10 +434,6 @@ Deno.serve(async (req) => {
       posts_classified: derived.posts_classified,
     };
 
-    if (!body.orchestrated) {
-      await triggerAggregateVibes(supabase, SOURCE, { reason: "standalone_run" });
-    }
-
     return new Response(JSON.stringify(responseBody, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -395,7 +444,7 @@ Deno.serve(async (req) => {
       await updateRunRecord(supabase, runRecord!.id, {
         status: "failed",
         errors: [message],
-        metadata: { error: message },
+        metadata: { error: message, apify_usage: apifyRunMetadata },
         completed_at: new Date().toISOString(),
       });
     }

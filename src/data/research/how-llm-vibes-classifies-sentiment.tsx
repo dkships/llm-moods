@@ -33,16 +33,16 @@ const HowLlmVibesClassifiesSentimentBody = () => (
     <h2>What gets scraped</h2>
     <p>Five platforms, five edge functions, one orchestrator.</p>
     <p>
-      Reddit comes from the Apify <code>trudax~reddit-scraper-lite</code> actor, pulling 40 posts per run from
+      Reddit comes from the Apify <code>trudax~reddit-scraper-lite</code> actor, pulling 25 posts per run from
       five subreddits (r/ClaudeAI, r/ChatGPT, r/LocalLLaMA, r/GoogleGemini, r/artificial). Hacker News uses the
       Algolia API, free and rate-friendly. Bluesky uses the AT Protocol with an authenticated handle. Twitter/X
-      uses the Apify <code>apidojo~tweet-scraper</code> actor, four search terms, 50 posts per run. Mastodon uses
-      the public API across five instances.
+      uses the Apify <code>apidojo~tweet-scraper</code> actor, one combined latest-search query, 50 posts per run.
+      Mastodon uses the public API across five instances.
     </p>
     <p>
-      A coordinator function (<code>run-scrapers</code>) fires each scraper in batches of three. The schedule
-      lives in Supabase <code>pg_cron</code> and runs hourly, but the orchestrator only does a real fetch on
-      three Pacific-time windows per day (05:00, 14:00, 21:00). On the other 21 hourly invocations it returns{" "}
+      A coordinator function (<code>run-scrapers</code>) dispatches source-specific scraper windows. The schedule
+      lives in Supabase <code>pg_cron</code> and checks hourly, but each source only does a real fetch on its
+      configured Pacific-time windows. On other hourly invocations it returns{" "}
       <code>{`{"status":"skipped","reason":"outside_window"}`}</code> in milliseconds, which keeps the cron
       column legible without burning Apify credits.
     </p>

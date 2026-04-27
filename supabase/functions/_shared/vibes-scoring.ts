@@ -174,11 +174,17 @@ export function getMatchingWindow(
   date: Date,
   timeZone: string,
   windowTimes: string[],
+  graceMinutes = 0,
 ): MatchingWindow | null {
   const parts = getTimeZoneParts(date, timeZone);
   const localTime = `${pad2(parts.hour)}:${pad2(parts.minute)}`;
   const windows = normalizeWindowTimes(windowTimes);
-  const matched = windows.find((window) => window.time === localTime);
+  const currentMinutes = parts.hour * 60 + parts.minute;
+  const matched = windows.find((window) => {
+    const [hour, minute] = window.time.split(":").map(Number);
+    const windowMinutes = hour * 60 + minute;
+    return currentMinutes >= windowMinutes && currentMinutes <= windowMinutes + graceMinutes;
+  });
 
   if (!matched) return null;
 

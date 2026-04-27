@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted, isClassifierFailure } from "../_shared/classifier.ts";
 import { isInternalServiceRequest, internalOnlyResponse } from "../_shared/runtime.ts";
 
 const corsHeaders = {
@@ -80,6 +80,11 @@ Deno.serve(async (req) => {
     for (let i = 0; i < candidates.length; i++) {
       const result = classifications[i];
       const c = candidates[i];
+
+      if (isClassifierFailure(result)) {
+        errors++;
+        continue;
+      }
 
       if (!result.relevant) {
         irrelevant++;
@@ -305,6 +310,12 @@ async function reclassifyTargetedPosts(
   for (let i = 0; i < items.length; i++) {
     const result = classifications[i];
     const item = items[i];
+
+    if (isClassifierFailure(result)) {
+      errors++;
+      await logError(`Skipped targeted reclassify update for ${item.id}: ${result.status} ${result.error || ""}`, "classifier-failure");
+      continue;
+    }
 
     const payload = result.relevant
       ? {

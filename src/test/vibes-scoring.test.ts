@@ -50,6 +50,29 @@ describe("vibes scoring helpers", () => {
     });
   });
 
+  it("allows a small scheduler grace period after a scrape window", () => {
+    const matched = getMatchingWindow(
+      new Date("2026-04-18T12:12:00.000Z"),
+      "America/Los_Angeles",
+      ["05:00", "14:00", "21:00"],
+      15,
+    );
+
+    expect(matched?.time).toBe("05:00");
+    expect(matched?.localTime).toBe("05:12");
+  });
+
+  it("does not match scrape windows after the grace period", () => {
+    const matched = getMatchingWindow(
+      new Date("2026-04-18T12:16:00.000Z"),
+      "America/Los_Angeles",
+      ["05:00", "14:00", "21:00"],
+      15,
+    );
+
+    expect(matched).toBeNull();
+  });
+
   it("ignores the current day row when selecting the smoothing seed", () => {
     const previousScore = getPreviousDailyScore([
       { period_start: "2026-04-18T00:00:00.000Z", score: 62 },

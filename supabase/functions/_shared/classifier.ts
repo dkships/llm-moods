@@ -1,7 +1,11 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "./taxonomy.ts";
 
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const MODEL = "gemini-2.5-flash";
+const DAILY_REQUEST_LIMIT = Number((globalThis as any).Deno?.env.get("GEMINI_DAILY_REQUEST_LIMIT") ?? "200");
+const MINUTE_REQUEST_LIMIT = Number((globalThis as any).Deno?.env.get("GEMINI_MINUTE_REQUEST_LIMIT") ?? "8");
+const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 
 export const CLASSIFY_PROMPT = `You are classifying a social media post about AI language models (ChatGPT, Claude, Gemini, Grok, DeepSeek, Perplexity, etc).
 
@@ -55,7 +59,7 @@ STEP 4 — CONFIDENCE (0.0-1.0)
 - Below 0.5: Weak signal, likely not relevant
 
 Return ONLY valid JSON:
-{"relevant": true/false, "sentiment": "positive"/"negative"/"neutral"/null, "complaint_category": "<category>"/null, "praise_category": "<category>"/null, "confidence": 0.0-1.0, "language": "<iso-code>"/null, "english_translation": "<translation>"/null}
+{"result":{"relevant": true/false, "sentiment": "positive"/"negative"/"neutral"/null, "complaint_category": "<category>"/null, "praise_category": "<category>"/null, "confidence": 0.0-1.0, "language": "<iso-code>"/null, "english_translation": "<translation>"/null}}
 
 Post to classify: `;
 
@@ -96,8 +100,8 @@ Category guidance: hallucinations = model generated false info (NOT someone usin
 
 CONFIDENCE: 0.0-1.0 (0.9+ = explicit model name + clear sentiment from direct experience, 0.7-0.8 = clear but indirect, below 0.5 = weak)
 
-Return ONLY a JSON array with one object per post in the same order:
-[{"relevant": true/false, "sentiment": "..."/null, "complaint_category": "..."/null, "praise_category": "..."/null, "confidence": 0.0-1.0, "language": "..."/null, "english_translation": "..."/null}, ...]
+Return ONLY a JSON object with one result per post in the same order:
+{"results":[{"relevant": true/false, "sentiment": "..."/null, "complaint_category": "..."/null, "praise_category": "..."/null, "confidence": 0.0-1.0, "language": "..."/null, "english_translation": "..."/null}, ...]}
 
 Posts to classify:
 `;
@@ -143,11 +147,13 @@ Category guidance: hallucinations = model generated false info. censorship = mod
 
 CONFIDENCE: 0.0-1.0 (0.9+ = explicit target model name + clear sentiment from direct experience, 0.7-0.8 = clear but indirect, below 0.5 = weak)
 
-Return ONLY a JSON array with one object per post in the same order:
-[{"relevant": true/false, "sentiment": "..."/null, "complaint_category": "..."/null, "praise_category": "..."/null, "confidence": 0.0-1.0, "language": "..."/null, "english_translation": "..."/null}, ...]
+Return ONLY a JSON object with one result per post in the same order:
+{"results":[{"relevant": true/false, "sentiment": "..."/null, "complaint_category": "..."/null, "praise_category": "..."/null, "confidence": 0.0-1.0, "language": "..."/null, "english_translation": "..."/null}, ...]}
 
 Posts to classify:
 `;
+
+export type ClassifierStatus = "classified" | "irrelevant" | "classifier_error" | "parse_error" | "quota_deferred";
 
 export interface ClassifyResult {
   relevant: boolean;
@@ -157,15 +163,37 @@ export interface ClassifyResult {
   confidence: number;
   language?: string | null;
   english_translation?: string | null;
+  status?: ClassifierStatus;
+  error?: string | null;
 }
 
-const SKIP_RESULT: ClassifyResult = {
+function makeSkippedResult(status: Exclude<ClassifierStatus, "classified" | "irrelevant">, error: string): ClassifyResult {
+  return {
+    relevant: false,
+    sentiment: null,
+    complaint_category: null,
+    praise_category: null,
+    confidence: 0,
+    status,
+    error,
+  };
+}
+
+const IRRELEVANT_RESULT: ClassifyResult = {
   relevant: false,
   sentiment: null,
   complaint_category: null,
   praise_category: null,
   confidence: 0,
+  status: "irrelevant",
+  error: null,
 };
+
+export function isClassifierFailure(result: ClassifyResult | undefined | null): boolean {
+  return result?.status === "classifier_error"
+    || result?.status === "parse_error"
+    || result?.status === "quota_deferred";
+}
 
 function parseResult(parsed: any): ClassifyResult {
   const sentiment = normalizeSentiment(parsed.sentiment);
@@ -180,7 +208,108 @@ function parseResult(parsed: any): ClassifyResult {
     confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.5,
     language: parsed.language || null,
     english_translation: parsed.english_translation || null,
+    status: parsed.relevant === false ? "irrelevant" : "classified",
+    error: null,
   };
+}
+
+function requestBody(prompt: string, maxTokens: number) {
+  return JSON.stringify({
+    model: MODEL,
+    messages: [{ role: "user", content: prompt }],
+    max_tokens: maxTokens,
+    temperature: 0,
+    reasoning_effort: "none",
+    response_format: { type: "json_object" },
+  });
+}
+
+function retryDelayMs(res: Response | null, attempt: number): number {
+  const retryAfter = parseInt(res?.headers.get("retry-after") || "", 10);
+  if (retryAfter > 0) return retryAfter * 1000;
+  const base = Math.min(20_000, 1_000 * (2 ** attempt));
+  return Math.round(base * (0.5 + Math.random()));
+}
+
+function nextMinuteDelayMs(): number {
+  const msIntoMinute = Date.now() % 60_000;
+  return (60_000 - msIntoMinute) + Math.round(Math.random() * 1_000);
+}
+
+let quotaClient: any | null = null;
+
+async function claimGeminiQuota(logError?: (msg: string, ctx?: string) => Promise<void>): Promise<ClassifyResult | null> {
+  const supabaseUrl = (globalThis as any).Deno?.env.get("SUPABASE_URL");
+  const serviceRoleKey = (globalThis as any).Deno?.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!supabaseUrl || !serviceRoleKey) return null;
+
+  quotaClient ??= createClient(supabaseUrl, serviceRoleKey);
+  const { data, error } = await quotaClient.rpc("claim_api_quota", {
+    p_provider: "gemini",
+    p_quota_key: MODEL,
+    p_daily_limit: DAILY_REQUEST_LIMIT,
+    p_minute_limit: MINUTE_REQUEST_LIMIT,
+  });
+
+  if (error) {
+    if (logError) await logError(`Gemini quota gate error: ${error.message}`, "quota-error");
+    return makeSkippedResult("classifier_error", "quota_gate_error");
+  }
+
+  const response = Array.isArray(data) ? data[0] : data;
+  if (response && response.allowed === false) {
+    const reason = response.reason || "quota_deferred";
+    if (logError) await logError(`Gemini quota deferred: ${reason}`, "quota-deferred");
+    return makeSkippedResult("quota_deferred", reason);
+  }
+
+  return null;
+}
+
+async function fetchGemini(
+  prompt: string,
+  apiKey: string,
+  maxTokens: number,
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+): Promise<Response | ClassifyResult> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const quotaResult = await claimGeminiQuota(logError);
+    if (quotaResult) {
+      if (quotaResult.status === "quota_deferred" && quotaResult.error === "minute_limit" && attempt < 2) {
+        const waitMs = nextMinuteDelayMs();
+        if (logError) await logError(`Gemini minute quota deferred, retrying in ${waitMs}ms`, "quota-minute-wait");
+        await new Promise((r) => setTimeout(r, waitMs));
+        continue;
+      }
+      return quotaResult;
+    }
+
+    let res: Response | null = null;
+    try {
+      res = await fetch(API_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: requestBody(prompt, maxTokens),
+      });
+    } catch (e) {
+      if (attempt === 2) {
+        return makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e));
+      }
+      await new Promise((r) => setTimeout(r, retryDelayMs(null, attempt)));
+      continue;
+    }
+
+    if (res.ok) return res;
+    if (!TRANSIENT_STATUSES.has(res.status) || attempt === 2) {
+      return makeSkippedResult("classifier_error", `HTTP ${res.status}`);
+    }
+
+    const waitMs = retryDelayMs(res, attempt);
+    if (logError) await logError(`Gemini HTTP ${res.status}, retrying in ${waitMs}ms (attempt ${attempt + 1}/3)`, "classify-retry");
+    await new Promise((r) => setTimeout(r, waitMs));
+  }
+
+  return makeSkippedResult("classifier_error", "retry_exhausted");
 }
 
 export async function classifyPost(
@@ -189,36 +318,24 @@ export async function classifyPost(
   logError?: (msg: string, ctx?: string) => Promise<void>,
 ): Promise<ClassifyResult> {
   try {
-    let res: Response | null = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      res = await fetch(API_URL, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: MODEL,
-          messages: [{ role: "user", content: CLASSIFY_PROMPT + text.slice(0, 600) }],
-        }),
-      });
-      if (res.status !== 429) break;
-      const retryAfter = parseInt(res.headers.get("retry-after") || "", 10);
-      const waitMs = retryAfter > 0 ? retryAfter * 1000 : (attempt + 1) * 5000;
-      await new Promise(r => setTimeout(r, waitMs));
-    }
-    if (!res || !res.ok) {
-      if (logError) await logError(`AI gateway HTTP ${res?.status ?? "no-response"}`, "classify-error");
-      return SKIP_RESULT;
+    const res = await fetchGemini(CLASSIFY_PROMPT + text.slice(0, 600), apiKey, 700, logError);
+    if (!(res instanceof Response)) {
+      if (logError) await logError(`AI gateway ${res.status}: ${res.error}`, "classify-error");
+      return res;
     }
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || "";
-    const jsonMatch = raw.match(/\{[\s\S]*?\}/);
-    if (!jsonMatch) {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? raw);
+    } catch {
       if (logError) await logError(`AI gateway returned unparseable response: ${raw.slice(0, 200)}`, "classify-parse-error");
-      return SKIP_RESULT;
+      return makeSkippedResult("parse_error", "unparseable_response");
     }
-    return parseResult(JSON.parse(jsonMatch[0]));
+    return parseResult(parsed.result ?? parsed);
   } catch (e) {
     if (logError) await logError(`classifyPost exception: ${e instanceof Error ? e.message : String(e)}`, "classify-exception");
-    return SKIP_RESULT;
+    return makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e));
   }
 }
 
@@ -229,40 +346,29 @@ async function batchClassifyWithPrompt(
   apiKey: string,
   logError?: (msg: string, ctx?: string) => Promise<void>,
 ): Promise<ClassifyResult[]> {
-  let res: Response | null = null;
-  for (let attempt = 0; attempt < 3; attempt++) {
-    res = await fetch(API_URL, {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: MODEL,
-        messages: [{ role: "user", content: prompt + numbered }],
-      }),
-    });
-    if (res.status !== 429) break;
-    const retryAfter = parseInt(res.headers.get("retry-after") || "", 10);
-    const waitMs = retryAfter > 0 ? retryAfter * 1000 : (attempt + 1) * 5000;
-    if (logError) await logError(`Batch classify 429, retrying in ${waitMs}ms (attempt ${attempt + 1}/3)`, "batch-classify-retry");
-    await new Promise(r => setTimeout(r, waitMs));
-  }
-  if (!res || !res.ok) {
-    if (logError) await logError(`Batch classify HTTP ${res?.status ?? "no-response"}`, "batch-classify-error");
-    return Array(batchLength).fill(SKIP_RESULT);
+  const res = await fetchGemini(prompt + numbered, apiKey, 4096, logError);
+  if (!(res instanceof Response)) {
+    if (logError) await logError(`Batch classify ${res.status}: ${res.error}`, "batch-classify-error");
+    return Array.from({ length: batchLength }, () => res);
   }
   const data = await res.json();
   const raw = data.choices?.[0]?.message?.content || "";
-  const jsonMatch = raw.match(/\[[\s\S]*\]/);
+  const trimmed = raw.trim();
+  const jsonMatch = trimmed.startsWith("[")
+    ? trimmed.match(/\[[\s\S]*\]/)
+    : trimmed.match(/\{[\s\S]*\}/) || trimmed.match(/\[[\s\S]*\]/);
   if (!jsonMatch) {
     if (logError) await logError(`Batch classify unparseable: ${raw.slice(0, 200)}`, "batch-classify-parse");
-    return Array(batchLength).fill(SKIP_RESULT);
+    return Array.from({ length: batchLength }, () => makeSkippedResult("parse_error", "unparseable_response"));
   }
   const parsed = JSON.parse(jsonMatch[0]);
-  if (!Array.isArray(parsed)) {
-    return Array(batchLength).fill(SKIP_RESULT);
+  const parsedResults = Array.isArray(parsed) ? parsed : parsed.results;
+  if (!Array.isArray(parsedResults)) {
+    return Array.from({ length: batchLength }, () => makeSkippedResult("parse_error", "missing_results_array"));
   }
   const results: ClassifyResult[] = [];
   for (let j = 0; j < batchLength; j++) {
-    results.push(j < parsed.length ? parseResult(parsed[j]) : SKIP_RESULT);
+    results.push(j < parsedResults.length ? parseResult(parsedResults[j]) : IRRELEVANT_RESULT);
   }
   return results;
 }
@@ -288,7 +394,7 @@ export async function classifyBatch(
       }
     } catch (e) {
       if (logError) await logError(`Batch classify exception: ${e instanceof Error ? e.message : String(e)}`, "batch-classify-exception");
-      allResults.push(...batch.map(() => SKIP_RESULT));
+      allResults.push(...batch.map(() => makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e))));
     }
   }
   return allResults;
@@ -314,7 +420,7 @@ export async function classifyBatchTargeted(
       }
     } catch (e) {
       if (logError) await logError(`Targeted classify exception: ${e instanceof Error ? e.message : String(e)}`, "targeted-classify-exception");
-      allResults.push(...batch.map(() => SKIP_RESULT));
+      allResults.push(...batch.map(() => makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e))));
     }
   }
   return allResults;

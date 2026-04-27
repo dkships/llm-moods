@@ -1,8 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted, isClassifierFailure } from "../_shared/classifier.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
+  internalOnlyResponse,
+  isInternalServiceRequest,
   isUniqueViolation,
   readJsonBody,
   type RunRecordRow,
@@ -18,7 +20,6 @@ import {
   isDuplicate,
   logToErrorLog,
   logZeroDataWarning,
-  triggerAggregateVibes,
   upsertScrapedPost,
 } from "../_shared/utils.ts";
 
@@ -76,6 +77,7 @@ async function authenticateBluesky(handle: string, appPassword: string): Promise
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const body = await readJsonBody(req);
@@ -143,13 +145,24 @@ Deno.serve(async (req) => {
       posts_found: 0,
       filtered_candidates: 0,
       classified: 0,
+      classification_success: 0,
       net_new_rows: 0,
       duplicate_conflicts: 0,
       irrelevant: 0,
+      classifierErrors: 0,
       dedupSkipped: 0,
       contentSkipped: 0,
       errors: [] as string[],
     };
+
+    const candidates: {
+      text: string;
+      matchedSlugs: string[];
+      sourceUrl: string;
+      createdAt: string;
+      score: number;
+    }[] = [];
+    const candidateUrls = new Set<string>();
 
     for (let i = 0; i < SEARCH_TERMS.length; i++) {
       const term = SEARCH_TERMS[i];
@@ -170,18 +183,10 @@ Deno.serve(async (req) => {
         const posts = json.posts || [];
         summary.posts_found += posts.length;
 
-        const candidates: {
-          text: string;
-          matchedSlugs: string[];
-          sourceUrl: string;
-          createdAt: string;
-          score: number;
-        }[] = [];
-
         for (const post of posts) {
           const text = post.record?.text || "";
           const createdAt = post.record?.createdAt ? new Date(post.record.createdAt) : null;
-          if (!createdAt || createdAt < cutoff) continue;
+          if (!createdAt || Number.isNaN(createdAt.getTime()) || createdAt < cutoff) continue;
 
           if (!meetsMinLength(text, "")) {
             summary.contentSkipped++;
@@ -200,7 +205,7 @@ Deno.serve(async (req) => {
           const uriParts = (post.uri || "").split("/");
           const rkey = uriParts[uriParts.length - 1];
           const sourceUrl = `https://bsky.app/profile/${handle}/post/${rkey}`;
-          if (existingUrls.has(sourceUrl)) {
+          if (existingUrls.has(sourceUrl) || candidateUrls.has(sourceUrl)) {
             summary.dedupSkipped++;
             continue;
           }
@@ -225,83 +230,88 @@ Deno.serve(async (req) => {
             createdAt: createdAt.toISOString(),
             score: post.likeCount || 0,
           });
-        }
-
-        const blueskyLogError = async (msg: string, ctx?: string) => {
-          await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
-        };
-        const classifications = await classifyBatch(candidates.map((candidate) => candidate.text), geminiApiKey, 25, blueskyLogError);
-        summary.classified += classifications.length;
-        summary.irrelevant += classifications.filter((classification) => !classification.relevant).length;
-
-        // Phase 12 G-prime: only run the targeted classifier pass on
-        // multi-model posts (matchedSlugs.length >= 2). The targeted prompt's
-        // contrast guidance only matters when there's a contrast; for single-
-        // model posts it produces the same sentiment as the base pass.
-        // The per-slug upsert site falls back to baseClassification when no
-        // targeted result is present, so single-model posts still get stored.
-        const targetedItems: { idx: number; slug: string }[] = [];
-        for (let index = 0; index < candidates.length; index++) {
-          if (!classifications[index].relevant) continue;
-          if (candidates[index].matchedSlugs.length < 2) continue;
-          for (const slug of candidates[index].matchedSlugs) {
-            targetedItems.push({ idx: index, slug });
-          }
-        }
-        const targetedResults = targetedItems.length > 0
-          ? await classifyBatchTargeted(
-            targetedItems.map((item) => ({ text: candidates[item.idx].text, targetModel: item.slug })),
-            geminiApiKey,
-            25,
-            blueskyLogError,
-          )
-          : [];
-        const targetedMap = new Map<string, typeof classifications[0]>();
-        targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
-
-        for (let index = 0; index < candidates.length; index++) {
-          const baseClassification = classifications[index];
-          if (!baseClassification.relevant) continue;
-          const candidate = candidates[index];
-
-          for (const slug of candidate.matchedSlugs) {
-            const classification = targetedMap.get(`${index}:${slug}`) || baseClassification;
-            const modelId = modelMap[slug];
-            if (!modelId || isDuplicate(titleKeys, candidate.text.slice(0, 120), modelId)) continue;
-
-            const upsertResult = await upsertScrapedPost(supabase, {
-              model_id: modelId,
-              source: "bluesky",
-              source_url: candidate.sourceUrl,
-              title: candidate.text.slice(0, 120),
-              content: candidate.text.slice(0, 2000),
-              sentiment: classification.sentiment,
-              complaint_category: classification.complaint_category,
-              praise_category: classification.praise_category,
-              confidence: classification.confidence,
-              content_type: "full_content",
-              original_language: classification.language || null,
-              translated_content: classification.english_translation || null,
-              score: candidate.score,
-              posted_at: candidate.createdAt,
-            });
-
-            if (upsertResult.error) {
-              summary.errors.push(`Insert: ${upsertResult.error}`);
-              continue;
-            }
-
-            if (upsertResult.inserted) {
-              summary.net_new_rows++;
-              existingUrls.add(candidate.sourceUrl);
-              titleKeys.add(`${modelId}:${candidate.text.slice(0, 80).toLowerCase()}`);
-            } else {
-              summary.duplicate_conflicts++;
-            }
-          }
+          candidateUrls.add(sourceUrl);
         }
       } catch (error) {
         summary.errors.push(`"${term}": ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    const blueskyLogError = async (msg: string, ctx?: string) => {
+      await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
+    };
+    const classifications = await classifyBatch(candidates.map((candidate) => candidate.text), geminiApiKey, 25, blueskyLogError);
+    summary.classified = classifications.length;
+    summary.classification_success = classifications.filter((classification) => !isClassifierFailure(classification)).length;
+    summary.classifierErrors = classifications.filter(isClassifierFailure).length;
+    summary.irrelevant = classifications.filter((classification) => !classification.relevant && !isClassifierFailure(classification)).length;
+    if (summary.classifierErrors > 0) {
+      summary.errors.push(`Classifier failed for ${summary.classifierErrors}/${classifications.length} candidates`);
+    }
+
+    const targetedItems: { idx: number; slug: string }[] = [];
+    for (let index = 0; index < candidates.length; index++) {
+      if (!classifications[index].relevant || isClassifierFailure(classifications[index])) continue;
+      if (candidates[index].matchedSlugs.length < 2) continue;
+      for (const slug of candidates[index].matchedSlugs) {
+        targetedItems.push({ idx: index, slug });
+      }
+    }
+    const targetedResults = targetedItems.length > 0
+      ? await classifyBatchTargeted(
+        targetedItems.map((item) => ({ text: candidates[item.idx].text, targetModel: item.slug })),
+        geminiApiKey,
+        25,
+        blueskyLogError,
+      )
+      : [];
+    const targetedMap = new Map<string, typeof classifications[0]>();
+    targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
+    const targetedClassifierErrors = targetedResults.filter(isClassifierFailure).length;
+    if (targetedClassifierErrors > 0) {
+      summary.errors.push(`Targeted classifier failed for ${targetedClassifierErrors}/${targetedResults.length} candidates`);
+    }
+
+    for (let index = 0; index < candidates.length; index++) {
+      const baseClassification = classifications[index];
+      if (!baseClassification.relevant || isClassifierFailure(baseClassification)) continue;
+      const candidate = candidates[index];
+
+      for (const slug of candidate.matchedSlugs) {
+        const classification = targetedMap.get(`${index}:${slug}`) || baseClassification;
+        if (!classification.relevant || isClassifierFailure(classification)) continue;
+        const modelId = modelMap[slug];
+        if (!modelId || isDuplicate(titleKeys, candidate.text.slice(0, 120), modelId)) continue;
+
+        const upsertResult = await upsertScrapedPost(supabase, {
+          model_id: modelId,
+          source: "bluesky",
+          source_url: candidate.sourceUrl,
+          title: candidate.text.slice(0, 120),
+          content: candidate.text.slice(0, 2000),
+          sentiment: classification.sentiment,
+          complaint_category: classification.complaint_category,
+          praise_category: classification.praise_category,
+          confidence: classification.confidence,
+          content_type: "full_content",
+          original_language: classification.language || null,
+          translated_content: classification.english_translation || null,
+          score: candidate.score,
+          posted_at: candidate.createdAt,
+        });
+
+        if (upsertResult.error) {
+          summary.errors.push(`Insert: ${upsertResult.error}`);
+          continue;
+        }
+
+        if (upsertResult.inserted) {
+          summary.net_new_rows++;
+          existingUrls.add(candidate.sourceUrl);
+          titleKeys.add(`${modelId}:${candidate.text.slice(0, 80).toLowerCase()}`);
+        } else {
+          summary.duplicate_conflicts++;
+        }
       }
     }
 
@@ -316,6 +326,8 @@ Deno.serve(async (req) => {
       errors: derived.errors,
       metadata: {
         irrelevant: summary.irrelevant,
+        classifier_errors: summary.classifierErrors,
+        classification_success: summary.classification_success,
         dedup_skipped: summary.dedupSkipped,
         content_skipped: summary.contentSkipped,
       },
@@ -335,10 +347,6 @@ Deno.serve(async (req) => {
       status: derived.status,
       posts_classified: derived.posts_classified,
     };
-
-    if (!body.orchestrated) {
-      await triggerAggregateVibes(supabase, SOURCE, { reason: "standalone_run" });
-    }
 
     return new Response(JSON.stringify(responseBody, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

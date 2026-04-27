@@ -89,7 +89,8 @@ export async function loadScraperConfig(
     .eq("scraper", scraper)
     .order("created_at", { ascending: true });
 
-  if (error || !data) return {};
+  if (error) throw new Error(`Failed to load scraper config for ${scraper}: ${error.message}`);
+  if (!data) return {};
 
   const config: ScraperConfigMap = {};
   for (const row of data) {
@@ -155,12 +156,23 @@ export function deriveRunMetrics(summary: Record<string, unknown>): DerivedRunMe
     : [];
 
   const postsFound = toInt(summary.posts_found ?? summary.fetched ?? summary.total, 0);
-  const postsClassified = toInt(summary.posts_classified ?? summary.classified ?? summary.inserted, 0);
+  const postsClassified = toInt(
+    summary.classification_success ?? summary.classificationSuccess ?? summary.posts_classified ?? summary.classified ?? summary.inserted,
+    0,
+  );
+  const filteredCandidates = toInt(summary.filtered_candidates ?? summary.filtered, 0);
   const netNewRows = toInt(summary.net_new_rows ?? summary.inserted, 0);
 
   let status = typeof summary.status === "string" ? summary.status : "success";
   if (summary.skipped === true) {
     status = "skipped";
+  } else if (
+    status === "success"
+    && filteredCandidates > 0
+    && postsClassified === 0
+    && errors.some((error) => /classif|quota/i.test(error))
+  ) {
+    status = "failed";
   } else if (errors.length > 0 && status === "success") {
     status = (postsFound > 0 || postsClassified > 0 || netNewRows > 0) ? "partial" : "failed";
   }
@@ -170,7 +182,7 @@ export function deriveRunMetrics(summary: Record<string, unknown>): DerivedRunMe
     posts_found: postsFound,
     posts_classified: postsClassified,
     apify_items_fetched: toInt(summary.apify_items_fetched ?? summary.apifyItems ?? summary.raw_items, 0),
-    filtered_candidates: toInt(summary.filtered_candidates ?? summary.filtered, 0),
+    filtered_candidates: filteredCandidates,
     net_new_rows: netNewRows,
     duplicate_conflicts: toInt(summary.duplicate_conflicts, 0),
     errors,
@@ -235,7 +247,8 @@ export async function updateRunRecord(
   if (input.errors !== undefined) payload.errors = input.errors;
   if (input.metadata !== undefined) payload.metadata = input.metadata;
 
-  await supabase.from("scraper_runs").update(payload).eq("id", runId);
+  const { error } = await supabase.from("scraper_runs").update(payload).eq("id", runId);
+  if (error) throw new Error(`Failed to update scraper run ${runId}: ${error.message}`);
 }
 
 export function isUniqueViolation(error: any): boolean {

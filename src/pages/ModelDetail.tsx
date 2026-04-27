@@ -60,7 +60,10 @@ const ModelDetail = () => {
 
   const latestScore = enriched?.latestScore ?? 50;
   const trend = enriched?.trend ?? { direction: "up" as const, pts: 0 };
-  const totalPosts = enriched?.totalPosts ?? 0;
+  const recentPosts7d = enriched?.recentPosts7d ?? enriched?.totalPosts ?? 0;
+  const latestScoreTotalPosts = enriched?.latestScoreTotalPosts ?? 0;
+  const latestEligiblePosts = enriched?.eligiblePosts ?? 0;
+  const scoreBasisStatus = enriched?.scoreBasisStatus ?? "measured";
   const vibe = getVibeStatus(latestScore);
   const VibeIcon = vibe.icon;
   const accent = model?.accent_color || "#888";
@@ -224,7 +227,7 @@ const ModelDetail = () => {
                   }`}
                 >
                   {enriched?.isLatestCarryForward
-                    ? "no new posts today — score carried forward"
+                    ? "no scored posts in the latest window. Showing the previous daily score."
                     : trend.direction === "flat"
                     ? "no change from yesterday"
                     : `${trendUp ? "up" : "down"} ${trend.pts} pts from yesterday`}
@@ -233,16 +236,22 @@ const ModelDetail = () => {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
               <p className="text-sm text-text-tertiary font-mono">
-                Latest daily score with {totalPosts.toLocaleString()} recent posts over the last 7 days across Reddit, Hacker News, Bluesky, Mastodon, and X.
+                Daily score based on {latestEligiblePosts.toLocaleString()} scored posts in the latest scoring window. 7-day chatter: {recentPosts7d.toLocaleString()} posts across Reddit, Hacker News, Bluesky, Mastodon, and X.
               </p>
               <DataFreshnessIndicator lastUpdated={enriched?.lastUpdated ?? null} />
             </div>
-            {!enriched?.isLatestCarryForward
-              && (enriched?.eligiblePosts ?? 0) > 0
-              && (enriched?.eligiblePosts ?? 0) < 5 && (
+            {!enriched?.isLatestCarryForward && scoreBasisStatus === "no_eligible_posts" && latestScoreTotalPosts > 0 && (
               <p className="mt-2 flex items-center gap-1.5 text-xs text-text-tertiary font-mono">
                 <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden="true" />
-                Limited sample today. Only {enriched?.eligiblePosts} high-confidence posts back this score.
+                Posts were found in the latest window, but none met the high-confidence scoring threshold.
+              </p>
+            )}
+            {!enriched?.isLatestCarryForward
+              && latestEligiblePosts > 0
+              && latestEligiblePosts < 5 && (
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-text-tertiary font-mono">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden="true" />
+                Limited sample in the latest window. Only {latestEligiblePosts} high-confidence posts back this score.
               </p>
             )}
           </section>

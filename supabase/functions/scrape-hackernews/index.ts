@@ -1,8 +1,10 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted, isClassifierFailure } from "../_shared/classifier.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
+  internalOnlyResponse,
+  isInternalServiceRequest,
   isUniqueViolation,
   readJsonBody,
   type RunRecordRow,
@@ -17,7 +19,6 @@ import {
   isDuplicate,
   logToErrorLog,
   logZeroDataWarning,
-  triggerAggregateVibes,
   upsertScrapedPost,
 } from "../_shared/utils.ts";
 
@@ -44,6 +45,7 @@ function delay(ms: number) {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const body = await readJsonBody(req);
@@ -98,14 +100,26 @@ Deno.serve(async (req) => {
       posts_found: 0,
       filtered_candidates: 0,
       classified: 0,
+      classification_success: 0,
       net_new_rows: 0,
       duplicate_conflicts: 0,
       irrelevant: 0,
+      classifierErrors: 0,
       dedupSkipped: 0,
       contentSkipped: 0,
       errors: [] as string[],
       stories: 0,
     };
+
+    const storyCandidates: {
+      text: string;
+      matchedSlugs: string[];
+      sourceUrl: string;
+      title: string;
+      score: number;
+      postedAt: string;
+    }[] = [];
+    const candidateUrls = new Set<string>();
 
     for (const term of STORY_SEARCH_TERMS) {
       try {
@@ -122,24 +136,19 @@ Deno.serve(async (req) => {
         summary.stories += hits.length;
         summary.posts_found += hits.length;
 
-        const storyCandidates: {
-          text: string;
-          matchedSlugs: string[];
-          sourceUrl: string;
-          title: string;
-          score: number;
-          postedAt: string;
-        }[] = [];
-
         for (const hit of hits) {
           if (!hit.title) continue;
+          if (!hit.created_at) {
+            summary.contentSkipped++;
+            continue;
+          }
           if (!meetsMinLength(hit.title, "")) {
             summary.contentSkipped++;
             continue;
           }
 
           const sourceUrl = `https://news.ycombinator.com/item?id=${hit.objectID}`;
-          if (existingUrls.has(sourceUrl)) {
+          if (existingUrls.has(sourceUrl) || candidateUrls.has(sourceUrl)) {
             summary.dedupSkipped++;
             continue;
           }
@@ -167,85 +176,93 @@ Deno.serve(async (req) => {
             sourceUrl,
             title: hit.title,
             score: hit.points || 0,
-            postedAt: hit.created_at || new Date().toISOString(),
+            postedAt: hit.created_at,
           });
-        }
-
-        const hnLogError = async (msg: string, ctx?: string) => {
-          await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
-        };
-        const storyClassifications = await classifyBatch(storyCandidates.map((candidate) => candidate.text), geminiApiKey, 25, hnLogError);
-        summary.classified += storyClassifications.length;
-        summary.irrelevant += storyClassifications.filter((classification) => !classification.relevant).length;
-
-        // Phase 12 G-prime: only run targeted classifier on multi-model posts.
-        // Single-model posts use baseClassification via the existing fallback at
-        // the per-slug upsert site below.
-        const targetedItems: { idx: number; slug: string }[] = [];
-        for (let i = 0; i < storyCandidates.length; i++) {
-          if (!storyClassifications[i].relevant) continue;
-          if (storyCandidates[i].matchedSlugs.length < 2) continue;
-          for (const slug of storyCandidates[i].matchedSlugs) {
-            targetedItems.push({ idx: i, slug });
-          }
-        }
-        const targetedResults = targetedItems.length > 0
-          ? await classifyBatchTargeted(
-            targetedItems.map((item) => ({ text: storyCandidates[item.idx].text, targetModel: item.slug })),
-            geminiApiKey,
-            25,
-            hnLogError,
-          )
-          : [];
-        const targetedMap = new Map<string, typeof storyClassifications[0]>();
-        targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
-
-        for (let i = 0; i < storyCandidates.length; i++) {
-          const baseClassification = storyClassifications[i];
-          if (!baseClassification.relevant) continue;
-          const candidate = storyCandidates[i];
-
-          for (const slug of candidate.matchedSlugs) {
-            const classification = targetedMap.get(`${i}:${slug}`) || baseClassification;
-            const modelId = modelMap[slug];
-            if (!modelId || isDuplicate(titleKeys, candidate.title, modelId)) continue;
-
-            const upsertResult = await upsertScrapedPost(supabase, {
-              model_id: modelId,
-              source: "hackernews",
-              source_url: candidate.sourceUrl,
-              title: candidate.title.slice(0, 500),
-              content: candidate.title.slice(0, 2000),
-              sentiment: classification.sentiment,
-              complaint_category: classification.complaint_category,
-              praise_category: classification.praise_category,
-              confidence: classification.confidence,
-              content_type: "title_only",
-              original_language: classification.language || null,
-              translated_content: classification.english_translation || null,
-              score: candidate.score,
-              posted_at: candidate.postedAt,
-            });
-
-            if (upsertResult.error) {
-              summary.errors.push(upsertResult.error);
-              continue;
-            }
-
-            if (upsertResult.inserted) {
-              summary.net_new_rows++;
-              existingUrls.add(candidate.sourceUrl);
-              titleKeys.add(`${modelId}:${candidate.title.slice(0, 80).toLowerCase()}`);
-            } else {
-              summary.duplicate_conflicts++;
-            }
-          }
+          candidateUrls.add(sourceUrl);
         }
       } catch (error) {
         summary.errors.push(`Story ${term}: ${error instanceof Error ? error.message : "unknown"}`);
       }
 
       await delay(500);
+    }
+
+    const hnLogError = async (msg: string, ctx?: string) => {
+      await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
+    };
+    const storyClassifications = await classifyBatch(storyCandidates.map((candidate) => candidate.text), geminiApiKey, 25, hnLogError);
+    summary.classified = storyClassifications.length;
+    summary.classification_success = storyClassifications.filter((classification) => !isClassifierFailure(classification)).length;
+    summary.classifierErrors = storyClassifications.filter(isClassifierFailure).length;
+    summary.irrelevant = storyClassifications.filter((classification) => !classification.relevant && !isClassifierFailure(classification)).length;
+    if (summary.classifierErrors > 0) {
+      summary.errors.push(`Classifier failed for ${summary.classifierErrors}/${storyClassifications.length} candidates`);
+    }
+
+    const targetedItems: { idx: number; slug: string }[] = [];
+    for (let i = 0; i < storyCandidates.length; i++) {
+      if (!storyClassifications[i].relevant || isClassifierFailure(storyClassifications[i])) continue;
+      if (storyCandidates[i].matchedSlugs.length < 2) continue;
+      for (const slug of storyCandidates[i].matchedSlugs) {
+        targetedItems.push({ idx: i, slug });
+      }
+    }
+    const targetedResults = targetedItems.length > 0
+      ? await classifyBatchTargeted(
+        targetedItems.map((item) => ({ text: storyCandidates[item.idx].text, targetModel: item.slug })),
+        geminiApiKey,
+        25,
+        hnLogError,
+      )
+      : [];
+    const targetedMap = new Map<string, typeof storyClassifications[0]>();
+    targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
+    const targetedClassifierErrors = targetedResults.filter(isClassifierFailure).length;
+    if (targetedClassifierErrors > 0) {
+      summary.errors.push(`Targeted classifier failed for ${targetedClassifierErrors}/${targetedResults.length} candidates`);
+    }
+
+    for (let i = 0; i < storyCandidates.length; i++) {
+      const baseClassification = storyClassifications[i];
+      if (!baseClassification.relevant || isClassifierFailure(baseClassification)) continue;
+      const candidate = storyCandidates[i];
+
+      for (const slug of candidate.matchedSlugs) {
+        const classification = targetedMap.get(`${i}:${slug}`) || baseClassification;
+        if (!classification.relevant || isClassifierFailure(classification)) continue;
+        const modelId = modelMap[slug];
+        if (!modelId || isDuplicate(titleKeys, candidate.title, modelId)) continue;
+
+        const upsertResult = await upsertScrapedPost(supabase, {
+          model_id: modelId,
+          source: "hackernews",
+          source_url: candidate.sourceUrl,
+          title: candidate.title.slice(0, 500),
+          content: candidate.title.slice(0, 2000),
+          sentiment: classification.sentiment,
+          complaint_category: classification.complaint_category,
+          praise_category: classification.praise_category,
+          confidence: classification.confidence,
+          content_type: "title_only",
+          original_language: classification.language || null,
+          translated_content: classification.english_translation || null,
+          score: candidate.score,
+          posted_at: candidate.postedAt,
+        });
+
+        if (upsertResult.error) {
+          summary.errors.push(upsertResult.error);
+          continue;
+        }
+
+        if (upsertResult.inserted) {
+          summary.net_new_rows++;
+          existingUrls.add(candidate.sourceUrl);
+          titleKeys.add(`${modelId}:${candidate.title.slice(0, 80).toLowerCase()}`);
+        } else {
+          summary.duplicate_conflicts++;
+        }
+      }
     }
 
     const derived = deriveRunMetrics(summary);
@@ -260,6 +277,8 @@ Deno.serve(async (req) => {
       metadata: {
         stories: summary.stories,
         irrelevant: summary.irrelevant,
+        classifier_errors: summary.classifierErrors,
+        classification_success: summary.classification_success,
         dedup_skipped: summary.dedupSkipped,
         content_skipped: summary.contentSkipped,
       },
@@ -279,10 +298,6 @@ Deno.serve(async (req) => {
       status: derived.status,
       posts_classified: derived.posts_classified,
     };
-
-    if (!body.orchestrated) {
-      await triggerAggregateVibes(supabase, SOURCE, { reason: "standalone_run" });
-    }
 
     return new Response(JSON.stringify(responseBody, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

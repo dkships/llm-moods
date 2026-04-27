@@ -97,7 +97,7 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
                 }
               >
                 {m.isLatestCarryForward
-                  ? "no new posts today"
+                  ? "no scored posts in latest window"
                   : m.trend.direction === "flat"
                   ? "no change from yesterday"
                   : `${trendUp ? "up" : "down"} ${m.trend.pts} pts from yesterday`}
@@ -236,10 +236,10 @@ const Dashboard = () => {
     prefetch(slug, id);
   }, [prefetch]);
 
-  const latestScoreUpdate = (models || []).reduce<string | null>((latest, model) => {
-    if (!model.lastUpdated) return latest;
-    if (!latest) return model.lastUpdated;
-    return new Date(model.lastUpdated).getTime() > new Date(latest).getTime() ? model.lastUpdated : latest;
+  const latestScoreUpdate = (models || []).reduce<string | null>((oldest, model) => {
+    if (!model.lastUpdated) return oldest;
+    if (!oldest) return model.lastUpdated;
+    return new Date(model.lastUpdated).getTime() < new Date(oldest).getTime() ? model.lastUpdated : oldest;
   }, null);
 
   return (
