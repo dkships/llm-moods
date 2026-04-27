@@ -10,7 +10,6 @@ import SectionHeader from "@/components/SectionHeader";
 import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
-import { ConfidenceChip } from "@/components/ConfidenceChip";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   useModelsWithLatestVibes,
@@ -55,7 +54,7 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
                 <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
               </div>
             </div>
-            <div className="flex flex-col items-end gap-1.5">
+            <div className="text-right">
               <Tooltip>
                 <TooltipTrigger asChild>
                   <p className="text-5xl font-extrabold font-mono text-foreground cursor-help leading-none">{m.latestScore}</p>
@@ -64,8 +63,7 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
                   0 = everyone's complaining, 100 = pure good vibes
                 </TooltipContent>
               </Tooltip>
-              <p className="text-xs text-text-tertiary font-mono">/ 100</p>
-              <ConfidenceChip eligiblePosts={m.eligiblePosts} size="sm" />
+              <p className="text-xs text-text-tertiary font-mono mt-0.5">/ 100</p>
             </div>
           </div>
 

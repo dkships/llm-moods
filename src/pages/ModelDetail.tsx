@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { TrendingUp, TrendingDown, Minus, ArrowLeft, ArrowRight, BookOpen, ExternalLink } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, ArrowLeft, ArrowRight, BookOpen, ExternalLink, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -19,7 +19,6 @@ import { getResearchPostsForModel } from "@/data/research-posts";
 import { detectProductSurface } from "@/lib/product-surface";
 import StatusCard from "@/components/StatusCard";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
-import { ConfidenceChip } from "@/components/ConfidenceChip";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
@@ -207,7 +206,7 @@ const ModelDetail = () => {
             </div>
             <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
               <p className="text-5xl sm:text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-text-tertiary ml-1">/ 100</span></p>
-              <div className="flex flex-wrap items-center gap-2 pb-2">
+              <div className="flex items-center gap-2 pb-2">
                 {trendUp ? (
                   <TrendingUp className="h-4 w-4 text-primary" />
                 ) : trendDown ? (
@@ -230,7 +229,6 @@ const ModelDetail = () => {
                     ? "no change from yesterday"
                     : `${trendUp ? "up" : "down"} ${trend.pts} pts from yesterday`}
                 </span>
-                <ConfidenceChip eligiblePosts={enriched?.eligiblePosts ?? 0} />
               </div>
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
@@ -239,6 +237,14 @@ const ModelDetail = () => {
               </p>
               <DataFreshnessIndicator lastUpdated={enriched?.lastUpdated ?? null} />
             </div>
+            {!enriched?.isLatestCarryForward
+              && (enriched?.eligiblePosts ?? 0) > 0
+              && (enriched?.eligiblePosts ?? 0) < 5 && (
+              <p className="mt-2 flex items-center gap-1.5 text-xs text-text-tertiary font-mono">
+                <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden="true" />
+                Limited sample today. Only {enriched?.eligiblePosts} high-confidence posts back this score.
+              </p>
+            )}
           </section>
 
           {/* Recent incident analysis — only when a research post references this model */}

@@ -50,24 +50,11 @@ export function getVibeStatus(score: number) {
   return { label: "Good Vibes", icon: Sun, color: SENTIMENT_HSL.good };
 }
 
-// Confidence tiers reflect how many *eligible* posts (confidence ≥ 0.65)
-// drove a score. Thresholds align with DEFAULT_MIN_POSTS=5 in the smoothing
-// math: below 5 the smoothing weights tip heavily toward the previous day,
-// so the surfaced score is "preliminary" by definition.
-export type ConfidenceTier = "preliminary" | "good" | "strong";
-
-export const CONFIDENCE_TIER_LABELS: Record<ConfidenceTier, string> = {
-  preliminary: "Preliminary",
-  good: "Good",
-  strong: "Strong",
-};
-
-export function getConfidenceTier(eligiblePosts: number | null | undefined): ConfidenceTier {
-  const n = eligiblePosts ?? 0;
-  if (n < 5) return "preliminary";
-  if (n < 20) return "good";
-  return "strong";
-}
+// Sample-size warning threshold for asymmetric "Limited sample" notes on
+// the model detail page and chart tooltips. Mirrors DEFAULT_MIN_POSTS=5 in
+// vibes-scoring.ts: below this floor the smoothing weights tip heavily
+// toward the previous day, so the surfaced score is mostly inertia.
+export const LIMITED_SAMPLE_THRESHOLD = 5;
 
 // Maps a post sentiment to the unified left-border accent class. Used by
 // chatter posts and recent-posts list items so the border-color language is
