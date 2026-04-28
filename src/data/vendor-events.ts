@@ -6,7 +6,8 @@ export type VendorEventType =
   | "known_regression"
   | "pricing_change"
   | "outage"
-  | "infrastructure_change";
+  | "infrastructure_change"
+  | "incident_observed";
 
 export interface VendorEvent {
   id: string;
@@ -82,6 +83,15 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     title: "Opus 4.7 launch",
     notes: "Date inferred from public chatter (`Opus 4.7 Dropped` posts on April 17).",
   },
+  {
+    id: "claude-2026-03-27-first-community-signal",
+    vendor: "anthropic",
+    modelSlug: "claude",
+    eventDate: "2026-03-27",
+    eventType: "incident_observed",
+    title: "First community signal in LLM Vibes",
+    notes: "Score fell 32 points (70 → 38) Mar 24 → Mar 27 as Anthropic shipped the cache change.",
+  },
 ];
 
 export function getEventsForModel(slug: string | undefined): VendorEvent[] {
@@ -101,6 +111,7 @@ const EVENT_TYPE_COLORS: Record<VendorEventType, string> = {
   pricing_change: "hsl(40 85% 60%)",
   outage: "hsl(0 60% 50%)",
   infrastructure_change: "hsl(260 60% 65%)",
+  incident_observed: "hsl(38 90% 60%)",
 };
 
 export function getEventColor(type: VendorEventType): string {

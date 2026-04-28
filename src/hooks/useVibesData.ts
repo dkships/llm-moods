@@ -215,7 +215,8 @@ export function useVibesHistory(modelId: string | undefined, period: string, ran
       const now = new Date();
       let sinceISO: string;
       if (period === "daily") {
-        const daysBack = range === "7d" ? 6 : 29;
+        const match = range.match(/^(\d+)d$/);
+        const daysBack = range === "7d" ? 6 : match ? Number(match[1]) - 1 : 29;
         sinceISO = getPacificDayWindowSince(daysBack, now);
       } else if (range === "24h") {
         sinceISO = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();

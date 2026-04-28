@@ -7,6 +7,7 @@
 import EmbeddedModelChart from "@/components/research/EmbeddedModelChart";
 import AuthorBio from "@/components/research/AuthorBio";
 import PullQuote from "@/components/research/PullQuote";
+import StatCallout from "@/components/research/StatCallout";
 
 const ExternalLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <a href={href} target="_blank" rel="noopener noreferrer">
@@ -16,7 +17,7 @@ const ExternalLink = ({ href, children }: { href: string; children: React.ReactN
 
 const ClaudeApril2026Body = () => (
   <>
-    <h2>The 28-day gap</h2>
+    <h2 id="the-28-day-gap">The 28-day gap</h2>
     <p>
       On March 26, 2026, Anthropic shipped a thinking-cache regression into Claude Sonnet 4.6 and Opus 4.6. The
       same day, an LLM Vibes scraper logged a{" "}
@@ -36,32 +37,43 @@ const ClaudeApril2026Body = () => (
       it didn't.
     </p>
 
-    <EmbeddedModelChart modelSlug="claude" />
+    <StatCallout
+      stats={[
+        { value: "32 points", label: "Daily score drop, Mar 24 → Mar 27" },
+        { value: "28 days", label: "Until Anthropic confirmed the bug" },
+      ]}
+    />
+
+    <EmbeddedModelChart modelSlug="claude" daysBack={46} />
     <p className="mt-2 text-sm text-foreground/65">
       <em>
-        Claude's daily sentiment score over the last 30 days. The shaded bands are Anthropic's three confirmed
-        bug windows from the April 23 postmortem.
+        Claude's daily sentiment score, March 14 through today. Shaded bands are Anthropic's three confirmed
+        bug windows from the April 23 postmortem. The amber line marks March 27, the user-visible inflection
+        day.
       </em>
     </p>
 
-    <h2>The match-up</h2>
+    <h2 id="the-match-up">The match-up</h2>
     <p>
       Anthropic's{" "}
       <ExternalLink href="https://www.anthropic.com/engineering/april-23-postmortem">
         April 23 engineering postmortem
       </ExternalLink>{" "}
-      named three bugs that ran between March 4 and April 20. Each one maps onto a complaint category our
-      classifier was already tagging.
+      named three bugs running March 4 – April 20. Our classifier had already tagged complaints for all three.
     </p>
     <div className="my-6 overflow-x-auto rounded-lg border border-border">
       <table className="w-full">
+        <caption className="sr-only">
+          Anthropic's three confirmed bugs from the April 23 postmortem matched to LLM Vibes complaint
+          categories.
+        </caption>
         <thead>
           <tr>
-            <th>Bug</th>
-            <th className="whitespace-nowrap">Anthropic window</th>
-            <th>Stated symptom</th>
-            <th>LLM Vibes complaint tag</th>
-            <th className="whitespace-nowrap">First captured signal</th>
+            <th scope="col">Bug</th>
+            <th scope="col" className="whitespace-nowrap">Anthropic window</th>
+            <th scope="col">Stated symptom</th>
+            <th scope="col">LLM Vibes complaint tag</th>
+            <th scope="col" className="whitespace-nowrap">First captured signal</th>
           </tr>
         </thead>
         <tbody>
@@ -105,10 +117,9 @@ const ClaudeApril2026Body = () => (
       deployment.
     </p>
 
-    <h2>The receipts</h2>
+    <h2 id="the-receipts">The receipts</h2>
     <p>
-      These are verbatim posts pulled from the <code>scraped_posts</code> table, paired with Anthropic's
-      postmortem dates.
+      Verbatim from our <code>scraped_posts</code> table, paired with the postmortem dates.
     </p>
     <PullQuote
       text="Restart session, clear conversations, clear claude md, give it specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf."
@@ -124,6 +135,7 @@ const ClaudeApril2026Body = () => (
       platform="Reddit"
       timestamp="2026-03-27 21:36 UTC"
       href="https://www.reddit.com/r/ClaudeAI/comments/1s5hfa4/"
+      archivedHref="https://web.archive.org/web/2026/https://www.reddit.com/r/ClaudeAI/comments/1s5hfa4/"
     />
     <PullQuote
       text="Paying for Claude Max 20x and the token limits still tank mid-session on heavy coding work. If you're selling a premium tier for power users, actually build for power users."
@@ -131,12 +143,12 @@ const ClaudeApril2026Body = () => (
       platform="X"
       timestamp="2026-03-29 23:55 UTC"
       href="https://x.com/mkalkere/status/2038404677000216624"
+      archivedHref="https://web.archive.org/web/2026/https://x.com/mkalkere/status/2038404677000216624"
     />
     <p>
-      The first quote is the most direct. Bug 2, the thinking-cache regression, shipped on March 26. The post
-      was captured on March 26. The user is comparing Claude's behavior to a model two generations old. Our
-      classifier tagged it <code>general_drop</code> and <code>lazy_responses</code>, the categories Anthropic
-      later mapped to "forgetful and repetitive."
+      Bug 2 (thinking-cache) shipped March 26. The first quote arrived same-day, comparing Claude to a model
+      two generations old. Our classifier tagged it <code>general_drop</code> and <code>lazy_responses</code>,
+      the categories Anthropic later mapped to "forgetful and repetitive."
     </p>
     <p>
       The second quote is the token-drain symptom Anthropic admitted to in the postmortem, captured 24 hours
@@ -145,31 +157,35 @@ const ClaudeApril2026Body = () => (
       before any tech outlet had filed copy on it.
     </p>
 
-    <h2>What we got right</h2>
+    <h2 id="what-we-got-right">What we got right</h2>
     <p>
-      Same-day capture on March 26. Same-day capture on the March 27 token-drain spike: our{" "}
-      <code>api_reliability</code> complaint volume jumped on the day Anthropic later said the cache bug began
-      burning quota. A one-day match between an internal engineering change and an external sentiment pattern is
-      the case for tools like ours existing at all.
+      Same-day capture on March 26: an LLM Vibes scraper logged @tetrac-official's "feels like sonnet 3.5"
+      post on the day Anthropic shipped the cache change. Over the same 72 hours our daily score for Claude
+      fell 32 points, 70 → 38, March 24 → 27. Same-day capture again on March 27: our{" "}
+      <code>api_reliability</code> complaint volume jumped on the day Anthropic later said the cache bug
+      began burning quota. A one-day match between an internal engineering change and an external sentiment
+      pattern is the case for tools like ours existing at all.
     </p>
     <p>
       The cross-model isolation also held up, but not in the way the bug-window numbers alone would tell you.
       During the cache-bug window (March 26 – April 10), Claude scored 48.2, ChatGPT 31.1, Gemini 36.9, Grok
-      33.6. Claude was still ahead in absolute terms. Bug-window deltas don't differentiate it either: Claude
-      dropped 23, ChatGPT dropped 50, Gemini dropped 39, Grok dropped 15. By that read, ChatGPT looked far
+      32.6. Claude was still ahead in absolute terms. Bug-window deltas don't differentiate it either: Claude
+      dropped 23, ChatGPT dropped 50, Gemini dropped 39, Grok dropped 16. By that read, ChatGPT looked far
       worse than Claude. The signal that singled Claude out is the <em>post-fix recovery shape</em>. Between
-      April 11 and April 15, ChatGPT moved back toward its baseline (31 → 49) while Gemini stayed flat
-      (37 → 38) and Claude fell another 15 points to 33. That post-fix divergence is the strongest evidence we
-      have that the underlying issue was Claude-specific rather than the press cycle hitting every model.
+      April 11 and April 15, ChatGPT moved back toward its baseline (31 → 48), Gemini also recovered
+      (37 → 42), and Claude fell another 14 points to 34. (Grok kept sliding on much thinner post volume;
+      Claude's drop is the only one with high-volume support.) That post-fix divergence is the strongest
+      evidence we have that the underlying issue was Claude-specific rather than the press cycle hitting every
+      model.
     </p>
 
-    <h2>What we got wrong</h2>
+    <h2 id="what-we-got-wrong">What we got wrong</h2>
     <p>
-      Three things, listed because the post-fix dip is currently the lowest score on Claude's chart and that
-      misleads anyone reading the dashboard cold.
+      Three things, in order of how much they undercut the dashboard.
     </p>
     <p>
-      The April 11–15 trough (score 33, the lowest single-window number on Claude's history) landed{" "}
+      The April 11–15 trough (score 34, the lowest single-window average on Claude's chart through April 24)
+      landed{" "}
       <em>after</em> Anthropic fixed the cache bug on April 10 and <em>before</em> the verbosity-prompt bug on
       April 16. That window is press-cycle echo, not silent-bug detection. The Register published on April 13,
       VentureBeat and Hacker News followed, and our scrapers captured the resulting wave of "Claude is broken"
@@ -191,26 +207,26 @@ const ClaudeApril2026Body = () => (
           [1]
         </a>
       </sup>{" "}
-      There is no evidence of bias in this dataset, and the directional movement is consistent across complaint
-      categories and sources, but the structural risk is real and we have no validation harness yet to spot-check.
+      In this dataset Claude often outscored Gemini, the opposite of what self-favoritism would produce, but
+      the structural risk is real and we have no validation harness yet.
     </p>
 
-    <h2>What this changes</h2>
+    <h2 id="what-this-changes">What this changes</h2>
     <p>
       When SaaS reliability mattered enough, third-party status pages and observability tools (StatusGator,
       Downdetector, Datadog's third-party monitors) emerged because vendor-published uptime numbers turned out
-      to be a conflict of interest. Frontier-model quality is now in roughly the same position. Anthropic's
-      postmortem is unusually candid by industry standards, but it took 28 days, multiple Hacker News threads,
-      and an international press cycle to produce. The user-side signal was visible the day the bug shipped.
+      to be a conflict of interest. Frontier-model quality is now in roughly the same position. Anthropic
+      published its postmortem 28 days after the bug shipped. That lag, from internal detection to external
+      confirmation, is the gap independent telemetry fills. The user-side signal was visible the day the bug
+      shipped.
     </p>
     <p>
-      The argument is not that LLM Vibes is correct and Anthropic is wrong. We share a classifier vendor with
-      our subjects, our scrapers are imperfect, and our lowest score landed on the wrong week. The argument is
-      that AI accountability needs more sources of telemetry that don't sit inside the lab's CI pipeline. We're
-      one of them. There should be five.
+      AI accountability needs more sources of telemetry that don't sit inside the lab's CI pipeline. We share
+      a classifier vendor with our subjects, our scrapers are imperfect, and our lowest score landed on the
+      wrong week. We're one source. There should be five.
     </p>
 
-    <h2>Methodology</h2>
+    <h2 id="methodology">Methodology</h2>
     <p>
       LLM Vibes scrapes posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across five social platforms:
       Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), and Mastodon (5
@@ -225,13 +241,14 @@ const ClaudeApril2026Body = () => (
     </p>
     <p>
       The numbers in this article come from the <code>vibes_scores</code> and <code>scraped_posts</code> tables,
-      filtered to days with ≥10 Claude posts. All quoted text is verbatim. The full data analysis lives in the{" "}
+      filtered to days with ≥10 total Claude posts (matching the methodology in the public retrospective). All
+      quoted text is verbatim. The full data analysis lives in the{" "}
       <ExternalLink href="https://github.com/dkships/llm-moods">public repository</ExternalLink> under{" "}
       <code>docs/claude-april-2026-degradation-analysis.md</code>, and the internal retrospective is at{" "}
       <code>docs/llm-vibes-retrospective-april-2026.md</code>.
     </p>
 
-    <h2>What you can do next</h2>
+    <h2 id="what-you-can-do-next">What you can do next</h2>
     <p>
       See the <a href="/model/claude">live Claude chart</a>. The three Anthropic bug bands are overlaid on the
       score history, with annotation arrows on March 26 and April 11.

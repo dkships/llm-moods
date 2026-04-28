@@ -7,6 +7,8 @@ const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
 interface EmbeddedModelChartProps {
   modelSlug: string;
+  /** Number of inclusive days to render. Defaults to 30. */
+  daysBack?: number;
 }
 
 /**
@@ -16,13 +18,14 @@ interface EmbeddedModelChartProps {
  * vendor-events overlay so an article's hero chart stays current with the
  * underlying data instead of relying on a screenshot.
  */
-const EmbeddedModelChart = ({ modelSlug }: EmbeddedModelChartProps) => {
+const EmbeddedModelChart = ({ modelSlug, daysBack }: EmbeddedModelChartProps) => {
+  const days = daysBack ?? 30;
   const { data: model } = useModelDetail(modelSlug);
-  const { data: vibesHistory, isLoading, isError } = useVibesHistory(model?.id, "daily", "30d");
+  const { data: vibesHistory, isLoading, isError } = useVibesHistory(model?.id, "daily", `${days}d`);
 
   const accent = model?.accent_color || "#888";
 
-  const { chartData, dateLabels } = useDailyChartData(vibesHistory, 30);
+  const { chartData, dateLabels } = useDailyChartData(vibesHistory, days);
   const chartEvents = useChartEvents(modelSlug, dateLabels);
 
   if (isError) {
@@ -37,7 +40,7 @@ const EmbeddedModelChart = ({ modelSlug }: EmbeddedModelChartProps) => {
     <Surface className="my-6">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-mono text-sm uppercase tracking-wide text-text-tertiary">
-          {model?.name ?? modelSlug} · daily score · last 30 days
+          {model?.name ?? modelSlug} · daily score · last {days} days
         </h3>
       </div>
       <div className="h-56 sm:h-64">
