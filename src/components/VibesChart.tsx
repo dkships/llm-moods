@@ -1,5 +1,6 @@
 import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, ReferenceLine, ReferenceArea } from "recharts";
 import { memo } from "react";
+import { LIMITED_SAMPLE_THRESHOLD } from "@/lib/vibes";
 
 // Theme colors — mapped from CSS variables (Recharts needs raw strings)
 const CHART_COLORS = {
@@ -67,7 +68,7 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
     !datum.isCarryForward
     && datum.eligiblePosts != null
     && datum.eligiblePosts > 0
-    && datum.eligiblePosts < 5;
+    && datum.eligiblePosts < LIMITED_SAMPLE_THRESHOLD;
   return (
     <div
       style={{

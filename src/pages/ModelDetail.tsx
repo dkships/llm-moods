@@ -19,17 +19,27 @@ import { getResearchPostsForModel } from "@/data/research-posts";
 import { detectProductSurface } from "@/lib/product-surface";
 import StatusCard from "@/components/StatusCard";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
+import ScoreMetaBadge from "@/components/ScoreMetaBadge";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
   SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
-  sentimentBorderClass,
+  sentimentBorderClass, LIMITED_SAMPLE_THRESHOLD,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
 const TIME_RANGES = ["24h", "7d", "30d"] as const;
+
+function formatAbsoluteTimestamp(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
 
 const ModelDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -66,6 +76,22 @@ const ModelDetail = () => {
   const scoreBasisStatus = enriched?.scoreBasisStatus ?? "measured";
   const latestDataUpdatedAt = enriched?.latestPostIngestedAt ?? enriched?.latestPostPostedAt ?? null;
   const scoreComputedAt = enriched?.scoreComputedAt ?? null;
+  const scoreComputedLabel = scoreComputedAt ? formatTimeAgo(scoreComputedAt) : null;
+  const scoreComputedAbsolute = scoreComputedAt ? formatAbsoluteTimestamp(scoreComputedAt) : null;
+  const hasNoEligiblePosts = !enriched?.isLatestCarryForward && scoreBasisStatus === "no_eligible_posts" && latestScoreTotalPosts > 0;
+  const hasLimitedSample = !enriched?.isLatestCarryForward
+    && latestEligiblePosts > 0
+    && latestEligiblePosts < LIMITED_SAMPLE_THRESHOLD;
+  const scoredPostsTitle = [
+    hasNoEligiblePosts
+      ? "Posts were found in the latest window, but none met the high-confidence scoring threshold."
+      : hasLimitedSample
+      ? `Limited sample: ${latestEligiblePosts.toLocaleString()} high-confidence posts back this score.`
+      : "High-confidence posts backing the latest daily score.",
+    scoreComputedLabel && scoreComputedAbsolute
+      ? `Score recomputed ${scoreComputedLabel} (${scoreComputedAbsolute}).`
+      : null,
+  ].filter(Boolean).join(" ");
   const vibe = getVibeStatus(latestScore);
   const VibeIcon = vibe.icon;
   const accent = model?.accent_color || "#888";
@@ -230,41 +256,27 @@ const ModelDetail = () => {
                   }`}
                 >
                   {enriched?.isLatestCarryForward
-                    ? "no scored posts in the latest window. Showing the previous daily score."
+                    ? "no scored posts in latest window"
                     : trend.direction === "flat"
                     ? "no change from yesterday"
                     : `${trendUp ? "up" : "down"} ${trend.pts} pts from yesterday`}
                 </span>
               </div>
             </div>
-            <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1">
-              <p className="text-sm text-text-tertiary font-mono">
-                Daily score based on {latestEligiblePosts.toLocaleString()} scored posts in the latest scoring window. 7-day chatter: {recentPosts7d.toLocaleString()} posts across Reddit, Hacker News, Bluesky, Mastodon, and X.
-              </p>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <ScoreMetaBadge
+                tone={hasNoEligiblePosts || hasLimitedSample ? "warning" : "muted"}
+                icon={hasNoEligiblePosts || hasLimitedSample ? AlertTriangle : undefined}
+                title={scoredPostsTitle}
+                ariaLabel={`${latestEligiblePosts.toLocaleString()} scored posts`}
+              >
+                {latestEligiblePosts.toLocaleString()} scored
+              </ScoreMetaBadge>
+              <ScoreMetaBadge title="Classified posts from the last 7 days.">
+                {recentPosts7d.toLocaleString()} posts · 7d
+              </ScoreMetaBadge>
               <DataFreshnessIndicator lastUpdated={latestDataUpdatedAt} />
-              {scoreComputedAt && (
-                <span
-                  className="text-xs sm:text-[11px] font-mono text-text-tertiary"
-                  title={`Score computed at ${new Date(scoreComputedAt).toLocaleString()}`}
-                >
-                  Score recalculated {formatTimeAgo(scoreComputedAt)}
-                </span>
-              )}
             </div>
-            {!enriched?.isLatestCarryForward && scoreBasisStatus === "no_eligible_posts" && latestScoreTotalPosts > 0 && (
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-text-tertiary font-mono">
-                <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden="true" />
-                Posts were found in the latest window, but none met the high-confidence scoring threshold.
-              </p>
-            )}
-            {!enriched?.isLatestCarryForward
-              && latestEligiblePosts > 0
-              && latestEligiblePosts < 5 && (
-              <p className="mt-2 flex items-center gap-1.5 text-xs text-text-tertiary font-mono">
-                <AlertTriangle className="h-3.5 w-3.5 text-warning" aria-hidden="true" />
-                Limited sample in the latest window. Only {latestEligiblePosts} high-confidence posts back this score.
-              </p>
-            )}
           </section>
 
           {/* Recent incident analysis — only when a research post references this model */}

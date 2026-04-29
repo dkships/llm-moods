@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Minus, MessageSquare, Zap, ExternalLink } from "lucide-react";
+import { TrendingUp, TrendingDown, Minus, MessageSquare, Zap, ExternalLink, AlertTriangle } from "lucide-react";
 import { memo, useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -19,9 +19,10 @@ import {
   type RecentChatterPost,
 } from "@/hooks/useVibesData";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
-import { getVibeStatus, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities, sentimentBorderClass } from "@/lib/vibes";
+import { getVibeStatus, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities, sentimentBorderClass, LIMITED_SAMPLE_THRESHOLD } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
+import ScoreMetaBadge from "@/components/ScoreMetaBadge";
 
 const LazySparkline = lazy(() => import("@/components/Sparkline"));
 
@@ -33,6 +34,9 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
 
   const trendDown = m.trend.direction === "down" && !m.isLatestCarryForward;
   const trendUp = m.trend.direction === "up" && !m.isLatestCarryForward;
+  const hasLimitedSample = !m.isLatestCarryForward
+    && m.eligiblePosts > 0
+    && m.eligiblePosts < LIMITED_SAMPLE_THRESHOLD;
 
   return (
     <Link
@@ -103,7 +107,21 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
                   : `${trendUp ? "up" : "down"} ${m.trend.pts} pts from yesterday`}
               </span>
             </div>
-            <span className="text-text-tertiary">Recent volume: {(m.totalPosts || 0).toLocaleString()} posts (7d)</span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              {hasLimitedSample && (
+                <ScoreMetaBadge
+                  tone="warning"
+                  icon={AlertTriangle}
+                  title={`${m.eligiblePosts.toLocaleString()} high-confidence posts back this score.`}
+                  ariaLabel={`${m.eligiblePosts.toLocaleString()} scored posts`}
+                >
+                  {m.eligiblePosts.toLocaleString()} scored
+                </ScoreMetaBadge>
+              )}
+              <ScoreMetaBadge title="Classified posts from the last 7 days.">
+                {(m.totalPosts || 0).toLocaleString()} posts · 7d
+              </ScoreMetaBadge>
+            </div>
           </div>
 
           {m.topComplaint && (

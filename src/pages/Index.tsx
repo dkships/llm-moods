@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import Surface from "@/components/Surface";
+import ScoreMetaBadge from "@/components/ScoreMetaBadge";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import { useModelsWithLatestVibes, usePrefetchModelDetail, type ModelWithVibes } from "@/hooks/useVibesData";
@@ -56,9 +57,9 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
             </div>
             <div className="mt-3 flex items-center justify-between">
               <TrendIcon trend={m.trend.direction} />
-              <span className="text-xs font-mono text-text-tertiary">
-                {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts (7d)` : "Tracking"}
-              </span>
+              <ScoreMetaBadge title="Classified posts from the last 7 days.">
+                {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts · 7d` : "Tracking"}
+              </ScoreMetaBadge>
             </div>
           </div>
         </Surface>

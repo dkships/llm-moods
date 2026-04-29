@@ -74,9 +74,9 @@ const mockModels = [
     ],
     topComplaint: "reasoning",
     totalPosts: 328,
-    latestScoreTotalPosts: 42,
+    latestScoreTotalPosts: 2,
     recentPosts7d: 328,
-    eligiblePosts: 31,
+    eligiblePosts: 2,
     lastUpdated: "2026-04-29T10:00:00.000Z",
     scoreComputedAt: "2026-04-29T11:30:00.000Z",
     latestPostPostedAt: "2026-04-29T09:00:00.000Z",
@@ -193,6 +193,7 @@ describe("public app routes", () => {
     expect(await screen.findByRole("heading", { name: /is your ai having a bad day/i })).toBeInTheDocument();
     expect(screen.getByText(/skip to main content/i)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /chatgpt mixed signals 59/i })).toBeInTheDocument();
+    expect(screen.getByText("328 posts · 7d")).toBeInTheDocument();
   });
 
   it("renders the dashboard route with freshness status", async () => {
@@ -203,6 +204,9 @@ describe("public app routes", () => {
       /^updated\b/i.test(element.textContent || ""),
     );
     expect(freshnessStatus).toBeDefined();
+    expect(screen.getByLabelText("2 scored posts")).toBeInTheDocument();
+    expect(screen.getByText("328 posts · 7d")).toBeInTheDocument();
+    expect(screen.queryByText(/recent volume:/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /recent community chatter/i })).toBeInTheDocument();
   });
 
@@ -214,12 +218,17 @@ describe("public app routes", () => {
     expect(screen.getByRole("heading", { name: /recent posts about chatgpt/i })).toBeInTheDocument();
   });
 
-  it("renders model detail with separate post freshness and score diagnostics", async () => {
+  it("renders model detail with compact score metadata", async () => {
     await renderAt("/model/chatgpt");
 
     expect(await screen.findByText(/updated\b/i)).toBeInTheDocument();
-    expect(screen.getByText(/^score recalculated\b/i)).toBeInTheDocument();
+    expect(screen.getByLabelText("2 scored posts")).toBeInTheDocument();
+    expect(screen.getByText("2 scored")).toBeInTheDocument();
+    expect(screen.getByText("328 posts · 7d")).toBeInTheDocument();
     expect(screen.getByText(/^latest classified post\b/i)).toBeInTheDocument();
+    expect(screen.queryByText(/daily score based on/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^score recalculated\b/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/limited sample in the latest window/i)).not.toBeInTheDocument();
   });
 
   it("labels negative surface distribution with the loaded 7-day window", async () => {
