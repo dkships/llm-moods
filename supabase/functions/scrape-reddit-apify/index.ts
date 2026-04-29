@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted, isClassifierFailure } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted, isClassifierFailure, summarizeClassifierFailures } from "../_shared/classifier.ts";
 import { abortApifyRun, apifyRunUrl, checkApifyBudget, scrubApifyRun } from "../_shared/apify-budget.ts";
 import {
   createRunRecord,
@@ -28,6 +28,9 @@ import {
 } from "../_shared/utils.ts";
 
 const SOURCE = "scrape-reddit-apify";
+const APIFY_ACTOR_TIMEOUT_SECS = 120;
+const APIFY_POLL_TIMEOUT_SECS = 105;
+const APIFY_POLL_INTERVAL_MS = 10_000;
 
 const DEFAULT_START_URLS = [
   "https://www.reddit.com/r/ClaudeAI/new/",
@@ -144,9 +147,17 @@ Deno.serve(async (req) => {
       maxItems: getConfigNumber(config, "max_items", 25),
       maxPostCount: getConfigNumber(config, "max_post_count", 8),
     };
+    const actorTimeoutSecs = Math.min(
+      getConfigNumber(config, "actor_timeout_secs", APIFY_ACTOR_TIMEOUT_SECS),
+      180,
+    );
+    const pollTimeoutSecs = Math.min(
+      getConfigNumber(config, "poll_timeout_secs", APIFY_POLL_TIMEOUT_SECS),
+      150,
+    );
 
     const startRes = await fetch(apifyRunUrl("trudax~reddit-scraper-lite", apifyToken, apifyInput.maxItems, {
-      timeoutSecs: 240,
+      timeoutSecs: actorTimeoutSecs,
       maxTotalChargeUsd: 0.35,
     }), {
       method: "POST",
@@ -189,8 +200,9 @@ Deno.serve(async (req) => {
 
     let runStatus = "";
     let terminalRunData: any = null;
-    for (let i = 0; i < 24; i++) {
-      await delay(10000);
+    const pollDeadline = Date.now() + pollTimeoutSecs * 1000;
+    while (Date.now() < pollDeadline) {
+      await delay(Math.min(APIFY_POLL_INTERVAL_MS, Math.max(1, pollDeadline - Date.now())));
       const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${apifyToken}`);
       if (!statusRes.ok) continue;
       const statusData = await statusRes.json();
@@ -218,7 +230,47 @@ Deno.serve(async (req) => {
         }
       } catch {}
       await logToErrorLog(supabase, SOURCE, `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
-      throw new Error(`Apify run status: ${runStatus || "TIMEOUT"}${errorDetail ? ` (${errorDetail})` : ""}`);
+      const message = `Apify run status: ${runStatus || "TIMEOUT"}${errorDetail ? ` (${errorDetail})` : ""}`;
+      const failed = {
+        source: SOURCE,
+        status: "failed",
+        backend: "apify",
+        posts_found: 0,
+        filtered_candidates: 0,
+        classified: 0,
+        classification_success: 0,
+        posts_classified: 0,
+        net_new_rows: 0,
+        duplicate_conflicts: 0,
+        apify_items_fetched: 0,
+        errors: [message],
+        apifyUsage: apifyRunMetadata,
+        apifyBudget: budget.usage,
+      };
+      await updateRunRecord(supabase, runRecord!.id, {
+        status: "failed",
+        posts_found: 0,
+        posts_classified: 0,
+        apify_items_fetched: 0,
+        filtered_candidates: 0,
+        net_new_rows: 0,
+        duplicate_conflicts: 0,
+        errors: failed.errors,
+        metadata: {
+          backend: "apify",
+          reason: "apify_run_not_succeeded",
+          apify_status: runStatus || "TIMEOUT",
+          apify_error_detail: errorDetail || null,
+          apify_usage: apifyRunMetadata,
+          apify_budget: budget.usage,
+          actor_timeout_secs: actorTimeoutSecs,
+          poll_timeout_secs: pollTimeoutSecs,
+        },
+        completed_at: new Date().toISOString(),
+      });
+      return new Response(JSON.stringify(failed, null, 2), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json`);
@@ -248,6 +300,8 @@ Deno.serve(async (req) => {
       duplicate_conflicts: 0,
       irrelevant: 0,
       classifierErrors: 0,
+      classifierRequestErrors: 0,
+      classifierQuotaDeferred: 0,
       classification_success: 0,
       duplicateSkipped: 0,
       dedupSkipped: 0,
@@ -318,13 +372,14 @@ Deno.serve(async (req) => {
       await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
     };
     const classifications = await classifyBatch(candidates.map((candidate) => candidate.fullText), geminiApiKey, 25, redditLogError);
+    const classifierSummary = summarizeClassifierFailures(classifications);
     summary.classified = classifications.length;
     summary.classification_success = classifications.filter((classification) => !isClassifierFailure(classification)).length;
-    summary.classifierErrors = classifications.filter(isClassifierFailure).length;
+    summary.classifierErrors = classifierSummary.candidateFailures;
+    summary.classifierRequestErrors = classifierSummary.requestFailures;
+    summary.classifierQuotaDeferred = classifierSummary.quotaDeferred;
     summary.irrelevant = classifications.filter((classification) => !classification.relevant && !isClassifierFailure(classification)).length;
-    if (summary.classifierErrors > 0) {
-      summary.errors.push(`Classifier failed for ${summary.classifierErrors}/${classifications.length} candidates`);
-    }
+    summary.errors.push(...classifierSummary.messages);
 
     // Phase 12 G-prime: only run targeted classifier on multi-model posts.
     // Single-model posts use baseClassification via the existing fallback at
@@ -347,10 +402,11 @@ Deno.serve(async (req) => {
       : [];
     const targetedMap = new Map<string, typeof classifications[0]>();
     targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
-    const targetedClassifierErrors = targetedResults.filter(isClassifierFailure).length;
-    if (targetedClassifierErrors > 0) {
-      summary.errors.push(`Targeted classifier failed for ${targetedClassifierErrors}/${targetedResults.length} candidates`);
-    }
+    const targetedClassifierSummary = summarizeClassifierFailures(targetedResults, "Targeted classifier");
+    summary.classifierErrors += targetedClassifierSummary.candidateFailures;
+    summary.classifierRequestErrors += targetedClassifierSummary.requestFailures;
+    summary.classifierQuotaDeferred += targetedClassifierSummary.quotaDeferred;
+    summary.errors.push(...targetedClassifierSummary.messages);
 
     for (let i = 0; i < candidates.length; i++) {
       const baseClassification = classifications[i];
@@ -413,6 +469,8 @@ Deno.serve(async (req) => {
         content_skipped: summary.contentSkipped,
         irrelevant: summary.irrelevant,
         classifier_errors: summary.classifierErrors,
+        classifier_request_errors: summary.classifierRequestErrors,
+        classifier_quota_deferred: summary.classifierQuotaDeferred,
         classification_success: summary.classification_success,
         apify_usage: summary.apifyUsage,
         apify_budget: summary.apifyBudget,

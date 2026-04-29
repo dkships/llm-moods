@@ -66,6 +66,8 @@ export interface ModelWithVibes {
   eligiblePosts: number;
   lastUpdated: string | null;
   scoreComputedAt: string | null;
+  latestPostPostedAt: string | null;
+  latestPostIngestedAt: string | null;
   scorePeriodStart: string | null;
   scorePeriodEnd: string | null;
   scoreBasisStatus: string;
@@ -145,8 +147,10 @@ export function useModelsWithLatestVibes() {
           latestScoreTotalPosts: m.latest_score_total_posts ?? 0,
           recentPosts7d: m.recent_posts_7d ?? m.total_posts ?? 0,
           eligiblePosts: m.latest_score_eligible_posts ?? m.eligible_posts ?? 0,
-          lastUpdated: m.score_computed_at ?? m.last_updated ?? null,
+          lastUpdated: m.latest_post_ingested_at ?? m.latest_post_posted_at ?? null,
           scoreComputedAt: m.score_computed_at ?? m.last_updated ?? null,
+          latestPostPostedAt: m.latest_post_posted_at ?? null,
+          latestPostIngestedAt: m.latest_post_ingested_at ?? null,
           scorePeriodStart: m.score_period_start ?? null,
           scorePeriodEnd: m.score_period_end ?? null,
           scoreBasisStatus: m.score_basis_status ?? (isLatestCarryForward ? "carried_forward" : "measured"),

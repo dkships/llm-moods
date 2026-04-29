@@ -1,11 +1,45 @@
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "./taxonomy.ts";
 
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const MODEL = "gemini-2.5-flash";
-const DAILY_REQUEST_LIMIT = Number((globalThis as any).Deno?.env.get("GEMINI_DAILY_REQUEST_LIMIT") ?? "200");
-const MINUTE_REQUEST_LIMIT = Number((globalThis as any).Deno?.env.get("GEMINI_MINUTE_REQUEST_LIMIT") ?? "8");
+type DenoGlobal = typeof globalThis & {
+  Deno?: { env: { get(name: string): string | undefined } };
+};
+type JsonRecord = Record<string, unknown>;
+type QuotaClient = {
+  rpc: (
+    fn: string,
+    args: Record<string, unknown>,
+  ) => Promise<{ data: unknown; error: { message: string } | null }>;
+};
+
+function envValue(name: string, fallback: string): string {
+  return (globalThis as DenoGlobal).Deno?.env.get(name) ?? fallback;
+}
+
+function isRecord(value: unknown): value is JsonRecord {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function nullableString(value: unknown): string | null {
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+const DAILY_REQUEST_LIMIT = Number(envValue("GEMINI_DAILY_REQUEST_LIMIT", "200"));
+const MINUTE_REQUEST_LIMIT = Number(envValue("GEMINI_MINUTE_REQUEST_LIMIT", "8"));
+const MAX_REMOTE_429_RETRY_WAIT_MS = Number(envValue("GEMINI_429_MAX_RETRY_WAIT_MS", "65000"));
 const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+const SAFE_ERROR_HEADERS = [
+  "retry-after",
+  "x-ratelimit-limit-requests",
+  "x-ratelimit-limit-tokens",
+  "x-ratelimit-remaining-requests",
+  "x-ratelimit-remaining-tokens",
+  "x-ratelimit-reset-requests",
+  "x-ratelimit-reset-tokens",
+  "x-request-id",
+  "x-goog-request-id",
+];
 
 export const CLASSIFY_PROMPT = `You are classifying a social media post about AI language models (ChatGPT, Claude, Gemini, Grok, DeepSeek, Perplexity, etc).
 
@@ -165,9 +199,22 @@ export interface ClassifyResult {
   english_translation?: string | null;
   status?: ClassifierStatus;
   error?: string | null;
+  error_type?: string | null;
+  request_error_id?: string | null;
+  retry_after_ms?: number | null;
 }
 
-function makeSkippedResult(status: Exclude<ClassifierStatus, "classified" | "irrelevant">, error: string): ClassifyResult {
+interface SkippedResultMetadata {
+  error_type?: string | null;
+  request_error_id?: string | null;
+  retry_after_ms?: number | null;
+}
+
+function makeSkippedResult(
+  status: Exclude<ClassifierStatus, "classified" | "irrelevant">,
+  error: string,
+  metadata: SkippedResultMetadata = {},
+): ClassifyResult {
   return {
     relevant: false,
     sentiment: null,
@@ -176,6 +223,9 @@ function makeSkippedResult(status: Exclude<ClassifierStatus, "classified" | "irr
     confidence: 0,
     status,
     error,
+    error_type: metadata.error_type ?? null,
+    request_error_id: metadata.request_error_id ?? null,
+    retry_after_ms: metadata.retry_after_ms ?? null,
   };
 }
 
@@ -195,10 +245,63 @@ export function isClassifierFailure(result: ClassifyResult | undefined | null): 
     || result?.status === "quota_deferred";
 }
 
-function parseResult(parsed: any): ClassifyResult {
-  const sentiment = normalizeSentiment(parsed.sentiment);
-  const complaintCategory = normalizeComplaintCategory(parsed.complaint_category);
-  const praiseCategory = normalizePraiseCategory(parsed.praise_category);
+export interface ClassifierFailureSummary {
+  candidateFailures: number;
+  requestFailures: number;
+  quotaDeferred: number;
+  parseErrors: number;
+  classifierErrors: number;
+  firstError: string | null;
+  messages: string[];
+}
+
+export function summarizeClassifierFailures(
+  results: ClassifyResult[],
+  label = "Classifier",
+): ClassifierFailureSummary {
+  const failures = results.filter(isClassifierFailure);
+  const requestErrorIds = new Set(
+    failures
+      .map((result) => result.request_error_id)
+      .filter((id): id is string => Boolean(id)),
+  );
+  const quotaDeferred = failures.filter((result) => result.status === "quota_deferred").length;
+  const parseErrors = failures.filter((result) => result.status === "parse_error").length;
+  const classifierErrors = failures.filter((result) => result.status === "classifier_error").length;
+  const firstError = failures.find((result) => result.error)?.error ?? null;
+  const messages: string[] = [];
+
+  if (quotaDeferred > 0) {
+    const requestSuffix = requestErrorIds.size > 0
+      ? ` across ${requestErrorIds.size} request${requestErrorIds.size === 1 ? "" : "s"}`
+      : "";
+    messages.push(`${label} quota deferred for ${quotaDeferred}/${results.length} candidates${requestSuffix}${firstError ? `: ${firstError}` : ""}`);
+  }
+
+  const nonQuotaFailures = failures.length - quotaDeferred;
+  if (nonQuotaFailures > 0) {
+    const requestSuffix = requestErrorIds.size > 0
+      ? ` (${requestErrorIds.size} request-level failure${requestErrorIds.size === 1 ? "" : "s"})`
+      : "";
+    messages.push(`${label} failed for ${nonQuotaFailures}/${results.length} candidates${requestSuffix}${firstError ? `: ${firstError}` : ""}`);
+  }
+
+  return {
+    candidateFailures: failures.length,
+    requestFailures: requestErrorIds.size,
+    quotaDeferred,
+    parseErrors,
+    classifierErrors,
+    firstError,
+    messages,
+  };
+}
+
+function parseResult(value: unknown): ClassifyResult {
+  const parsed = isRecord(value) ? value : {};
+  const sentiment = normalizeSentiment(nullableString(parsed.sentiment));
+  const complaintCategory = normalizeComplaintCategory(nullableString(parsed.complaint_category));
+  const praiseCategory = normalizePraiseCategory(nullableString(parsed.praise_category));
 
   return {
     relevant: parsed.relevant !== false,
@@ -206,8 +309,8 @@ function parseResult(parsed: any): ClassifyResult {
     complaint_category: sentiment === "negative" ? complaintCategory : null,
     praise_category: sentiment === "positive" ? praiseCategory : null,
     confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.5,
-    language: parsed.language || null,
-    english_translation: parsed.english_translation || null,
+    language: nullableString(parsed.language),
+    english_translation: nullableString(parsed.english_translation),
     status: parsed.relevant === false ? "irrelevant" : "classified",
     error: null,
   };
@@ -224,11 +327,106 @@ function requestBody(prompt: string, maxTokens: number) {
   });
 }
 
+function retryAfterMs(res: Response | null): number | null {
+  const retryAfter = res?.headers.get("retry-after");
+  if (!retryAfter) return null;
+  const seconds = Number(retryAfter);
+  if (Number.isFinite(seconds) && seconds > 0) return Math.round(seconds * 1000);
+  const dateMs = Date.parse(retryAfter);
+  if (Number.isFinite(dateMs)) return Math.max(0, dateMs - Date.now());
+  return null;
+}
+
 function retryDelayMs(res: Response | null, attempt: number): number {
-  const retryAfter = parseInt(res?.headers.get("retry-after") || "", 10);
-  if (retryAfter > 0) return retryAfter * 1000;
+  const explicitRetryAfter = retryAfterMs(res);
+  if (explicitRetryAfter !== null) return explicitRetryAfter;
   const base = Math.min(20_000, 1_000 * (2 ** attempt));
   return Math.round(base * (0.5 + Math.random()));
+}
+
+let requestErrorSequence = 0;
+
+function nextRequestErrorId(): string {
+  requestErrorSequence = (requestErrorSequence + 1) % 1_000_000;
+  return `${Date.now().toString(36)}-${requestErrorSequence}`;
+}
+
+function clipped(value: unknown, maxLength = 220): string | null {
+  if (value === undefined || value === null) return null;
+  const text = String(value).replace(/\s+/g, " ").trim();
+  if (!text) return null;
+  return text.length > maxLength ? `${text.slice(0, maxLength)}...` : text;
+}
+
+function sanitizedHeaders(res: Response): Record<string, string> {
+  const headers: Record<string, string> = {};
+  for (const name of SAFE_ERROR_HEADERS) {
+    const value = res.headers.get(name);
+    if (value) headers[name] = value;
+  }
+  return headers;
+}
+
+async function readGeminiFailure(res: Response): Promise<{
+  reason: string;
+  statusText: string | null;
+  errorType: string | null;
+  retryAfterMs: number | null;
+  headers: Record<string, string>;
+}> {
+  const retryMs = retryAfterMs(res);
+  let parsed: unknown = null;
+  let raw: string | null = null;
+
+  try {
+    raw = await res.text();
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    parsed = null;
+  }
+
+  const parsedRecord = isRecord(parsed) ? parsed : {};
+  const error = isRecord(parsedRecord.error) ? parsedRecord.error : parsedRecord;
+  const details = Array.isArray(error.details) ? error.details : [];
+  const quotaViolation = details
+    .flatMap((detail) => isRecord(detail) && Array.isArray(detail.violations) ? detail.violations.filter(isRecord) : [])
+    .find((violation) => violation.quotaMetric || violation.quotaId || violation.quota_metric || violation.quota_id);
+  const findDetailString = (key: string) => {
+    const detail = details.find((entry) => isRecord(entry) && typeof entry[key] === "string");
+    return isRecord(detail) ? detail[key] : undefined;
+  };
+  const statusText = clipped(error.status ?? error.type ?? parsedRecord.status ?? parsedRecord.type);
+  const message = clipped(error.message ?? parsedRecord.message ?? raw, 260);
+  const quotaReason = clipped(
+    findDetailString("reason")
+      ?? findDetailString("quota_limit")
+      ?? findDetailString("quotaLimit")
+      ?? quotaViolation?.quotaMetric
+      ?? quotaViolation?.quotaId
+      ?? quotaViolation?.quota_metric
+      ?? quotaViolation?.quota_id
+      ?? error.code,
+    120,
+  );
+  const headers = sanitizedHeaders(res);
+  const headerDetail = Object.entries(headers)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ");
+  const parts = [
+    `HTTP ${res.status}`,
+    statusText,
+    quotaReason,
+    message,
+    headerDetail || null,
+  ].filter(Boolean);
+
+  return {
+    reason: parts.join(" | "),
+    statusText,
+    errorType: quotaReason ?? statusText,
+    retryAfterMs: retryMs,
+    headers,
+  };
 }
 
 function nextMinuteDelayMs(): number {
@@ -236,14 +434,18 @@ function nextMinuteDelayMs(): number {
   return (60_000 - msIntoMinute) + Math.round(Math.random() * 1_000);
 }
 
-let quotaClient: any | null = null;
+let quotaClient: QuotaClient | null = null;
 
 async function claimGeminiQuota(logError?: (msg: string, ctx?: string) => Promise<void>): Promise<ClassifyResult | null> {
-  const supabaseUrl = (globalThis as any).Deno?.env.get("SUPABASE_URL");
-  const serviceRoleKey = (globalThis as any).Deno?.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  const supabaseUrl = (globalThis as DenoGlobal).Deno?.env.get("SUPABASE_URL");
+  const serviceRoleKey = (globalThis as DenoGlobal).Deno?.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) return null;
 
-  quotaClient ??= createClient(supabaseUrl, serviceRoleKey);
+  if (!quotaClient) {
+    const supabaseModuleUrl = "https://esm.sh/@supabase/supabase-js@2.45.4";
+    const { createClient } = await import(supabaseModuleUrl) as { createClient: (url: string, key: string) => QuotaClient };
+    quotaClient = createClient(supabaseUrl, serviceRoleKey);
+  }
   const { data, error } = await quotaClient.rpc("claim_api_quota", {
     p_provider: "gemini",
     p_quota_key: MODEL,
@@ -300,8 +502,45 @@ async function fetchGemini(
     }
 
     if (res.ok) return res;
+
+    if (res.status === 429) {
+      const details = await readGeminiFailure(res);
+      const requestErrorId = nextRequestErrorId();
+      if (logError) {
+        await logError(`Gemini request quota deferred (${requestErrorId}): ${details.reason}`, "classify-request-quota");
+      }
+      if (
+        details.retryAfterMs !== null
+        && details.retryAfterMs > 0
+        && details.retryAfterMs <= MAX_REMOTE_429_RETRY_WAIT_MS
+        && attempt < 2
+      ) {
+        if (logError) {
+          await logError(
+            `Gemini 429 retry-after ${details.retryAfterMs}ms, retrying request ${requestErrorId} (attempt ${attempt + 1}/3)`,
+            "classify-request-retry-after",
+          );
+        }
+        await new Promise((r) => setTimeout(r, details.retryAfterMs!));
+        continue;
+      }
+
+      return makeSkippedResult("quota_deferred", details.reason, {
+        error_type: details.errorType ?? "RESOURCE_EXHAUSTED",
+        request_error_id: requestErrorId,
+        retry_after_ms: details.retryAfterMs,
+      });
+    }
+
     if (!TRANSIENT_STATUSES.has(res.status) || attempt === 2) {
-      return makeSkippedResult("classifier_error", `HTTP ${res.status}`);
+      const details = await readGeminiFailure(res);
+      const requestErrorId = nextRequestErrorId();
+      if (logError) await logError(`Gemini request failed (${requestErrorId}): ${details.reason}`, "classify-request-error");
+      return makeSkippedResult("classifier_error", details.reason, {
+        error_type: details.errorType,
+        request_error_id: requestErrorId,
+        retry_after_ms: details.retryAfterMs,
+      });
     }
 
     const waitMs = retryDelayMs(res, attempt);
@@ -325,14 +564,14 @@ export async function classifyPost(
     }
     const data = await res.json();
     const raw = data.choices?.[0]?.message?.content || "";
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = JSON.parse(raw.match(/\{[\s\S]*\}/)?.[0] ?? raw);
     } catch {
       if (logError) await logError(`AI gateway returned unparseable response: ${raw.slice(0, 200)}`, "classify-parse-error");
       return makeSkippedResult("parse_error", "unparseable_response");
     }
-    return parseResult(parsed.result ?? parsed);
+    return parseResult(isRecord(parsed) ? parsed.result ?? parsed : parsed);
   } catch (e) {
     if (logError) await logError(`classifyPost exception: ${e instanceof Error ? e.message : String(e)}`, "classify-exception");
     return makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e));
@@ -361,8 +600,8 @@ async function batchClassifyWithPrompt(
     if (logError) await logError(`Batch classify unparseable: ${raw.slice(0, 200)}`, "batch-classify-parse");
     return Array.from({ length: batchLength }, () => makeSkippedResult("parse_error", "unparseable_response"));
   }
-  const parsed = JSON.parse(jsonMatch[0]);
-  const parsedResults = Array.isArray(parsed) ? parsed : parsed.results;
+  const parsed = JSON.parse(jsonMatch[0]) as unknown;
+  const parsedResults = Array.isArray(parsed) ? parsed : isRecord(parsed) ? parsed.results : null;
   if (!Array.isArray(parsedResults)) {
     return Array.from({ length: batchLength }, () => makeSkippedResult("parse_error", "missing_results_array"));
   }

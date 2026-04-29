@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted, isClassifierFailure } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted, isClassifierFailure, summarizeClassifierFailures } from "../_shared/classifier.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
@@ -105,6 +105,8 @@ Deno.serve(async (req) => {
       duplicate_conflicts: 0,
       irrelevant: 0,
       classifierErrors: 0,
+      classifierRequestErrors: 0,
+      classifierQuotaDeferred: 0,
       dedupSkipped: 0,
       contentSkipped: 0,
       errors: [] as string[],
@@ -191,13 +193,14 @@ Deno.serve(async (req) => {
       await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
     };
     const storyClassifications = await classifyBatch(storyCandidates.map((candidate) => candidate.text), geminiApiKey, 25, hnLogError);
+    const classifierSummary = summarizeClassifierFailures(storyClassifications);
     summary.classified = storyClassifications.length;
     summary.classification_success = storyClassifications.filter((classification) => !isClassifierFailure(classification)).length;
-    summary.classifierErrors = storyClassifications.filter(isClassifierFailure).length;
+    summary.classifierErrors = classifierSummary.candidateFailures;
+    summary.classifierRequestErrors = classifierSummary.requestFailures;
+    summary.classifierQuotaDeferred = classifierSummary.quotaDeferred;
     summary.irrelevant = storyClassifications.filter((classification) => !classification.relevant && !isClassifierFailure(classification)).length;
-    if (summary.classifierErrors > 0) {
-      summary.errors.push(`Classifier failed for ${summary.classifierErrors}/${storyClassifications.length} candidates`);
-    }
+    summary.errors.push(...classifierSummary.messages);
 
     const targetedItems: { idx: number; slug: string }[] = [];
     for (let i = 0; i < storyCandidates.length; i++) {
@@ -217,10 +220,11 @@ Deno.serve(async (req) => {
       : [];
     const targetedMap = new Map<string, typeof storyClassifications[0]>();
     targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
-    const targetedClassifierErrors = targetedResults.filter(isClassifierFailure).length;
-    if (targetedClassifierErrors > 0) {
-      summary.errors.push(`Targeted classifier failed for ${targetedClassifierErrors}/${targetedResults.length} candidates`);
-    }
+    const targetedClassifierSummary = summarizeClassifierFailures(targetedResults, "Targeted classifier");
+    summary.classifierErrors += targetedClassifierSummary.candidateFailures;
+    summary.classifierRequestErrors += targetedClassifierSummary.requestFailures;
+    summary.classifierQuotaDeferred += targetedClassifierSummary.quotaDeferred;
+    summary.errors.push(...targetedClassifierSummary.messages);
 
     for (let i = 0; i < storyCandidates.length; i++) {
       const baseClassification = storyClassifications[i];
@@ -278,6 +282,8 @@ Deno.serve(async (req) => {
         stories: summary.stories,
         irrelevant: summary.irrelevant,
         classifier_errors: summary.classifierErrors,
+        classifier_request_errors: summary.classifierRequestErrors,
+        classifier_quota_deferred: summary.classifierQuotaDeferred,
         classification_success: summary.classification_success,
         dedup_skipped: summary.dedupSkipped,
         content_skipped: summary.contentSkipped,

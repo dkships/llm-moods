@@ -64,6 +64,8 @@ const ModelDetail = () => {
   const latestScoreTotalPosts = enriched?.latestScoreTotalPosts ?? 0;
   const latestEligiblePosts = enriched?.eligiblePosts ?? 0;
   const scoreBasisStatus = enriched?.scoreBasisStatus ?? "measured";
+  const latestDataUpdatedAt = enriched?.latestPostIngestedAt ?? enriched?.latestPostPostedAt ?? null;
+  const scoreComputedAt = enriched?.scoreComputedAt ?? null;
   const vibe = getVibeStatus(latestScore);
   const VibeIcon = vibe.icon;
   const accent = model?.accent_color || "#888";
@@ -87,6 +89,7 @@ const ModelDetail = () => {
   const filteredPostsWithSurface = surfaceFilter === "all"
     ? postsWithSurface
     : postsWithSurface.filter(({ surface }) => surface?.label === surfaceFilter);
+  const latestRecentPostAt = postsWithSurface[0]?.post.posted_at ?? null;
 
   // Surface distribution among negative posts in the loaded recent window.
   const negativeBySurface = new Map<string, number>();
@@ -238,7 +241,15 @@ const ModelDetail = () => {
               <p className="text-sm text-text-tertiary font-mono">
                 Daily score based on {latestEligiblePosts.toLocaleString()} scored posts in the latest scoring window. 7-day chatter: {recentPosts7d.toLocaleString()} posts across Reddit, Hacker News, Bluesky, Mastodon, and X.
               </p>
-              <DataFreshnessIndicator lastUpdated={enriched?.lastUpdated ?? null} />
+              <DataFreshnessIndicator lastUpdated={latestDataUpdatedAt} />
+              {scoreComputedAt && (
+                <span
+                  className="text-xs sm:text-[11px] font-mono text-text-tertiary"
+                  title={`Score computed at ${new Date(scoreComputedAt).toLocaleString()}`}
+                >
+                  Score recalculated {formatTimeAgo(scoreComputedAt)}
+                </span>
+              )}
             </div>
             {!enriched?.isLatestCarryForward && scoreBasisStatus === "no_eligible_posts" && latestScoreTotalPosts > 0 && (
               <p className="mt-2 flex items-center gap-1.5 text-xs text-text-tertiary font-mono">
@@ -360,7 +371,7 @@ const ModelDetail = () => {
                   <Surface motion="fade">
                     <SectionHeader
                       title="Negative posts by surface"
-                      meta="Last 30 days"
+                      meta="Loaded 7-day recent-post window"
                     />
                     <div className="flex h-2 w-full overflow-hidden rounded-full bg-secondary">
                       {negativeSurfaceRows.map((row, i) => {
@@ -457,6 +468,7 @@ const ModelDetail = () => {
             <SectionHeader
               level="page"
               title={`Recent Posts about ${model.name}`}
+              meta={latestRecentPostAt ? `Latest classified post ${formatTimeAgo(latestRecentPostAt)}` : undefined}
               className="mb-3"
             />
             {availableSurfaceLabels.length > 0 && (
@@ -496,6 +508,10 @@ const ModelDetail = () => {
             ) : filteredPostsWithSurface.length === 0 && surfaceFilter !== "all" ? (
               <p className="py-8 text-center text-sm text-text-tertiary">
                 No recent posts match the {surfaceFilter} filter. Try another surface.
+              </p>
+            ) : filteredPostsWithSurface.length === 0 ? (
+              <p className="py-8 text-center text-sm text-text-tertiary">
+                No posts in the last 7 days.
               </p>
             ) : (
               <div className="space-y-3">

@@ -74,7 +74,18 @@ const mockModels = [
     ],
     topComplaint: "reasoning",
     totalPosts: 328,
-    lastUpdated: "2026-04-18T10:00:00.000Z",
+    latestScoreTotalPosts: 42,
+    recentPosts7d: 328,
+    eligiblePosts: 31,
+    lastUpdated: "2026-04-29T10:00:00.000Z",
+    scoreComputedAt: "2026-04-29T11:30:00.000Z",
+    latestPostPostedAt: "2026-04-29T09:00:00.000Z",
+    latestPostIngestedAt: "2026-04-29T10:00:00.000Z",
+    scorePeriodStart: "2026-04-29T07:00:00.000Z",
+    scorePeriodEnd: "2026-04-30T07:00:00.000Z",
+    scoreBasisStatus: "measured",
+    measurementPeriodStart: "2026-04-29T07:00:00.000Z",
+    carriedFromPeriodStart: null,
     isLatestCarryForward: false,
   },
   {
@@ -91,7 +102,18 @@ const mockModels = [
     ],
     topComplaint: "general_drop",
     totalPosts: 281,
-    lastUpdated: "2026-04-18T10:00:00.000Z",
+    latestScoreTotalPosts: 38,
+    recentPosts7d: 281,
+    eligiblePosts: 24,
+    lastUpdated: "2026-04-29T10:00:00.000Z",
+    scoreComputedAt: "2026-04-29T11:30:00.000Z",
+    latestPostPostedAt: "2026-04-29T09:00:00.000Z",
+    latestPostIngestedAt: "2026-04-29T10:00:00.000Z",
+    scorePeriodStart: "2026-04-29T07:00:00.000Z",
+    scorePeriodEnd: "2026-04-30T07:00:00.000Z",
+    scoreBasisStatus: "measured",
+    measurementPeriodStart: "2026-04-29T07:00:00.000Z",
+    carriedFromPeriodStart: null,
     isLatestCarryForward: false,
   },
 ];
@@ -99,16 +121,16 @@ const mockModels = [
 const mockPost = {
   id: "post-1",
   complaint_category: "reasoning",
-  content: "ChatGPT feels more reliable again.",
-  created_at: "2026-04-18T10:00:00.000Z",
+  content: "OpenAI API errors made ChatGPT unreliable again.",
+  created_at: "2026-04-29T10:00:00.000Z",
   model_id: "chatgpt-id",
   original_language: null,
-  posted_at: "2026-04-18T09:00:00.000Z",
+  posted_at: "2026-04-29T09:00:00.000Z",
   praise_category: null,
-  sentiment: "positive",
+  sentiment: "negative",
   source: "reddit",
   source_url: "https://example.com/post-1",
-  title: "ChatGPT feels stronger this week",
+  title: "OpenAI API errors are back",
   translated_content: null,
 };
 
@@ -190,6 +212,33 @@ describe("public app routes", () => {
     expect(await screen.findByRole("heading", { name: /^chatgpt$/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "30d" })).toHaveAttribute("aria-pressed", "true");
     expect(screen.getByRole("heading", { name: /recent posts about chatgpt/i })).toBeInTheDocument();
+  });
+
+  it("renders model detail with separate post freshness and score diagnostics", async () => {
+    await renderAt("/model/chatgpt");
+
+    expect(await screen.findByText(/updated\b/i)).toBeInTheDocument();
+    expect(screen.getByText(/^score recalculated\b/i)).toBeInTheDocument();
+    expect(screen.getByText(/^latest classified post\b/i)).toBeInTheDocument();
+  });
+
+  it("labels negative surface distribution with the loaded 7-day window", async () => {
+    await renderAt("/model/chatgpt");
+
+    expect(await screen.findByRole("heading", { name: /negative posts by surface/i })).toBeInTheDocument();
+    expect(screen.getByText(/loaded 7-day recent-post window/i)).toBeInTheDocument();
+  });
+
+  it("renders an empty recent-post state on the all filter", async () => {
+    mockUseModelPosts.mockReturnValue({
+      data: [],
+      isLoading: false,
+      isError: false,
+    });
+
+    await renderAt("/model/chatgpt");
+
+    expect(await screen.findByText(/no posts in the last 7 days/i)).toBeInTheDocument();
   });
 
   it("renders the not found route", async () => {
