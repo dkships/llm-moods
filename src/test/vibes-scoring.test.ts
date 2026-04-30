@@ -161,7 +161,7 @@ describe("vibes scoring helpers", () => {
     expect(applyScoreSmoothing(result.score, 46, result.eligible_posts, 5)).toBe(62);
   });
 
-  it("keeps a dominant source from exceeding half of final scoring weight", () => {
+  it("uses a softer source cap when alternate-source evidence is sparse", () => {
     const result = computeScore([
       ...Array.from({ length: 9 }, () => scoredPost("positive", "bluesky")),
       scoredPost("negative", "twitter"),
@@ -169,6 +169,19 @@ describe("vibes scoring helpers", () => {
 
     expect(result.positive_count).toBe(9);
     expect(result.negative_count).toBe(1);
+    expect(result.score).toBe(83);
+  });
+
+  it("keeps a dominant source from exceeding half of final scoring weight once alternate evidence is sufficient", () => {
+    const result = computeScore([
+      ...Array.from({ length: 9 }, () => scoredPost("positive", "bluesky")),
+      scoredPost("negative", "twitter"),
+      scoredPost("negative", "twitter"),
+      scoredPost("negative", "twitter"),
+    ]);
+
+    expect(result.positive_count).toBe(9);
+    expect(result.negative_count).toBe(3);
     expect(result.score).toBe(50);
   });
 

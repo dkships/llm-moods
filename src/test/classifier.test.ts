@@ -89,4 +89,11 @@ describe("scraper relevance prefilters", () => {
       "I hooked up Claude to a multi-file refactor and it kept context better than ChatGPT.",
     )).toBe(false);
   });
+
+  it("keeps first-person experience posts even when they include CTA language and a URL", () => {
+    expect(isLikelyPromotionalShare(
+      "Claude refactor notes",
+      "I tested Claude on this refactor and it kept context across files. Learn more: https://example.com",
+    )).toBe(false);
+  });
 });

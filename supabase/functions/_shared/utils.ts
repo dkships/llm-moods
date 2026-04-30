@@ -118,6 +118,10 @@ export function isLikelyPromotionalShare(title: string, content: string): boolea
     .trim();
   const lower = stripped.toLowerCase();
   const hasUrl = /https?:\/\/\S+/i.test(raw);
+  const hasDirectExperience =
+    /\b(?:i|we)\s+(?:asked|connected|debugged|hooked up|noticed|prefer|prompted|ran|rely|switched|tested|tried|use|used)\b/i.test(lower) ||
+    /\bi(?:'ve| have| just)?\s+(?:asked|connected|debugged|hooked up|noticed|preferred|prompted|run|ran|relied|switched|tested|tried|used|been using)\b/i.test(lower) ||
+    /\b(?:my|our)\s+(?:code|project|prompt|prompts|refactor|setup|usage|workflow)\b/i.test(lower);
 
   if (/\[\uAD11\uACE0\]/u.test(raw)) return true;
   if (/\b(affiliate|sponsored|paid partnership|partner link|coupon|referral)\b/i.test(lower)) return true;
@@ -125,10 +129,9 @@ export function isLikelyPromotionalShare(title: string, content: string): boolea
 
   const hasCta = /\b(book (?:a )?(?:call|demo|date)|coffee date|schedule (?:a )?(?:call|demo)|sign up|get started|try (?:it|now)|download now|subscribe to unlock|contact us|learn more)\b/i.test(lower);
   const hasPromoNoun = /\b(agency|course|newsletter|service|startup|template|webinar|whitepaper|workflow|product suite)\b/i.test(lower);
-  if (hasCta && (hasUrl || hasPromoNoun)) return true;
+  if (hasCta && (hasUrl || hasPromoNoun) && !hasDirectExperience) return true;
 
   const looksLikeAnnouncement = /\b(announces?|became an api call|integration|integrations|launch(?:ed|es)?|now supports?|released?|rolls? out|unveils?)\b/i.test(lower);
-  const hasDirectExperience = /\b(i|we|my|our)\s+(asked|built|connected|debugged|hooked up|love|noticed|prefer|prompted|ran|rely|switched|tested|tried|use|used)\b/i.test(lower);
   if (looksLikeAnnouncement && hasUrl && !hasDirectExperience) return true;
 
   return false;

@@ -79,6 +79,10 @@ export function internalOnlyResponse(corsHeaders: HeadersInit): Response {
   });
 }
 
+export function isMaintenanceRequestAllowed(maintenance: unknown, isInternal: boolean): boolean {
+  return maintenance !== "reaggregate-vibes" || isInternal;
+}
+
 export async function loadScraperConfig(
   supabase: any,
   scraper: string,

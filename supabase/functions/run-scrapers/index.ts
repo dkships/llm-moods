@@ -3,7 +3,9 @@ import {
   createRunRecord,
   deriveRunMetrics,
   getConfiguredWindows,
+  internalOnlyResponse,
   isInternalServiceRequest,
+  isMaintenanceRequestAllowed,
   isUniqueViolation,
   loadScraperConfig,
   readJsonBody,
@@ -334,6 +336,11 @@ Deno.serve(async (req) => {
 
   const body = await readJsonBody(req);
   const isInternal = isInternalServiceRequest(req);
+
+  if (!isMaintenanceRequestAllowed(body.maintenance, isInternal)) {
+    return internalOnlyResponse(corsHeaders);
+  }
+
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const config = await loadScraperConfig(supabase, "run-scrapers");
   const { timeZone, windows } = getConfiguredWindows(config);
