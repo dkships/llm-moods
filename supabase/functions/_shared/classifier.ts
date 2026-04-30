@@ -55,6 +55,7 @@ Is this post expressing a PERSONAL opinion about an AI model's quality, behavior
   - Pricing observations without quality judgment: "ChatGPT costs the same as a Starbucks drink"
   - Pure news/funding/company strategy: "OpenAI raised $6B", "Sam Altman tweeted about AGI"
   - Tutorials with no quality opinion: "Here's a tutorial on using the ChatGPT API"
+  - Ads, affiliate posts, newsletter promos, product launch/integration announcements, or company marketing unless the author gives direct model-quality experience
   - Posts where the model is mentioned but the opinion is about something else entirely (a platform, a person, society)
 
 KEY TEST: Ask yourself "Is this person expressing satisfaction or frustration with the MODEL ITSELF based on using it?" If no → not relevant.
@@ -111,6 +112,7 @@ RELEVANCE: Is this post expressing a PERSONAL opinion about an AI model's qualit
   - Benchmark/spec comparisons without personal opinion: "Gemini 3 Flash: 218 tokens/sec vs GPT-4.5: 125 t/s"
   - Pricing observations without quality judgment: "ChatGPT costs the same as a Starbucks drink"
   - Pure news/funding/company strategy: "OpenAI raised $6B"
+  - Ads, affiliate posts, newsletter promos, product launch/integration announcements, or company marketing unless the author gives direct model-quality experience
   - Posts where the model is mentioned but the opinion is about something else (a platform, a person, society)
 
 KEY TEST: "Is this person expressing satisfaction or frustration with the MODEL ITSELF based on using it?" If no → not relevant.
@@ -161,7 +163,7 @@ DISAMBIGUATION RULE: When a sentence says "X is [adjective] which Y is not as go
 For EACH post, determine:
 
 RELEVANCE: Is this post expressing a PERSONAL opinion about the TARGET model's quality, behavior, or usefulness based on direct or reported experience? If the target model is only mentioned in passing with no opinion about it, mark as not relevant.
-- NOT RELEVANT: news/research reporting, societal commentary, third-party business decisions mentioning the model, benchmark/spec comparisons without personal opinion, posts where the opinion is about something else (a platform, a person, society).
+- NOT RELEVANT: news/research reporting, societal commentary, third-party business decisions mentioning the model, benchmark/spec comparisons without personal opinion, ads/affiliate/newsletter/company marketing, product launch or integration announcements without direct model-quality experience, posts where the opinion is about something else (a platform, a person, society).
 - KEY TEST: "Is this person expressing satisfaction or frustration with the TARGET MODEL ITSELF based on using it?" If no → not relevant.
 
 LANGUAGE: If a post is NOT in English, detect the language (ISO 639-1 code) and provide a concise English translation. Classify sentiment based on the translated meaning. If the post IS in English, set both to null.

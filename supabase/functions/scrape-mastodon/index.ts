@@ -15,7 +15,7 @@ import {
   loadKeywords,
   matchModels,
   meetsMinLength,
-  isLikelyNewsShare,
+  isLikelyNonExperienceShare,
   loadRecentTitleKeys,
   isDuplicate,
   logToErrorLog,
@@ -239,7 +239,7 @@ Deno.serve(async (req) => {
         summary.contentSkipped++;
         continue;
       }
-      if (isLikelyNewsShare("", content)) {
+      if (isLikelyNonExperienceShare("", content)) {
         summary.contentSkipped++;
         continue;
       }

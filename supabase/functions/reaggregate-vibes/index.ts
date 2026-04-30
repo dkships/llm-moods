@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { readJsonBody } from "../_shared/runtime.ts";
+import { internalOnlyResponse, isInternalServiceRequest, readJsonBody } from "../_shared/runtime.ts";
 import {
   claimServiceLock,
   refreshScores,
@@ -18,6 +18,7 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   let lockOwner: string | null = null;

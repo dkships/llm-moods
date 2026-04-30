@@ -10,6 +10,18 @@ import {
 } from "../../supabase/functions/_shared/vibes-scoring";
 
 describe("vibes scoring helpers", () => {
+  const scoredPost = (
+    sentiment: "positive" | "negative" | "neutral",
+    source: string,
+  ) => ({
+    sentiment,
+    complaint_category: sentiment === "negative" ? "general_drop" : null,
+    confidence: 1,
+    score: 0,
+    content_type: "full_content",
+    source,
+  });
+
   it("builds daily windows from UTC calendar boundaries", () => {
     const window = getUtcDayWindow(new Date("2026-04-18T15:42:10.000Z"));
 
@@ -147,5 +159,33 @@ describe("vibes scoring helpers", () => {
     expect(result.total_posts).toBe(5);
     expect(result.eligible_posts).toBe(3);
     expect(applyScoreSmoothing(result.score, 46, result.eligible_posts, 5)).toBe(62);
+  });
+
+  it("keeps a dominant source from exceeding half of final scoring weight", () => {
+    const result = computeScore([
+      ...Array.from({ length: 9 }, () => scoredPost("positive", "bluesky")),
+      scoredPost("negative", "twitter"),
+    ]);
+
+    expect(result.positive_count).toBe(9);
+    expect(result.negative_count).toBe(1);
+    expect(result.score).toBe(50);
+  });
+
+  it("does not cap single-source days when there is no alternate source", () => {
+    const result = computeScore([
+      scoredPost("positive", "bluesky"),
+      scoredPost("positive", "bluesky"),
+      scoredPost("positive", "bluesky"),
+    ]);
+
+    expect(result.score).toBe(100);
+  });
+
+  it("ramps sample weighting gradually after the measured threshold", () => {
+    expect(applyScoreSmoothing(100, 50, 4, 5)).toBe(70);
+    expect(applyScoreSmoothing(100, 50, 5, 5)).toBe(73);
+    expect(applyScoreSmoothing(100, 50, 9, 5)).toBe(83);
+    expect(applyScoreSmoothing(100, 50, 10, 5)).toBe(85);
   });
 });

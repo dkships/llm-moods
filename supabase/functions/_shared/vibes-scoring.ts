@@ -228,10 +228,75 @@ export function applyScoreSmoothing(
     currentWeight = 0.3;
   } else if (postCount < minPosts) {
     currentWeight = 0.4;
+  } else {
+    const fullWeightPosts = minPosts + 5;
+    if (postCount < fullWeightPosts) {
+      const rampSteps = (fullWeightPosts - minPosts) + 1;
+      const rampPosition = (postCount - minPosts) + 1;
+      currentWeight = 0.4 + ((rampPosition / rampSteps) * 0.3);
+    }
   }
   const previousWeight = 1 - currentWeight;
 
   return Math.round((currentWeight * score) + (previousWeight * previousScore));
+}
+
+function computeSourceScale(sourceRawWeights: Record<string, number>, maxShare: number): Record<string, number> {
+  const entries = Object.entries(sourceRawWeights).filter(([, weight]) => weight > 0);
+  const scales: Record<string, number> = {};
+  for (const [source] of entries) scales[source] = 1.0;
+
+  if (entries.length <= 1 || maxShare <= 0 || maxShare >= 1) {
+    return scales;
+  }
+
+  const cappedSources = new Set<string>();
+  let remainingWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
+
+  // Water-fill dominant sources so the cap applies to final scaled weight,
+  // not just to each source's share of the pre-scaled raw total.
+  while (remainingWeight > 0) {
+    const denominator = 1 - (cappedSources.size * maxShare);
+    if (denominator <= 0) break;
+
+    const finalTotal = remainingWeight / denominator;
+    const maxAllowed = finalTotal * maxShare;
+    const nextCapped = entries
+      .filter(([source]) => !cappedSources.has(source))
+      .filter(([, weight]) => weight > maxAllowed);
+
+    if (nextCapped.length === 0) {
+      for (const [source, weight] of entries) {
+        if (cappedSources.has(source)) {
+          scales[source] = Math.min(1, maxAllowed / weight);
+        }
+      }
+      return scales;
+    }
+
+    for (const [source, weight] of nextCapped) {
+      cappedSources.add(source);
+      remainingWeight -= weight;
+    }
+  }
+
+  if (cappedSources.size === 0) {
+    return scales;
+  }
+
+  const denominator = 1 - (cappedSources.size * maxShare);
+  if (denominator <= 0) {
+    return scales;
+  }
+
+  const maxAllowed = (remainingWeight / denominator) * maxShare;
+  for (const [source, weight] of entries) {
+    if (cappedSources.has(source)) {
+      scales[source] = Math.min(1, maxAllowed / weight);
+    }
+  }
+
+  return scales;
 }
 
 export function computeScore(posts: ScoreInputPost[]): ScoreResult {
@@ -265,14 +330,7 @@ export function computeScore(posts: ScoreInputPost[]): ScoreResult {
     });
   }
 
-  const totalRaw = Object.values(sourceRawWeights).reduce((sum, weight) => sum + weight, 0);
-  const sourceScale: Record<string, number> = {};
-  if (totalRaw > 0) {
-    const maxAllowed = totalRaw * MAX_SOURCE_SHARE;
-    for (const [source, sourceWeight] of Object.entries(sourceRawWeights)) {
-      sourceScale[source] = sourceWeight > maxAllowed ? maxAllowed / sourceWeight : 1.0;
-    }
-  }
+  const sourceScale = computeSourceScale(sourceRawWeights, MAX_SOURCE_SHARE);
 
   let positiveWeight = 0;
   let negativeWeight = 0;

@@ -110,6 +110,34 @@ export function isLikelyNewsShare(title: string, content: string): boolean {
   return false;
 }
 
+export function isLikelyPromotionalShare(title: string, content: string): boolean {
+  const raw = `${title} ${content}`.trim();
+  const stripped = stripUrls(raw)
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const lower = stripped.toLowerCase();
+  const hasUrl = /https?:\/\/\S+/i.test(raw);
+
+  if (/\[\uAD11\uACE0\]/u.test(raw)) return true;
+  if (/\b(affiliate|sponsored|paid partnership|partner link|coupon|referral)\b/i.test(lower)) return true;
+  if (/\b(coupang partners|commission may be earned|as an amazon associate)\b/i.test(lower)) return true;
+
+  const hasCta = /\b(book (?:a )?(?:call|demo|date)|coffee date|schedule (?:a )?(?:call|demo)|sign up|get started|try (?:it|now)|download now|subscribe to unlock|contact us|learn more)\b/i.test(lower);
+  const hasPromoNoun = /\b(agency|course|newsletter|service|startup|template|webinar|whitepaper|workflow|product suite)\b/i.test(lower);
+  if (hasCta && (hasUrl || hasPromoNoun)) return true;
+
+  const looksLikeAnnouncement = /\b(announces?|became an api call|integration|integrations|launch(?:ed|es)?|now supports?|released?|rolls? out|unveils?)\b/i.test(lower);
+  const hasDirectExperience = /\b(i|we|my|our)\s+(asked|built|connected|debugged|hooked up|love|noticed|prefer|prompted|ran|rely|switched|tested|tried|use|used)\b/i.test(lower);
+  if (looksLikeAnnouncement && hasUrl && !hasDirectExperience) return true;
+
+  return false;
+}
+
+export function isLikelyNonExperienceShare(title: string, content: string): boolean {
+  return isLikelyNewsShare(title, content) || isLikelyPromotionalShare(title, content);
+}
+
 export async function logToErrorLog(supabase: any, functionName: string, msg: string, ctx?: string) {
   try { await supabase.from("error_log").insert({ function_name: functionName, error_message: msg, context: ctx || null }); } catch (e) { console.error("logToErrorLog failed:", msg, e); }
 }
