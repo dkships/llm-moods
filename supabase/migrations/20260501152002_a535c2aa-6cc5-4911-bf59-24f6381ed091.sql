@@ -1,0 +1,1 @@
+DROP TABLE IF EXISTS public.quota_retry_results;

@@ -124,42 +124,6 @@ export type Database = {
         }
         Relationships: []
       }
-      quota_retry_results: {
-        Row: {
-          action: string
-          created_at: string
-          error: string | null
-          finished_at: string | null
-          id: string
-          label: string
-          response: string | null
-          started_at: string | null
-          status: number | null
-        }
-        Insert: {
-          action: string
-          created_at?: string
-          error?: string | null
-          finished_at?: string | null
-          id?: string
-          label: string
-          response?: string | null
-          started_at?: string | null
-          status?: number | null
-        }
-        Update: {
-          action?: string
-          created_at?: string
-          error?: string | null
-          finished_at?: string | null
-          id?: string
-          label?: string
-          response?: string | null
-          started_at?: string | null
-          status?: number | null
-        }
-        Relationships: []
-      }
       scraped_posts: {
         Row: {
           complaint_category: string | null
