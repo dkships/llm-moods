@@ -47,3 +47,6 @@ verify_jwt = false
 
 [functions.reaggregate-vibes]
 verify_jwt = false
+
+[functions.drain-queue-trigger]
+verify_jwt = false
