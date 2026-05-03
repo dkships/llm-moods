@@ -1,6 +1,4 @@
-// Cron-facing wrapper that invokes the gated `drain-classification-queue`
-// edge function with the service-role key. pg_cron only has the anon key,
-// so this trampoline keeps the downstream function gated to internal callers.
+console.log("drain-queue-trigger module load");
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,6 +6,7 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
+  console.log("drain-queue-trigger request", req.method);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL");
