@@ -4,6 +4,8 @@ import {
   normalizeWindowTimes,
 } from "./vibes-scoring.ts";
 
+declare const Deno: { env: { get(name: string): string | undefined } };
+
 export interface ScraperConfigMap {
   [key: string]: string[];
 }
