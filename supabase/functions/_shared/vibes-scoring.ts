@@ -1,4 +1,4 @@
-import { normalizeComplaintCategory } from "./taxonomy.ts";
+import { normalizeComplaintCategory, normalizeSentiment } from "./taxonomy.ts";
 
 export interface ScoreInputPost {
   sentiment: string | null;
@@ -346,6 +346,8 @@ export function computeScore(posts: ScoreInputPost[]): ScoreResult {
   for (const post of posts) {
     const rawConfidence = post.confidence ?? 0.5;
     if (rawConfidence < MIN_CONFIDENCE) continue;
+    const sentiment = normalizeSentiment(post.sentiment);
+    if (!sentiment) continue;
 
     const contentMult = post.content_type === "title_only" ? 0.6 : 1.0;
     const confidence = Math.max(0, Math.min(1, rawConfidence)) * contentMult;
@@ -356,7 +358,7 @@ export function computeScore(posts: ScoreInputPost[]): ScoreResult {
     sourceRawWeights[source] = (sourceRawWeights[source] || 0) + weight;
     eligible.push({
       w: weight,
-      sentiment: post.sentiment,
+      sentiment,
       complaint_category: post.complaint_category,
       source,
     });

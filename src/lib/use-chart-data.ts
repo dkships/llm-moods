@@ -8,6 +8,9 @@ export interface VibesHistoryRow {
   score: number;
   total_posts?: number | null;
   eligible_posts?: number | null;
+  score_basis_status?: string | null;
+  queued_posts?: number | null;
+  classification_coverage?: number | null;
 }
 
 export interface DailyChartPoint {
@@ -20,6 +23,9 @@ export interface DailyChartPoint {
   /** Eligible posts (confidence ≥ 0.65) for this day. Null pre-backfill;
    * confidence chip on the tooltip coerces null → 0 → "Preliminary". */
   eligiblePosts?: number | null;
+  scoreBasisStatus?: string | null;
+  queuedPosts?: number | null;
+  classificationCoverage?: number | null;
 }
 
 export interface DailyChartData {
@@ -65,8 +71,11 @@ export function useDailyChartData(
       result.push({
         day: label,
         score: row?.score ?? null,
-        isCarryForward: row != null && row.total_posts === 0,
+        isCarryForward: row != null && (row.score_basis_status === "carried_forward" || row.total_posts === 0),
         eligiblePosts: row?.eligible_posts ?? null,
+        scoreBasisStatus: row?.score_basis_status ?? null,
+        queuedPosts: row?.queued_posts ?? null,
+        classificationCoverage: row?.classification_coverage ?? null,
       });
       labels[key] = label;
     }

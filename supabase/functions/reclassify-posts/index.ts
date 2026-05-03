@@ -27,7 +27,7 @@ Deno.serve(async (req) => {
   try {
     const url = new URL(req.url);
     const mode = url.searchParams.get("mode") || "neutral";
-    const batchSize = Math.max(1, Math.min(parseInt(url.searchParams.get("batch_size") || "100", 10) || 100, 500));
+    const batchSize = Math.max(1, Math.min(parseInt(url.searchParams.get("batch_size") || "25", 10) || 25, 50));
     const offset = Math.max(0, parseInt(url.searchParams.get("offset") || "0", 10) || 0);
     const postedAfter = url.searchParams.get("posted_after");
     const postedBefore = url.searchParams.get("posted_before");

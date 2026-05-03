@@ -161,6 +161,26 @@ describe("vibes scoring helpers", () => {
     expect(applyScoreSmoothing(result.score, 46, result.eligible_posts, 5)).toBe(62);
   });
 
+  it("does not count high-confidence null sentiment as neutral score evidence", () => {
+    const result = computeScore([
+      {
+        sentiment: null,
+        complaint_category: null,
+        confidence: 0.95,
+        score: 1,
+        content_type: "full_text",
+        source: "bluesky",
+      },
+      scoredPost("negative", "reddit"),
+    ]);
+
+    expect(result.total_posts).toBe(2);
+    expect(result.eligible_posts).toBe(1);
+    expect(result.neutral_count).toBe(0);
+    expect(result.negative_count).toBe(1);
+    expect(result.score).toBe(0);
+  });
+
   it("uses a softer source cap when alternate-source evidence is sparse", () => {
     const result = computeScore([
       ...Array.from({ length: 9 }, () => scoredPost("positive", "bluesky")),

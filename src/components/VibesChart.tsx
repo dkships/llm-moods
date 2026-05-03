@@ -24,6 +24,9 @@ export interface VibesChartDatum {
   score: number | null;
   isCarryForward?: boolean;
   eligiblePosts?: number | null;
+  scoreBasisStatus?: string | null;
+  queuedPosts?: number | null;
+  classificationCoverage?: number | null;
 }
 
 interface VibesChartProps {
@@ -69,6 +72,7 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
     && datum.eligiblePosts != null
     && datum.eligiblePosts > 0
     && datum.eligiblePosts < LIMITED_SAMPLE_THRESHOLD;
+  const isPartialCoverage = datum.scoreBasisStatus === "partial_coverage" || (datum.queuedPosts ?? 0) > 0;
   return (
     <div
       style={{
@@ -92,6 +96,11 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
           Limited sample — {datum.eligiblePosts} high-confidence posts
         </p>
       )}
+      {isPartialCoverage && (
+        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 10, margin: "4px 0 0" }}>
+          Partial coverage{datum.queuedPosts ? ` — ${datum.queuedPosts} queued` : ""}
+        </p>
+      )}
     </div>
   );
 };
@@ -110,9 +119,23 @@ interface CarryForwardDotProps {
 const renderCarryForwardDot = (accent: string) => (props: CarryForwardDotProps) => {
   const { cx, cy, payload, index } = props;
   const dotKey = `dot-${index ?? 0}`;
-  if (cx == null || cy == null || !payload?.isCarryForward || payload.score == null) {
+  if (cx == null || cy == null || payload?.score == null) {
     return <g key={dotKey} />;
   }
+  if (payload.scoreBasisStatus === "partial_coverage" || (payload.queuedPosts ?? 0) > 0) {
+    return (
+      <circle
+        key={dotKey}
+        cx={cx}
+        cy={cy}
+        r={4}
+        fill={CHART_COLORS.card}
+        stroke={accent}
+        strokeWidth={1.5}
+      />
+    );
+  }
+  if (!payload.isCarryForward) return <g key={dotKey} />;
   return (
     <circle
       key={dotKey}

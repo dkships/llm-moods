@@ -22,6 +22,10 @@ type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Ret
   score_basis_status?: string | null;
   measurement_period_start?: string | null;
   carried_from_period_start?: string | null;
+  queued_posts?: number | null;
+  unclassified_posts?: number | null;
+  classification_coverage?: number | null;
+  score_confidence?: string | null;
 };
 type ScrapedPostRow = Database["public"]["Tables"]["scraped_posts"]["Row"];
 type ModelRow = Database["public"]["Tables"]["models"]["Row"];
@@ -30,6 +34,8 @@ export interface SparklinePoint {
   score: number;
   isCarryForward: boolean;
   eligiblePosts: number;
+  scoreBasisStatus?: string | null;
+  classificationCoverage?: number | null;
 }
 
 export interface ComplaintBreakdownItem {
@@ -64,6 +70,10 @@ export interface ModelWithVibes {
   /** Eligible posts (confidence ≥ 0.65) backing the latest score. Drives the
    *  confidence tier chip on dashboard cards and headers. */
   eligiblePosts: number;
+  queuedPosts: number;
+  unclassifiedPosts: number;
+  classificationCoverage: number;
+  scoreConfidence: "high" | "medium" | "low";
   lastUpdated: string | null;
   scoreComputedAt: string | null;
   latestPostPostedAt: string | null;
@@ -96,7 +106,7 @@ export function useModelsWithLatestVibes() {
         .from("vibes_scores")
         // eligible_posts column added by migration 20260426230000_score_integrity_fixes;
         // pre-backfill historic rows have NULL — coerced to 0 ("Preliminary") in the chip.
-        .select("model_id, period_start, score, total_posts, eligible_posts")
+        .select("model_id, period_start, score, total_posts, eligible_posts, score_basis_status, classification_coverage")
         .eq("period", "daily")
         .gte("period_start", sinceISO)
         .order("period_start", { ascending: true });
@@ -104,7 +114,13 @@ export function useModelsWithLatestVibes() {
 
       const sparkByModel = new Map<
         string,
-        Array<{ score: number; total_posts: number | null; eligible_posts: number | null }>
+        Array<{
+          score: number;
+          total_posts: number | null;
+          eligible_posts: number | null;
+          score_basis_status?: string | null;
+          classification_coverage?: number | null;
+        }>
       >();
       for (const row of sparkRows || []) {
         const arr = sparkByModel.get(row.model_id) ?? [];
@@ -112,6 +128,8 @@ export function useModelsWithLatestVibes() {
           score: row.score,
           total_posts: row.total_posts,
           eligible_posts: (row as { eligible_posts: number | null }).eligible_posts ?? null,
+          score_basis_status: (row as { score_basis_status?: string | null }).score_basis_status ?? null,
+          classification_coverage: (row as { classification_coverage?: number | null }).classification_coverage ?? null,
         });
         sparkByModel.set(row.model_id, arr);
       }
@@ -121,14 +139,19 @@ export function useModelsWithLatestVibes() {
         const recent = allRows.slice(-7);
         const sparkline: SparklinePoint[] = recent.map((r) => ({
           score: r.score,
-          isCarryForward: r.total_posts === 0,
+          isCarryForward: r.score_basis_status === "carried_forward" || r.total_posts === 0,
           eligiblePosts: r.eligible_posts ?? 0,
+          scoreBasisStatus: r.score_basis_status ?? null,
+          classificationCoverage: r.classification_coverage ?? null,
         }));
         const latestRow = recent[recent.length - 1];
         const isLatestCarryForward = latestRow ? latestRow.total_posts === 0 : false;
 
         const trendPts = m.previous_score != null ? m.latest_score - m.previous_score : 0;
         const topComplaint = normalizePublicComplaintCategory(m.top_complaint);
+        const scoreConfidence = m.score_confidence === "high" || m.score_confidence === "medium" || m.score_confidence === "low"
+          ? m.score_confidence
+          : "low";
 
         return {
           id: m.model_id,
@@ -147,6 +170,10 @@ export function useModelsWithLatestVibes() {
           latestScoreTotalPosts: m.latest_score_total_posts ?? 0,
           recentPosts7d: m.recent_posts_7d ?? m.total_posts ?? 0,
           eligiblePosts: m.latest_score_eligible_posts ?? m.eligible_posts ?? 0,
+          queuedPosts: m.queued_posts ?? 0,
+          unclassifiedPosts: m.unclassified_posts ?? 0,
+          classificationCoverage: Number(m.classification_coverage ?? 1),
+          scoreConfidence,
           lastUpdated: m.latest_post_ingested_at ?? m.latest_post_posted_at ?? null,
           scoreComputedAt: m.score_computed_at ?? m.last_updated ?? null,
           latestPostPostedAt: m.latest_post_posted_at ?? null,

@@ -63,7 +63,8 @@ async function fetchJson(url: string): Promise<any | null> {
   return await res.json().catch(() => null);
 }
 
-export async function checkApifyBudget(token: string): Promise<ApifyBudgetResult> {
+export async function checkApifyBudget(token: string, plannedMaxChargeUsd = 0): Promise<ApifyBudgetResult> {
+  const planned = Math.max(0, plannedMaxChargeUsd);
   const encodedToken = encodeURIComponent(token);
   const monthly = await fetchJson(`https://api.apify.com/v2/users/me/usage/monthly?token=${encodedToken}`);
   const limits = await fetchJson(`https://api.apify.com/v2/users/me/limits?token=${encodedToken}`);
@@ -89,20 +90,30 @@ export async function checkApifyBudget(token: string): Promise<ApifyBudgetResult
     };
   }
 
-  if (monthlyUsageUsd !== null && monthlyUsageUsd >= MONTHLY_SPEND_LIMIT_USD) {
+  if (monthlyUsageUsd !== null && monthlyUsageUsd + planned > MONTHLY_SPEND_LIMIT_USD) {
     return {
       allowed: false,
       reason: "apify_monthly_budget_exceeded",
-      usage: { monthly_usage_usd: monthlyUsageUsd, monthly_limit_usd: MONTHLY_SPEND_LIMIT_USD },
+      usage: {
+        monthly_usage_usd: monthlyUsageUsd,
+        planned_max_charge_usd: planned,
+        projected_monthly_usage_usd: monthlyUsageUsd + planned,
+        monthly_limit_usd: MONTHLY_SPEND_LIMIT_USD,
+      },
     };
   }
 
   const todayUsageUsd = findTodayUsageUsd(monthly);
-  if (todayUsageUsd !== null && todayUsageUsd >= DAILY_SPEND_LIMIT_USD) {
+  if (todayUsageUsd !== null && todayUsageUsd + planned > DAILY_SPEND_LIMIT_USD) {
     return {
       allowed: false,
       reason: "apify_daily_budget_exceeded",
-      usage: { daily_usage_usd: todayUsageUsd, daily_limit_usd: DAILY_SPEND_LIMIT_USD },
+      usage: {
+        daily_usage_usd: todayUsageUsd,
+        planned_max_charge_usd: planned,
+        projected_daily_usage_usd: todayUsageUsd + planned,
+        daily_limit_usd: DAILY_SPEND_LIMIT_USD,
+      },
     };
   }
 
@@ -113,6 +124,9 @@ export async function checkApifyBudget(token: string): Promise<ApifyBudgetResult
       monthly_limit_usd: MONTHLY_SPEND_LIMIT_USD,
       daily_usage_usd: todayUsageUsd,
       daily_limit_usd: DAILY_SPEND_LIMIT_USD,
+      planned_max_charge_usd: planned,
+      projected_monthly_usage_usd: monthlyUsageUsd + planned,
+      projected_daily_usage_usd: todayUsageUsd === null ? null : todayUsageUsd + planned,
       limits_available: Boolean(limits),
     },
   };

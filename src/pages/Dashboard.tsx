@@ -19,7 +19,7 @@ import {
   type RecentChatterPost,
 } from "@/hooks/useVibesData";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
-import { getVibeStatus, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities, sentimentBorderClass, LIMITED_SAMPLE_THRESHOLD } from "@/lib/vibes";
+import { getVibeStatus, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities, sentimentBorderClass, formatScoreConfidence, scoreConfidenceTone } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
 import ScoreMetaBadge from "@/components/ScoreMetaBadge";
@@ -34,9 +34,14 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
 
   const trendDown = m.trend.direction === "down" && !m.isLatestCarryForward;
   const trendUp = m.trend.direction === "up" && !m.isLatestCarryForward;
-  const hasLimitedSample = !m.isLatestCarryForward
-    && m.eligiblePosts > 0
-    && m.eligiblePosts < LIMITED_SAMPLE_THRESHOLD;
+  const confidenceLabel = formatScoreConfidence(m.scoreConfidence);
+  const coveragePct = Math.round((m.classificationCoverage ?? 1) * 100);
+  const hasPartialCoverage = m.scoreBasisStatus === "partial_coverage" || m.queuedPosts > 0 || m.scoreConfidence === "low";
+  const confidenceTitle = [
+    `${m.eligiblePosts.toLocaleString()} scored of ${m.latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`,
+    `${coveragePct}% classified for scoring.`,
+    m.queuedPosts > 0 ? `${m.queuedPosts.toLocaleString()} queued for Gemini classification.` : null,
+  ].filter(Boolean).join(" ");
 
   return (
     <Link
@@ -108,18 +113,22 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
               </span>
             </div>
             <div className="flex flex-wrap items-center gap-1.5">
-              {hasLimitedSample && (
-                <ScoreMetaBadge
-                  tone="warning"
-                  icon={AlertTriangle}
-                  title={`${m.eligiblePosts.toLocaleString()} high-confidence posts back this score.`}
-                  ariaLabel={`${m.eligiblePosts.toLocaleString()} scored posts`}
-                >
-                  {m.eligiblePosts.toLocaleString()} scored
-                </ScoreMetaBadge>
-              )}
-              <ScoreMetaBadge title="Classified posts from the last 7 days.">
-                {(m.totalPosts || 0).toLocaleString()} posts · 7d
+              <ScoreMetaBadge
+                tone={scoreConfidenceTone(m.scoreConfidence)}
+                icon={hasPartialCoverage ? AlertTriangle : undefined}
+                title={confidenceTitle}
+                ariaLabel={confidenceLabel}
+              >
+                {confidenceLabel}
+              </ScoreMetaBadge>
+              <ScoreMetaBadge
+                title={`${m.eligiblePosts.toLocaleString()} scored of ${m.latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`}
+                ariaLabel={`${m.eligiblePosts.toLocaleString()} scored posts`}
+              >
+                {m.eligiblePosts.toLocaleString()} scored
+              </ScoreMetaBadge>
+              <ScoreMetaBadge title="Collected posts from the last 7 days.">
+                {(m.totalPosts || 0).toLocaleString()} collected · 7d
               </ScoreMetaBadge>
             </div>
           </div>

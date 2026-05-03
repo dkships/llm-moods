@@ -13,6 +13,7 @@ export const PUBLIC_COMPLAINT_CATEGORIES = [
   "api_reliability",
   "multimodal_quality",
   "reasoning",
+  "other",
 ] as const;
 
 export const PRAISE_CATEGORIES = [
@@ -45,6 +46,7 @@ export const PUBLIC_COMPLAINT_LABELS: Record<PublicComplaintCategory, string> = 
   api_reliability: "API reliability",
   multimodal_quality: "Multimodal quality",
   reasoning: "Reasoning",
+  other: "Other",
 };
 
 const PUBLIC_COMPLAINT_ALIASES: Record<string, PublicComplaintCategory> = {

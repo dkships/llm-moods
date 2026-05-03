@@ -66,6 +66,29 @@ describe("Gemini classifier failure handling", () => {
     expect(summary.quotaDeferred).toBe(2);
     expect(summary.messages[0]).toContain("across 1 request");
   });
+
+  it("stops later batches after the first quota deferral", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      error: {
+        code: 429,
+        status: "RESOURCE_EXHAUSTED",
+        message: "Daily quota exceeded.",
+      },
+    }), { status: 429, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const results = await classifyBatch(
+      Array.from({ length: 30 }, (_, i) => `Claude quota test ${i}`),
+      "test-key",
+      25,
+      vi.fn(async () => {}),
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(results).toHaveLength(30);
+    expect(results.every((result) => result.status === "quota_deferred")).toBe(true);
+    expect(new Set(results.map((result) => result.request_error_id)).size).toBe(1);
+  });
 });
 
 describe("scraper relevance prefilters", () => {

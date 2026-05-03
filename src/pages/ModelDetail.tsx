@@ -24,7 +24,7 @@ import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
   SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
-  sentimentBorderClass, LIMITED_SAMPLE_THRESHOLD,
+  sentimentBorderClass, formatScoreConfidence, scoreConfidenceTone,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
@@ -73,21 +73,23 @@ const ModelDetail = () => {
   const recentPosts7d = enriched?.recentPosts7d ?? enriched?.totalPosts ?? 0;
   const latestScoreTotalPosts = enriched?.latestScoreTotalPosts ?? 0;
   const latestEligiblePosts = enriched?.eligiblePosts ?? 0;
+  const queuedPosts = enriched?.queuedPosts ?? 0;
+  const coveragePct = Math.round((enriched?.classificationCoverage ?? 1) * 100);
+  const scoreConfidence = enriched?.scoreConfidence ?? "low";
+  const confidenceLabel = formatScoreConfidence(scoreConfidence);
   const scoreBasisStatus = enriched?.scoreBasisStatus ?? "measured";
   const latestDataUpdatedAt = enriched?.latestPostIngestedAt ?? enriched?.latestPostPostedAt ?? null;
   const scoreComputedAt = enriched?.scoreComputedAt ?? null;
   const scoreComputedLabel = scoreComputedAt ? formatTimeAgo(scoreComputedAt) : null;
   const scoreComputedAbsolute = scoreComputedAt ? formatAbsoluteTimestamp(scoreComputedAt) : null;
   const hasNoEligiblePosts = !enriched?.isLatestCarryForward && scoreBasisStatus === "no_eligible_posts" && latestScoreTotalPosts > 0;
-  const hasLimitedSample = !enriched?.isLatestCarryForward
-    && latestEligiblePosts > 0
-    && latestEligiblePosts < LIMITED_SAMPLE_THRESHOLD;
+  const hasPartialCoverage = scoreBasisStatus === "partial_coverage" || queuedPosts > 0 || scoreConfidence === "low";
   const scoredPostsTitle = [
     hasNoEligiblePosts
       ? "Posts were found in the latest window, but none met the high-confidence scoring threshold."
-      : hasLimitedSample
-      ? `Limited sample: ${latestEligiblePosts.toLocaleString()} high-confidence posts back this score.`
-      : "High-confidence posts backing the latest daily score.",
+      : `${latestEligiblePosts.toLocaleString()} scored of ${latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`,
+    `${coveragePct}% classified for scoring.`,
+    queuedPosts > 0 ? `${queuedPosts.toLocaleString()} queued for Gemini classification.` : null,
     scoreComputedLabel && scoreComputedAbsolute
       ? `Score recomputed ${scoreComputedLabel} (${scoreComputedAbsolute}).`
       : null,
@@ -265,15 +267,24 @@ const ModelDetail = () => {
             </div>
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <ScoreMetaBadge
-                tone={hasNoEligiblePosts || hasLimitedSample ? "warning" : "muted"}
-                icon={hasNoEligiblePosts || hasLimitedSample ? AlertTriangle : undefined}
+                tone={scoreConfidenceTone(scoreConfidence)}
+                icon={hasNoEligiblePosts || hasPartialCoverage ? AlertTriangle : undefined}
                 title={scoredPostsTitle}
+                ariaLabel={confidenceLabel}
+              >
+                {confidenceLabel}
+              </ScoreMetaBadge>
+              <ScoreMetaBadge
+                title={`${latestEligiblePosts.toLocaleString()} scored of ${latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`}
                 ariaLabel={`${latestEligiblePosts.toLocaleString()} scored posts`}
               >
                 {latestEligiblePosts.toLocaleString()} scored
               </ScoreMetaBadge>
-              <ScoreMetaBadge title="Classified posts from the last 7 days.">
-                {recentPosts7d.toLocaleString()} posts · 7d
+              <ScoreMetaBadge title="Collected posts from the last 7 days.">
+                {recentPosts7d.toLocaleString()} collected · 7d
+              </ScoreMetaBadge>
+              <ScoreMetaBadge title={scoredPostsTitle}>
+                {coveragePct}% classified
               </ScoreMetaBadge>
               <DataFreshnessIndicator lastUpdated={latestDataUpdatedAt} />
             </div>

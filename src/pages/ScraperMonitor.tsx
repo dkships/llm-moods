@@ -39,6 +39,14 @@ interface RecentError {
   sample_message: string | null;
 }
 
+interface QueueHealth {
+  queued: number | null;
+  retrying: number | null;
+  failed: number | null;
+  oldest_queued_at: string | null;
+  next_attempt_at: string | null;
+}
+
 interface MonitorRpcClient {
   rpc: ((
     fn: "get_scraper_monitor_runs",
@@ -47,7 +55,11 @@ interface MonitorRpcClient {
     ((
       fn: "get_recent_errors",
       args: { hours_back: number },
-    ) => Promise<{ data: RecentError[] | null; error: { message: string } | null }>);
+    ) => Promise<{ data: RecentError[] | null; error: { message: string } | null }>) &
+    ((
+      fn: "get_classification_queue_health",
+      args?: Record<string, never>,
+    ) => Promise<{ data: QueueHealth[] | null; error: { message: string } | null }>);
 }
 
 // Contexts logged to error_log that aren't actually errors — completion
@@ -114,6 +126,16 @@ const ScraperMonitor = () => {
       return (data || []) as RecentError[];
     },
   });
+  const { data: queueHealth, isLoading: queueLoading } = useQuery({
+    queryKey: ["classification-queue-health"],
+    refetchInterval: 60_000,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as unknown as MonitorRpcClient).rpc("get_classification_queue_health");
+      if (error) throw error;
+      return (data || [])[0] as QueueHealth | undefined;
+    },
+  });
   const recentErrors = (rawErrors ?? []).filter(
     (e) => !NON_ERROR_CONTEXTS.has(e.context ?? "") && !(e.context ?? "").endsWith("-retry"),
   );
@@ -141,6 +163,37 @@ const ScraperMonitor = () => {
     { label: "Succeeded", value: isLoading ? "—" : allRuns.filter((run) => run.status === "success").length },
     { label: "Partial", value: isLoading ? "—" : allRuns.filter((run) => run.status === "partial").length },
     { label: "Failed", value: isLoading ? "—" : allRuns.filter((run) => run.status === "failed").length },
+  ];
+  const queuedFromRuns = scraperRuns.reduce((sum, run) => sum + Number(run.metadata?.classification_queued ?? 0), 0);
+  const deferredFromRuns = scraperRuns.reduce((sum, run) => sum + Number(run.metadata?.classifier_quota_deferred ?? 0), 0);
+  const latestApifyBudget = scraperRuns
+    .map((run) => run.metadata?.apify_budget as Record<string, unknown> | undefined)
+    .find(Boolean);
+  const apifyMonthlyUsage = latestApifyBudget?.monthly_usage_usd;
+  const apifyMonthlyLimit = latestApifyBudget?.monthly_limit_usd;
+  const pipelineCards = [
+    {
+      label: "Queue",
+      value: queueLoading ? "—" : `${queueHealth?.queued ?? 0} queued`,
+      detail: queueHealth?.oldest_queued_at ? `oldest ${formatTimeAgo(queueHealth.oldest_queued_at)}` : "no backlog",
+    },
+    {
+      label: "Deferred",
+      value: isLoading ? "—" : deferredFromRuns.toLocaleString(),
+      detail: "recent run metadata",
+    },
+    {
+      label: "Queued from runs",
+      value: isLoading ? "—" : queuedFromRuns.toLocaleString(),
+      detail: "preserved candidates",
+    },
+    {
+      label: "Apify budget",
+      value: typeof apifyMonthlyUsage === "number" && typeof apifyMonthlyLimit === "number"
+        ? `$${apifyMonthlyUsage.toFixed(2)} / $${apifyMonthlyLimit.toFixed(0)}`
+        : "—",
+      detail: "$24 internal monthly cap",
+    },
   ];
 
   return (
@@ -178,6 +231,16 @@ const ScraperMonitor = () => {
             {classifierStatus === "breach" && " — investigate Gemini quota or model rotation."}
             {classifierStatus === "watch" && " — elevated error rate, monitor."}
             {classifierStatus === "ok" && classifierErrorCount === 0 && " — clean."}
+          </div>
+
+          <div className="mb-8 grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {pipelineCards.map((card) => (
+              <div key={card.label} className="glass rounded-lg p-4">
+                <p className="font-mono text-xs text-muted-foreground">{card.label}</p>
+                <p className="text-lg font-bold text-foreground">{card.value}</p>
+                <p className="mt-1 font-mono text-[11px] text-muted-foreground">{card.detail}</p>
+              </div>
+            ))}
           </div>
 
           <h2 className="mb-3 text-lg font-semibold text-foreground">Score Anomalies</h2>

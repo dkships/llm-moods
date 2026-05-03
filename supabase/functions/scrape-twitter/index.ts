@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { classifyBatch, classifyBatchTargeted, isClassifierFailure, summarizeClassifierFailures } from "../_shared/classifier.ts";
+import { enqueueClassificationCandidate } from "../_shared/classification-queue.ts";
 import { abortApifyRun, apifyRunUrl, checkApifyBudget, scrubApifyRun } from "../_shared/apify-budget.ts";
 import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "../_shared/taxonomy.ts";
 import {
@@ -25,12 +26,14 @@ import {
   meetsMinLength,
   loadRecentTitleKeys,
   isDuplicate,
+  isLikelyNonExperienceShare,
   logToErrorLog,
   logZeroDataWarning,
   upsertScrapedPost,
 } from "../_shared/utils.ts";
 
 const SOURCE = "scrape-twitter";
+const APIFY_MAX_TOTAL_CHARGE_USD = 0.15;
 const DEFAULT_SEARCH_TERMS = [
   `("claude" OR "claude ai" OR "claude code" OR anthropic OR "chatgpt" OR "chat gpt" OR "openai gpt" OR openai OR "gemini" OR "google gemini" OR "gemini ai" OR "grok" OR "grok ai" OR "xai grok") lang:en -filter:retweets`,
 ];
@@ -73,6 +76,7 @@ function buildTwitterSummary(backend: "apify" | "grok") {
     classifierErrors: 0,
     classifierRequestErrors: 0,
     classifierQuotaDeferred: 0,
+    classificationQueued: 0,
     dedupSkipped: 0,
     contentSkipped: 0,
     errors: [] as string[],
@@ -96,7 +100,7 @@ async function runApifyPath(
     sort: getConfigValue(config, "sort_mode", "Latest"),
     maxItems: getConfigNumber(config, "max_items", 50),
   };
-  const budget = await checkApifyBudget(apifyToken);
+  const budget = await checkApifyBudget(apifyToken, APIFY_MAX_TOTAL_CHARGE_USD);
   if (!budget.allowed) {
     return {
       ...summary,
@@ -110,7 +114,7 @@ async function runApifyPath(
 
   const startRes = await fetch(apifyRunUrl("apidojo~tweet-scraper", apifyToken, apifyInput.maxItems, {
     timeoutSecs: 180,
-    maxTotalChargeUsd: 0.15,
+    maxTotalChargeUsd: APIFY_MAX_TOTAL_CHARGE_USD,
   }), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -214,6 +218,10 @@ async function runApifyPath(
       summary.contentSkipped++;
       continue;
     }
+    if (isLikelyNonExperienceShare(text, "")) {
+      summary.contentSkipped++;
+      continue;
+    }
 
     const matchedSlugs = matchModels(text, keywords);
     if (matchedSlugs.length === 0) {
@@ -301,14 +309,54 @@ async function runApifyPath(
 
   for (let i = 0; i < candidates.length; i++) {
     const baseClassification = classifications[i];
-    if (!baseClassification.relevant || isClassifierFailure(baseClassification)) continue;
     const candidate = candidates[i];
+    if (isClassifierFailure(baseClassification)) {
+      for (const slug of candidate.matchedSlugs) {
+        const modelId = modelMap[slug];
+        if (!modelId) continue;
+        const queued = await enqueueClassificationCandidate(supabase, {
+          source: "twitter",
+          scraper_source: SOURCE,
+          model_id: modelId,
+          model_slug: slug,
+          source_url: candidate.sourceUrl,
+          title: candidate.title.slice(0, 120),
+          content: candidate.text.slice(0, 2000),
+          full_text: candidate.text,
+          content_type: "title_only",
+          score: candidate.engagementScore,
+          posted_at: candidate.createdAt,
+        }, baseClassification);
+        if (queued.queued) summary.classificationQueued++;
+        else if (queued.error) summary.errors.push(`Queue: ${queued.error}`);
+      }
+      continue;
+    }
+    if (!baseClassification.relevant) continue;
 
     for (const slug of candidate.matchedSlugs) {
       const classification = targetedMap.get(`${i}:${slug}`) || baseClassification;
-      if (!classification.relevant || isClassifierFailure(classification)) continue;
       const modelId = modelMap[slug];
       if (!modelId || isDuplicate(titleKeys, candidate.title, modelId)) continue;
+      if (isClassifierFailure(classification)) {
+        const queued = await enqueueClassificationCandidate(supabase, {
+          source: "twitter",
+          scraper_source: SOURCE,
+          model_id: modelId,
+          model_slug: slug,
+          source_url: candidate.sourceUrl,
+          title: candidate.title.slice(0, 120),
+          content: candidate.text.slice(0, 2000),
+          full_text: candidate.text,
+          content_type: "title_only",
+          score: candidate.engagementScore,
+          posted_at: candidate.createdAt,
+        }, classification);
+        if (queued.queued) summary.classificationQueued++;
+        else if (queued.error) summary.errors.push(`Queue: ${queued.error}`);
+        continue;
+      }
+      if (!classification.relevant) continue;
 
       const upsertResult = await upsertScrapedPost(supabase, {
         model_id: modelId,
@@ -603,6 +651,7 @@ Deno.serve(async (req) => {
         classifier_request_errors: summary.classifierRequestErrors,
         classifier_quota_deferred: summary.classifierQuotaDeferred,
         classification_success: summary.classification_success,
+        classification_queued: summary.classificationQueued,
         apify_usage: (summary as any).apifyUsage ?? null,
         apify_budget: (summary as any).apifyBudget ?? null,
         dedup_skipped: summary.dedupSkipped,
@@ -622,6 +671,7 @@ Deno.serve(async (req) => {
 
     const responseBody = {
       ...summary,
+      classification_queued: summary.classificationQueued,
       status: derived.status,
       posts_classified: derived.posts_classified,
     };

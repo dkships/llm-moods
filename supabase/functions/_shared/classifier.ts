@@ -1,7 +1,7 @@
 import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "./taxonomy.ts";
 
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
-const MODEL = "gemini-2.5-flash";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 type DenoGlobal = typeof globalThis & {
   Deno?: { env: { get(name: string): string | undefined } };
 };
@@ -27,6 +27,8 @@ function nullableString(value: unknown): string | null {
 
 const DAILY_REQUEST_LIMIT = Number(envValue("GEMINI_DAILY_REQUEST_LIMIT", "200"));
 const MINUTE_REQUEST_LIMIT = Number(envValue("GEMINI_MINUTE_REQUEST_LIMIT", "8"));
+const EVAL_DAILY_REQUEST_LIMIT = Number(envValue("GEMINI_EVAL_DAILY_REQUEST_LIMIT", "20"));
+const EVAL_MINUTE_REQUEST_LIMIT = Number(envValue("GEMINI_EVAL_MINUTE_REQUEST_LIMIT", "2"));
 const MAX_REMOTE_429_RETRY_WAIT_MS = Number(envValue("GEMINI_429_MAX_RETRY_WAIT_MS", "65000"));
 const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
 const SAFE_ERROR_HEADERS = [
@@ -40,6 +42,33 @@ const SAFE_ERROR_HEADERS = [
   "x-request-id",
   "x-goog-request-id",
 ];
+
+export interface ClassifyOptions {
+  model?: string;
+  quotaKey?: string;
+  dailyLimit?: number;
+  minuteLimit?: number;
+  quotaScope?: "production" | "eval";
+}
+
+function classifierModel(options: ClassifyOptions = {}): string {
+  return options.model ?? envValue("GEMINI_CLASSIFIER_MODEL", DEFAULT_MODEL);
+}
+
+function quotaKeyFor(model: string, options: ClassifyOptions = {}): string {
+  const scope = options.quotaScope ?? "production";
+  return options.quotaKey ?? (scope === "eval" ? `${model}:eval` : model);
+}
+
+function dailyLimitFor(options: ClassifyOptions = {}): number {
+  if (options.dailyLimit !== undefined) return options.dailyLimit;
+  return (options.quotaScope ?? "production") === "eval" ? EVAL_DAILY_REQUEST_LIMIT : DAILY_REQUEST_LIMIT;
+}
+
+function minuteLimitFor(options: ClassifyOptions = {}): number {
+  if (options.minuteLimit !== undefined) return options.minuteLimit;
+  return (options.quotaScope ?? "production") === "eval" ? EVAL_MINUTE_REQUEST_LIMIT : MINUTE_REQUEST_LIMIT;
+}
 
 export const CLASSIFY_PROMPT = `You are classifying a social media post about AI language models (ChatGPT, Claude, Gemini, Grok, DeepSeek, Perplexity, etc).
 
@@ -300,32 +329,125 @@ export function summarizeClassifierFailures(
 }
 
 function parseResult(value: unknown): ClassifyResult {
-  const parsed = isRecord(value) ? value : {};
-  const sentiment = normalizeSentiment(nullableString(parsed.sentiment));
-  const complaintCategory = normalizeComplaintCategory(nullableString(parsed.complaint_category));
-  const praiseCategory = normalizePraiseCategory(nullableString(parsed.praise_category));
+  if (!isRecord(value)) return makeSkippedResult("parse_error", "result_not_object");
+  if (typeof value.relevant !== "boolean") return makeSkippedResult("parse_error", "missing_relevant_boolean");
+  if (value.relevant === false) return IRRELEVANT_RESULT;
+
+  const sentiment = normalizeSentiment(nullableString(value.sentiment));
+  if (!sentiment) return makeSkippedResult("parse_error", "missing_or_invalid_sentiment");
+
+  const rawConfidence = typeof value.confidence === "number" ? value.confidence : NaN;
+  if (!Number.isFinite(rawConfidence)) return makeSkippedResult("parse_error", "missing_confidence");
+  const confidence = Math.max(0, Math.min(1, rawConfidence));
+
+  const complaintCategory = normalizeComplaintCategory(nullableString(value.complaint_category));
+  const praiseCategory = normalizePraiseCategory(nullableString(value.praise_category));
 
   return {
-    relevant: parsed.relevant !== false,
+    relevant: true,
     sentiment,
-    complaint_category: sentiment === "negative" ? complaintCategory : null,
+    complaint_category: sentiment === "negative" ? complaintCategory ?? "other" : null,
     praise_category: sentiment === "positive" ? praiseCategory : null,
-    confidence: typeof parsed.confidence === "number" ? parsed.confidence : 0.5,
-    language: nullableString(parsed.language),
-    english_translation: nullableString(parsed.english_translation),
-    status: parsed.relevant === false ? "irrelevant" : "classified",
+    confidence,
+    language: nullableString(value.language),
+    english_translation: nullableString(value.english_translation),
+    status: "classified",
     error: null,
   };
 }
 
-function requestBody(prompt: string, maxTokens: number) {
+const CLASSIFICATION_RESULT_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: [
+    "relevant",
+    "sentiment",
+    "complaint_category",
+    "praise_category",
+    "confidence",
+    "language",
+    "english_translation",
+  ],
+  properties: {
+    relevant: { type: "boolean" },
+    sentiment: { type: ["string", "null"], enum: ["positive", "negative", "neutral", null] },
+    complaint_category: {
+      type: ["string", "null"],
+      enum: [
+        "lazy_responses",
+        "hallucinations",
+        "refusals",
+        "coding_quality",
+        "speed",
+        "general_drop",
+        "pricing_value",
+        "censorship",
+        "context_window",
+        "api_reliability",
+        "multimodal_quality",
+        "reasoning",
+        "other",
+        null,
+      ],
+    },
+    praise_category: {
+      type: ["string", "null"],
+      enum: [
+        "output_quality",
+        "coding_quality",
+        "speed",
+        "reasoning",
+        "creativity",
+        "value",
+        "reliability",
+        "context_handling",
+        "multimodal_quality",
+        "general_improvement",
+        null,
+      ],
+    },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
+    language: { type: ["string", "null"] },
+    english_translation: { type: ["string", "null"] },
+  },
+};
+
+function responseSchema(mode: "single" | "batch") {
+  return mode === "single"
+    ? {
+      name: "llm_vibes_single_classification",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["result"],
+        properties: { result: CLASSIFICATION_RESULT_SCHEMA },
+      },
+    }
+    : {
+      name: "llm_vibes_batch_classification",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["results"],
+        properties: { results: { type: "array", items: CLASSIFICATION_RESULT_SCHEMA } },
+      },
+    };
+}
+
+function requestBody(prompt: string, maxTokens: number, mode: "single" | "batch", options: ClassifyOptions = {}) {
+  const model = classifierModel(options);
   return JSON.stringify({
-    model: MODEL,
+    model,
     messages: [{ role: "user", content: prompt }],
     max_tokens: maxTokens,
     temperature: 0,
     reasoning_effort: "none",
-    response_format: { type: "json_object" },
+    response_format: {
+      type: "json_schema",
+      json_schema: responseSchema(mode),
+    },
   });
 }
 
@@ -438,7 +560,10 @@ function nextMinuteDelayMs(): number {
 
 let quotaClient: QuotaClient | null = null;
 
-async function claimGeminiQuota(logError?: (msg: string, ctx?: string) => Promise<void>): Promise<ClassifyResult | null> {
+async function claimGeminiQuota(
+  options: ClassifyOptions = {},
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+): Promise<ClassifyResult | null> {
   const supabaseUrl = (globalThis as DenoGlobal).Deno?.env.get("SUPABASE_URL");
   const serviceRoleKey = (globalThis as DenoGlobal).Deno?.env.get("SUPABASE_SERVICE_ROLE_KEY");
   if (!supabaseUrl || !serviceRoleKey) return null;
@@ -448,11 +573,12 @@ async function claimGeminiQuota(logError?: (msg: string, ctx?: string) => Promis
     const { createClient } = await import(supabaseModuleUrl) as { createClient: (url: string, key: string) => QuotaClient };
     quotaClient = createClient(supabaseUrl, serviceRoleKey);
   }
+  const model = classifierModel(options);
   const { data, error } = await quotaClient.rpc("claim_api_quota", {
     p_provider: "gemini",
-    p_quota_key: MODEL,
-    p_daily_limit: DAILY_REQUEST_LIMIT,
-    p_minute_limit: MINUTE_REQUEST_LIMIT,
+    p_quota_key: quotaKeyFor(model, options),
+    p_daily_limit: dailyLimitFor(options),
+    p_minute_limit: minuteLimitFor(options),
   });
 
   if (error) {
@@ -474,10 +600,12 @@ async function fetchGemini(
   prompt: string,
   apiKey: string,
   maxTokens: number,
+  mode: "single" | "batch",
   logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
 ): Promise<Response | ClassifyResult> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const quotaResult = await claimGeminiQuota(logError);
+    const quotaResult = await claimGeminiQuota(options, logError);
     if (quotaResult) {
       if (quotaResult.status === "quota_deferred" && quotaResult.error === "minute_limit" && attempt < 2) {
         const waitMs = nextMinuteDelayMs();
@@ -493,7 +621,7 @@ async function fetchGemini(
       res = await fetch(API_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: requestBody(prompt, maxTokens),
+        body: requestBody(prompt, maxTokens, mode, options),
       });
     } catch (e) {
       if (attempt === 2) {
@@ -557,9 +685,10 @@ export async function classifyPost(
   text: string,
   apiKey: string,
   logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
 ): Promise<ClassifyResult> {
   try {
-    const res = await fetchGemini(CLASSIFY_PROMPT + text.slice(0, 600), apiKey, 700, logError);
+    const res = await fetchGemini(CLASSIFY_PROMPT + text.slice(0, 600), apiKey, 700, "single", logError, options);
     if (!(res instanceof Response)) {
       if (logError) await logError(`AI gateway ${res.status}: ${res.error}`, "classify-error");
       return res;
@@ -586,8 +715,9 @@ async function batchClassifyWithPrompt(
   batchLength: number,
   apiKey: string,
   logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
 ): Promise<ClassifyResult[]> {
-  const res = await fetchGemini(prompt + numbered, apiKey, 4096, logError);
+  const res = await fetchGemini(prompt + numbered, apiKey, 4096, "batch", logError, options);
   if (!(res instanceof Response)) {
     if (logError) await logError(`Batch classify ${res.status}: ${res.error}`, "batch-classify-error");
     return Array.from({ length: batchLength }, () => res);
@@ -614,22 +744,36 @@ async function batchClassifyWithPrompt(
   return results;
 }
 
+function shouldStopAfterBatch(results: ClassifyResult[]): ClassifyResult | null {
+  return results.find((result) => result.status === "quota_deferred") ?? null;
+}
+
+function fillRemainingFromStop(stopResult: ClassifyResult, count: number): ClassifyResult[] {
+  return Array.from({ length: count }, () => ({ ...stopResult }));
+}
+
 export async function classifyBatch(
   texts: string[],
   apiKey: string,
   batchSize = 25,
   logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
 ): Promise<ClassifyResult[]> {
   if (texts.length === 0) return [];
-  if (texts.length === 1) return [await classifyPost(texts[0], apiKey, logError)];
+  if (texts.length === 1) return [await classifyPost(texts[0], apiKey, logError, options)];
 
   const allResults: ClassifyResult[] = [];
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
     const numbered = batch.map((t, j) => `Post ${j + 1}: "${t.slice(0, 600)}"`).join("\n\n");
     try {
-      const results = await batchClassifyWithPrompt(BATCH_CLASSIFY_PROMPT, numbered, batch.length, apiKey, logError);
+      const results = await batchClassifyWithPrompt(BATCH_CLASSIFY_PROMPT, numbered, batch.length, apiKey, logError, options);
       allResults.push(...results);
+      const stopResult = shouldStopAfterBatch(results);
+      if (stopResult && i + batchSize < texts.length) {
+        allResults.push(...fillRemainingFromStop(stopResult, texts.length - (i + batchSize)));
+        break;
+      }
       if (i + batchSize < texts.length) {
         await new Promise(r => setTimeout(r, 2000));
       }
@@ -646,6 +790,7 @@ export async function classifyBatchTargeted(
   apiKey: string,
   batchSize = 25,
   logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
 ): Promise<ClassifyResult[]> {
   if (items.length === 0) return [];
 
@@ -654,8 +799,13 @@ export async function classifyBatchTargeted(
     const batch = items.slice(i, i + batchSize);
     const numbered = batch.map((item, j) => `Post ${j + 1} [TARGET: ${item.targetModel}]: "${item.text.slice(0, 600)}"`).join("\n\n");
     try {
-      const results = await batchClassifyWithPrompt(BATCH_CLASSIFY_TARGETED_PROMPT, numbered, batch.length, apiKey, logError);
+      const results = await batchClassifyWithPrompt(BATCH_CLASSIFY_TARGETED_PROMPT, numbered, batch.length, apiKey, logError, options);
       allResults.push(...results);
+      const stopResult = shouldStopAfterBatch(results);
+      if (stopResult && i + batchSize < items.length) {
+        allResults.push(...fillRemainingFromStop(stopResult, items.length - (i + batchSize)));
+        break;
+      }
       if (i + batchSize < items.length) {
         await new Promise(r => setTimeout(r, 2000));
       }

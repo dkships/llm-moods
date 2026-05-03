@@ -166,6 +166,7 @@ export function deriveRunMetrics(summary: Record<string, unknown>): DerivedRunMe
   );
   const filteredCandidates = toInt(summary.filtered_candidates ?? summary.filtered, 0);
   const netNewRows = toInt(summary.net_new_rows ?? summary.inserted, 0);
+  const classificationQueued = toInt(summary.classification_queued ?? summary.classificationQueued ?? summary.queued_classifications, 0);
 
   let status = typeof summary.status === "string" ? summary.status : "success";
   if (summary.skipped === true) {
@@ -176,7 +177,7 @@ export function deriveRunMetrics(summary: Record<string, unknown>): DerivedRunMe
     && postsClassified === 0
     && errors.some((error) => /classif|quota/i.test(error))
   ) {
-    status = "failed";
+    status = classificationQueued > 0 ? "partial" : "failed";
   } else if (errors.length > 0 && status === "success") {
     status = (postsFound > 0 || postsClassified > 0 || netNewRows > 0) ? "partial" : "failed";
   }

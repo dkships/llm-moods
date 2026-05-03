@@ -84,11 +84,20 @@ describe("correlateStatusWithAnomalies", () => {
       [
         anomaly({ periodStart: "2026-04-14T00:00:00.000Z", z: -2.1, severity: "watch" }),
         anomaly({ periodStart: "2026-04-15T00:00:00.000Z", z: -3.4, severity: "breach" }),
-        anomaly({ periodStart: "2026-04-16T00:00:00.000Z", z: 2.5, severity: "watch" }),
+        anomaly({ periodStart: "2026-04-16T00:00:00.000Z", z: -2.5, severity: "watch" }),
       ],
       "claude",
     );
-    expect(result[0].correlatedAnomalies.map((a) => a.z)).toEqual([-3.4, 2.5, -2.1]);
+    expect(result[0].correlatedAnomalies.map((a) => a.z)).toEqual([-3.4, -2.5, -2.1]);
+  });
+
+  it("filters out positive anomalies even within the window", () => {
+    const result = correlateStatusWithAnomalies(
+      [event({ updatedAt: "2026-04-15T00:00:00.000Z" })],
+      [anomaly({ periodStart: "2026-04-15T00:00:00.000Z", severity: "watch", z: 2.4 })],
+      "claude",
+    );
+    expect(result[0].correlatedAnomalies).toHaveLength(0);
   });
 
   it("respects a custom windowDays argument", () => {

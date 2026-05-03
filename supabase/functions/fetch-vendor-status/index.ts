@@ -5,7 +5,7 @@
  *   - anthropic: status.anthropic.com (Atom)
  *   - openai:    status.openai.com    (Atom)
  *   - google:    status.cloud.google.com (JSON)
- *   - xai:       no public feed (returns supported=false)
+ *   - xai:       status.x.ai (RSS)
  *
  * No DB access. No service-role key. Pure outbound HTTP to public URLs,
  * cached for 10 minutes at the CDN.
@@ -34,17 +34,18 @@ interface VendorStatusResponse {
   error?: string;
 }
 
-const STATUS_URLS: Record<Exclude<Vendor, "xai">, string> = {
+const STATUS_URLS: Record<Vendor, string> = {
   anthropic: "https://status.anthropic.com/history.atom",
   openai: "https://status.openai.com/history.atom",
   google: "https://status.cloud.google.com/incidents.json",
+  xai: "https://status.x.ai/feed.xml",
 };
 
 const VENDOR_PUBLIC_URL: Record<Vendor, string> = {
   anthropic: "https://status.anthropic.com",
   openai: "https://status.openai.com",
   google: "https://status.cloud.google.com",
-  xai: "https://x.ai",
+  xai: "https://status.x.ai",
 };
 
 function decodeXmlEntities(text: string): string {
@@ -124,6 +125,36 @@ function parseAtomFeed(xml: string, cutoffMs: number): VendorStatusEvent[] {
   return events;
 }
 
+function parseRssFeed(xml: string, cutoffMs: number): VendorStatusEvent[] {
+  const events: VendorStatusEvent[] = [];
+  const itemMatches = xml.matchAll(/<item[^>]*>([\s\S]*?)<\/item>/gi);
+  for (const match of itemMatches) {
+    const item = match[1];
+    const id = extractTag(item, "guid") ?? "";
+    const titleRaw = extractTag(item, "title") ?? "";
+    const updatedAt = extractTag(item, "pubDate") ?? extractTag(item, "updated") ?? "";
+    const summaryRaw = extractTag(item, "description") ?? extractTag(item, "content:encoded") ?? "";
+    const url = extractTag(item, "link");
+
+    if (!updatedAt) continue;
+    const updatedMs = Date.parse(updatedAt);
+    if (Number.isNaN(updatedMs) || updatedMs < cutoffMs) continue;
+
+    const title = stripHtml(titleRaw).slice(0, 200);
+    const summary = stripHtml(summaryRaw).slice(0, 500);
+
+    events.push({
+      id: id || `${title}-${updatedAt}`,
+      title,
+      updatedAt: new Date(updatedMs).toISOString(),
+      summary: summary || null,
+      url,
+      severity: classifyAtomSeverity(title, summary),
+    });
+  }
+  return events;
+}
+
 interface GoogleIncident {
   id?: string;
   number?: string;
@@ -180,22 +211,12 @@ async function fetchVendorStatus(vendor: Vendor): Promise<VendorStatusResponse> 
   const fetchedAt = new Date().toISOString();
   const cutoffMs = Date.now() - 30 * 24 * 60 * 60 * 1000;
 
-  if (vendor === "xai") {
-    return {
-      vendor,
-      supported: false,
-      fetchedAt,
-      events: [],
-      message: "xAI does not publish a public status feed.",
-    };
-  }
-
   const url = STATUS_URLS[vendor];
   try {
     const res = await fetch(url, {
       headers: {
         "user-agent": "llmvibes-status-fetcher/1.0 (+https://llmvibes.ai)",
-        accept: vendor === "google" ? "application/json" : "application/atom+xml, application/xml",
+        accept: vendor === "google" ? "application/json" : "application/atom+xml, application/rss+xml, application/xml",
       },
     });
     if (!res.ok) {
@@ -211,6 +232,8 @@ async function fetchVendorStatus(vendor: Vendor): Promise<VendorStatusResponse> 
     const events =
       vendor === "google"
         ? parseGoogleIncidents(JSON.parse(body) as GoogleIncident[], cutoffMs)
+        : vendor === "xai"
+        ? parseRssFeed(body, cutoffMs)
         : parseAtomFeed(body, cutoffMs);
     events.sort((a, b) => Date.parse(b.updatedAt) - Date.parse(a.updatedAt));
     return { vendor, supported: true, fetchedAt, events };

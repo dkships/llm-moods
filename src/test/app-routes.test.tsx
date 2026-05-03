@@ -204,8 +204,9 @@ describe("public app routes", () => {
       /^updated\b/i.test(element.textContent || ""),
     );
     expect(freshnessStatus).toBeDefined();
+    expect(screen.getAllByText("Low confidence").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("2 scored posts")).toBeInTheDocument();
-    expect(screen.getByText("328 posts · 7d")).toBeInTheDocument();
+    expect(screen.getByText("328 collected · 7d")).toBeInTheDocument();
     expect(screen.queryByText(/recent volume:/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /recent community chatter/i })).toBeInTheDocument();
   });
@@ -222,9 +223,11 @@ describe("public app routes", () => {
     await renderAt("/model/chatgpt");
 
     expect(await screen.findByText(/updated\b/i)).toBeInTheDocument();
+    expect(screen.getAllByText("Low confidence").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("2 scored posts")).toBeInTheDocument();
     expect(screen.getByText("2 scored")).toBeInTheDocument();
-    expect(screen.getByText("328 posts · 7d")).toBeInTheDocument();
+    expect(screen.getByText("328 collected · 7d")).toBeInTheDocument();
+    expect(screen.getByText("100% classified")).toBeInTheDocument();
     expect(screen.getByText(/^latest classified post\b/i)).toBeInTheDocument();
     expect(screen.queryByText(/daily score based on/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^score recalculated\b/i)).not.toBeInTheDocument();

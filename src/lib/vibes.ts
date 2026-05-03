@@ -56,6 +56,20 @@ export function getVibeStatus(score: number) {
 // toward the previous day, so the surfaced score is mostly inertia.
 export const LIMITED_SAMPLE_THRESHOLD = 5;
 
+export type ScoreConfidence = "high" | "medium" | "low";
+
+export function formatScoreConfidence(confidence: ScoreConfidence): string {
+  if (confidence === "high") return "High confidence";
+  if (confidence === "medium") return "Medium confidence";
+  return "Low confidence";
+}
+
+export function scoreConfidenceTone(confidence: ScoreConfidence): "muted" | "primary" | "warning" {
+  if (confidence === "high") return "primary";
+  if (confidence === "medium") return "muted";
+  return "warning";
+}
+
 // Maps a post sentiment to the unified left-border accent class. Used by
 // chatter posts and recent-posts list items so the border-color language is
 // consistent with `border-l-primary` (incident card, research featured card).

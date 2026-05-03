@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { classifyBatch, classifyBatchTargeted, isClassifierFailure, summarizeClassifierFailures } from "../_shared/classifier.ts";
+import { enqueueClassificationCandidate } from "../_shared/classification-queue.ts";
 import { abortApifyRun, apifyRunUrl, checkApifyBudget, scrubApifyRun } from "../_shared/apify-budget.ts";
 import {
   createRunRecord,
@@ -22,6 +23,7 @@ import {
   meetsMinLength,
   loadRecentTitleKeys,
   isDuplicate,
+  isLikelyNonExperienceShare,
   logToErrorLog,
   logZeroDataWarning,
   upsertScrapedPost,
@@ -31,6 +33,7 @@ const SOURCE = "scrape-reddit-apify";
 const APIFY_ACTOR_TIMEOUT_SECS = 120;
 const APIFY_POLL_TIMEOUT_SECS = 105;
 const APIFY_POLL_INTERVAL_MS = 10_000;
+const APIFY_MAX_TOTAL_CHARGE_USD = 0.35;
 
 const DEFAULT_START_URLS = [
   "https://www.reddit.com/r/ClaudeAI/new/",
@@ -118,7 +121,7 @@ Deno.serve(async (req) => {
     }
 
     await logToErrorLog(supabase, SOURCE, "Reddit Apify scraper started", "health-check");
-    const budget = await checkApifyBudget(apifyToken);
+    const budget = await checkApifyBudget(apifyToken, APIFY_MAX_TOTAL_CHARGE_USD);
     if (!budget.allowed) {
       const skipped = {
         source: SOURCE,
@@ -158,7 +161,7 @@ Deno.serve(async (req) => {
 
     const startRes = await fetch(apifyRunUrl("trudax~reddit-scraper-lite", apifyToken, apifyInput.maxItems, {
       timeoutSecs: actorTimeoutSecs,
-      maxTotalChargeUsd: 0.35,
+      maxTotalChargeUsd: APIFY_MAX_TOTAL_CHARGE_USD,
     }), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -214,6 +217,7 @@ Deno.serve(async (req) => {
       }
     }
 
+    let apifyRunWarning: string | null = null;
     if (runStatus !== "SUCCEEDED") {
       let errorDetail = "";
       if (!runStatus) {
@@ -231,46 +235,7 @@ Deno.serve(async (req) => {
       } catch {}
       await logToErrorLog(supabase, SOURCE, `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
       const message = `Apify run status: ${runStatus || "TIMEOUT"}${errorDetail ? ` (${errorDetail})` : ""}`;
-      const failed = {
-        source: SOURCE,
-        status: "failed",
-        backend: "apify",
-        posts_found: 0,
-        filtered_candidates: 0,
-        classified: 0,
-        classification_success: 0,
-        posts_classified: 0,
-        net_new_rows: 0,
-        duplicate_conflicts: 0,
-        apify_items_fetched: 0,
-        errors: [message],
-        apifyUsage: apifyRunMetadata,
-        apifyBudget: budget.usage,
-      };
-      await updateRunRecord(supabase, runRecord!.id, {
-        status: "failed",
-        posts_found: 0,
-        posts_classified: 0,
-        apify_items_fetched: 0,
-        filtered_candidates: 0,
-        net_new_rows: 0,
-        duplicate_conflicts: 0,
-        errors: failed.errors,
-        metadata: {
-          backend: "apify",
-          reason: "apify_run_not_succeeded",
-          apify_status: runStatus || "TIMEOUT",
-          apify_error_detail: errorDetail || null,
-          apify_usage: apifyRunMetadata,
-          apify_budget: budget.usage,
-          actor_timeout_secs: actorTimeoutSecs,
-          poll_timeout_secs: pollTimeoutSecs,
-        },
-        completed_at: new Date().toISOString(),
-      });
-      return new Response(JSON.stringify(failed, null, 2), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+      apifyRunWarning = message;
     }
 
     const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json`);
@@ -302,6 +267,7 @@ Deno.serve(async (req) => {
       classifierErrors: 0,
       classifierRequestErrors: 0,
       classifierQuotaDeferred: 0,
+      classificationQueued: 0,
       classification_success: 0,
       duplicateSkipped: 0,
       dedupSkipped: 0,
@@ -310,6 +276,7 @@ Deno.serve(async (req) => {
       apifyUsage: scrubApifyRun(terminalRunData),
       apifyBudget: budget.usage,
     };
+    if (apifyRunWarning) summary.errors.push(`${apifyRunWarning}; salvaged dataset items when available`);
 
     const candidates: {
       fullText: string;
@@ -330,6 +297,10 @@ Deno.serve(async (req) => {
       const fullText = `${title} ${bodyText}`;
 
       if (!meetsMinLength(title, bodyText)) {
+        summary.contentSkipped++;
+        continue;
+      }
+      if (isLikelyNonExperienceShare(title, bodyText)) {
         summary.contentSkipped++;
         continue;
       }
@@ -410,14 +381,54 @@ Deno.serve(async (req) => {
 
     for (let i = 0; i < candidates.length; i++) {
       const baseClassification = classifications[i];
-      if (!baseClassification.relevant || isClassifierFailure(baseClassification)) continue;
       const candidate = candidates[i];
+      if (isClassifierFailure(baseClassification)) {
+        for (const slug of candidate.matchedSlugs) {
+          const modelId = modelMap[slug];
+          if (!modelId) continue;
+          const queued = await enqueueClassificationCandidate(supabase, {
+            source: "reddit",
+            scraper_source: SOURCE,
+            model_id: modelId,
+            model_slug: slug,
+            source_url: candidate.sourceUrl,
+            title: candidate.title.slice(0, 120),
+            content: (candidate.body || candidate.title).slice(0, 2000),
+            full_text: candidate.fullText,
+            content_type: candidate.body ? "title_and_body" : "title_only",
+            score: candidate.score,
+            posted_at: candidate.createdAt,
+          }, baseClassification);
+          if (queued.queued) summary.classificationQueued++;
+          else if (queued.error) summary.errors.push(`Queue: ${queued.error}`);
+        }
+        continue;
+      }
+      if (!baseClassification.relevant) continue;
 
       for (const slug of candidate.matchedSlugs) {
         const classification = targetedMap.get(`${i}:${slug}`) || baseClassification;
-        if (!classification.relevant || isClassifierFailure(classification)) continue;
         const modelId = modelMap[slug];
         if (!modelId || isDuplicate(titleKeys, candidate.title, modelId)) continue;
+        if (isClassifierFailure(classification)) {
+          const queued = await enqueueClassificationCandidate(supabase, {
+            source: "reddit",
+            scraper_source: SOURCE,
+            model_id: modelId,
+            model_slug: slug,
+            source_url: candidate.sourceUrl,
+            title: candidate.title.slice(0, 120),
+            content: (candidate.body || candidate.title).slice(0, 2000),
+            full_text: candidate.fullText,
+            content_type: candidate.body ? "title_and_body" : "title_only",
+            score: candidate.score,
+            posted_at: candidate.createdAt,
+          }, classification);
+          if (queued.queued) summary.classificationQueued++;
+          else if (queued.error) summary.errors.push(`Queue: ${queued.error}`);
+          continue;
+        }
+        if (!classification.relevant) continue;
 
         const upsertResult = await upsertScrapedPost(supabase, {
           model_id: modelId,
@@ -472,6 +483,7 @@ Deno.serve(async (req) => {
         classifier_request_errors: summary.classifierRequestErrors,
         classifier_quota_deferred: summary.classifierQuotaDeferred,
         classification_success: summary.classification_success,
+        classification_queued: summary.classificationQueued,
         apify_usage: summary.apifyUsage,
         apify_budget: summary.apifyBudget,
       },
@@ -488,6 +500,7 @@ Deno.serve(async (req) => {
 
     const responseBody = {
       ...summary,
+      classification_queued: summary.classificationQueued,
       status: derived.status,
       posts_classified: derived.posts_classified,
     };

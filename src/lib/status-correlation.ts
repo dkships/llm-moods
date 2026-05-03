@@ -16,9 +16,9 @@ function startOfUtcDay(iso: string): number {
 }
 
 /**
- * Pair vendor status events with score anomalies that occurred within a
+ * Pair vendor status events with score drops that occurred within a
  * ±windowDays window of the event date, restricted to a single model and
- * to non-normal anomalies. Returned matches are sorted by absolute z
+ * to non-normal negative anomalies. Returned matches are sorted by absolute z
  * descending so the strongest signal renders first.
  *
  * Pure function — no fetching, no React. Both inputs are small (~30
@@ -32,7 +32,7 @@ export function correlateStatusWithAnomalies(
 ): CorrelatedStatusEvent[] {
   const windowMs = windowDays * 24 * 60 * 60 * 1000;
   const eligibleAnomalies = anomalies.filter(
-    (a) => a.modelSlug === modelSlug && a.severity !== "normal",
+    (a) => a.modelSlug === modelSlug && a.severity !== "normal" && a.z < 0,
   );
 
   return events.map((event) => {

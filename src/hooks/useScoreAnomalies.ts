@@ -37,6 +37,9 @@ interface ScoreRow {
   score: number;
   period_start: string;
   total_posts: number | null;
+  eligible_posts?: number | null;
+  score_basis_status?: string | null;
+  classification_coverage?: number | null;
   top_complaint: string | null;
 }
 
@@ -94,7 +97,7 @@ export function useScoreAnomalies(options: UseScoreAnomaliesOptions = {}) {
       const [scoresResult, modelsResult] = await Promise.all([
         supabase
           .from("vibes_scores")
-          .select("model_id, score, period_start, total_posts, top_complaint")
+          .select("model_id, score, period_start, total_posts, eligible_posts, score_basis_status, classification_coverage, top_complaint")
           .eq("period", "daily")
           .gte("period_start", since)
           .order("period_start", { ascending: true })
@@ -143,10 +146,15 @@ export function useScoreAnomalies(options: UseScoreAnomaliesOptions = {}) {
             // total_posts=0, so including them biases the baseline mean toward
             // stale numbers and inflates |z| on the next real-data day.
             if ((sorted[j].total_posts ?? 0) === 0) continue;
+            if (sorted[j].score_basis_status && sorted[j].score_basis_status !== "measured") continue;
+            if ((sorted[j].eligible_posts ?? 0) < 5) continue;
             baseline.push(sorted[j].score);
           }
 
           if (baseline.length < minBaselineDays) continue;
+          if (row.score_basis_status && row.score_basis_status !== "measured") continue;
+          if ((row.eligible_posts ?? 0) < 5) continue;
+          if ((row.classification_coverage ?? 1) < 0.8) continue;
 
           const avg = mean(baseline);
           // Floor stddev at 1.0 — a too-stable baseline (stddev<1) blows up

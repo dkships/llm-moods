@@ -85,7 +85,7 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
               >
                 <ArrowLeftRight className="h-3 w-3 text-primary" aria-hidden="true" />
                 <span>
-                  Our {formatAnomalyDate(a.periodStart)} {a.severity}
+                  Possible overlap · {formatAnomalyDate(a.periodStart)} {a.severity}
                 </span>
                 <span className={a.z < 0 ? "text-destructive" : "text-primary"}>
                   z={a.z >= 0 ? "+" : ""}{a.z.toFixed(1)}
@@ -174,10 +174,15 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
       ) : (
         <>
           <ul>
-            {correlatedEvents.slice(0, 5).map((event) => (
+            {correlatedEvents.slice(0, 3).map((event) => (
               <StatusEventRow key={event.id} event={event} />
             ))}
           </ul>
+          {correlatedEvents.every((event) => event.correlatedAnomalies.length === 0) && (
+            <p className="mt-3 text-sm text-text-tertiary">
+              No matching score drop found.
+            </p>
+          )}
           {data.fetchedAt && (
             <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-text-tertiary">
               Last checked {formatTimeAgo(data.fetchedAt)}
