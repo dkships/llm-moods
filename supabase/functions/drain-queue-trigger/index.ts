@@ -26,18 +26,27 @@ Deno.serve(async (req) => {
     // no body or invalid JSON — use defaults
   }
 
-  const upstream = await fetch(`${supabaseUrl}/functions/v1/drain-classification-queue`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${serviceKey}`,
-    },
-    body: JSON.stringify(body),
-  });
-
-  const text = await upstream.text();
-  return new Response(text, {
-    status: upstream.status,
-    headers: { ...corsHeaders, "Content-Type": "application/json" },
-  });
+  try {
+    const upstream = await fetch(`${supabaseUrl}/functions/v1/drain-classification-queue`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${serviceKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+    const text = await upstream.text();
+    console.log("drain-queue-trigger upstream", upstream.status);
+    return new Response(text, {
+      status: upstream.status,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.error("drain-queue-trigger upstream error", message);
+    return new Response(JSON.stringify({ error: "upstream_failed", message }), {
+      status: 502,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 });
