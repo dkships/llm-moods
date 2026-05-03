@@ -41,6 +41,89 @@ export type Database = {
         }
         Relationships: []
       }
+      classification_queue: {
+        Row: {
+          attempt_count: number
+          content: string | null
+          content_type: string
+          created_at: string
+          full_text: string
+          id: string
+          last_attempt_at: string | null
+          last_error: string | null
+          last_error_type: string | null
+          metadata: Json
+          model_id: string
+          model_slug: string
+          next_attempt_at: string
+          posted_at: string
+          request_error_id: string | null
+          score: number
+          scraper_source: string
+          source: string
+          source_url: string
+          status: string
+          title: string | null
+          updated_at: string
+        }
+        Insert: {
+          attempt_count?: number
+          content?: string | null
+          content_type?: string
+          created_at?: string
+          full_text: string
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_error_type?: string | null
+          metadata?: Json
+          model_id: string
+          model_slug: string
+          next_attempt_at?: string
+          posted_at: string
+          request_error_id?: string | null
+          score?: number
+          scraper_source: string
+          source: string
+          source_url: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Update: {
+          attempt_count?: number
+          content?: string | null
+          content_type?: string
+          created_at?: string
+          full_text?: string
+          id?: string
+          last_attempt_at?: string | null
+          last_error?: string | null
+          last_error_type?: string | null
+          metadata?: Json
+          model_id?: string
+          model_slug?: string
+          next_attempt_at?: string
+          posted_at?: string
+          request_error_id?: string | null
+          score?: number
+          scraper_source?: string
+          source?: string
+          source_url?: string
+          status?: string
+          title?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "classification_queue_model_id_fkey"
+            columns: ["model_id"]
+            isOneToOne: false
+            referencedRelation: "models"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       error_log: {
         Row: {
           context: string | null
@@ -314,6 +397,7 @@ export type Database = {
       vibes_scores: {
         Row: {
           carried_from_period_start: string | null
+          classification_coverage: number
           created_at: string
           eligible_posts: number | null
           id: string
@@ -326,14 +410,18 @@ export type Database = {
           period: string
           period_start: string
           positive_count: number | null
+          queued_posts: number
           score: number
           score_basis_status: string
           score_computed_at: string
+          score_confidence: string
           top_complaint: string | null
           total_posts: number | null
+          unclassified_posts: number
         }
         Insert: {
           carried_from_period_start?: string | null
+          classification_coverage?: number
           created_at?: string
           eligible_posts?: number | null
           id?: string
@@ -346,14 +434,18 @@ export type Database = {
           period: string
           period_start: string
           positive_count?: number | null
+          queued_posts?: number
           score: number
           score_basis_status?: string
           score_computed_at?: string
+          score_confidence?: string
           top_complaint?: string | null
           total_posts?: number | null
+          unclassified_posts?: number
         }
         Update: {
           carried_from_period_start?: string | null
+          classification_coverage?: number
           created_at?: string
           eligible_posts?: number | null
           id?: string
@@ -366,11 +458,14 @@ export type Database = {
           period?: string
           period_start?: string
           positive_count?: number | null
+          queued_posts?: number
           score?: number
           score_basis_status?: string
           score_computed_at?: string
+          score_confidence?: string
           top_complaint?: string | null
           total_posts?: number | null
+          unclassified_posts?: number
         }
         Relationships: [
           {
@@ -401,6 +496,16 @@ export type Database = {
           reason: string
         }[]
       }
+      get_classification_queue_health: {
+        Args: never
+        Returns: {
+          failed: number
+          next_attempt_at: string
+          oldest_queued_at: string
+          queued: number
+          retrying: number
+        }[]
+      }
       get_complaint_breakdown: {
         Args: { p_model_id: string }
         Returns: {
@@ -413,6 +518,7 @@ export type Database = {
         Returns: {
           accent_color: string
           carried_from_period_start: string
+          classification_coverage: number
           eligible_posts: number
           last_updated: string
           latest_post_ingested_at: string
@@ -425,13 +531,16 @@ export type Database = {
           model_name: string
           model_slug: string
           previous_score: number
+          queued_posts: number
           recent_posts_7d: number
           score_basis_status: string
           score_computed_at: string
+          score_confidence: string
           score_period_end: string
           score_period_start: string
           top_complaint: string
           total_posts: number
+          unclassified_posts: number
         }[]
       }
       get_recent_errors: {
