@@ -1,12 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { classifyBatchTargeted, isClassifierFailure, summarizeClassifierFailures } from "../_shared/classifier.ts";
 import {
-  claimServiceLock,
   internalOnlyResponse,
   isInternalServiceRequest,
   readJsonBody,
-  releaseServiceLock,
 } from "../_shared/runtime.ts";
+import { claimServiceLock, releaseServiceLock } from "../_shared/score-refresh.ts";
 import {
   corsHeaders,
   isDuplicate,
