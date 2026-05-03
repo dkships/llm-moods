@@ -49,7 +49,7 @@ The dashboard caught the problem early. It just couldn't tell us so in real time
 
 **Operational blindness.** The 17-day post-volume gap had no monitoring. `scraper_runs` was logging successful zero-row runs and the dashboard rendered stale-from-baseline scores carried forward via the smoothing logic. The only thing that would have caught it was a daily-volume threshold alert, which we didn't have.
 
-**Classifier risk.** Sentiment classification runs through Gemini 3.1 Flash-Lite, classifying posts about Gemini's main competitor. We have no validation harness to spot-check Claude classifications against a second model. There's no evidence of bias in this dataset, but the structural risk is real and worth naming.
+**Classifier risk.** Sentiment classification runs through Gemini 2.5 Flash by default, classifying posts about Gemini and its competitors. The structural risk is real and worth naming. Current mitigation is a Gemini-only canary that samples recent uncertain posts, reruns them through approved Gemini candidates, and reports agreement before classifier upgrades.
 
 ## Counterfactuals (what the dashboard would have shown if Tier 1 had already shipped)
 

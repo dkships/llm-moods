@@ -208,7 +208,8 @@ const ClaudeApril2026Body = () => (
         </a>
       </sup>{" "}
       In this dataset Claude often outscored Gemini, the opposite of what self-favoritism would produce, but
-      the structural risk is real and we have no validation harness yet.
+      the structural risk is real. The current validation harness is a Gemini-only canary over recent stored
+      posts, used before changing the production classifier.
     </p>
 
     <h2 id="what-this-changes">What this changes</h2>
@@ -273,10 +274,11 @@ const ClaudeApril2026Body = () => (
         [1]
       </a>{" "}
       Self-bias risk on the classifier. Gemini 2.5 Flash is the model performing classification and is
-      also one of the four tracked models. We have no second-model validation harness yet. Mitigating evidence:
-      across the windows examined, Claude often outscored Gemini, the opposite of what classifier bias toward
-      Gemini would produce. The risk is structural, and disclosing it is the obligation; spot-checking it is
-      the next build item.
+      also one of the four tracked models. Current mitigation: a Gemini-only canary samples recent uncertain
+      posts and reruns them through approved Gemini candidates before classifier upgrades. That does not prove
+      neutrality, but it makes model changes auditable without adding OpenAI or Anthropic keys. Across the
+      windows examined, Claude often outscored Gemini, the opposite of what classifier bias toward Gemini would
+      produce.
     </p>
 
     <AuthorBio />

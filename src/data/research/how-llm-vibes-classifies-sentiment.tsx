@@ -170,14 +170,15 @@ score = round((effective_positive / total_weight) × 100)`}</code>
     <p>Three caveats that anyone reading the dashboard should know.</p>
     <p>
       The classifier vendor is one of the tracked models. Gemini 2.5 Flash classifies posts about Gemini's
-      competitors. We tested this directly in April 2026. 50 Gemini-on-Gemini posts (random sample, 30-day
-      window) were re-classified through Claude Sonnet 4.6 via the Anthropic API. Sentiment agreement was
-      91.9%, average confidence delta 0.13. No meaningful self-bias at the sentiment level. (Claude also
-      often scores higher than Gemini in the windows we've examined, the opposite of what classifier
-      favoritism toward Gemini would produce.) The two classifiers agreed less often on complaint category
-      (~52%), but the disagreements cluster on boundaries that genuinely overlap (lazy_responses vs
-      general_drop, refusals vs censorship), not on Gemini favoring itself. The check fixture lives at{" "}
-      <code>supabase/functions/check-gemini-self-bias</code> and can be re-run when either model is upgraded.
+      competitors and itself, so self-bias remains a measurement risk. The current check fixture lives at{" "}
+      <code>supabase/functions/check-gemini-self-bias</code>. It samples up to 150 recent stored posts from
+      the past 21 days that are unclassified, low-confidence, or missing a negative complaint category, then
+      reruns them through approved Gemini candidates (<code>gemini-2.5-flash</code>,{" "}
+      <code>gemini-3-flash-preview</code>, and <code>gemini-3.1-flash-lite-preview</code>). The canary reports
+      sentiment-match and complaint-match rates without writing public scores. This keeps validation inside the
+      Gemini free tier and removes the need for Anthropic or OpenAI keys. Across the windows we've examined,
+      Claude often scores higher than Gemini, the opposite of what classifier favoritism toward Gemini would
+      produce, but the canary is the guardrail we use before changing the production classifier.
     </p>
     <p>
       Volume gaps are part of the record. The Feb 19 – Mar 7, 2026 gap (no scheduled cron, manual triggers only)

@@ -2,10 +2,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { classifyBatchTargeted, isClassifierFailure } from "../_shared/classifier.ts";
 import { internalOnlyResponse, isInternalServiceRequest, readJsonBody } from "../_shared/runtime.ts";
 
-// Gemini-only classifier canary. This replaces the old Anthropic/Claude
-// self-bias check so sentiment evaluation stays inside the Gemini free-tier
-// budget. It reads recent stored posts, compares candidate Gemini models
-// against current labels, and never writes public scores or scraped posts.
+// Gemini-only classifier canary for sentiment model upgrades. It keeps
+// evaluation inside the Gemini free-tier budget, compares candidate Gemini
+// models against current labels, and never writes public scores or scraped
+// posts.
 
 const SOURCE = "check-gemini-self-bias";
 const DEFAULT_CANDIDATES = ["gemini-2.5-flash", "gemini-3-flash-preview", "gemini-3.1-flash-lite-preview"];
