@@ -2,7 +2,7 @@
   "name": "llm-moods",
   "private": true,
   "version": "0.1.0",
-  "description": "Real-time AI sentiment dashboard tracking community vibes for LLM models across 12+ social platforms",
+  "description": "AI sentiment dashboard updated throughout the day for Claude, ChatGPT, Gemini, and Grok across 5 social platforms",
   "homepage": "https://llmvibes.ai",
   "repository": {
     "type": "git",
@@ -23,7 +23,8 @@
     "typescript",
     "claude",
     "chatgpt",
-    "gemini"
+    "gemini",
+    "grok"
   ],
   "type": "module",
   "scripts": {

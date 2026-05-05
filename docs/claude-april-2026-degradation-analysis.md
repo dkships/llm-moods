@@ -125,7 +125,7 @@ Anthropic named three user-observable symptoms. Every one shows up in our classi
 
 - Claude's lowest score window (Apr 11–15, score 34) is *after* the cache bug was fixed and coincides with the press cycle, not with the silent bug period. That looks more like social media echo than early detection.
 - Post volume before Mar 8 is too low (1–5 posts/day) to treat February as a real baseline. We can say Claude was well below its pre-period weighted average; we can't cleanly say "Claude was X% below normal."
-- The sentiment classifier is Gemini 3.1 Flash-Lite, which is itself one of the tracked models. No evidence of Claude-specific bias in this dataset, but worth flagging.
+- The sentiment classifier defaults to Gemini 2.5 Flash, which is itself one of the tracked models. No evidence of Claude-specific bias in this dataset, but worth flagging.
 - Our scrapers do not distinguish Claude.ai chat users from Claude Code users. Anthropic's bugs were Claude Code-specific. Some share of the Claude complaints we captured are unrelated to the three bugs.
 
 ## Method

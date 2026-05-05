@@ -20,7 +20,7 @@ interface HeadConfig {
 
 const BASE_URL = "https://llmvibes.ai";
 const DEFAULT_DESCRIPTION =
-  "Track community sentiment for Claude, ChatGPT, Gemini, and Grok. Is your AI having a bad day? Find out instantly.";
+  "Updated throughout the day, LLM Vibes tracks community sentiment for Claude, ChatGPT, Gemini, and Grok.";
 const DEFAULT_OG_IMAGE = "https://llmvibes.ai/og-image.png";
 
 const JSON_LD_ID = "page-json-ld";

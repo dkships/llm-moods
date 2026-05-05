@@ -72,7 +72,7 @@ LandingModelCard.displayName = "LandingModelCard";
 const Index = () => {
   useHead({
     title: "LLM Vibes — Is Your AI Having a Bad Day?",
-    description: "Track community sentiment for Claude, ChatGPT, Gemini, and Grok. Is your AI having a bad day?",
+    description: "Updated throughout the day, LLM Vibes tracks community sentiment for Claude, ChatGPT, Gemini, and Grok.",
     url: "/",
   });
   const { data: models, isLoading, isError } = useModelsWithLatestVibes();
