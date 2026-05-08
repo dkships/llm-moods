@@ -163,7 +163,7 @@ Deno.serve(async (req) => {
 
     if (!dryRun) {
       for (const source of SOURCE_HANDLERS) {
-        collection.push(await runSourceHandler(source.name, source.handler, sourcePayload));
+        collection.push(await runSourceHandler(source.name, sourcePayload));
       }
     }
 
