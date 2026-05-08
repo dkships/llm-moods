@@ -53,6 +53,3 @@ verify_jwt = false
 
 [functions.drain-queue-trigger]
 verify_jwt = false
-
-[functions.pipeline-dry-run-trigger]
-verify_jwt = false
