@@ -69,11 +69,12 @@ export interface RefreshSummary {
 
 const PAGE_SIZE = 1000;
 
-function maxIso(rows: Array<Record<string, unknown>>, key: string): string | null {
+function maxIso(rows: ReadonlyArray<unknown>, key: string): string | null {
   let maxValue: string | null = null;
   for (const row of rows) {
-    const value = row[key];
-    if (value && (!maxValue || new Date(value).getTime() > new Date(maxValue).getTime())) {
+    const value = (row as Record<string, unknown>)[key];
+    if (typeof value !== "string" || !value) continue;
+    if (!maxValue || new Date(value).getTime() > new Date(maxValue).getTime()) {
       maxValue = value;
     }
   }
