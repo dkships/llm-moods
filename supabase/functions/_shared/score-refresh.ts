@@ -23,6 +23,7 @@ interface ScrapedScorePost extends ScoreInputPost {
   model_id: string;
   posted_at: string;
   created_at: string | null;
+  classification_status?: string | null;
 }
 
 interface DailySeedRow {
@@ -34,7 +35,7 @@ interface DailySeedRow {
   measurement_period_start?: string | null;
 }
 
-interface ScoreUpsertRow {
+export interface ScoreUpsertRow {
   model_id: string;
   period: "daily" | "hourly";
   period_start: string;
@@ -63,6 +64,7 @@ export interface RefreshSummary {
   skipped_days: number;
   posts_scanned: number;
   models: Record<string, unknown>;
+  rows?: ScoreUpsertRow[];
 }
 
 const PAGE_SIZE = 1000;
@@ -96,9 +98,8 @@ function hasValidSentiment(post: ScoreInputPost): boolean {
 }
 
 function basisForResult(result: ScoreResult, queuedPosts = 0, classificationCoverage = 1, minPosts = DEFAULT_MIN_POSTS): ScoreBasisStatus {
-  if (result.eligible_posts === 0) return "no_eligible_posts";
-  if (result.eligible_posts < minPosts) return "thin_sample";
   if (queuedPosts > 0 || classificationCoverage < 0.8) return "partial_coverage";
+  if (result.eligible_posts < minPosts) return "thin_sample";
   return "measured";
 }
 
@@ -109,9 +110,9 @@ function confidenceForResult(result: ScoreResult, basis: ScoreBasisStatus, class
   return "low";
 }
 
-function coverageFor(eligiblePosts: number, totalCollected: number): number {
+function coverageFor(classifiedPosts: number, totalCollected: number): number {
   if (totalCollected <= 0) return 1;
-  return Math.max(0, Math.min(1, eligiblePosts / totalCollected));
+  return Math.max(0, Math.min(1, classifiedPosts / totalCollected));
 }
 
 function asScoreInput(posts: ScrapedScorePost[]): ScoreInputPost[] {
@@ -131,7 +132,7 @@ async function fetchPostsInRange(supabase: any, rangeStart: string, rangeEnd: st
   for (let from = 0; ; from += PAGE_SIZE) {
     const { data, error } = await supabase
       .from("scraped_posts")
-      .select("model_id, sentiment, complaint_category, confidence, score, content_type, source, posted_at, created_at")
+      .select("model_id, sentiment, complaint_category, confidence, score, content_type, source, posted_at, created_at, classification_status")
       .gte("posted_at", rangeStart)
       .lt("posted_at", rangeEnd)
       .order("posted_at", { ascending: true })
@@ -144,39 +145,6 @@ async function fetchPostsInRange(supabase: any, rangeStart: string, rangeEnd: st
   }
 
   return rows;
-}
-
-async function fetchQueuedCountsInRange(
-  supabase: any,
-  rangeStart: string,
-  rangeEnd: string,
-): Promise<Map<string, number>> {
-  const counts = new Map<string, number>();
-  const { data, error } = await supabase
-    .from("classification_queue")
-    .select("model_id, posted_at")
-    .in("status", ["queued", "retrying", "failed"])
-    .gte("posted_at", rangeStart)
-    .lt("posted_at", rangeEnd)
-    .limit(10000);
-
-  if (error) {
-    // Older deployments may not have the queue table yet; score refresh should
-    // still work and will emit zero queued coverage until the migration lands.
-    if (error.code === "42P01" || /classification_queue/i.test(error.message ?? "")) {
-      return counts;
-    }
-    throw new Error(`Failed to fetch classification queue counts: ${error.message}`);
-  }
-
-  for (const row of data ?? []) {
-    const postedAt = new Date(row.posted_at);
-    if (!Number.isFinite(postedAt.getTime())) continue;
-    const key = `${row.model_id}|${getPacificDayWindow(postedAt).periodStart}`;
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-
-  return counts;
 }
 
 async function fetchSeedRows(supabase: any, modelId: string, beforePeriodStart: string): Promise<DailySeedRow[]> {
@@ -193,16 +161,18 @@ async function fetchSeedRows(supabase: any, modelId: string, beforePeriodStart: 
   return (data ?? []) as DailySeedRow[];
 }
 
-function leadingEmptyDays(rows: DailySeedRow[]): number {
-  let count = 0;
-  for (const row of rows) {
-    const basis = row.score_basis_status ?? null;
-    const hasUsablePosts = (row.eligible_posts ?? 0) > 0
-      || (row.eligible_posts === null && (row.total_posts ?? 0) > 0 && basis !== "no_eligible_posts");
-    if (hasUsablePosts && basis !== "carried_forward") break;
-    count++;
+function isPendingClassification(post: ScrapedScorePost): boolean {
+  return post.classification_status === "pending"
+    || post.classification_status === "retry"
+    || post.classification_status === "failed";
+}
+
+function isClassifiedForScoring(post: ScrapedScorePost): boolean {
+  if (post.classification_status === "classified") return true;
+  if (post.classification_status === "pending" || post.classification_status === "retry" || post.classification_status === "failed" || post.classification_status === "irrelevant") {
+    return false;
   }
-  return count;
+  return hasValidSentiment(post);
 }
 
 async function deleteScoreRange(
@@ -280,6 +250,7 @@ export async function refreshScores(
     minPosts?: number;
     dryRun?: boolean;
     replaceRange?: boolean;
+    includeRows?: boolean;
     now?: Date;
   },
 ): Promise<RefreshSummary> {
@@ -307,7 +278,6 @@ export async function refreshScores(
     )).toISOString()
     : dailyRangeEnd;
   const posts = await fetchPostsInRange(supabase, rangeStart, rangeEnd);
-  const queuedCounts = await fetchQueuedCountsInRange(supabase, rangeStart, rangeEnd);
   const computedAt = new Date().toISOString();
   const postsByDay = new Map<string, ScrapedScorePost[]>();
   const rows: ScoreUpsertRow[] = [];
@@ -336,33 +306,31 @@ export async function refreshScores(
   for (const model of models) {
     const seedRows = await fetchSeedRows(supabase, model.id, dailyRangeStart);
     let previousScore: number | null = seedRows[0]?.score ?? null;
-    let previousPeriodStart: string | null = seedRows[0]?.period_start ?? null;
-    let previousMeasurementPeriodStart: string | null = seedRows[0]?.measurement_period_start ?? seedRows[0]?.period_start ?? null;
-    let consecutiveEmpty = leadingEmptyDays(seedRows);
     const modelSummary = {
       daily_rows: 0,
       skipped_days: 0,
-      carried_forward: 0,
       thin_sample: 0,
-      no_eligible_posts: 0,
+      partial_coverage: 0,
     };
 
     for (const window of windows) {
       const dayPosts = postsByDay.get(`${model.id}|${window.periodStart}`) ?? [];
-      const queuedPosts = queuedCounts.get(`${model.id}|${window.periodStart}`) ?? 0;
+      const classifiedPosts = dayPosts.filter(isClassifiedForScoring);
+      const queuedPosts = dayPosts.filter(isPendingClassification).length;
 
-      if (dayPosts.length > 0 || queuedPosts > 0) {
-        const result = computeScore(asScoreInput(dayPosts));
-        const validClassifiedPosts = dayPosts.filter(hasValidSentiment).length;
-        const unclassifiedPosts = dayPosts.length - validClassifiedPosts + queuedPosts;
-        const totalCollectedPosts = result.total_posts + queuedPosts;
-        const classificationCoverage = coverageFor(result.eligible_posts, totalCollectedPosts);
+      if (classifiedPosts.length > 0) {
+        const result = computeScore(asScoreInput(classifiedPosts));
+        if (result.eligible_posts === 0) {
+          summary.skipped_days++;
+          modelSummary.skipped_days++;
+          continue;
+        }
+        const totalCollectedPosts = classifiedPosts.length + queuedPosts;
+        const classificationCoverage = coverageFor(classifiedPosts.length, totalCollectedPosts);
         const basis = basisForResult(result, queuedPosts, classificationCoverage, minPosts);
         const scoreConfidence = confidenceForResult(result, basis, classificationCoverage, minPosts);
-        const measurementPeriodStart = result.eligible_posts > 0 ? window.periodStart : previousMeasurementPeriodStart;
-        const score = result.eligible_posts === 0 && previousScore !== null
-          ? previousScore
-          : applyScoreSmoothing(result.score, previousScore, result.eligible_posts, minPosts);
+        const measurementPeriodStart = window.periodStart;
+        const score = applyScoreSmoothing(result.score, previousScore, result.eligible_posts, minPosts);
 
         rows.push({
           model_id: model.id,
@@ -379,70 +347,23 @@ export async function refreshScores(
           score_basis_status: basis,
           measurement_period_start: measurementPeriodStart,
           carried_from_period_start: null,
-          input_max_posted_at: maxIso(dayPosts, "posted_at"),
-          input_max_created_at: maxIso(dayPosts, "created_at"),
+          input_max_posted_at: maxIso(classifiedPosts, "posted_at"),
+          input_max_created_at: maxIso(classifiedPosts, "created_at"),
           queued_posts: queuedPosts,
-          unclassified_posts: unclassifiedPosts,
+          unclassified_posts: queuedPosts,
           classification_coverage: classificationCoverage,
           score_confidence: scoreConfidence,
         });
 
-        if (result.eligible_posts > 0) {
-          previousScore = score;
-          previousPeriodStart = window.periodStart;
-          previousMeasurementPeriodStart = window.periodStart;
-          consecutiveEmpty = 0;
-        } else {
-          consecutiveEmpty++;
-        }
+        previousScore = score;
         modelSummary.daily_rows++;
         if (basis === "thin_sample") modelSummary.thin_sample++;
-        if (basis === "no_eligible_posts") modelSummary.no_eligible_posts++;
+        if (basis === "partial_coverage") modelSummary.partial_coverage++;
         continue;
       }
 
-      if (previousScore !== null && consecutiveEmpty < 3) {
-        const carryForward: ScoreResult = {
-          score: previousScore,
-          positive_count: 0,
-          negative_count: 0,
-          neutral_count: 0,
-          total_posts: 0,
-          eligible_posts: 0,
-          top_complaint: null,
-        };
-
-        rows.push({
-          model_id: model.id,
-          period: "daily",
-          period_start: window.periodStart,
-          score: carryForward.score,
-          positive_count: 0,
-          negative_count: 0,
-          neutral_count: 0,
-          total_posts: 0,
-          eligible_posts: 0,
-          top_complaint: null,
-          score_computed_at: computedAt,
-          score_basis_status: "carried_forward",
-          measurement_period_start: previousMeasurementPeriodStart,
-          carried_from_period_start: previousMeasurementPeriodStart ?? previousPeriodStart,
-          input_max_posted_at: null,
-          input_max_created_at: null,
-          queued_posts: 0,
-          unclassified_posts: 0,
-          classification_coverage: 1,
-          score_confidence: "low",
-        });
-
-        previousPeriodStart = window.periodStart;
-        consecutiveEmpty++;
-        modelSummary.daily_rows++;
-        modelSummary.carried_forward++;
-      } else {
-        summary.skipped_days++;
-        modelSummary.skipped_days++;
-      }
+      summary.skipped_days++;
+      modelSummary.skipped_days++;
     }
 
     summary.models[model.slug] = modelSummary;
@@ -479,10 +400,13 @@ export async function refreshScores(
 
     for (const [key, hourPosts] of postsByHour.entries()) {
       const [modelId, periodStart] = key.split("|");
-      const result = computeScore(asScoreInput(hourPosts));
-      const unclassifiedPosts = hourPosts.filter((post) => !hasValidSentiment(post)).length;
-      const classificationCoverage = coverageFor(result.eligible_posts, result.total_posts);
-      const basis = basisForResult(result, 0, classificationCoverage, minPosts);
+      const classifiedPosts = hourPosts.filter(isClassifiedForScoring);
+      const queuedPosts = hourPosts.filter(isPendingClassification).length;
+      if (classifiedPosts.length === 0) continue;
+      const result = computeScore(asScoreInput(classifiedPosts));
+      if (result.eligible_posts === 0) continue;
+      const classificationCoverage = coverageFor(classifiedPosts.length, classifiedPosts.length + queuedPosts);
+      const basis = basisForResult(result, queuedPosts, classificationCoverage, minPosts);
       rows.push({
         model_id: modelId,
         period: "hourly",
@@ -491,17 +415,17 @@ export async function refreshScores(
         positive_count: result.positive_count,
         negative_count: result.negative_count,
         neutral_count: result.neutral_count,
-        total_posts: result.total_posts,
+        total_posts: classifiedPosts.length + queuedPosts,
         eligible_posts: result.eligible_posts,
         top_complaint: result.top_complaint,
         score_computed_at: computedAt,
         score_basis_status: basis,
         measurement_period_start: result.eligible_posts > 0 ? periodStart : null,
         carried_from_period_start: null,
-        input_max_posted_at: maxIso(hourPosts, "posted_at"),
-        input_max_created_at: maxIso(hourPosts, "created_at"),
-        queued_posts: 0,
-        unclassified_posts: unclassifiedPosts,
+        input_max_posted_at: maxIso(classifiedPosts, "posted_at"),
+        input_max_created_at: maxIso(classifiedPosts, "created_at"),
+        queued_posts: queuedPosts,
+        unclassified_posts: queuedPosts,
         classification_coverage: classificationCoverage,
         score_confidence: confidenceForResult(result, basis, classificationCoverage, minPosts),
       });
@@ -522,6 +446,7 @@ export async function refreshScores(
   }
   await upsertScoreRows(supabase, rows, dryRun);
   summary.daily_rows = rows.filter((row) => row.period === "daily").length;
+  if (options.includeRows) summary.rows = rows;
 
   return summary;
 }

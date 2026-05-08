@@ -5,6 +5,7 @@ import {
   refreshScores,
   releaseServiceLock,
   type ModelRow,
+  type ScoreUpsertRow,
 } from "../_shared/score-refresh.ts";
 
 // Cron currently calls this function with the public anon JWT. Keep handler
@@ -16,6 +17,81 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
+interface ExistingDailyScoreRow {
+  model_id: string;
+  period_start: string;
+  score: number | null;
+  total_posts: number | null;
+  eligible_posts: number | null;
+  score_basis_status: string | null;
+  queued_posts?: number | null;
+  unclassified_posts?: number | null;
+}
+
+interface BackfillDiffQueryBuilder {
+  select: (columns: string) => BackfillDiffQueryBuilder;
+  eq: (column: string, value: string) => BackfillDiffQueryBuilder;
+  gte: (column: string, value: string) => BackfillDiffQueryBuilder;
+  order: (
+    column: string,
+    options?: { ascending?: boolean },
+  ) => Promise<{ data: unknown[] | null; error: { message: string } | null }>;
+}
+
+interface BackfillDiffClient {
+  from: (table: "vibes_scores") => BackfillDiffQueryBuilder;
+}
+
+function scoreKey(modelId: string, periodStart: string): string {
+  return `${modelId}|${periodStart}`;
+}
+
+async function buildBackfillDiffReport(
+  supabase: BackfillDiffClient,
+  rows: ScoreUpsertRow[],
+  daysBack: number,
+) {
+  const fromIso = new Date(Date.now() - (daysBack + 1) * 24 * 60 * 60 * 1000).toISOString();
+  const { data, error } = await supabase
+    .from("vibes_scores")
+    .select("model_id, period_start, score, total_posts, eligible_posts, score_basis_status, queued_posts, unclassified_posts")
+    .eq("period", "daily")
+    .gte("period_start", fromIso)
+    .order("period_start", { ascending: true });
+  if (error) throw new Error(`Failed to fetch existing score diff rows: ${error.message}`);
+
+  const oldByKey = new Map<string, ExistingDailyScoreRow>();
+  for (const row of (data ?? []) as ExistingDailyScoreRow[]) {
+    oldByKey.set(scoreKey(row.model_id, row.period_start), row);
+  }
+
+  const newRows = rows.filter((row) => row.period === "daily");
+  const newByKey = new Map<string, ScoreUpsertRow>();
+  for (const row of newRows) {
+    newByKey.set(scoreKey(row.model_id, row.period_start), row);
+  }
+
+  const keys = Array.from(new Set([...oldByKey.keys(), ...newByKey.keys()])).sort();
+  return keys.map((key) => {
+    const oldRow = oldByKey.get(key);
+    const newRow = newByKey.get(key);
+    const [modelId, periodStart] = key.split("|");
+    return {
+      model_id: modelId,
+      period_start: newRow?.period_start ?? oldRow?.period_start ?? periodStart,
+      old_score: oldRow?.score ?? null,
+      new_score: newRow?.score ?? null,
+      old_basis: oldRow?.score_basis_status ?? null,
+      new_basis: newRow?.score_basis_status ?? null,
+      eligible_posts: newRow?.eligible_posts ?? 0,
+      pending_count: newRow?.queued_posts ?? 0,
+      old_total_posts: oldRow?.total_posts ?? null,
+      new_total_posts: newRow?.total_posts ?? null,
+      stale_carry_forward_removed: oldRow?.score_basis_status === "carried_forward" && !newRow,
+    };
+  });
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
@@ -25,9 +101,10 @@ Deno.serve(async (req) => {
 
   try {
     const body = await readJsonBody(req);
-    const daysBack = Math.max(0, Math.min(Number(body.days_back ?? 2), 30));
+    const daysBack = Math.max(0, Math.min(Number(body.days_back ?? 2), 90));
     const minPosts = Math.max(1, Number(body.min_posts ?? 5));
     const dryRun = body.dry_run === true;
+    const includeDiffReport = body.diff_report === true || body.backfill_diff_report === true;
 
     const { data: models, error: modelsError } = await supabase
       .from("models")
@@ -55,7 +132,12 @@ Deno.serve(async (req) => {
       minPosts,
       dryRun,
       replaceRange: true,
+      includeRows: includeDiffReport,
     });
+    const diffReport = includeDiffReport
+      ? await buildBackfillDiffReport(supabase, summary.rows ?? [], daysBack)
+      : null;
+    delete summary.rows;
 
     await supabase.from("error_log").insert({
       function_name: "reaggregate-vibes",
@@ -73,6 +155,7 @@ Deno.serve(async (req) => {
       dry_run: dryRun,
       days_back: daysBack,
       summary,
+      diff_report: diffReport,
     }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

@@ -21,6 +21,9 @@ type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Ret
   latest_post_ingested_at?: string | null;
   score_basis_status?: string | null;
   measurement_period_start?: string | null;
+  latest_measurement_period_start?: string | null;
+  is_stale?: boolean | null;
+  pending_classifications?: number | null;
   carried_from_period_start?: string | null;
   queued_posts?: number | null;
   unclassified_posts?: number | null;
@@ -82,7 +85,10 @@ export interface ModelWithVibes {
   scorePeriodEnd: string | null;
   scoreBasisStatus: string;
   measurementPeriodStart: string | null;
+  latestMeasurementPeriodStart: string | null;
   carriedFromPeriodStart: string | null;
+  isStale: boolean;
+  pendingClassifications: number;
   /** Latest daily row had zero scraped posts — score is carried forward from
    * the previous day. UI should soften the trend chip and mark the chart point. */
   isLatestCarryForward: boolean;
@@ -139,13 +145,13 @@ export function useModelsWithLatestVibes() {
         const recent = allRows.slice(-7);
         const sparkline: SparklinePoint[] = recent.map((r) => ({
           score: r.score,
-          isCarryForward: r.score_basis_status === "carried_forward" || r.total_posts === 0,
+          isCarryForward: r.score_basis_status === "carried_forward",
           eligiblePosts: r.eligible_posts ?? 0,
           scoreBasisStatus: r.score_basis_status ?? null,
           classificationCoverage: r.classification_coverage ?? null,
         }));
         const latestRow = recent[recent.length - 1];
-        const isLatestCarryForward = latestRow ? latestRow.total_posts === 0 : false;
+        const isLatestCarryForward = latestRow?.score_basis_status === "carried_forward";
 
         const trendPts = m.previous_score != null ? m.latest_score - m.previous_score : 0;
         const topComplaint = normalizePublicComplaintCategory(m.top_complaint);
@@ -170,7 +176,7 @@ export function useModelsWithLatestVibes() {
           latestScoreTotalPosts: m.latest_score_total_posts ?? 0,
           recentPosts7d: m.recent_posts_7d ?? m.total_posts ?? 0,
           eligiblePosts: m.latest_score_eligible_posts ?? m.eligible_posts ?? 0,
-          queuedPosts: m.queued_posts ?? 0,
+          queuedPosts: m.pending_classifications ?? m.queued_posts ?? 0,
           unclassifiedPosts: m.unclassified_posts ?? 0,
           classificationCoverage: Number(m.classification_coverage ?? 1),
           scoreConfidence,
@@ -182,7 +188,10 @@ export function useModelsWithLatestVibes() {
           scorePeriodEnd: m.score_period_end ?? null,
           scoreBasisStatus: m.score_basis_status ?? (isLatestCarryForward ? "carried_forward" : "measured"),
           measurementPeriodStart: m.measurement_period_start ?? null,
+          latestMeasurementPeriodStart: m.latest_measurement_period_start ?? m.measurement_period_start ?? null,
           carriedFromPeriodStart: m.carried_from_period_start ?? null,
+          isStale: Boolean(m.is_stale),
+          pendingClassifications: m.pending_classifications ?? m.queued_posts ?? 0,
           isLatestCarryForward: (m.score_basis_status ?? null) === "carried_forward" || isLatestCarryForward,
         };
       });
@@ -202,6 +211,7 @@ export function useRecentChatter(enabled = true) {
       let query = supabase
         .from("scraped_posts")
         .select("*, models(name, accent_color, slug)")
+        .filter("classification_status", "eq", "classified")
         .order("posted_at", { ascending: false })
         .limit(CHATTER_PAGE_SIZE);
       if (pageParam) {
@@ -341,6 +351,7 @@ export function useModelPosts(modelId: string | undefined, limit = 25, enabled =
         .from("scraped_posts")
         .select("*")
         .eq("model_id", modelId!)
+        .filter("classification_status", "eq", "classified")
         .gte("posted_at", sinceISO)
         .order("posted_at", { ascending: false })
         .limit(limit);
@@ -404,6 +415,7 @@ export function usePrefetchModelDetail() {
           .from("scraped_posts")
           .select("*")
           .eq("model_id", modelId)
+          .filter("classification_status", "eq", "classified")
           .gte("posted_at", sinceISO)
           .order("posted_at", { ascending: false })
           .limit(25);

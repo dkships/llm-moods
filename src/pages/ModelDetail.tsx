@@ -83,13 +83,14 @@ const ModelDetail = () => {
   const scoreComputedLabel = scoreComputedAt ? formatTimeAgo(scoreComputedAt) : null;
   const scoreComputedAbsolute = scoreComputedAt ? formatAbsoluteTimestamp(scoreComputedAt) : null;
   const hasNoEligiblePosts = !enriched?.isLatestCarryForward && scoreBasisStatus === "no_eligible_posts" && latestScoreTotalPosts > 0;
-  const hasPartialCoverage = scoreBasisStatus === "partial_coverage" || queuedPosts > 0 || scoreConfidence === "low";
+  const hasPartialCoverage = scoreBasisStatus === "partial_coverage" || queuedPosts > 0 || scoreConfidence === "low" || Boolean(enriched?.isStale);
   const scoredPostsTitle = [
     hasNoEligiblePosts
       ? "Posts were found in the latest window, but none met the high-confidence scoring threshold."
       : `${latestEligiblePosts.toLocaleString()} scored of ${latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`,
     `${coveragePct}% classified for scoring.`,
     queuedPosts > 0 ? `${queuedPosts.toLocaleString()} queued for Gemini classification.` : null,
+    enriched?.isStale ? "No measured score exists for the current Pacific day yet." : null,
     scoreComputedLabel && scoreComputedAbsolute
       ? `Score recomputed ${scoreComputedLabel} (${scoreComputedAbsolute}).`
       : null,
@@ -211,8 +212,8 @@ const ModelDetail = () => {
     return { chartData: data, chartEvents: [] as ReturnType<typeof useChartEvents> };
   })();
 
-  const trendDown = !enriched?.isLatestCarryForward && trend.direction === "down";
-  const trendUp = !enriched?.isLatestCarryForward && trend.direction === "up";
+  const trendDown = !enriched?.isLatestCarryForward && !enriched?.isStale && trend.direction === "down";
+  const trendUp = !enriched?.isLatestCarryForward && !enriched?.isStale && trend.direction === "up";
 
   return (
     <PageTransition>
@@ -257,7 +258,9 @@ const ModelDetail = () => {
                       : "text-text-tertiary"
                   }`}
                 >
-                  {enriched?.isLatestCarryForward
+                  {enriched?.isStale
+                    ? "latest measured score is stale"
+                    : enriched?.isLatestCarryForward
                     ? "no scored posts in latest window"
                     : trend.direction === "flat"
                     ? "no change from yesterday"
@@ -286,6 +289,11 @@ const ModelDetail = () => {
               <ScoreMetaBadge title={scoredPostsTitle}>
                 {coveragePct}% classified
               </ScoreMetaBadge>
+              {enriched?.isStale && (
+                <ScoreMetaBadge tone="warning" icon={AlertTriangle} title="No current Pacific-day measured score yet.">
+                  Stale score
+                </ScoreMetaBadge>
+              )}
               <DataFreshnessIndicator lastUpdated={latestDataUpdatedAt} />
             </div>
           </section>

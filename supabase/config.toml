@@ -36,6 +36,9 @@ verify_jwt = false
 [functions.run-scrapers]
 verify_jwt = false
 
+[functions.run-pipeline]
+verify_jwt = false
+
 [functions.scrape-github]
 verify_jwt = false
 

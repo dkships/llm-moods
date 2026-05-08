@@ -1,8 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted, isClassifierFailure, summarizeClassifierFailures } from "../_shared/classifier.ts";
-import { enqueueClassificationCandidate } from "../_shared/classification-queue.ts";
 import { abortApifyRun, apifyRunUrl, checkApifyBudget, scrubApifyRun } from "../_shared/apify-budget.ts";
-import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "../_shared/taxonomy.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
@@ -29,7 +26,7 @@ import {
   isLikelyNonExperienceShare,
   logToErrorLog,
   logZeroDataWarning,
-  upsertScrapedPost,
+  upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
 
 const SOURCE = "scrape-twitter";
@@ -90,7 +87,6 @@ async function runApifyPath(
   keywords: KeywordEntry[],
   existingUrls: Set<string>,
   titleKeys: Set<string>,
-  geminiApiKey: string,
   config: Record<string, string[]>,
 ) {
   const summary = buildTwitterSummary("apify");
@@ -267,112 +263,21 @@ async function runApifyPath(
     await logToErrorLog(supabase, SOURCE, `Unmatched tweets (${unmatchedSamples.length} samples): ${unmatchedSamples.join(" | ")}`, "match-debug");
   }
 
-  const twitterLogError = async (msg: string, ctx?: string) => {
-    await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
-  };
-  const classifications = await classifyBatch(candidates.map((candidate) => candidate.text), geminiApiKey, 25, twitterLogError);
-  const classifierSummary = summarizeClassifierFailures(classifications);
-  summary.classified = classifications.length;
-  summary.classification_success = classifications.filter((classification) => !isClassifierFailure(classification)).length;
-  summary.classifierErrors = classifierSummary.candidateFailures;
-  summary.classifierRequestErrors = classifierSummary.requestFailures;
-  summary.classifierQuotaDeferred = classifierSummary.quotaDeferred;
-  summary.irrelevant = classifications.filter((classification) => !classification.relevant && !isClassifierFailure(classification)).length;
-  summary.errors.push(...classifierSummary.messages);
-
-  // Phase 12 G-prime: only run targeted classifier on multi-model posts.
-  // Single-model posts use baseClassification via the existing fallback at
-  // the per-slug upsert site below.
-  const targetedItems: { idx: number; slug: string }[] = [];
   for (let i = 0; i < candidates.length; i++) {
-    if (!classifications[i].relevant) continue;
-    if (candidates[i].matchedSlugs.length < 2) continue;
-    for (const slug of candidates[i].matchedSlugs) {
-      targetedItems.push({ idx: i, slug });
-    }
-  }
-  const targetedResults = targetedItems.length > 0
-    ? await classifyBatchTargeted(
-      targetedItems.map((item) => ({ text: candidates[item.idx].text, targetModel: item.slug })),
-      geminiApiKey,
-      25,
-      twitterLogError,
-    )
-    : [];
-  const targetedMap = new Map<string, typeof classifications[0]>();
-  targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
-  const targetedClassifierSummary = summarizeClassifierFailures(targetedResults, "Targeted classifier");
-  summary.classifierErrors += targetedClassifierSummary.candidateFailures;
-  summary.classifierRequestErrors += targetedClassifierSummary.requestFailures;
-  summary.classifierQuotaDeferred += targetedClassifierSummary.quotaDeferred;
-  summary.errors.push(...targetedClassifierSummary.messages);
-
-  for (let i = 0; i < candidates.length; i++) {
-    const baseClassification = classifications[i];
     const candidate = candidates[i];
-    if (isClassifierFailure(baseClassification)) {
-      for (const slug of candidate.matchedSlugs) {
-        const modelId = modelMap[slug];
-        if (!modelId) continue;
-        const queued = await enqueueClassificationCandidate(supabase, {
-          source: "twitter",
-          scraper_source: SOURCE,
-          model_id: modelId,
-          model_slug: slug,
-          source_url: candidate.sourceUrl,
-          title: candidate.title.slice(0, 120),
-          content: candidate.text.slice(0, 2000),
-          full_text: candidate.text,
-          content_type: "title_only",
-          score: candidate.engagementScore,
-          posted_at: candidate.createdAt,
-        }, baseClassification);
-        if (queued.queued) summary.classificationQueued++;
-        else if (queued.error) summary.errors.push(`Queue: ${queued.error}`);
-      }
-      continue;
-    }
-    if (!baseClassification.relevant) continue;
-
     for (const slug of candidate.matchedSlugs) {
-      const classification = targetedMap.get(`${i}:${slug}`) || baseClassification;
       const modelId = modelMap[slug];
       if (!modelId || isDuplicate(titleKeys, candidate.title, modelId)) continue;
-      if (isClassifierFailure(classification)) {
-        const queued = await enqueueClassificationCandidate(supabase, {
-          source: "twitter",
-          scraper_source: SOURCE,
-          model_id: modelId,
-          model_slug: slug,
-          source_url: candidate.sourceUrl,
-          title: candidate.title.slice(0, 120),
-          content: candidate.text.slice(0, 2000),
-          full_text: candidate.text,
-          content_type: "title_only",
-          score: candidate.engagementScore,
-          posted_at: candidate.createdAt,
-        }, classification);
-        if (queued.queued) summary.classificationQueued++;
-        else if (queued.error) summary.errors.push(`Queue: ${queued.error}`);
-        continue;
-      }
-      if (!classification.relevant) continue;
 
-      const upsertResult = await upsertScrapedPost(supabase, {
+      const upsertResult = await upsertPendingScrapedPost(supabase, {
         model_id: modelId,
         source: "twitter",
         source_url: candidate.sourceUrl,
         title: candidate.title.slice(0, 120),
         content: candidate.text.slice(0, 2000),
-        sentiment: classification.sentiment,
-        complaint_category: classification.complaint_category,
-        praise_category: classification.praise_category,
-        confidence: classification.confidence,
         content_type: "title_only",
         score: candidate.engagementScore,
         posted_at: candidate.createdAt,
-        original_language: classification.language || null,
-        translated_content: classification.english_translation || null,
       });
 
       if (upsertResult.error) {
@@ -382,6 +287,7 @@ async function runApifyPath(
 
       if (upsertResult.inserted) {
         summary.net_new_rows++;
+        summary.classificationQueued++;
         existingUrls.add(candidate.sourceUrl);
         titleKeys.add(`${modelId}:${candidate.title.slice(0, 80).toLowerCase()}`);
       } else {
@@ -478,18 +384,6 @@ async function runGrokPath(
       continue;
     }
 
-    const sentiment = normalizeSentiment(post.sentiment);
-    if (!sentiment) {
-      summary.irrelevant++;
-      continue;
-    }
-    summary.classified++;
-
-    const complaint = sentiment === "negative" ? normalizeComplaintCategory(post.complaint_category) : null;
-    const praise = sentiment === "positive" ? normalizePraiseCategory(post.praise_category) : null;
-    const confidence = typeof post.confidence === "number" && post.confidence >= 0 && post.confidence <= 1
-      ? post.confidence
-      : 0.5;
     if (!post.posted_at || Number.isNaN(new Date(post.posted_at).getTime())) {
       summary.contentSkipped++;
       continue;
@@ -500,21 +394,15 @@ async function runGrokPath(
       const modelId = modelMap[slug];
       if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
 
-      const upsertResult = await upsertScrapedPost(supabase, {
+      const upsertResult = await upsertPendingScrapedPost(supabase, {
         model_id: modelId,
         source: "twitter",
         source_url: sourceUrl,
         title: title.slice(0, 120),
         content: text.slice(0, 2000),
-        sentiment,
-        complaint_category: complaint,
-        praise_category: praise,
-        confidence,
         content_type: "title_only",
         score: 0,
         posted_at: postedAt,
-        original_language: null,
-        translated_content: null,
       });
 
       if (upsertResult.error) {
@@ -524,6 +412,7 @@ async function runGrokPath(
 
       if (upsertResult.inserted) {
         summary.net_new_rows++;
+        summary.classificationQueued++;
         existingUrls.add(sourceUrl);
         titleKeys.add(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
       } else {
@@ -535,7 +424,7 @@ async function runGrokPath(
   return summary;
 }
 
-Deno.serve(async (req) => {
+export async function handleScrapeTwitter(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
@@ -606,12 +495,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    if (apifyToken && !geminiApiKey) {
-      await logToErrorLog(supabase, SOURCE, "GEMINI_API_KEY not set — required for Apify path sentiment classification", "config-error");
-      throw new Error("GEMINI_API_KEY not configured (required for Apify path)");
-    }
-
     await logToErrorLog(supabase, SOURCE, "Twitter scraper started", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
@@ -630,7 +513,7 @@ Deno.serve(async (req) => {
     const titleKeys = await loadRecentTitleKeys(supabase);
 
     const summary = apifyToken
-      ? await runApifyPath(supabase, apifyToken, modelMap, keywords, existingUrls, titleKeys, geminiApiKey!, config)
+      ? await runApifyPath(supabase, apifyToken, modelMap, keywords, existingUrls, titleKeys, config)
       : await runGrokPath(supabase, xaiApiKey!, modelMap, keywords, existingUrls, titleKeys);
 
     const derived = deriveRunMetrics(summary);
@@ -695,4 +578,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleScrapeTwitter);
+}

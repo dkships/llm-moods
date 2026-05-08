@@ -57,8 +57,8 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
             </div>
             <div className="mt-3 flex items-center justify-between">
               <TrendIcon trend={m.trend.direction} />
-              <ScoreMetaBadge title="Classified posts from the last 7 days.">
-                {m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts · 7d` : "Tracking"}
+              <ScoreMetaBadge title={m.isStale ? "Latest measured score is older than the current Pacific day." : "Classified posts from the last 7 days."}>
+                {m.isStale ? "Stale score" : m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts · 7d` : "Tracking"}
               </ScoreMetaBadge>
             </div>
           </div>

@@ -32,15 +32,16 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
   const VibeIcon = vibe.icon;
   const brandColor = m.accent_color || "#888";
 
-  const trendDown = m.trend.direction === "down" && !m.isLatestCarryForward;
-  const trendUp = m.trend.direction === "up" && !m.isLatestCarryForward;
+  const trendDown = m.trend.direction === "down" && !m.isLatestCarryForward && !m.isStale;
+  const trendUp = m.trend.direction === "up" && !m.isLatestCarryForward && !m.isStale;
   const confidenceLabel = formatScoreConfidence(m.scoreConfidence);
   const coveragePct = Math.round((m.classificationCoverage ?? 1) * 100);
-  const hasPartialCoverage = m.scoreBasisStatus === "partial_coverage" || m.queuedPosts > 0 || m.scoreConfidence === "low";
+  const hasPartialCoverage = m.scoreBasisStatus === "partial_coverage" || m.queuedPosts > 0 || m.scoreConfidence === "low" || m.isStale;
   const confidenceTitle = [
     `${m.eligiblePosts.toLocaleString()} scored of ${m.latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`,
     `${coveragePct}% classified for scoring.`,
     m.queuedPosts > 0 ? `${m.queuedPosts.toLocaleString()} queued for Gemini classification.` : null,
+    m.isStale ? "No measured score exists for the current Pacific day yet." : null,
   ].filter(Boolean).join(" ");
 
   return (
@@ -96,7 +97,7 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
               )}
               <span
                 className={
-                  m.isLatestCarryForward
+                  m.isLatestCarryForward || m.isStale
                     ? "text-text-tertiary"
                     : trendUp
                     ? "text-primary"
@@ -105,7 +106,9 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
                     : "text-text-tertiary"
                 }
               >
-                {m.isLatestCarryForward
+                {m.isStale
+                  ? "latest measured score is stale"
+                  : m.isLatestCarryForward
                   ? "no scored posts in latest window"
                   : m.trend.direction === "flat"
                   ? "no change from yesterday"
@@ -130,6 +133,11 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
               <ScoreMetaBadge title="Collected posts from the last 7 days.">
                 {(m.totalPosts || 0).toLocaleString()} collected · 7d
               </ScoreMetaBadge>
+              {m.isStale && (
+                <ScoreMetaBadge tone="warning" icon={AlertTriangle} title="No current Pacific-day measured score yet.">
+                  Stale score
+                </ScoreMetaBadge>
+              )}
             </div>
           </div>
 

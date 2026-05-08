@@ -204,9 +204,33 @@ export async function upsertScrapedPost(
   supabase: any,
   payload: Record<string, unknown>,
 ): Promise<{ inserted: boolean; error: string | null }> {
+  const now = new Date().toISOString();
+  const hasClassifierState = typeof payload.classification_status === "string";
+  const hasInlineClassification = typeof payload.sentiment === "string" && payload.sentiment.length > 0;
+  const row = hasClassifierState
+    ? payload
+    : hasInlineClassification
+      ? {
+        ...payload,
+        classification_status: "classified",
+        classification_attempts: 1,
+        classified_at: now,
+        classifier_version: "legacy-inline-v1",
+        last_classification_error: null,
+      }
+      : {
+        ...payload,
+        classification_status: "pending",
+        classification_attempts: 0,
+        next_classification_at: now,
+        classified_at: null,
+        classifier_version: null,
+        last_classification_error: null,
+      };
+
   const { data, error } = await supabase
     .from("scraped_posts")
-    .upsert(payload, { onConflict: "source_url,model_id", ignoreDuplicates: true })
+    .upsert(row, { onConflict: "source_url,model_id", ignoreDuplicates: true })
     .select("id");
 
   if (error) {
@@ -217,4 +241,25 @@ export async function upsertScrapedPost(
     inserted: Array.isArray(data) && data.length > 0,
     error: null,
   };
+}
+
+export async function upsertPendingScrapedPost(
+  supabase: any,
+  payload: Record<string, unknown>,
+): Promise<{ inserted: boolean; error: string | null }> {
+  return upsertScrapedPost(supabase, {
+    ...payload,
+    sentiment: null,
+    complaint_category: null,
+    praise_category: null,
+    confidence: null,
+    original_language: null,
+    translated_content: null,
+    classification_status: "pending",
+    classification_attempts: 0,
+    next_classification_at: new Date().toISOString(),
+    classified_at: null,
+    classifier_version: null,
+    last_classification_error: null,
+  });
 }

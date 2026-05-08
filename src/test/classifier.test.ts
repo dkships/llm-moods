@@ -9,6 +9,7 @@ import {
   isLikelyNonExperienceShare,
   isLikelyPromotionalShare,
 } from "../../supabase/functions/_shared/utils";
+import { buildClassificationStateUpdate } from "../../supabase/functions/_shared/classification-state";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -118,5 +119,81 @@ describe("scraper relevance prefilters", () => {
       "Claude refactor notes",
       "I tested Claude on this refactor and it kept context across files. Learn more: https://example.com",
     )).toBe(false);
+  });
+});
+
+describe("model mention classification state", () => {
+  const now = new Date("2026-05-08T16:00:00.000Z");
+
+  it("moves pending mentions to classified with sentiment fields", () => {
+    const update = buildClassificationStateUpdate(
+      { classification_attempts: 0 },
+      {
+        relevant: true,
+        sentiment: "negative",
+        complaint_category: "reasoning",
+        praise_category: null,
+        confidence: 0.91,
+        status: "classified",
+        error: null,
+      },
+      { now, classifierVersion: "test-v1" },
+    );
+
+    expect(update).toMatchObject({
+      classification_status: "classified",
+      classification_attempts: 1,
+      classifier_version: "test-v1",
+      sentiment: "negative",
+      complaint_category: "reasoning",
+      confidence: 0.91,
+    });
+  });
+
+  it("moves non-relevant mentions to irrelevant", () => {
+    const update = buildClassificationStateUpdate(
+      { classification_attempts: 1 },
+      {
+        relevant: false,
+        sentiment: null,
+        complaint_category: null,
+        praise_category: null,
+        confidence: 0,
+        status: "irrelevant",
+        error: null,
+      },
+      { now },
+    );
+
+    expect(update).toMatchObject({
+      classification_status: "irrelevant",
+      classification_attempts: 2,
+      sentiment: null,
+      confidence: 0,
+    });
+  });
+
+  it("moves transient classifier failures to retry", () => {
+    const update = buildClassificationStateUpdate(
+      { classification_attempts: 0 },
+      {
+        relevant: false,
+        sentiment: null,
+        complaint_category: null,
+        praise_category: null,
+        confidence: 0,
+        status: "quota_deferred",
+        error: "minute_limit",
+        retry_after_ms: 30_000,
+      },
+      { now },
+    );
+
+    expect(update).toMatchObject({
+      classification_status: "retry",
+      classification_attempts: 1,
+      last_classification_error: "minute_limit",
+    });
+    expect(update.next_classification_at).toBe("2026-05-08T16:00:30.000Z");
   });
 });

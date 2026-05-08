@@ -1,6 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted, isClassifierFailure, summarizeClassifierFailures } from "../_shared/classifier.ts";
-import { enqueueClassificationCandidate } from "../_shared/classification-queue.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
@@ -21,7 +19,7 @@ import {
   isDuplicate,
   logToErrorLog,
   logZeroDataWarning,
-  upsertScrapedPost,
+  upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
 
 const SOURCE = "scrape-bluesky";
@@ -76,7 +74,7 @@ async function authenticateBluesky(handle: string, appPassword: string): Promise
   }
 }
 
-Deno.serve(async (req) => {
+export async function handleScrapeBluesky(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
@@ -85,9 +83,6 @@ Deno.serve(async (req) => {
   let runRecord: RunRecordRow | null = null;
 
   try {
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiApiKey) throw new Error("GEMINI_API_KEY not configured");
-
     const { data: startedRun, error: runError } = await createRunRecord(supabase, {
       source: SOURCE,
       run_kind: "scraper",
@@ -241,107 +236,19 @@ Deno.serve(async (req) => {
       }
     }
 
-    const blueskyLogError = async (msg: string, ctx?: string) => {
-      await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
-    };
-    const classifications = await classifyBatch(candidates.map((candidate) => candidate.text), geminiApiKey, 25, blueskyLogError);
-    const classifierSummary = summarizeClassifierFailures(classifications);
-    summary.classified = classifications.length;
-    summary.classification_success = classifications.filter((classification) => !isClassifierFailure(classification)).length;
-    summary.classifierErrors = classifierSummary.candidateFailures;
-    summary.classifierRequestErrors = classifierSummary.requestFailures;
-    summary.classifierQuotaDeferred = classifierSummary.quotaDeferred;
-    summary.irrelevant = classifications.filter((classification) => !classification.relevant && !isClassifierFailure(classification)).length;
-    summary.errors.push(...classifierSummary.messages);
-
-    const targetedItems: { idx: number; slug: string }[] = [];
     for (let index = 0; index < candidates.length; index++) {
-      if (!classifications[index].relevant || isClassifierFailure(classifications[index])) continue;
-      if (candidates[index].matchedSlugs.length < 2) continue;
-      for (const slug of candidates[index].matchedSlugs) {
-        targetedItems.push({ idx: index, slug });
-      }
-    }
-    const targetedResults = targetedItems.length > 0
-      ? await classifyBatchTargeted(
-        targetedItems.map((item) => ({ text: candidates[item.idx].text, targetModel: item.slug })),
-        geminiApiKey,
-        25,
-        blueskyLogError,
-      )
-      : [];
-    const targetedMap = new Map<string, typeof classifications[0]>();
-    targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
-    const targetedClassifierSummary = summarizeClassifierFailures(targetedResults, "Targeted classifier");
-    summary.classifierErrors += targetedClassifierSummary.candidateFailures;
-    summary.classifierRequestErrors += targetedClassifierSummary.requestFailures;
-    summary.classifierQuotaDeferred += targetedClassifierSummary.quotaDeferred;
-    summary.errors.push(...targetedClassifierSummary.messages);
-
-    for (let index = 0; index < candidates.length; index++) {
-      const baseClassification = classifications[index];
       const candidate = candidates[index];
-      if (isClassifierFailure(baseClassification)) {
-        for (const slug of candidate.matchedSlugs) {
-          const modelId = modelMap[slug];
-          if (!modelId) continue;
-          const queued = await enqueueClassificationCandidate(supabase, {
-            source: "bluesky",
-            scraper_source: SOURCE,
-            model_id: modelId,
-            model_slug: slug,
-            source_url: candidate.sourceUrl,
-            title: candidate.text.slice(0, 120),
-            content: candidate.text.slice(0, 2000),
-            full_text: candidate.text,
-            content_type: "full_content",
-            score: candidate.score,
-            posted_at: candidate.createdAt,
-          }, baseClassification);
-          if (queued.queued) summary.classificationQueued++;
-          else if (queued.error) summary.errors.push(`Queue: ${queued.error}`);
-        }
-        continue;
-      }
-      if (!baseClassification.relevant) continue;
-
       for (const slug of candidate.matchedSlugs) {
-        const classification = targetedMap.get(`${index}:${slug}`) || baseClassification;
         const modelId = modelMap[slug];
         if (!modelId || isDuplicate(titleKeys, candidate.text.slice(0, 120), modelId)) continue;
-        if (isClassifierFailure(classification)) {
-          const queued = await enqueueClassificationCandidate(supabase, {
-            source: "bluesky",
-            scraper_source: SOURCE,
-            model_id: modelId,
-            model_slug: slug,
-            source_url: candidate.sourceUrl,
-            title: candidate.text.slice(0, 120),
-            content: candidate.text.slice(0, 2000),
-            full_text: candidate.text,
-            content_type: "full_content",
-            score: candidate.score,
-            posted_at: candidate.createdAt,
-          }, classification);
-          if (queued.queued) summary.classificationQueued++;
-          else if (queued.error) summary.errors.push(`Queue: ${queued.error}`);
-          continue;
-        }
-        if (!classification.relevant) continue;
 
-        const upsertResult = await upsertScrapedPost(supabase, {
+        const upsertResult = await upsertPendingScrapedPost(supabase, {
           model_id: modelId,
           source: "bluesky",
           source_url: candidate.sourceUrl,
           title: candidate.text.slice(0, 120),
           content: candidate.text.slice(0, 2000),
-          sentiment: classification.sentiment,
-          complaint_category: classification.complaint_category,
-          praise_category: classification.praise_category,
-          confidence: classification.confidence,
           content_type: "full_content",
-          original_language: classification.language || null,
-          translated_content: classification.english_translation || null,
           score: candidate.score,
           posted_at: candidate.createdAt,
         });
@@ -353,6 +260,7 @@ Deno.serve(async (req) => {
 
         if (upsertResult.inserted) {
           summary.net_new_rows++;
+          summary.classificationQueued++;
           existingUrls.add(candidate.sourceUrl);
           titleKeys.add(`${modelId}:${candidate.text.slice(0, 80).toLowerCase()}`);
         } else {
@@ -417,4 +325,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleScrapeBluesky);
+}

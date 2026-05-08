@@ -1,6 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted, isClassifierFailure, summarizeClassifierFailures } from "../_shared/classifier.ts";
-import { enqueueClassificationCandidate } from "../_shared/classification-queue.ts";
 import { abortApifyRun, apifyRunUrl, checkApifyBudget, scrubApifyRun } from "../_shared/apify-budget.ts";
 import {
   createRunRecord,
@@ -26,7 +24,7 @@ import {
   isLikelyNonExperienceShare,
   logToErrorLog,
   logZeroDataWarning,
-  upsertScrapedPost,
+  upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
 
 const SOURCE = "scrape-reddit-apify";
@@ -56,7 +54,7 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-Deno.serve(async (req) => {
+export async function handleScrapeRedditApify(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
@@ -112,12 +110,6 @@ Deno.serve(async (req) => {
     if (!apifyToken) {
       await logToErrorLog(supabase, SOURCE, "APIFY_API_TOKEN not configured", "config-error");
       throw new Error("APIFY_API_TOKEN not configured");
-    }
-
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!geminiApiKey) {
-      await logToErrorLog(supabase, SOURCE, "GEMINI_API_KEY not configured", "config-error");
-      throw new Error("GEMINI_API_KEY not configured");
     }
 
     await logToErrorLog(supabase, SOURCE, "Reddit Apify scraper started", "health-check");
@@ -339,112 +331,21 @@ Deno.serve(async (req) => {
       });
     }
 
-    const redditLogError = async (msg: string, ctx?: string) => {
-      await logToErrorLog(supabase, SOURCE, msg, ctx || "classify");
-    };
-    const classifications = await classifyBatch(candidates.map((candidate) => candidate.fullText), geminiApiKey, 25, redditLogError);
-    const classifierSummary = summarizeClassifierFailures(classifications);
-    summary.classified = classifications.length;
-    summary.classification_success = classifications.filter((classification) => !isClassifierFailure(classification)).length;
-    summary.classifierErrors = classifierSummary.candidateFailures;
-    summary.classifierRequestErrors = classifierSummary.requestFailures;
-    summary.classifierQuotaDeferred = classifierSummary.quotaDeferred;
-    summary.irrelevant = classifications.filter((classification) => !classification.relevant && !isClassifierFailure(classification)).length;
-    summary.errors.push(...classifierSummary.messages);
-
-    // Phase 12 G-prime: only run targeted classifier on multi-model posts.
-    // Single-model posts use baseClassification via the existing fallback at
-    // the per-slug upsert site below.
-    const targetedItems: { idx: number; slug: string }[] = [];
     for (let i = 0; i < candidates.length; i++) {
-      if (!classifications[i].relevant) continue;
-      if (candidates[i].matchedSlugs.length < 2) continue;
-      for (const slug of candidates[i].matchedSlugs) {
-        targetedItems.push({ idx: i, slug });
-      }
-    }
-    const targetedResults = targetedItems.length > 0
-      ? await classifyBatchTargeted(
-        targetedItems.map((item) => ({ text: candidates[item.idx].fullText, targetModel: item.slug })),
-        geminiApiKey,
-        25,
-        redditLogError,
-      )
-      : [];
-    const targetedMap = new Map<string, typeof classifications[0]>();
-    targetedItems.forEach((item, index) => targetedMap.set(`${item.idx}:${item.slug}`, targetedResults[index]));
-    const targetedClassifierSummary = summarizeClassifierFailures(targetedResults, "Targeted classifier");
-    summary.classifierErrors += targetedClassifierSummary.candidateFailures;
-    summary.classifierRequestErrors += targetedClassifierSummary.requestFailures;
-    summary.classifierQuotaDeferred += targetedClassifierSummary.quotaDeferred;
-    summary.errors.push(...targetedClassifierSummary.messages);
-
-    for (let i = 0; i < candidates.length; i++) {
-      const baseClassification = classifications[i];
       const candidate = candidates[i];
-      if (isClassifierFailure(baseClassification)) {
-        for (const slug of candidate.matchedSlugs) {
-          const modelId = modelMap[slug];
-          if (!modelId) continue;
-          const queued = await enqueueClassificationCandidate(supabase, {
-            source: "reddit",
-            scraper_source: SOURCE,
-            model_id: modelId,
-            model_slug: slug,
-            source_url: candidate.sourceUrl,
-            title: candidate.title.slice(0, 120),
-            content: (candidate.body || candidate.title).slice(0, 2000),
-            full_text: candidate.fullText,
-            content_type: candidate.body ? "title_and_body" : "title_only",
-            score: candidate.score,
-            posted_at: candidate.createdAt,
-          }, baseClassification);
-          if (queued.queued) summary.classificationQueued++;
-          else if (queued.error) summary.errors.push(`Queue: ${queued.error}`);
-        }
-        continue;
-      }
-      if (!baseClassification.relevant) continue;
-
       for (const slug of candidate.matchedSlugs) {
-        const classification = targetedMap.get(`${i}:${slug}`) || baseClassification;
         const modelId = modelMap[slug];
         if (!modelId || isDuplicate(titleKeys, candidate.title, modelId)) continue;
-        if (isClassifierFailure(classification)) {
-          const queued = await enqueueClassificationCandidate(supabase, {
-            source: "reddit",
-            scraper_source: SOURCE,
-            model_id: modelId,
-            model_slug: slug,
-            source_url: candidate.sourceUrl,
-            title: candidate.title.slice(0, 120),
-            content: (candidate.body || candidate.title).slice(0, 2000),
-            full_text: candidate.fullText,
-            content_type: candidate.body ? "title_and_body" : "title_only",
-            score: candidate.score,
-            posted_at: candidate.createdAt,
-          }, classification);
-          if (queued.queued) summary.classificationQueued++;
-          else if (queued.error) summary.errors.push(`Queue: ${queued.error}`);
-          continue;
-        }
-        if (!classification.relevant) continue;
 
-        const upsertResult = await upsertScrapedPost(supabase, {
+        const upsertResult = await upsertPendingScrapedPost(supabase, {
           model_id: modelId,
           source: "reddit",
           source_url: candidate.sourceUrl,
           title: candidate.title.slice(0, 120),
           content: (candidate.body || candidate.title).slice(0, 2000),
-          sentiment: classification.sentiment,
-          complaint_category: classification.complaint_category,
-          praise_category: classification.praise_category,
-          confidence: classification.confidence,
           content_type: candidate.body ? "title_and_body" : "title_only",
           score: candidate.score,
           posted_at: candidate.createdAt,
-          original_language: classification.language || null,
-          translated_content: classification.english_translation || null,
         });
 
         if (upsertResult.error) {
@@ -454,6 +355,7 @@ Deno.serve(async (req) => {
 
         if (upsertResult.inserted) {
           summary.net_new_rows++;
+          summary.classificationQueued++;
           existingUrls.add(candidate.sourceUrl);
           titleKeys.add(`${modelId}:${candidate.title.slice(0, 80).toLowerCase()}`);
         } else {
@@ -524,4 +426,8 @@ Deno.serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve(handleScrapeRedditApify);
+}
