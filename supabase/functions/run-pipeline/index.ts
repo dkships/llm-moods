@@ -6,9 +6,11 @@ import {
   getConfiguredWindows,
   internalOnlyResponse,
   isInternalServiceRequest,
+  isRunPipelineTriggerRequest,
   isUniqueViolation,
   loadScraperConfig,
   readJsonBody,
+  RUN_PIPELINE_TRIGGER_HEADER,
   updateRunRecord,
 } from "../_shared/runtime.ts";
 import {
@@ -23,6 +25,7 @@ import { corsHeaders, logToErrorLog } from "../_shared/utils.ts";
 const SOURCE = "run-pipeline";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+const RUN_PIPELINE_TRIGGER_SECRET = Deno.env.get("RUN_PIPELINE_TRIGGER_SECRET") ?? "";
 
 const SOURCE_HANDLERS = [
   { name: "scrape-hackernews" },
@@ -40,13 +43,18 @@ async function runSourceHandler(
   name: string,
   payload: Record<string, unknown>,
 ) {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+    apikey: SERVICE_ROLE_KEY,
+    "Content-Type": "application/json",
+  };
+  if (RUN_PIPELINE_TRIGGER_SECRET) {
+    headers[RUN_PIPELINE_TRIGGER_HEADER] = RUN_PIPELINE_TRIGGER_SECRET;
+  }
+
   const response = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
-      apikey: SERVICE_ROLE_KEY,
-      "Content-Type": "application/json",
-    },
+    headers,
     body: JSON.stringify(payload),
   });
   const text = await response.text().catch(() => "");
@@ -73,8 +81,9 @@ Deno.serve(async (req) => {
 
   const body = await readJsonBody(req);
   const isInternal = isInternalServiceRequest(req);
+  const isPipelineTrigger = isRunPipelineTriggerRequest(req);
   const isSchedulerRequest = body.scheduler === "pg_cron" && body.pipeline === SOURCE && body.dry_run !== true && body.dryRun !== true;
-  if (!isInternal && !isSchedulerRequest) return internalOnlyResponse(corsHeaders);
+  if (!isInternal && !isPipelineTrigger && !isSchedulerRequest) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const dryRun = body.dry_run === true || body.dryRun === true;

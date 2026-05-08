@@ -74,6 +74,13 @@ export function isInternalServiceRequest(req: Request): boolean {
   return getAuthorizationHeader(req) === `Bearer ${serviceRoleKey}`;
 }
 
+export const RUN_PIPELINE_TRIGGER_HEADER = "x-run-pipeline-trigger-secret";
+
+export function isRunPipelineTriggerRequest(req: Request): boolean {
+  const triggerSecret = Deno.env.get("RUN_PIPELINE_TRIGGER_SECRET");
+  return Boolean(triggerSecret && req.headers.get(RUN_PIPELINE_TRIGGER_HEADER) === triggerSecret);
+}
+
 export function internalOnlyResponse(corsHeaders: HeadersInit): Response {
   return new Response(JSON.stringify({ error: "Forbidden" }), {
     status: 403,
