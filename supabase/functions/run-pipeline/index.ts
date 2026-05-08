@@ -1,9 +1,4 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { handleScrapeBluesky } from "../scrape-bluesky/index.ts";
-import { handleScrapeHackerNews } from "../scrape-hackernews/index.ts";
-import { handleScrapeMastodon } from "../scrape-mastodon/index.ts";
-import { handleScrapeRedditApify } from "../scrape-reddit-apify/index.ts";
-import { handleScrapeTwitter } from "../scrape-twitter/index.ts";
 import { processPendingClassifications } from "../_shared/classification-state.ts";
 import {
   createRunRecord,
@@ -30,11 +25,11 @@ const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const SOURCE_HANDLERS = [
-  { name: "scrape-hackernews", handler: handleScrapeHackerNews },
-  { name: "scrape-bluesky", handler: handleScrapeBluesky },
-  { name: "scrape-mastodon", handler: handleScrapeMastodon },
-  { name: "scrape-twitter", handler: handleScrapeTwitter },
-  { name: "scrape-reddit-apify", handler: handleScrapeRedditApify },
+  { name: "scrape-hackernews" },
+  { name: "scrape-bluesky" },
+  { name: "scrape-mastodon" },
+  { name: "scrape-twitter" },
+  { name: "scrape-reddit-apify" },
 ];
 
 function stableWindowLabel(time: string): string {
@@ -43,17 +38,17 @@ function stableWindowLabel(time: string): string {
 
 async function runSourceHandler(
   name: string,
-  handler: (req: Request) => Promise<Response>,
   payload: Record<string, unknown>,
 ) {
-  const response = await handler(new Request(`https://local.pipeline/${name}`, {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/${name}`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      apikey: SERVICE_ROLE_KEY,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(payload),
-  }));
+  });
   const text = await response.text().catch(() => "");
   let body: Record<string, unknown> = {};
   try {
