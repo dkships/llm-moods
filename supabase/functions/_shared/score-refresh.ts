@@ -69,7 +69,7 @@ export interface RefreshSummary {
 
 const PAGE_SIZE = 1000;
 
-function maxIso(rows: { [key: string]: string | null }[], key: string): string | null {
+function maxIso(rows: Array<Record<string, unknown>>, key: string): string | null {
   let maxValue: string | null = null;
   for (const row of rows) {
     const value = row[key];
