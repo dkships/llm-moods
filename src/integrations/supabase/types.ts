@@ -209,6 +209,10 @@ export type Database = {
       }
       scraped_posts: {
         Row: {
+          classification_attempts: number
+          classification_status: string
+          classified_at: string | null
+          classifier_version: string | null
           complaint_category: string | null
           confidence: number | null
           content: string | null
@@ -216,7 +220,9 @@ export type Database = {
           created_at: string
           id: string
           is_backfill: boolean | null
+          last_classification_error: string | null
           model_id: string
+          next_classification_at: string | null
           original_language: string | null
           posted_at: string | null
           praise_category: string | null
@@ -228,6 +234,10 @@ export type Database = {
           translated_content: string | null
         }
         Insert: {
+          classification_attempts?: number
+          classification_status?: string
+          classified_at?: string | null
+          classifier_version?: string | null
           complaint_category?: string | null
           confidence?: number | null
           content?: string | null
@@ -235,7 +245,9 @@ export type Database = {
           created_at?: string
           id?: string
           is_backfill?: boolean | null
+          last_classification_error?: string | null
           model_id: string
+          next_classification_at?: string | null
           original_language?: string | null
           posted_at?: string | null
           praise_category?: string | null
@@ -247,6 +259,10 @@ export type Database = {
           translated_content?: string | null
         }
         Update: {
+          classification_attempts?: number
+          classification_status?: string
+          classified_at?: string | null
+          classifier_version?: string | null
           complaint_category?: string | null
           confidence?: number | null
           content?: string | null
@@ -254,7 +270,9 @@ export type Database = {
           created_at?: string
           id?: string
           is_backfill?: boolean | null
+          last_classification_error?: string | null
           model_id?: string
+          next_classification_at?: string | null
           original_language?: string | null
           posted_at?: string | null
           praise_category?: string | null
@@ -520,7 +538,9 @@ export type Database = {
           carried_from_period_start: string
           classification_coverage: number
           eligible_posts: number
+          is_stale: boolean
           last_updated: string
+          latest_measurement_period_start: string
           latest_post_ingested_at: string
           latest_post_posted_at: string
           latest_score: number
@@ -530,6 +550,7 @@ export type Database = {
           model_id: string
           model_name: string
           model_slug: string
+          pending_classifications: number
           previous_score: number
           queued_posts: number
           recent_posts_7d: number
@@ -605,6 +626,10 @@ export type Database = {
           pct_change: number
           this_week: number
         }[]
+      }
+      normalize_public_complaint_category: {
+        Args: { p_category: string }
+        Returns: string
       }
       release_service_lock: {
         Args: { p_lock_key: string; p_owner: string }
