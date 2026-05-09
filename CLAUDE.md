@@ -78,7 +78,7 @@ Functions safe to leave ungated (called by pg_cron with anon key): `aggregate-vi
 
 ## Cron architecture (May 2026)
 
-The pipeline runs as 7 independent pg_cron rows, each within its own 400 s edge-function budget. No orchestrator. Migration: `20260508183000_decompose_pipeline_to_independent_crons.sql`.
+The pipeline runs as independent pg_cron rows, each within its own 400 s edge-function budget. No orchestrator. Migration: `20260508183000_decompose_pipeline_to_independent_crons.sql`.
 
 | Cron | Schedule (UTC) | PT | Function |
 |---|---|---|---|
@@ -87,8 +87,10 @@ The pipeline runs as 7 independent pg_cron rows, each within its own 400 s edge-
 | `scrape-bluesky-3x` | `4 4,12,21 * * *` | +4 min | `scrape-bluesky` |
 | `scrape-twitter-3x` | `6 4,12,21 * * *` | +6 min | `scrape-twitter` |
 | `scrape-mastodon-3x` | `8 4,12,21 * * *` | +8 min | `scrape-mastodon` |
-| `drain-classifications-q30` | `*/30 * * * *` | every 30 min | `drain-classification-queue` |
-| `aggregate-vibes-q30` | `15,45 * * * *` | every 30 min, offset | `aggregate-vibes` |
+| `drain-classification-queue-15min` | `*/15 * * * *` | every 15 min | `drain-classification-queue` |
+| `aggregate-vibes-q30` | `20,50 * * * *` | every 30 min, offset | `aggregate-vibes` |
+| `cleanup-stuck-scraper-runs` | `*/30 * * * *` | every 30 min | (SQL only — marks runs >30 min as failed) |
+| `cleanup-old-posts-weekly` | `0 8 * * 0` | Sun 01:00 PT | `cleanup-old-posts` |
 
 The May 8 "simplified pipeline rebuild" (`20260508120000`) merged scrape+classify+aggregate into a single `run-pipeline` function — that cannot fit in 400 s and silently froze scores until this decomposition. `run-pipeline` and `run-scrapers` remain in code as manual debug tools but are not scheduled.
 

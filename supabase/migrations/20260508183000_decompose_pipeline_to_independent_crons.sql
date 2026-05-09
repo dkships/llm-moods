@@ -7,9 +7,12 @@
 -- kills the function before reaching refreshScores(), so vibes_scores
 -- never updates and the dashboard goes stale.
 --
--- Fix: each scraper, the classifier worker, and the score aggregator runs
--- on its own pg_cron row, each invocation living within its own 400 s
--- budget. Matches Supabase guidance for fan-out workloads:
+-- Fix: each scraper and the score aggregator runs on its own pg_cron row,
+-- each invocation living within its own 400 s budget. The pre-existing
+-- drain-classification-queue-15min cron is left alone — it points at the
+-- (now rewritten) drain function which will start working immediately on
+-- the new scraped_posts.classification_status='pending' schema. Matches
+-- Supabase guidance for fan-out workloads:
 -- https://supabase.com/blog/processing-large-jobs-with-edge-functions
 --
 -- Cost note: Apify and Gemini call counts are unchanged from the
@@ -22,8 +25,13 @@ DECLARE
   anon_token text := 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyaG1jdW50dHZwbXlsY3hqa2JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMDgzNDcsImV4cCI6MjA4ODU4NDM0N30.zzccv_H7YbqDml3YQgd05eiSSQSgg_v8Ov1w17BaPc4';
   base_url text := 'https://trhmcunttvpmylcxjkbd.supabase.co/functions/v1';
 BEGIN
-  -- Unschedule everything we're replacing, plus our own target names
-  -- (so this migration is idempotent if re-applied).
+  -- Unschedule the broken orchestrator + any orphaned legacy crons + our
+  -- own new target names (so this migration is idempotent if re-applied).
+  -- DO NOT unschedule:
+  --   * cleanup-old-posts-weekly      (still useful)
+  --   * cleanup-stuck-scraper-runs    (still useful: marks any hung run failed)
+  --   * drain-classification-queue-15min (existing, points at drain fn we just
+  --     rewrote — will start working at 15 min cadence post-redeploy)
   FOR job_id IN
     SELECT jobid FROM cron.job
     WHERE jobname IN (
@@ -38,7 +46,6 @@ BEGIN
       'reaggregate-vibes-recent',
       'run-scrapers-nightly-reaggregate-0930-utc',
       'run-scrapers-nightly-reaggregate-1030-utc',
-      'drain-classification-queue',
       'drain-queue-trigger',
       'invoke-aggregate-vibes-hourly',
       'invoke-reaggregate-vibes-daily',
@@ -47,7 +54,6 @@ BEGIN
       'scrape-bluesky-3x',
       'scrape-twitter-3x',
       'scrape-mastodon-3x',
-      'drain-classifications-q30',
       'aggregate-vibes-q30'
     )
   LOOP
@@ -112,26 +118,13 @@ BEGIN
     $cron$, base_url, anon_token)
   );
 
-  -- Drain pending classifications every 30 min. processPendingClassifications
-  -- short-circuits on empty queue, and Gemini quota is enforced at the RPC
-  -- layer (see _shared/classifier.ts:claimGeminiQuota).
+  -- Refresh vibes_scores every 30 min on minutes 20 and 50 — offset 5 min
+  -- after the existing drain-classification-queue-15min runs (cron `*/15`
+  -- fires at :00/:15/:30/:45) so most invocations see freshly classified
+  -- posts rather than in-flight ones. aggregate-vibes is intentionally
+  -- ungated; its action set is bounded and idempotent.
   PERFORM cron.schedule(
-    'drain-classifications-q30', '*/30 * * * *',
-    format($cron$
-      SELECT net.http_post(
-        url := '%s/drain-classification-queue',
-        headers := jsonb_build_object('Content-Type','application/json','Authorization','Bearer %s'),
-        body := '{"scheduler":"pg_cron","pipeline":"drain-classifications"}'::jsonb
-      );
-    $cron$, base_url, anon_token)
-  );
-
-  -- Refresh vibes_scores every 30 min, offset 15 min from drain so most
-  -- invocations see freshly classified posts rather than in-flight ones.
-  -- aggregate-vibes is intentionally ungated; its action set is bounded
-  -- and idempotent.
-  PERFORM cron.schedule(
-    'aggregate-vibes-q30', '15,45 * * * *',
+    'aggregate-vibes-q30', '20,50 * * * *',
     format($cron$
       SELECT net.http_post(
         url := '%s/aggregate-vibes',
