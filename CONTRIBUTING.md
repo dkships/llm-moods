@@ -33,9 +33,10 @@ Look at any existing scraper in `supabase/functions/scrape-*` as a template. Eac
 
 1. Fetches posts from a platform API
 2. Matches posts to models using keywords from the `model_keywords` table
-3. Classifies sentiment via the AI gateway
-4. Upserts results into `scraped_posts`
-5. Logs the run to `scraper_runs`
+3. Upserts results into `scraped_posts` with `classification_status='pending'`
+4. Logs the run to `scraper_runs`
+
+The separate `drain-classification-queue` function picks up pending posts on a 30-min cron and runs them through the Gemini classifier. `aggregate-vibes` computes daily/hourly scores into `vibes_scores` on its own 30-min cron. Each scraper has its own pg_cron row firing 3x daily — there is no orchestrator.
 
 ## How to Add a New Model
 
