@@ -76,15 +76,31 @@ Functions safe to leave ungated (called by pg_cron with anon key): `aggregate-vi
 
 **RPC Functions:** `get_landing_vibes()`, `get_sparkline_scores()`, `get_complaint_breakdown()`, `get_source_breakdown()`, `get_trending_complaints()`
 
-## Known reliability issues (Apr 2026)
+## Cron architecture (May 2026)
 
-- **`run-scrapers` orchestrator never finishes.** It hits the Supabase edge-function wall-clock budget mid-run; the `cleanup-stuck-scraper-runs` cron from Phase 9B-2 marks it failed at 30min with `auto-cleanup: status=running > 30min`. Children scrapers DO complete (data flows in), but the orchestrator's status field is permanently misleading. **Don't trust orchestrator status; trust per-scraper child runs.**
-- **`aggregate-vibes-hourly` cron is back** (Phase 11C migration `20260425175022_restore_aggregate_vibes_hourly.sql`). It used to be unscheduled in favor of the orchestrator calling aggregate-vibes itself, but the orchestrator times out first. Hourly cron is the safety net; the orchestrator's call is best-effort.
+The pipeline runs as 7 independent pg_cron rows, each within its own 400 s edge-function budget. No orchestrator. Migration: `20260508183000_decompose_pipeline_to_independent_crons.sql`.
+
+| Cron | Schedule (UTC) | PT | Function |
+|---|---|---|---|
+| `scrape-reddit-apify-3x` | `0 4,12,21 * * *` | 21/05/14 | `scrape-reddit-apify` |
+| `scrape-hackernews-3x` | `2 4,12,21 * * *` | +2 min | `scrape-hackernews` |
+| `scrape-bluesky-3x` | `4 4,12,21 * * *` | +4 min | `scrape-bluesky` |
+| `scrape-twitter-3x` | `6 4,12,21 * * *` | +6 min | `scrape-twitter` |
+| `scrape-mastodon-3x` | `8 4,12,21 * * *` | +8 min | `scrape-mastodon` |
+| `drain-classifications-q30` | `*/30 * * * *` | every 30 min | `drain-classification-queue` |
+| `aggregate-vibes-q30` | `15,45 * * * *` | every 30 min, offset | `aggregate-vibes` |
+
+The May 8 "simplified pipeline rebuild" (`20260508120000`) merged scrape+classify+aggregate into a single `run-pipeline` function — that cannot fit in 400 s and silently froze scores until this decomposition. `run-pipeline` and `run-scrapers` remain in code as manual debug tools but are not scheduled.
+
+Scraper auth gates accept three callers: service-role JWT, `RUN_PIPELINE_TRIGGER_SECRET` header, or anon JWT with body `{scheduler:"pg_cron", pipeline:"scrape-..."}`. Adding the third path is what lets pg_cron invoke each scraper directly without leaking service-role into a public-repo migration.
+
+## Known reliability issues
+
 - **`scrape-reddit-apify` fails ~57%** of recent windows. The `trudax~reddit-scraper-lite` Apify actor times out or returns 0 items intermittently. Investigate before relying on Reddit-only signals.
 
 ## Scrapers (Edge Functions)
 
-Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances). Lemmy was dropped in Phase 12 (yielded 0.4 posts/run for 18 wasted Gemini calls; mostly Reddit cross-posts). Orchestrated by `run-scrapers` (batches of 3). pg_cron schedules the orchestrator hourly (cron `0 * * * *`) but the orchestrator only does a real fetch on three Pacific-time windows per day (05:00, 14:00, 21:00) — the other 21 hourly invocations return `{"status":"skipped","reason":"outside_window"}` in milliseconds. The hourly trigger landed on Apr 22 2026 (`supabase/migrations/20260422120000_schedule_run_scrapers_hourly.sql`); before that the orchestrator code shipped without a schedule for 17 days.
+Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances). Lemmy was dropped in Phase 12 (yielded 0.4 posts/run for 18 wasted Gemini calls; mostly Reddit cross-posts). Each scraper runs on its own pg_cron row at the three Pacific-time windows (05:00, 14:00, 21:00 PT), staggered by minute — see "Cron architecture" above. Scrapers insert posts as `classification_status='pending'`; classification is drained by the separate `drain-classification-queue` cron, and `aggregate-vibes` runs independently to refresh scores.
 
 Shared utilities (keyword matching, dedup, error logging) are in `_shared/utils.ts` — scrapers import from there instead of duplicating code.
 

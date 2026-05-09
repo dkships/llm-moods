@@ -81,6 +81,17 @@ export function isRunPipelineTriggerRequest(req: Request): boolean {
   return Boolean(triggerSecret && req.headers.get(RUN_PIPELINE_TRIGGER_HEADER) === triggerSecret);
 }
 
+// pg_cron invokes edge functions with the public anon JWT (the only key safe
+// to embed in a public-repo migration). To accept those calls without weakening
+// the service-role gate, we require a body shape that pg_cron sets explicitly.
+export function isSchedulerRequest(body: unknown, expectedPipelinePrefix: string): boolean {
+  if (!body || typeof body !== "object") return false;
+  const candidate = body as { scheduler?: unknown; pipeline?: unknown };
+  return candidate.scheduler === "pg_cron"
+    && typeof candidate.pipeline === "string"
+    && candidate.pipeline.startsWith(expectedPipelinePrefix);
+}
+
 export function internalOnlyResponse(corsHeaders: HeadersInit): Response {
   return new Response(JSON.stringify({ error: "Forbidden" }), {
     status: 403,

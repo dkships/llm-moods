@@ -5,6 +5,7 @@ import {
   internalOnlyResponse,
   isInternalServiceRequest,
   isRunPipelineTriggerRequest,
+  isSchedulerRequest,
   isUniqueViolation,
   readJsonBody,
   type RunRecordRow,
@@ -88,10 +89,16 @@ interface Status {
 
 export async function handleScrapeMastodon(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (!isInternalServiceRequest(req) && !isRunPipelineTriggerRequest(req)) return internalOnlyResponse(corsHeaders);
+  const body = await readJsonBody(req);
+  if (
+    !isInternalServiceRequest(req)
+    && !isRunPipelineTriggerRequest(req)
+    && !isSchedulerRequest(body, "scrape-")
+  ) {
+    return internalOnlyResponse(corsHeaders);
+  }
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const body = await readJsonBody(req);
   let runRecord: RunRecordRow | null = null;
 
   try {
