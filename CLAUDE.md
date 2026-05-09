@@ -92,9 +92,9 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 | `cleanup-stuck-scraper-runs` | `*/30 * * * *` | every 30 min | (SQL only — marks runs >30 min as failed) |
 | `cleanup-old-posts-weekly` | `0 8 * * 0` | Sun 01:00 PT | `cleanup-old-posts` |
 
-The May 8 "simplified pipeline rebuild" (`20260508120000`) merged scrape+classify+aggregate into a single `run-pipeline` function — that cannot fit in 400 s and silently froze scores until this decomposition. `run-pipeline` and `run-scrapers` remain in code as manual debug tools but are not scheduled.
+`run-pipeline` and `run-scrapers` are kept in code as manual debug tools but are not scheduled (the merged pipeline blew the 400s edge-function budget — see commit history for the May 8 rebuild and decomposition).
 
-Scraper auth gates accept three callers: service-role JWT, `RUN_PIPELINE_TRIGGER_SECRET` header, or anon JWT with body `{scheduler:"pg_cron", pipeline:"scrape-..."}`. Adding the third path is what lets pg_cron invoke each scraper directly without leaking service-role into a public-repo migration.
+Scraper auth gates accept three callers: service-role JWT, `RUN_PIPELINE_TRIGGER_SECRET` header, or anon JWT with body `{scheduler:"pg_cron", pipeline:"scrape-..."}`. The third path lets pg_cron invoke each scraper directly without leaking service-role into a public-repo migration.
 
 ## Known reliability issues
 
@@ -106,7 +106,7 @@ Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Api
 
 Shared utilities (keyword matching, dedup, error logging) are in `_shared/utils.ts` — scrapers import from there instead of duplicating code.
 
-Sentiment classified via Google Gemini API (`generativelanguage.googleapis.com`) using `gemini-2.5-flash` (stable GA — moved off `gemini-3.1-flash-lite-preview` on 2026-04-25 after Google rotated the preview snapshot to a more conservative version that flagged 100% of posts as irrelevant). Single-model posts use `classifyBatch()` (25 posts/call). Multi-model posts (mentioning 2+ models) use `classifyBatchTargeted()` for per-model sentiment — e.g., "DeepSeek fixed Gemini's mess" is negative for Gemini, positive for DeepSeek. Both functions are in `_shared/classifier.ts`. Classifier has 429 retry logic (3 attempts with exponential backoff) and 2s inter-batch delay. Non-English posts are translated to English by the classifier prompt (no extra API calls); original text stored in `content`, translation in `translated_content`, language code in `original_language`. Known limitation: Gemini classifies posts about itself (potential self-bias). Gemini free tier is ~1,000 RPD (resets midnight Pacific Time). At 3x/day with ~24 calls/run (~72 calls/day including targeted batches) — well within limits.
+Sentiment is classified via Google Gemini API (`gemini-2.5-flash`). Single-model posts use `classifyBatch()` (25/call); multi-model posts use `classifyBatchTargeted()` for per-model sentiment (e.g., "DeepSeek fixed Gemini's mess" → negative Gemini, positive DeepSeek). Both live in `_shared/classifier.ts`. 429 retry: 3 attempts, exponential backoff, 2s inter-batch delay. Non-English posts are translated by the classifier prompt; original in `content`, translation in `translated_content`, language code in `original_language`. Known limitation: Gemini classifies posts about itself (potential self-bias). Free tier ~1,000 RPD; current usage ~72 calls/day.
 
 `reclassify-posts` edge function supports `?mode=multi_model` to find and fix historical multi-model posts with identical sentiment. Run `reaggregate-vibes` after to recalculate scores.
 
@@ -180,16 +180,12 @@ npm run test         # Vitest
 - Minimal test coverage (example test only)
 - Error handling in scrapers silently logs to `error_log` table
 
-## Accuracy Guardrails
+## Accuracy
 
-- If uncertain about a scraper API, Supabase schema, or edge function behavior, say "I don't know" rather than guessing
-- Read the relevant source file before making claims about scraper logic, classifier behavior, or database schema
-- Verify that Supabase tables, RPC functions, and edge functions exist before referencing them
-- Do not suggest Deno/Supabase features without verifying they are available in this project's edge function runtime
-- When referencing scraper configurations or API integrations, verify against `supabase/functions/` source files
-- Cite specific file paths when making recommendations
-- When analyzing scraper data, sentiment results, or edge function output, extract direct quotes and specific numbers first, then base conclusions on those — not on memory or paraphrase
-- After generating claims or recommendations, self-verify each against the source material; retract any claim that lacks a supporting code reference or data point
+- Verify Supabase tables, RPC functions, and edge functions in `supabase/functions/` before referencing them.
+- Check the `_shared/` modules before claiming scraper/classifier behavior; many features moved out of per-scraper files.
+
+Hallucination prevention: see `~/.agents/AGENTS.md`.
 
 ## Working Here with Claude Code
 
