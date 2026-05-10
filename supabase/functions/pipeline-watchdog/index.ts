@@ -18,7 +18,7 @@ const QUEUE_OLDEST_WARN_MIN = 60;
 const AGGREGATION_LAG_WARN_MIN = 90;
 const SCRAPER_STALE_HOURS = 12;
 const SCRAPER_SOURCES = [
-  "reddit-apify",
+  "reddit",
   "hackernews",
   "bluesky",
   "twitter",
@@ -130,10 +130,13 @@ Deno.serve(async (req) => {
 
     if (alerts.length > 0) {
       for (const a of alerts) {
-        await logToErrorLog(supabase, SOURCE, `[${a.level}] ${a.message}`, JSON.stringify(a.context));
+        await supabase.from("error_log").insert({
+          function_name: SOURCE,
+          severity: "critical",
+          error_message: `[${a.level}] ${a.message}`,
+          context: JSON.stringify(a.context),
+        });
       }
-    } else {
-      await logToErrorLog(supabase, SOURCE, "Pipeline healthy", JSON.stringify(summary));
     }
 
     return new Response(JSON.stringify({ status: alerts.length > 0 ? "alerts" : "healthy", summary, alerts }, null, 2), {
