@@ -87,14 +87,19 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 | `scrape-bluesky-3x` | `4 4,12,21 * * *` | +4 min | `scrape-bluesky` |
 | `scrape-twitter-3x` | `6 4,12,21 * * *` | +6 min | `scrape-twitter` |
 | `scrape-mastodon-3x` | `8 4,12,21 * * *` | +8 min | `scrape-mastodon` |
-| `drain-classification-queue-15min` | `*/15 * * * *` | every 15 min | `drain-classification-queue` |
+| `drain-classification-queue-5min` | `*/5 * * * *` | every 5 min | `drain-classification-queue` (body: `limit=60`, batch_size falls through to function default 20 → 3 Gemini calls/pass) |
 | `aggregate-vibes-q30` | `20,50 * * * *` | every 30 min, offset | `aggregate-vibes` |
+| `pipeline-watchdog-1h` | `17 * * * *` | hourly at :17 | `pipeline-watchdog` |
 | `cleanup-stuck-scraper-runs` | `*/30 * * * *` | every 30 min | (SQL only — marks runs >30 min as failed) |
 | `cleanup-old-posts-weekly` | `0 8 * * 0` | Sun 01:00 PT | `cleanup-old-posts` |
 
 `run-pipeline` and `run-scrapers` are kept in code as manual debug tools but are not scheduled (the merged pipeline blew the 400s edge-function budget — see commit history for the May 8 rebuild and decomposition).
 
 Scraper auth gates accept three callers: service-role JWT, `RUN_PIPELINE_TRIGGER_SECRET` header, or anon JWT with body `{scheduler:"pg_cron", pipeline:"scrape-..."}`. The third path lets pg_cron invoke each scraper directly without leaking service-role into a public-repo migration.
+
+**Drain throughput (May 10 update).** Account moved off the Gemini free tier; `GEMINI_DAILY_REQUEST_LIMIT` raised to 1500 and `GEMINI_MINUTE_REQUEST_LIMIT` to 60 in edge-function secrets. Drain cadence dropped from 15 min to 5 min and `limit` raised from 20 to 60 (~720 posts/hr capacity vs ~3,000–4,500/day ingest). `partial_coverage` is no longer the structural default — `score-refresh.ts` now treats `queuedPosts > 5 || classification_coverage < 0.85` as the partial threshold. Live cron diverges from migration history per the established pattern; check `cron.job` for actual state.
+
+**Watchdog.** `pipeline-watchdog-1h` writes `severity='critical'` rows into `error_log` on scraper-stale (>12h since last success), drain backlog (>500 queued or oldest queued >60 min), aggregate-vibes lag (>90 min), or classification failures piling up (>50). Surfaced via `get_critical_alerts(hours_back)` RPC into the `/admin/scrapers` banner and a calm `StalenessBanner` on the public dashboard when the newest `score_computed_at` is >3h old. `error_log` gained a `severity` column ('info' | 'warning' | 'critical', default 'info') in migration `20260510120100_pipeline_watchdog.sql`.
 
 ## Known reliability issues
 
