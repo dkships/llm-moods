@@ -8,38 +8,24 @@ import {
 } from "../_shared/runtime.ts";
 import { corsHeaders, logToErrorLog } from "../_shared/utils.ts";
 
+// Hourly watchdog. Reports queue backlog, scraper staleness, and aggregation
+// lag to error_log so operators see alerts without polling dashboards.
+
 const SOURCE = "pipeline-watchdog";
 
-const SCRAPER_SOURCES = ["reddit", "hackernews", "bluesky", "mastodon", "twitter"] as const;
+const QUEUE_BACKLOG_WARN = 500;
+const QUEUE_OLDEST_WARN_MIN = 60;
+const AGGREGATION_LAG_WARN_MIN = 90;
 const SCRAPER_STALE_HOURS = 12;
-const DRAIN_STALE_MINUTES = 60;
-const AGGREGATE_STALE_MINUTES = 90;
-const PENDING_QUEUE_ALERT_THRESHOLD = 100;
+const SCRAPER_SOURCES = [
+  "reddit-apify",
+  "hackernews",
+  "bluesky",
+  "twitter",
+  "mastodon",
+];
 
-interface ScraperHealth {
-  source: string;
-  last_success_at: string | null;
-  hours_since: number | null;
-  stale: boolean;
-}
-
-interface WatchdogReport {
-  ok: boolean;
-  checked_at: string;
-  scrapers: ScraperHealth[];
-  drain: {
-    last_classified_at: string | null;
-    minutes_since: number | null;
-    pending_count: number;
-    stale: boolean;
-  };
-  aggregate: {
-    last_computed_at: string | null;
-    minutes_since: number | null;
-    stale: boolean;
-  };
-  breaches: string[];
-}
+interface Alert { level: "warn" | "error"; message: string; context: Record<string, unknown>; }
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -54,129 +40,111 @@ Deno.serve(async (req) => {
   }
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const now = new Date();
+  const alerts: Alert[] = [];
+  const now = Date.now();
 
   try {
-    const report = await runChecks(supabase, now);
+    // 1. Classification queue health
+    const { data: queueHealth, error: queueErr } = await supabase.rpc("get_classification_queue_health");
+    if (queueErr) throw new Error(`queue_health: ${queueErr.message}`);
+    const queueRow = Array.isArray(queueHealth) ? queueHealth[0] : queueHealth;
+    const queued = Number(queueRow?.queued ?? 0);
+    const retrying = Number(queueRow?.retrying ?? 0);
+    const failed = Number(queueRow?.failed ?? 0);
+    const oldestQueuedAt = queueRow?.oldest_queued_at ? new Date(queueRow.oldest_queued_at).getTime() : null;
+    const oldestAgeMin = oldestQueuedAt ? Math.round((now - oldestQueuedAt) / 60000) : 0;
 
-    if (!report.ok) {
-      await supabase.from("error_log").insert({
-        function_name: SOURCE,
-        severity: "critical",
-        error_message: `Pipeline staleness detected: ${report.breaches.join("; ")}`,
-        context: JSON.stringify(report),
+    if (queued + retrying >= QUEUE_BACKLOG_WARN) {
+      alerts.push({
+        level: "warn",
+        message: `Classification queue backlog: ${queued + retrying} (queued=${queued}, retrying=${retrying})`,
+        context: { queued, retrying, failed, oldest_age_min: oldestAgeMin },
+      });
+    }
+    if (oldestAgeMin >= QUEUE_OLDEST_WARN_MIN) {
+      alerts.push({
+        level: "warn",
+        message: `Oldest queued post is ${oldestAgeMin} min old (drain may be stuck)`,
+        context: { oldest_queued_at: queueRow?.oldest_queued_at, queued, retrying },
+      });
+    }
+    if (failed >= 50) {
+      alerts.push({
+        level: "error",
+        message: `Classification failures piling up: ${failed} posts in failed state`,
+        context: { failed },
       });
     }
 
-    return new Response(JSON.stringify(report, null, 2), {
+    // 2. Scraper staleness — most recent run per source
+    const sinceIso = new Date(now - SCRAPER_STALE_HOURS * 60 * 60 * 1000 * 2).toISOString();
+    const { data: runs, error: runsErr } = await supabase
+      .from("scraper_runs")
+      .select("source, started_at, status")
+      .gte("started_at", sinceIso)
+      .order("started_at", { ascending: false })
+      .limit(500);
+    if (runsErr) throw new Error(`scraper_runs: ${runsErr.message}`);
+
+    const lastBySource = new Map<string, { started_at: string; status: string }>();
+    for (const row of runs ?? []) {
+      if (!lastBySource.has(row.source)) lastBySource.set(row.source, row);
+    }
+    for (const source of SCRAPER_SOURCES) {
+      const last = lastBySource.get(source);
+      const ageHours = last ? Math.round((now - new Date(last.started_at).getTime()) / 3_600_000) : Infinity;
+      if (ageHours >= SCRAPER_STALE_HOURS) {
+        alerts.push({
+          level: "warn",
+          message: `Scraper '${source}' has not run in ${ageHours === Infinity ? `>${SCRAPER_STALE_HOURS}` : ageHours}h`,
+          context: { source, last_run: last?.started_at ?? null, last_status: last?.status ?? null },
+        });
+      }
+    }
+
+    // 3. Aggregation lag — newest score_computed_at
+    const { data: lastScore, error: scoreErr } = await supabase
+      .from("vibes_scores")
+      .select("score_computed_at")
+      .order("score_computed_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (scoreErr) throw new Error(`vibes_scores: ${scoreErr.message}`);
+    const lastComputed = lastScore?.score_computed_at ? new Date(lastScore.score_computed_at).getTime() : null;
+    const lagMin = lastComputed ? Math.round((now - lastComputed) / 60000) : Infinity;
+    if (lagMin >= AGGREGATION_LAG_WARN_MIN) {
+      alerts.push({
+        level: "warn",
+        message: `aggregate-vibes hasn't run in ${lagMin === Infinity ? "ever" : `${lagMin} min`}`,
+        context: { last_score_computed_at: lastScore?.score_computed_at ?? null },
+      });
+    }
+
+    const summary = {
+      checked_at: new Date(now).toISOString(),
+      alerts: alerts.length,
+      queue: { queued, retrying, failed, oldest_age_min: oldestAgeMin },
+      aggregation_lag_min: lagMin === Infinity ? null : lagMin,
+      scrapers_checked: SCRAPER_SOURCES.length,
+    };
+
+    if (alerts.length > 0) {
+      for (const a of alerts) {
+        await logToErrorLog(supabase, SOURCE, `[${a.level}] ${a.message}`, JSON.stringify(a.context));
+      }
+    } else {
+      await logToErrorLog(supabase, SOURCE, "Pipeline healthy", JSON.stringify(summary));
+    }
+
+    return new Response(JSON.stringify({ status: alerts.length > 0 ? "alerts" : "healthy", summary, alerts }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await logToErrorLog(supabase, SOURCE, message, "watchdog-error");
-    return new Response(JSON.stringify({ error: message }), {
+    await logToErrorLog(supabase, SOURCE, message, "top-level error");
+    return new Response(JSON.stringify({ status: "failed", error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
-
-async function runChecks(supabase: any, now: Date): Promise<WatchdogReport> {
-  const scrapers = await checkScrapers(supabase, now);
-  const drain = await checkDrain(supabase, now);
-  const aggregate = await checkAggregate(supabase, now);
-
-  const breaches: string[] = [];
-  for (const s of scrapers) {
-    if (s.stale) {
-      const hours = s.hours_since === null ? "ever" : `${s.hours_since.toFixed(1)}h`;
-      breaches.push(`scraper:${s.source} no success in ${hours}`);
-    }
-  }
-  if (drain.stale) {
-    const mins = drain.minutes_since === null ? "ever" : `${drain.minutes_since.toFixed(0)}m`;
-    breaches.push(`drain stalled (last classified ${mins}, ${drain.pending_count} pending)`);
-  }
-  if (aggregate.stale) {
-    const mins = aggregate.minutes_since === null ? "ever" : `${aggregate.minutes_since.toFixed(0)}m`;
-    breaches.push(`aggregate-vibes stale (last refresh ${mins})`);
-  }
-
-  return {
-    ok: breaches.length === 0,
-    checked_at: now.toISOString(),
-    scrapers,
-    drain,
-    aggregate,
-    breaches,
-  };
-}
-
-async function checkScrapers(supabase: any, now: Date): Promise<ScraperHealth[]> {
-  const results: ScraperHealth[] = [];
-  for (const source of SCRAPER_SOURCES) {
-    const { data } = await supabase
-      .from("scraper_runs")
-      .select("started_at")
-      .eq("source", source)
-      .eq("status", "success")
-      .order("started_at", { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    const lastSuccessAt: string | null = data?.started_at ?? null;
-    const hoursSince = lastSuccessAt
-      ? (now.getTime() - new Date(lastSuccessAt).getTime()) / 3_600_000
-      : null;
-    const stale = hoursSince === null || hoursSince > SCRAPER_STALE_HOURS;
-
-    results.push({ source, last_success_at: lastSuccessAt, hours_since: hoursSince, stale });
-  }
-  return results;
-}
-
-async function checkDrain(supabase: any, now: Date) {
-  const { data: latest } = await supabase
-    .from("scraped_posts")
-    .select("classified_at")
-    .eq("classification_status", "classified")
-    .order("classified_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const lastClassifiedAt: string | null = latest?.classified_at ?? null;
-  const minutesSince = lastClassifiedAt
-    ? (now.getTime() - new Date(lastClassifiedAt).getTime()) / 60_000
-    : null;
-
-  const { count } = await supabase
-    .from("scraped_posts")
-    .select("id", { count: "exact", head: true })
-    .in("classification_status", ["pending", "retry"]);
-
-  const pendingCount = count ?? 0;
-  // Drain is "stale" only if both signals fire: nothing classified recently AND
-  // there's a real backlog. A long quiet period with zero pending posts is fine.
-  const stale =
-    pendingCount > PENDING_QUEUE_ALERT_THRESHOLD
-    && (minutesSince === null || minutesSince > DRAIN_STALE_MINUTES);
-
-  return { last_classified_at: lastClassifiedAt, minutes_since: minutesSince, pending_count: pendingCount, stale };
-}
-
-async function checkAggregate(supabase: any, now: Date) {
-  const { data } = await supabase
-    .from("vibes_scores")
-    .select("score_computed_at")
-    .order("score_computed_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  const lastComputedAt: string | null = data?.score_computed_at ?? null;
-  const minutesSince = lastComputedAt
-    ? (now.getTime() - new Date(lastComputedAt).getTime()) / 60_000
-    : null;
-  const stale = minutesSince === null || minutesSince > AGGREGATE_STALE_MINUTES;
-
-  return { last_computed_at: lastComputedAt, minutes_since: minutesSince, stale };
-}
