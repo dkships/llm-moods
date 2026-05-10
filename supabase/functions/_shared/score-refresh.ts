@@ -98,8 +98,11 @@ function hasValidSentiment(post: ScoreInputPost): boolean {
   return post.sentiment === "positive" || post.sentiment === "negative" || post.sentiment === "neutral";
 }
 
+const PARTIAL_COVERAGE_QUEUE_THRESHOLD = 5;
+const PARTIAL_COVERAGE_MIN_RATIO = 0.85;
+
 function basisForResult(result: ScoreResult, queuedPosts = 0, classificationCoverage = 1, minPosts = DEFAULT_MIN_POSTS): ScoreBasisStatus {
-  if (queuedPosts > 0 || classificationCoverage < 0.8) return "partial_coverage";
+  if (queuedPosts > PARTIAL_COVERAGE_QUEUE_THRESHOLD || classificationCoverage < PARTIAL_COVERAGE_MIN_RATIO) return "partial_coverage";
   if (result.eligible_posts < minPosts) return "thin_sample";
   return "measured";
 }

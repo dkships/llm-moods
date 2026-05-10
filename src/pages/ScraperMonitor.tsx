@@ -47,6 +47,14 @@ interface QueueHealth {
   next_attempt_at: string | null;
 }
 
+interface CriticalAlert {
+  id: string;
+  function_name: string;
+  error_message: string;
+  context: string | null;
+  created_at: string;
+}
+
 interface MonitorRpcClient {
   rpc: ((
     fn: "get_scraper_monitor_runs",
@@ -59,7 +67,11 @@ interface MonitorRpcClient {
     ((
       fn: "get_classification_queue_health",
       args?: Record<string, never>,
-    ) => Promise<{ data: QueueHealth[] | null; error: { message: string } | null }>);
+    ) => Promise<{ data: QueueHealth[] | null; error: { message: string } | null }>) &
+    ((
+      fn: "get_critical_alerts",
+      args: { hours_back: number },
+    ) => Promise<{ data: CriticalAlert[] | null; error: { message: string } | null }>);
 }
 
 // Contexts logged to error_log that aren't actually errors — completion
@@ -136,6 +148,17 @@ const ScraperMonitor = () => {
       return (data || [])[0] as QueueHealth | undefined;
     },
   });
+  const { data: criticalAlerts } = useQuery({
+    queryKey: ["critical-alerts"],
+    refetchInterval: 60_000,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const { data, error } = await (supabase as unknown as MonitorRpcClient).rpc("get_critical_alerts", { hours_back: 24 });
+      if (error) throw error;
+      return (data || []) as CriticalAlert[];
+    },
+  });
+  const latestCritical = criticalAlerts?.[0];
   const recentErrors = (rawErrors ?? []).filter(
     (e) => !NON_ERROR_CONTEXTS.has(e.context ?? "") && !(e.context ?? "").endsWith("-retry"),
   );
@@ -214,6 +237,20 @@ const ScraperMonitor = () => {
               </div>
             ))}
           </div>
+
+          {latestCritical && (
+            <div
+              className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-3 font-mono text-xs text-destructive"
+              role="alert"
+            >
+              <p className="font-semibold uppercase tracking-wide">Pipeline alert · {latestCritical.function_name}</p>
+              <p className="mt-1 whitespace-pre-wrap">{latestCritical.error_message}</p>
+              <p className="mt-2 text-[11px] opacity-80">
+                {formatTimeAgo(latestCritical.created_at)}
+                {criticalAlerts && criticalAlerts.length > 1 ? ` · ${criticalAlerts.length} critical alerts in last 24h` : null}
+              </p>
+            </div>
+          )}
 
           <div
             className={`mb-8 rounded-lg border px-4 py-3 font-mono text-xs ${

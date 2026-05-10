@@ -19,6 +19,7 @@ import {
   type RecentChatterPost,
 } from "@/hooks/useVibesData";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
+import StalenessBanner from "@/components/StalenessBanner";
 import { getVibeStatus, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities, sentimentBorderClass, formatScoreConfidence, scoreConfidenceTone } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
@@ -277,11 +278,21 @@ const Dashboard = () => {
     return new Date(model.lastUpdated).getTime() < new Date(oldest).getTime() ? model.lastUpdated : oldest;
   }, null);
 
+  // Newest score_computed_at across all models. Drives the staleness banner —
+  // if no model has been refreshed in 3+ hours, the pipeline is likely paused.
+  const mostRecentScoreAt = (models || []).reduce<string | null>((newest, model) => {
+    if (!model.scoreComputedAt) return newest;
+    if (!newest) return model.scoreComputedAt;
+    return new Date(model.scoreComputedAt).getTime() > new Date(newest).getTime() ? model.scoreComputedAt : newest;
+  }, null);
+
   return (
     <PageTransition>
       <div className="min-h-screen bg-background">
         <NavBar />
         <main id="main-content" tabIndex={-1} className="scroll-mt-24">
+          <StalenessBanner mostRecentScoreAt={mostRecentScoreAt} />
+
           {/* Page Header */}
           <section className="container pt-10 pb-8">
             <PageHeader
