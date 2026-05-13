@@ -59,6 +59,10 @@ export interface ClassifyOptions {
   minuteLimit?: number;
   quotaScope?: "production" | "eval";
   onUsage?: (sample: UsageSample) => void | Promise<void>;
+  // "none" (default) keeps current production behavior. "omit" leaves the
+  // field unset entirely, which is required for thinking-only models like
+  // gemini-2.5-pro that reject reasoning_effort=none with a 400.
+  reasoningEffort?: "none" | "low" | "medium" | "high" | "omit";
 }
 
 function classifierModel(options: ClassifyOptions = {}): string {
@@ -477,17 +481,21 @@ function responseSchema(mode: "single" | "batch") {
 
 function requestBody(prompt: string, maxTokens: number, mode: "single" | "batch", options: ClassifyOptions = {}) {
   const model = classifierModel(options);
-  return JSON.stringify({
+  const effort = options.reasoningEffort ?? "none";
+  const body: Record<string, unknown> = {
     model,
     messages: [{ role: "user", content: prompt }],
     max_tokens: maxTokens,
     temperature: 0,
-    reasoning_effort: "none",
     response_format: {
       type: "json_schema",
       json_schema: responseSchema(mode),
     },
-  });
+  };
+  if (effort !== "omit") {
+    body.reasoning_effort = effort;
+  }
+  return JSON.stringify(body);
 }
 
 function retryAfterMs(res: Response | null): number | null {

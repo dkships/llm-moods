@@ -631,6 +631,8 @@ Deno.serve(async (req) => {
 
     const targetedItems = sample.map((p) => ({ text: p.text, targetModel: p.model_slug }));
 
+    const isThinkingOnly = (model: string) => /^gemini-(?:2\.5|3(?:\.\d+)?)-pro/.test(model);
+
     const runModel = async (model: string) => {
       const usage: UsageSample[] = [];
       const results = await classifyBatchTargeted(
@@ -643,6 +645,7 @@ Deno.serve(async (req) => {
           quotaScope: "eval",
           minuteLimit: evalMinuteLimit,
           dailyLimit: evalDailyLimit,
+          reasoningEffort: isThinkingOnly(model) ? "omit" : "none",
           onUsage: (s) => {
             usage.push(s);
           },
