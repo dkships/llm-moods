@@ -553,7 +553,21 @@ Deno.serve(async (req) => {
     if (url.searchParams.get("token") !== PEEK_TOKEN) {
       return internalOnlyResponse(corsHeaders);
     }
-    const limit = Math.min(20, Math.max(1, Number(url.searchParams.get("limit") || "1")));
+    const view = url.searchParams.get("view") || "reports";
+    const limit = Math.min(50, Math.max(1, Number(url.searchParams.get("limit") || "1")));
+
+    if (view === "errors") {
+      const { data, error } = await supabase
+        .from("error_log")
+        .select("created_at, context, error_message")
+        .eq("function_name", SOURCE)
+        .neq("context", "full-report")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+      if (error) return jsonResponse({ status: "failed", error: error.message }, 500);
+      return jsonResponse({ status: "success", count: (data || []).length, errors: data || [] });
+    }
+
     const { data, error } = await supabase
       .from("error_log")
       .select("created_at, error_message")
