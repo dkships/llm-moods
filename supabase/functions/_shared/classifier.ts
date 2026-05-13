@@ -43,12 +43,22 @@ const SAFE_ERROR_HEADERS = [
   "x-goog-request-id",
 ];
 
+export interface UsageSample {
+  model: string;
+  promptTokens: number | null;
+  completionTokens: number | null;
+  totalTokens: number | null;
+  latencyMs: number;
+  mode: "single" | "batch";
+}
+
 export interface ClassifyOptions {
   model?: string;
   quotaKey?: string;
   dailyLimit?: number;
   minuteLimit?: number;
   quotaScope?: "production" | "eval";
+  onUsage?: (sample: UsageSample) => void | Promise<void>;
 }
 
 function classifierModel(options: ClassifyOptions = {}): string {
@@ -326,6 +336,35 @@ export function summarizeClassifierFailures(
     firstError,
     messages,
   };
+}
+
+function readUsageField(value: unknown): number | null {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+async function emitUsage(
+  options: ClassifyOptions,
+  model: string,
+  mode: "single" | "batch",
+  responseData: unknown,
+  startedAt: number,
+): Promise<void> {
+  if (!options.onUsage) return;
+  const latencyMs = Math.max(0, Math.round(performance.now() - startedAt));
+  const usage = isRecord(responseData) && isRecord(responseData.usage) ? responseData.usage : null;
+  const sample: UsageSample = {
+    model,
+    promptTokens: usage ? readUsageField(usage.prompt_tokens) : null,
+    completionTokens: usage ? readUsageField(usage.completion_tokens) : null,
+    totalTokens: usage ? readUsageField(usage.total_tokens) : null,
+    latencyMs,
+    mode,
+  };
+  try {
+    await options.onUsage(sample);
+  } catch {
+    // Usage telemetry is best-effort; never let it break classification.
+  }
 }
 
 function parseResult(value: unknown): ClassifyResult {
@@ -687,6 +726,7 @@ export async function classifyPost(
   logError?: (msg: string, ctx?: string) => Promise<void>,
   options: ClassifyOptions = {},
 ): Promise<ClassifyResult> {
+  const startedAt = performance.now();
   try {
     const res = await fetchGemini(CLASSIFY_PROMPT + text.slice(0, 600), apiKey, 700, "single", logError, options);
     if (!(res instanceof Response)) {
@@ -694,6 +734,7 @@ export async function classifyPost(
       return res;
     }
     const data = await res.json();
+    await emitUsage(options, classifierModel(options), "single", data, startedAt);
     const raw = data.choices?.[0]?.message?.content || "";
     let parsed: unknown;
     try {
@@ -717,12 +758,14 @@ async function batchClassifyWithPrompt(
   logError?: (msg: string, ctx?: string) => Promise<void>,
   options: ClassifyOptions = {},
 ): Promise<ClassifyResult[]> {
+  const startedAt = performance.now();
   const res = await fetchGemini(prompt + numbered, apiKey, 4096, "batch", logError, options);
   if (!(res instanceof Response)) {
     if (logError) await logError(`Batch classify ${res.status}: ${res.error}`, "batch-classify-error");
     return Array.from({ length: batchLength }, () => res);
   }
   const data = await res.json();
+  await emitUsage(options, classifierModel(options), "batch", data, startedAt);
   const raw = data.choices?.[0]?.message?.content || "";
   const trimmed = raw.trim();
   const jsonMatch = trimmed.startsWith("[")
