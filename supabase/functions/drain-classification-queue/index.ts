@@ -11,8 +11,8 @@ import { claimServiceLock, releaseServiceLock } from "../_shared/score-refresh.t
 import { corsHeaders, logToErrorLog } from "../_shared/utils.ts";
 
 const SOURCE = "drain-classification-queue";
-const DEFAULT_LIMIT = 40;
-const DEFAULT_BATCH_SIZE = 20;
+const DEFAULT_LIMIT = 100;
+const DEFAULT_BATCH_SIZE = 40;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });

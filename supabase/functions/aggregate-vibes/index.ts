@@ -43,7 +43,7 @@ Deno.serve(async (req) => {
     }
 
     const summary = await refreshScores(supabase, models as ModelRow[], {
-      daysBack: 2,
+      daysBack: 7,
       includeHourly: true,
     });
 
