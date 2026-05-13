@@ -13,6 +13,10 @@ import { internalOnlyResponse, isInternalServiceRequest, readJsonBody } from "..
 // and never writes to scraped_posts or public scores.
 
 const SOURCE = "check-gemini-self-bias";
+// Single-use token for the Goldilocks smoke test (May 2026). Allows GET
+// retrieval of the latest full-report from error_log without service-role
+// auth. Remove this constant + the GET handler once the test wraps.
+const PEEK_TOKEN = "goldilocks-2026-05-13-7f8a1e2c-9bb5-4f3a-b0e5-3a9c1d8e4f6b";
 const DEFAULT_ORACLE = "gemini-2.5-pro";
 const DEFAULT_CANDIDATES = [
   "gemini-2.5-flash",
@@ -538,12 +542,37 @@ async function persistReport(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
+
+  if (req.method === "GET") {
+    const url = new URL(req.url);
+    if (url.searchParams.get("token") !== PEEK_TOKEN) {
+      return internalOnlyResponse(corsHeaders);
+    }
+    const limit = Math.min(20, Math.max(1, Number(url.searchParams.get("limit") || "1")));
+    const { data, error } = await supabase
+      .from("error_log")
+      .select("created_at, error_message")
+      .eq("function_name", SOURCE)
+      .eq("context", "full-report")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+    if (error) return jsonResponse({ status: "failed", error: error.message }, 500);
+    const reports = (data || []).map((row) => {
+      try {
+        return { created_at: row.created_at, report: JSON.parse(row.error_message as string) };
+      } catch {
+        return { created_at: row.created_at, raw: row.error_message };
+      }
+    });
+    return jsonResponse({ status: "success", count: reports.length, reports });
+  }
+
+  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
   const apiKey = Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) {
     return jsonResponse({ error: "GEMINI_API_KEY not configured" }, 500);
