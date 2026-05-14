@@ -638,7 +638,9 @@ Deno.serve(async (req) => {
       const thinking = isThinkingOnly(model);
       // Thinking models share max_tokens between reasoning and structured
       // output; the default 4096 budget gets truncated mid-JSON. "low"
-      // constrains reasoning; 8192 max_tokens gives the JSON room.
+      // constrains reasoning; bigger token cap gives the JSON room.
+      // Non-thinking models also benefit from extra headroom because
+      // non-English posts with verbose translations can bloat the response.
       const batchSize = thinking ? 15 : 25;
       const results = await classifyBatchTargeted(
         targetedItems,
@@ -651,7 +653,7 @@ Deno.serve(async (req) => {
           minuteLimit: evalMinuteLimit,
           dailyLimit: evalDailyLimit,
           reasoningEffort: thinking ? "low" : "none",
-          maxTokensOverride: thinking ? 8192 : undefined,
+          maxTokensOverride: thinking ? 12288 : 8192,
           onUsage: (s) => {
             usage.push(s);
           },
