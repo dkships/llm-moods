@@ -63,6 +63,9 @@ export interface ClassifyOptions {
   // field unset entirely, which is required for thinking-only models like
   // gemini-2.5-pro that reject reasoning_effort=none with a 400.
   reasoningEffort?: "none" | "low" | "medium" | "high" | "omit";
+  // Override max_tokens for the underlying request. Useful for thinking-only
+  // models where the default 4096-token batch budget gets eaten by reasoning.
+  maxTokensOverride?: number;
 }
 
 function classifierModel(options: ClassifyOptions = {}): string {
@@ -736,7 +739,8 @@ export async function classifyPost(
 ): Promise<ClassifyResult> {
   const startedAt = performance.now();
   try {
-    const res = await fetchGemini(CLASSIFY_PROMPT + text.slice(0, 600), apiKey, 700, "single", logError, options);
+    const singleTokens = options.maxTokensOverride && options.maxTokensOverride > 0 ? options.maxTokensOverride : 700;
+    const res = await fetchGemini(CLASSIFY_PROMPT + text.slice(0, 600), apiKey, singleTokens, "single", logError, options);
     if (!(res instanceof Response)) {
       if (logError) await logError(`AI gateway ${res.status}: ${res.error}`, "classify-error");
       return res;
@@ -767,7 +771,8 @@ async function batchClassifyWithPrompt(
   options: ClassifyOptions = {},
 ): Promise<ClassifyResult[]> {
   const startedAt = performance.now();
-  const res = await fetchGemini(prompt + numbered, apiKey, 4096, "batch", logError, options);
+  const batchTokens = options.maxTokensOverride && options.maxTokensOverride > 0 ? options.maxTokensOverride : 4096;
+  const res = await fetchGemini(prompt + numbered, apiKey, batchTokens, "batch", logError, options);
   if (!(res instanceof Response)) {
     if (logError) await logError(`Batch classify ${res.status}: ${res.error}`, "batch-classify-error");
     return Array.from({ length: batchLength }, () => res);

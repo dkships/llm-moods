@@ -635,17 +635,23 @@ Deno.serve(async (req) => {
 
     const runModel = async (model: string) => {
       const usage: UsageSample[] = [];
+      const thinking = isThinkingOnly(model);
+      // Thinking models share max_tokens between reasoning and structured
+      // output; the default 4096 budget gets truncated mid-JSON. "low"
+      // constrains reasoning; 8192 max_tokens gives the JSON room.
+      const batchSize = thinking ? 15 : 25;
       const results = await classifyBatchTargeted(
         targetedItems,
         apiKey,
-        25,
+        batchSize,
         logError,
         {
           model,
           quotaScope: "eval",
           minuteLimit: evalMinuteLimit,
           dailyLimit: evalDailyLimit,
-          reasoningEffort: isThinkingOnly(model) ? "omit" : "none",
+          reasoningEffort: thinking ? "low" : "none",
+          maxTokensOverride: thinking ? 8192 : undefined,
           onUsage: (s) => {
             usage.push(s);
           },
