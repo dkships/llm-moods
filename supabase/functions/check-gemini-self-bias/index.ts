@@ -664,12 +664,26 @@ Deno.serve(async (req) => {
       ? Array.from(new Set([oracle, ...candidates]))
       : candidates;
 
+    // Run all models in parallel. Each model has its own quota bucket
+    // (`${model}:eval`), so they don't contend. Wall-clock collapses to the
+    // slowest model — required to fit a 300-post run inside the 400s
+    // edge-function budget when the oracle is a thinking model.
     const resultsByModel: Record<string, ClassifyResult[]> = {};
     const usageByModel: Record<string, UsageSample[]> = {};
-    for (const model of allModels) {
-      const { results, usage } = await runModel(model);
-      resultsByModel[model] = results;
-      usageByModel[model] = usage;
+    const settled = await Promise.allSettled(
+      allModels.map(async (model) => ({ model, ...(await runModel(model)) })),
+    );
+    for (let i = 0; i < settled.length; i++) {
+      const outcome = settled[i];
+      const model = allModels[i];
+      if (outcome.status === "fulfilled") {
+        resultsByModel[model] = outcome.value.results;
+        usageByModel[model] = outcome.value.usage;
+      } else {
+        await logError(`Model run rejected for ${model}: ${outcome.reason}`, "model-run-rejected");
+        resultsByModel[model] = [];
+        usageByModel[model] = [];
+      }
     }
 
     const reports: Record<string, CandidateReport> = {};
