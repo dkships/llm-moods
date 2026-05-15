@@ -10,6 +10,7 @@ export interface VibesHistoryRow {
   eligible_posts?: number | null;
   score_basis_status?: string | null;
   queued_posts?: number | null;
+  failed_posts?: number | null;
   classification_coverage?: number | null;
 }
 
@@ -25,6 +26,10 @@ export interface DailyChartPoint {
   eligiblePosts?: number | null;
   scoreBasisStatus?: string | null;
   queuedPosts?: number | null;
+  /** Posts that exhausted classification retries on this day; surfaced as
+   * "abandoned" in tooltips. Distinct from queuedPosts so the user sees
+   * dead posts separately from work-in-progress. */
+  failedPosts?: number | null;
   classificationCoverage?: number | null;
 }
 
@@ -75,6 +80,7 @@ export function useDailyChartData(
         eligiblePosts: row?.eligible_posts ?? null,
         scoreBasisStatus: row?.score_basis_status ?? null,
         queuedPosts: row?.queued_posts ?? null,
+        failedPosts: row?.failed_posts ?? null,
         classificationCoverage: row?.classification_coverage ?? null,
       });
       labels[key] = label;

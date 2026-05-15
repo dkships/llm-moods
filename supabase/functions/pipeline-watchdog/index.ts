@@ -17,6 +17,7 @@ const QUEUE_BACKLOG_WARN = 500;
 const QUEUE_OLDEST_WARN_MIN = 60;
 const AGGREGATION_LAG_WARN_MIN = 90;
 const SCRAPER_STALE_HOURS = 12;
+const RECENT_FAILED_WARN = 20;
 const SCRAPER_SOURCES = [
   "reddit",
   "hackernews",
@@ -76,6 +77,24 @@ Deno.serve(async (req) => {
       });
     }
 
+    // Recent-failure rate alert: posts fail within ~24h of first attempt due to
+    // the 5-attempt × ~24h backoff ceiling. Counting failed posts with
+    // posted_at > now()-24h approximates a 24h-delta without a snapshot table.
+    const recentFailedSince = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+    const { count: recentFailed, error: recentFailedErr } = await supabase
+      .from("scraped_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("classification_status", "failed")
+      .gte("posted_at", recentFailedSince);
+    if (recentFailedErr) throw new Error(`recent_failed: ${recentFailedErr.message}`);
+    if ((recentFailed ?? 0) >= RECENT_FAILED_WARN) {
+      alerts.push({
+        level: "error",
+        message: `Recent classification failures: ${recentFailed} posts (posted in last 24h) hit failed state`,
+        context: { recent_failed: recentFailed, threshold: RECENT_FAILED_WARN },
+      });
+    }
+
     // 2. Scraper staleness — most recent run per source
     const sinceIso = new Date(now - SCRAPER_STALE_HOURS * 60 * 60 * 1000 * 2).toISOString();
     const { data: runs, error: runsErr } = await supabase
@@ -123,7 +142,7 @@ Deno.serve(async (req) => {
     const summary = {
       checked_at: new Date(now).toISOString(),
       alerts: alerts.length,
-      queue: { queued, retrying, failed, oldest_age_min: oldestAgeMin },
+      queue: { queued, retrying, failed, recent_failed_24h: recentFailed ?? 0, oldest_age_min: oldestAgeMin },
       aggregation_lag_min: lagMin === Infinity ? null : lagMin,
       scrapers_checked: SCRAPER_SOURCES.length,
     };

@@ -74,6 +74,7 @@ const ModelDetail = () => {
   const latestScoreTotalPosts = enriched?.latestScoreTotalPosts ?? 0;
   const latestEligiblePosts = enriched?.eligiblePosts ?? 0;
   const queuedPosts = enriched?.queuedPosts ?? 0;
+  const failedPosts = enriched?.failedPosts ?? 0;
   const coveragePct = Math.round((enriched?.classificationCoverage ?? 1) * 100);
   const scoreConfidence = enriched?.scoreConfidence ?? "low";
   const confidenceLabel = formatScoreConfidence(scoreConfidence);
@@ -90,6 +91,7 @@ const ModelDetail = () => {
       : `${latestEligiblePosts.toLocaleString()} scored of ${latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`,
     `${coveragePct}% classified for scoring.`,
     queuedPosts > 0 ? `${queuedPosts.toLocaleString()} queued for Gemini classification.` : null,
+    failedPosts > 0 ? `${failedPosts.toLocaleString()} abandoned after max retries.` : null,
     enriched?.isStale ? "No measured score exists for the current Pacific day yet." : null,
     scoreComputedLabel && scoreComputedAbsolute
       ? `Score recomputed ${scoreComputedLabel} (${scoreComputedAbsolute}).`
@@ -289,6 +291,15 @@ const ModelDetail = () => {
               <ScoreMetaBadge title={scoredPostsTitle}>
                 {coveragePct}% classified
               </ScoreMetaBadge>
+              {failedPosts > 0 && (
+                <ScoreMetaBadge
+                  tone="warning"
+                  icon={AlertTriangle}
+                  title={`${failedPosts.toLocaleString()} posts in the latest 7-day window exhausted classification retries. Recoverable via reclassify-posts?mode=reset_failed.`}
+                >
+                  {failedPosts.toLocaleString()} abandoned
+                </ScoreMetaBadge>
+              )}
               {enriched?.isStale && (
                 <ScoreMetaBadge tone="warning" icon={AlertTriangle} title="No current Pacific-day measured score yet.">
                   Stale score

@@ -26,6 +26,7 @@ export interface VibesChartDatum {
   eligiblePosts?: number | null;
   scoreBasisStatus?: string | null;
   queuedPosts?: number | null;
+  failedPosts?: number | null;
   classificationCoverage?: number | null;
 }
 
@@ -72,7 +73,10 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
     && datum.eligiblePosts != null
     && datum.eligiblePosts > 0
     && datum.eligiblePosts < LIMITED_SAMPLE_THRESHOLD;
-  const isPartialCoverage = datum.scoreBasisStatus === "partial_coverage" || (datum.queuedPosts ?? 0) > 0;
+  const queuedCount = datum.queuedPosts ?? 0;
+  const failedCount = datum.failedPosts ?? 0;
+  const isPartialCoverage = datum.scoreBasisStatus === "partial_coverage" || queuedCount > 0;
+  const showAbandoned = failedCount > 0;
   return (
     <div
       style={{
@@ -98,7 +102,12 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
       )}
       {isPartialCoverage && (
         <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 10, margin: "4px 0 0" }}>
-          Partial coverage{datum.queuedPosts ? ` — ${datum.queuedPosts} queued` : ""}
+          Partial coverage{queuedCount > 0 ? ` — ${queuedCount} queued` : ""}
+        </p>
+      )}
+      {showAbandoned && (
+        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 10, margin: "4px 0 0" }}>
+          {failedCount} abandoned (max retries reached)
         </p>
       )}
     </div>

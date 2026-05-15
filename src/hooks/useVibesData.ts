@@ -27,6 +27,8 @@ type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Ret
   carried_from_period_start?: string | null;
   queued_posts?: number | null;
   unclassified_posts?: number | null;
+  failed_posts?: number | null;
+  failed_classifications?: number | null;
   classification_coverage?: number | null;
   score_confidence?: string | null;
 };
@@ -74,6 +76,10 @@ export interface ModelWithVibes {
    *  confidence tier chip on dashboard cards and headers. */
   eligiblePosts: number;
   queuedPosts: number;
+  /** Posts that exhausted classification retries; surfaced as "abandoned" in the UI.
+   * Distinct from queuedPosts so the dashboard can differentiate work-in-progress
+   * (drain will still attempt) from dead posts (only recoverable via reset_failed). */
+  failedPosts: number;
   unclassifiedPosts: number;
   classificationCoverage: number;
   scoreConfidence: "high" | "medium" | "low";
@@ -177,6 +183,7 @@ export function useModelsWithLatestVibes() {
           recentPosts7d: m.recent_posts_7d ?? m.total_posts ?? 0,
           eligiblePosts: m.latest_score_eligible_posts ?? m.eligible_posts ?? 0,
           queuedPosts: m.pending_classifications ?? m.queued_posts ?? 0,
+          failedPosts: m.failed_classifications ?? m.failed_posts ?? 0,
           unclassifiedPosts: m.unclassified_posts ?? 0,
           classificationCoverage: Number(m.classification_coverage ?? 1),
           scoreConfidence,

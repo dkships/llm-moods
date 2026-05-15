@@ -50,6 +50,14 @@ Deno.serve(async (req) => {
       );
     }
 
+    if (mode === "reset_failed") {
+      const errorPattern = (url.searchParams.get("error_pattern") || "transient").toLowerCase();
+      const sinceDays = Math.max(1, Math.min(parseInt(url.searchParams.get("since_days") || "14", 10) || 14, 90));
+      const limit = Math.max(1, Math.min(parseInt(url.searchParams.get("limit") || "200", 10) || 200, 2000));
+      const dryRun = url.searchParams.get("dry_run") === "1" || url.searchParams.get("dry_run") === "true";
+      return await handleResetFailed(supabase, errorPattern, sinceDays, limit, dryRun, logError);
+    }
+
     // Default mode: reclassify low-confidence neutral posts
     const { data: posts, error: fetchErr } = await supabase
       .from("scraped_posts")
@@ -122,6 +130,109 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// Transient-error patterns are deterministic Gemini failures we expect to clear
+// on retry (network blips, quota deferrals, 5xx). parse_error and missing_*
+// are deterministic prompt/output failures — same input → same broken output,
+// so resetting them just refills the failed bucket.
+const TRANSIENT_ERROR_PATTERNS = [
+  "classifier_error",
+  "quota_deferred",
+  "RESOURCE_EXHAUSTED",
+  "UNAVAILABLE",
+  "fetch failed",
+  "timeout",
+  "ETIMEDOUT",
+  "ECONNRESET",
+  "429",
+  "500",
+  "502",
+  "503",
+  "504",
+];
+
+async function handleResetFailed(
+  supabase: any,
+  errorPattern: string,
+  sinceDays: number,
+  limit: number,
+  dryRun: boolean,
+  logError: (msg: string, ctx?: string) => Promise<void>,
+): Promise<Response> {
+  const sinceIso = new Date(Date.now() - sinceDays * 24 * 60 * 60 * 1000).toISOString();
+
+  let query = supabase
+    .from("scraped_posts")
+    .select("id, last_classification_error", { count: "exact" })
+    .eq("classification_status", "failed")
+    .gte("posted_at", sinceIso)
+    .order("posted_at", { ascending: false })
+    .limit(limit);
+
+  if (errorPattern === "transient") {
+    const orFilter = TRANSIENT_ERROR_PATTERNS
+      .map((p) => `last_classification_error.ilike.%${p}%`)
+      .join(",");
+    query = query.or(orFilter);
+  } else if (errorPattern !== "all") {
+    return new Response(
+      JSON.stringify({ error: `Unknown error_pattern: ${errorPattern}. Use 'transient' or 'all'.` }),
+      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  const { data: posts, error: fetchErr, count } = await query;
+  if (fetchErr) throw fetchErr;
+
+  if (!posts || posts.length === 0) {
+    return new Response(JSON.stringify({
+      mode: "reset_failed",
+      error_pattern: errorPattern,
+      since_days: sinceDays,
+      reset: 0,
+      matched: count || 0,
+      message: "No matching failed posts to reset",
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  if (dryRun) {
+    return new Response(JSON.stringify({
+      mode: "reset_failed",
+      dry_run: true,
+      error_pattern: errorPattern,
+      since_days: sinceDays,
+      would_reset: posts.length,
+      matched: count || posts.length,
+      sample_errors: Array.from(new Set(posts.slice(0, 10).map((p: any) => p.last_classification_error))).filter(Boolean),
+    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  }
+
+  const ids = posts.map((p: any) => p.id);
+  const { error: updateErr } = await supabase
+    .from("scraped_posts")
+    .update({
+      classification_status: "pending",
+      classification_attempts: 0,
+      next_classification_at: null,
+      last_classification_error: null,
+    })
+    .in("id", ids);
+
+  if (updateErr) {
+    await logError(`Reset failed posts batch error: ${updateErr.message}`, "reset-failed-update");
+    throw updateErr;
+  }
+
+  return new Response(JSON.stringify({
+    mode: "reset_failed",
+    error_pattern: errorPattern,
+    since_days: sinceDays,
+    reset: ids.length,
+    matched: count || ids.length,
+    remaining_after_batch: Math.max((count || ids.length) - ids.length, 0),
+    message: `Reset ${ids.length} failed posts to pending; drain will pick them up on next 2-min tick.`,
+  }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+}
 
 async function handleMultiModel(
   supabase: any,

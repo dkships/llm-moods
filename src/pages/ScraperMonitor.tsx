@@ -47,6 +47,19 @@ interface QueueHealth {
   next_attempt_at: string | null;
 }
 
+interface FailedPostRow {
+  last_classification_error: string | null;
+  posted_at: string;
+  models: { slug: string | null } | { slug: string | null }[] | null;
+}
+
+interface FailedPostsByError {
+  error: string;
+  count: number;
+  models: string[];
+  oldestFailedAt: string | null;
+}
+
 interface CriticalAlert {
   id: string;
   function_name: string;
@@ -158,6 +171,43 @@ const ScraperMonitor = () => {
       return (data || []) as CriticalAlert[];
     },
   });
+  const { data: failedPostsRows, isLoading: failedLoading } = useQuery({
+    queryKey: ["failed-classifications-14d"],
+    refetchInterval: 60_000,
+    staleTime: 60_000,
+    queryFn: async () => {
+      const sinceIso = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabase
+        .from("scraped_posts")
+        .select("last_classification_error, posted_at, models(slug)")
+        .eq("classification_status", "failed")
+        .gte("posted_at", sinceIso)
+        .order("posted_at", { ascending: false })
+        .limit(1000);
+      if (error) throw error;
+      return (data || []) as FailedPostRow[];
+    },
+  });
+  const failedSummary: { total: number; byError: FailedPostsByError[] } = (() => {
+    const rows = failedPostsRows ?? [];
+    const buckets = new Map<string, { count: number; models: Set<string>; oldestFailedAt: string | null }>();
+    for (const row of rows) {
+      const key = (row.last_classification_error ?? "(no error string)").slice(0, 120);
+      const bucket = buckets.get(key) ?? { count: 0, models: new Set<string>(), oldestFailedAt: null };
+      bucket.count++;
+      const modelSlug = Array.isArray(row.models) ? row.models[0]?.slug : row.models?.slug;
+      if (modelSlug) bucket.models.add(modelSlug);
+      if (!bucket.oldestFailedAt || new Date(row.posted_at) < new Date(bucket.oldestFailedAt)) {
+        bucket.oldestFailedAt = row.posted_at;
+      }
+      buckets.set(key, bucket);
+    }
+    const byError = Array.from(buckets.entries())
+      .map(([error, b]) => ({ error, count: b.count, models: Array.from(b.models).sort(), oldestFailedAt: b.oldestFailedAt }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5);
+    return { total: rows.length, byError };
+  })();
   const latestCritical = criticalAlerts?.[0];
   const recentErrors = (rawErrors ?? []).filter(
     (e) => !NON_ERROR_CONTEXTS.has(e.context ?? "") && !(e.context ?? "").endsWith("-retry"),
@@ -278,6 +328,49 @@ const ScraperMonitor = () => {
                 <p className="mt-1 font-mono text-[11px] text-muted-foreground">{card.detail}</p>
               </div>
             ))}
+          </div>
+
+          <h2 className="mb-3 text-lg font-semibold text-foreground">Abandoned classifications (14d)</h2>
+          <p className="mb-3 font-mono text-xs text-muted-foreground">
+            Posts in <code className="rounded bg-secondary/40 px-1">classification_status = 'failed'</code> that the drain ignores.
+            Recover transient failures via <code className="rounded bg-secondary/40 px-1">reclassify-posts?mode=reset_failed&error_pattern=transient</code>.
+          </p>
+          <div className="glass mb-8 overflow-x-auto rounded-xl">
+            <table className="min-w-[840px] w-full text-sm">
+              <thead>
+                <tr className="border-b border-border font-mono text-xs text-muted-foreground">
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Last error</th>
+                  <th className="px-4 py-3 text-right whitespace-nowrap">Count</th>
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Models affected</th>
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Oldest post</th>
+                </tr>
+              </thead>
+              <tbody>
+                {failedLoading ? (
+                  <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">Loading...</td></tr>
+                ) : failedSummary.total === 0 ? (
+                  <tr><td colSpan={4} className="px-4 py-6 text-center text-muted-foreground">No abandoned classifications in the last 14 days.</td></tr>
+                ) : (
+                  <>
+                    <tr className="border-b border-border/50 bg-secondary/20">
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">Total (top 5 below)</td>
+                      <td className="px-4 py-3 text-right font-mono text-foreground">{failedSummary.total}</td>
+                      <td className="px-4 py-3" colSpan={2}></td>
+                    </tr>
+                    {failedSummary.byError.map((row) => (
+                      <tr key={row.error} className="border-b border-border/50 hover:bg-secondary/20">
+                        <td className="px-4 py-3 font-mono text-xs text-foreground break-all max-w-[440px]">{row.error}</td>
+                        <td className="px-4 py-3 text-right font-mono text-foreground">{row.count}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{row.models.join(", ") || "—"}</td>
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                          {row.oldestFailedAt ? formatTimeAgo(row.oldestFailedAt) : "—"}
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+              </tbody>
+            </table>
           </div>
 
           <h2 className="mb-3 text-lg font-semibold text-foreground">Score Anomalies</h2>

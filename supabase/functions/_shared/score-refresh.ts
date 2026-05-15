@@ -54,6 +54,7 @@ export interface ScoreUpsertRow {
   input_max_created_at: string | null;
   queued_posts: number;
   unclassified_posts: number;
+  failed_posts: number;
   classification_coverage: number;
   score_confidence: ScoreConfidence;
 }
@@ -165,10 +166,13 @@ async function fetchSeedRows(supabase: any, modelId: string, beforePeriodStart: 
   return (data ?? []) as DailySeedRow[];
 }
 
-function isPendingClassification(post: ScrapedScorePost): boolean {
+function isQueuedClassification(post: ScrapedScorePost): boolean {
   return post.classification_status === "pending"
-    || post.classification_status === "retry"
-    || post.classification_status === "failed";
+    || post.classification_status === "retry";
+}
+
+function isAbandonedClassification(post: ScrapedScorePost): boolean {
+  return post.classification_status === "failed";
 }
 
 function isClassifiedForScoring(post: ScrapedScorePost): boolean {
@@ -320,7 +324,8 @@ export async function refreshScores(
     for (const window of windows) {
       const dayPosts = postsByDay.get(`${model.id}|${window.periodStart}`) ?? [];
       const classifiedPosts = dayPosts.filter(isClassifiedForScoring);
-      const queuedPosts = dayPosts.filter(isPendingClassification).length;
+      const queuedPosts = dayPosts.filter(isQueuedClassification).length;
+      const failedPosts = dayPosts.filter(isAbandonedClassification).length;
 
       if (classifiedPosts.length > 0) {
         const result = computeScore(asScoreInput(classifiedPosts));
@@ -329,8 +334,10 @@ export async function refreshScores(
           modelSummary.skipped_days++;
           continue;
         }
-        const totalCollectedPosts = classifiedPosts.length + queuedPosts;
-        const classificationCoverage = coverageFor(classifiedPosts.length, totalCollectedPosts);
+        const totalCollectedPosts = classifiedPosts.length + queuedPosts + failedPosts;
+        // Coverage excludes failed so the ratio heals when reclassify-posts?mode=reset_failed
+        // moves failed rows back through pending → classified.
+        const classificationCoverage = coverageFor(classifiedPosts.length, classifiedPosts.length + queuedPosts);
         const basis = basisForResult(result, queuedPosts, classificationCoverage, minPosts);
         const scoreConfidence = confidenceForResult(result, basis, classificationCoverage, minPosts);
         const measurementPeriodStart = window.periodStart;
@@ -354,7 +361,8 @@ export async function refreshScores(
           input_max_posted_at: maxIso(classifiedPosts, "posted_at"),
           input_max_created_at: maxIso(classifiedPosts, "created_at"),
           queued_posts: queuedPosts,
-          unclassified_posts: queuedPosts,
+          unclassified_posts: queuedPosts + failedPosts,
+          failed_posts: failedPosts,
           classification_coverage: classificationCoverage,
           score_confidence: scoreConfidence,
         });
@@ -405,7 +413,8 @@ export async function refreshScores(
     for (const [key, hourPosts] of postsByHour.entries()) {
       const [modelId, periodStart] = key.split("|");
       const classifiedPosts = hourPosts.filter(isClassifiedForScoring);
-      const queuedPosts = hourPosts.filter(isPendingClassification).length;
+      const queuedPosts = hourPosts.filter(isQueuedClassification).length;
+      const failedPosts = hourPosts.filter(isAbandonedClassification).length;
       if (classifiedPosts.length === 0) continue;
       const result = computeScore(asScoreInput(classifiedPosts));
       if (result.eligible_posts === 0) continue;
@@ -419,7 +428,7 @@ export async function refreshScores(
         positive_count: result.positive_count,
         negative_count: result.negative_count,
         neutral_count: result.neutral_count,
-        total_posts: classifiedPosts.length + queuedPosts,
+        total_posts: classifiedPosts.length + queuedPosts + failedPosts,
         eligible_posts: result.eligible_posts,
         top_complaint: result.top_complaint,
         score_computed_at: computedAt,
@@ -429,7 +438,8 @@ export async function refreshScores(
         input_max_posted_at: maxIso(classifiedPosts, "posted_at"),
         input_max_created_at: maxIso(classifiedPosts, "created_at"),
         queued_posts: queuedPosts,
-        unclassified_posts: queuedPosts,
+        unclassified_posts: queuedPosts + failedPosts,
+        failed_posts: failedPosts,
         classification_coverage: classificationCoverage,
         score_confidence: confidenceForResult(result, basis, classificationCoverage, minPosts),
       });
