@@ -771,7 +771,12 @@ async function batchClassifyWithPrompt(
   options: ClassifyOptions = {},
 ): Promise<ClassifyResult[]> {
   const startedAt = performance.now();
-  const batchTokens = options.maxTokensOverride && options.maxTokensOverride > 0 ? options.maxTokensOverride : 4096;
+  // 4096 truncates ~40-post batches that include translations: each result is
+  // ~120-300 tokens (more when english_translation is populated), so a full
+  // batch easily exceeds 4096 and the JSON response cuts off mid-array.
+  // Canary harness (commit 7d49112) validated 8192 for translation-heavy posts;
+  // production drain uses batchSize=40 and needs the same headroom.
+  const batchTokens = options.maxTokensOverride && options.maxTokensOverride > 0 ? options.maxTokensOverride : 8192;
   const res = await fetchGemini(prompt + numbered, apiKey, batchTokens, "batch", logError, options);
   if (!(res instanceof Response)) {
     if (logError) await logError(`Batch classify ${res.status}: ${res.error}`, "batch-classify-error");
