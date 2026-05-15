@@ -131,10 +131,12 @@ Deno.serve(async (req) => {
   }
 });
 
-// Transient-error patterns are deterministic Gemini failures we expect to clear
-// on retry (network blips, quota deferrals, 5xx). parse_error and missing_*
-// are deterministic prompt/output failures — same input → same broken output,
-// so resetting them just refills the failed bucket.
+// Transient-error patterns are failures we expect to clear on retry: network
+// blips, quota deferrals, 5xx, and JSON-truncation errors that resolve once
+// the underlying max_tokens / batch-size config is fixed. Skip pure
+// missing_* (missing_relevant_boolean, missing_results_array, missing_or_invalid_sentiment)
+// and result_not_object — those are deterministic schema mismatches that
+// re-fail with the same input.
 const TRANSIENT_ERROR_PATTERNS = [
   "classifier_error",
   "quota_deferred",
@@ -149,6 +151,13 @@ const TRANSIENT_ERROR_PATTERNS = [
   "502",
   "503",
   "504",
+  // JSON parse errors from Gemini batch-response truncation. These show up as
+  // raw JS exception messages like "Expected ',' or ']' after array element
+  // in JSON at position N" — transient once max_tokens is sized correctly.
+  "Expected",
+  "JSON",
+  "position",
+  "unparseable_response",
 ];
 
 async function handleResetFailed(
