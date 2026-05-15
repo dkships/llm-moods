@@ -418,6 +418,7 @@ export type Database = {
           classification_coverage: number
           created_at: string
           eligible_posts: number | null
+          failed_posts: number
           id: string
           input_max_created_at: string | null
           input_max_posted_at: string | null
@@ -442,6 +443,7 @@ export type Database = {
           classification_coverage?: number
           created_at?: string
           eligible_posts?: number | null
+          failed_posts?: number
           id?: string
           input_max_created_at?: string | null
           input_max_posted_at?: string | null
@@ -466,6 +468,7 @@ export type Database = {
           classification_coverage?: number
           created_at?: string
           eligible_posts?: number | null
+          failed_posts?: number
           id?: string
           input_max_created_at?: string | null
           input_max_posted_at?: string | null
@@ -538,6 +541,8 @@ export type Database = {
           carried_from_period_start: string
           classification_coverage: number
           eligible_posts: number
+          failed_classifications: number
+          failed_posts: number
           is_stale: boolean
           last_updated: string
           latest_measurement_period_start: string
