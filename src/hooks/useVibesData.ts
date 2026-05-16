@@ -35,6 +35,8 @@ type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Ret
 type ScrapedPostRow = Database["public"]["Tables"]["scraped_posts"]["Row"];
 type ModelRow = Database["public"]["Tables"]["models"]["Row"];
 
+const QUERY_STALE_TIME = 60_000;
+
 export interface SparklinePoint {
   score: number;
   isCarryForward: boolean;
@@ -105,7 +107,7 @@ export function useModelsWithLatestVibes() {
     queryKey: ["models-with-vibes"],
     refetchInterval: 5 * 60 * 1000,
     refetchIntervalInBackground: false,
-    staleTime: 60_000,
+    staleTime: QUERY_STALE_TIME,
     queryFn: async () => {
       const { data: landing, error: lErr } = await supabase.rpc("get_landing_vibes");
       if (lErr) throw lErr;
@@ -211,7 +213,7 @@ const CHATTER_PAGE_SIZE = 25;
 export function useRecentChatter(enabled = true) {
   return useInfiniteQuery<RecentChatterPost[]>({
     queryKey: ["recent-chatter"],
-    staleTime: 60_000,
+    staleTime: QUERY_STALE_TIME,
     enabled,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
@@ -240,7 +242,7 @@ export function useModelDetail(slug: string | undefined) {
   return useQuery({
     queryKey: ["model-detail", slug],
     enabled: !!slug,
-    staleTime: 60_000,
+    staleTime: QUERY_STALE_TIME,
     queryFn: async () => {
       const { data: model, error: mErr } = await supabase
         .from("models")
@@ -274,7 +276,7 @@ export function useVibesHistory(
   return useQuery({
     queryKey: ["vibes-history", modelId, period, range, sinceOverride, untilOverride],
     enabled: !!modelId,
-    staleTime: 60_000,
+    staleTime: QUERY_STALE_TIME,
     queryFn: async () => {
       const now = new Date();
       let sinceISO: string;
@@ -331,16 +333,29 @@ function aggregateComplaintBreakdown(rows: { category: string | null; count: num
     }));
 }
 
+async function fetchComplaintBreakdown(modelId: string): Promise<ComplaintBreakdownItem[]> {
+  const { data, error } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId });
+  if (error) throw error;
+  return aggregateComplaintBreakdown(data || []);
+}
+
+async function fetchSourceBreakdown(modelId: string): Promise<SourceBreakdownItem[]> {
+  const { data, error } = await supabase.rpc("get_source_breakdown", { p_model_id: modelId });
+  if (error) throw error;
+  const total = (data || []).reduce((sum: number, row) => sum + Number(row.count), 0);
+  return (data || []).map((row) => ({
+    source: row.source,
+    count: Number(row.count),
+    pct: total > 0 ? Math.round((Number(row.count) / total) * 100) : 0,
+  }));
+}
+
 export function useComplaintBreakdown(modelId: string | undefined) {
   return useQuery<ComplaintBreakdownItem[]>({
     queryKey: ["complaint-breakdown", modelId],
     enabled: !!modelId,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId! });
-      if (error) throw error;
-      return aggregateComplaintBreakdown(data || []);
-    },
+    staleTime: QUERY_STALE_TIME,
+    queryFn: () => fetchComplaintBreakdown(modelId!),
   });
 }
 
@@ -348,18 +363,8 @@ export function useSourceBreakdown(modelId: string | undefined) {
   return useQuery<SourceBreakdownItem[]>({
     queryKey: ["source-breakdown", modelId],
     enabled: !!modelId,
-    staleTime: 60_000,
-    queryFn: async () => {
-      const { data, error } = await supabase.rpc("get_source_breakdown", { p_model_id: modelId! });
-      if (error) throw error;
-
-      const total = (data || []).reduce((sum: number, row) => sum + Number(row.count), 0);
-      return (data || []).map((row) => ({
-        source: row.source,
-        count: Number(row.count),
-        pct: total > 0 ? Math.round((Number(row.count) / total) * 100) : 0,
-      }));
-    },
+    staleTime: QUERY_STALE_TIME,
+    queryFn: () => fetchSourceBreakdown(modelId!),
   });
 }
 
@@ -373,7 +378,7 @@ export function useModelPosts(modelId: string | undefined, limit = 25, enabled =
   return useQuery<ScrapedPostRow[]>({
     queryKey: ["model-posts", modelId, limit],
     enabled: !!modelId && enabled,
-    staleTime: 60_000,
+    staleTime: QUERY_STALE_TIME,
     queryFn: async () => {
       const sinceISO = new Date(Date.now() - RECENT_POSTS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
       const { data, error } = await supabase
@@ -395,9 +400,12 @@ export function usePrefetchModelDetail() {
   const queryClient = useQueryClient();
 
   return useCallback((slug: string, modelId: string) => {
+    // Coarse cache-warmer with a tighter limit than useVibesHistory (90 vs 120
+    // rows, no range filters). Don't try to share queryFn — they're intentionally
+    // different shapes; the cached row set will be replaced on actual page load.
     queryClient.prefetchQuery({
       queryKey: ["vibes-history", modelId, "daily", "30d"],
-      staleTime: 60_000,
+      staleTime: QUERY_STALE_TIME,
       queryFn: async () => {
         const sinceISO = getPacificDayWindowSince(29);
         const { data } = await supabase
@@ -414,30 +422,19 @@ export function usePrefetchModelDetail() {
 
     queryClient.prefetchQuery({
       queryKey: ["complaint-breakdown", modelId],
-      staleTime: 60_000,
-      queryFn: async () => {
-        const { data } = await supabase.rpc("get_complaint_breakdown", { p_model_id: modelId });
-        return aggregateComplaintBreakdown(data || []);
-      },
+      staleTime: QUERY_STALE_TIME,
+      queryFn: () => fetchComplaintBreakdown(modelId),
     });
 
     queryClient.prefetchQuery({
       queryKey: ["source-breakdown", modelId],
-      staleTime: 60_000,
-      queryFn: async () => {
-        const { data } = await supabase.rpc("get_source_breakdown", { p_model_id: modelId });
-        const total = (data || []).reduce((sum: number, row) => sum + Number(row.count), 0);
-        return (data || []).map((row) => ({
-          source: row.source,
-          count: Number(row.count),
-          pct: total > 0 ? Math.round((Number(row.count) / total) * 100) : 0,
-        }));
-      },
+      staleTime: QUERY_STALE_TIME,
+      queryFn: () => fetchSourceBreakdown(modelId),
     });
 
     queryClient.prefetchQuery({
       queryKey: ["model-posts", modelId, 25],
-      staleTime: 60_000,
+      staleTime: QUERY_STALE_TIME,
       queryFn: async () => {
         const sinceISO = new Date(Date.now() - RECENT_POSTS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
         const { data } = await supabase

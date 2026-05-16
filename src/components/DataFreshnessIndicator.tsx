@@ -25,7 +25,7 @@ const DataFreshnessIndicator = memo(({ lastUpdated }: DataFreshnessIndicatorProp
 
   return (
     <span
-      className="inline-flex items-center gap-1.5 text-xs sm:text-[11px] font-mono text-foreground/65"
+      className="inline-flex items-center gap-1.5 text-xs sm:text-[11px] font-mono text-text-tertiary"
       role="status"
       aria-live="polite"
       aria-atomic="true"

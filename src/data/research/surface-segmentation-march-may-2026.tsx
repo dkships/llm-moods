@@ -180,7 +180,7 @@ const SurfaceSegmentationBody = () => (
     </p>
 
     <EmbeddedModelChart modelSlug="claude" startDate="2026-03-15" endDate="2026-05-14" caption="Claude · daily score · Mar 15 – May 14, 2026" />
-    <p className="mt-2 text-sm text-foreground/65">
+    <p className="mt-2 text-sm text-text-tertiary">
       <em>
         Claude's aggregate daily sentiment score across the window. Shaded band is Anthropic's confirmed
         cache-bug window (March 26 – April 10). The post-bug trough through April 11 – 15 is press-cycle echo,
@@ -351,7 +351,7 @@ const SurfaceSegmentationBody = () => (
     </p>
 
     <h2 id="notes">Notes</h2>
-    <p id="note-1" className="scroll-mt-24 text-sm text-foreground/80">
+    <p id="note-1" className="scroll-mt-24 text-sm text-text-secondary">
       <a
         href="#ref-1"
         className="font-bold no-underline hover:underline"

@@ -44,7 +44,7 @@ const ClaudeApril2026Body = () => (
     />
 
     <EmbeddedModelChart modelSlug="claude" startDate="2026-03-10" endDate="2026-04-25" />
-    <p className="mt-2 text-sm text-foreground/65">
+    <p className="mt-2 text-sm text-text-tertiary">
       <em>
         Claude's daily sentiment score, March 10 through April 25, 2026 (the publication window). Shaded bands
         are Anthropic's three confirmed bug windows from the April 23 postmortem. The amber line marks March
@@ -273,7 +273,7 @@ const ClaudeApril2026Body = () => (
     </p>
 
     <h2 id="notes">Notes</h2>
-    <p id="note-1" className="scroll-mt-24 text-sm text-foreground/80">
+    <p id="note-1" className="scroll-mt-24 text-sm text-text-secondary">
       <a
         href="#ref-1"
         className="font-bold no-underline hover:underline"
