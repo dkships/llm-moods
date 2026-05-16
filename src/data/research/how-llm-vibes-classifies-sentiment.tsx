@@ -168,7 +168,20 @@ score = round((effective_positive / total_weight) × 100)`}</code>
     </p>
 
     <h2>What this analysis assumes</h2>
-    <p>Three caveats that anyone reading the dashboard should know.</p>
+    <p>Four caveats that anyone reading the dashboard should know.</p>
+    <p>
+      The pipeline has changed underneath. Three classifier transitions happened in March–April 2026: a switch
+      from the Lovable AI gateway to the Google Gemini API on March 20, an upgrade through 2.5 Flash-Lite and
+      3.1 Flash-Lite Preview in the following days, and a final move to 2.5 Flash on April 25. Each transition
+      produced a visible step-change in the positive / negative / neutral mix — most dramatically a one-week,
+      roughly 25-percentage-point drop in neutral share across all four tracked models the week of the API
+      switch. Numbers cited in the{" "}
+      <a href="/research/claude-april-2026">Claude April 2026</a> and{" "}
+      <a href="/research/cross-model-deltas-march-april-2026">cross-model deltas</a> articles use reclassified
+      posts from the post-stabilization pipeline (May 2026), so they're internally consistent within each
+      article's window. Sentiment ratios reported pre-March-20 reflect a different classifier and aren't
+      directly comparable to anything in the live dashboard.
+    </p>
     <p>
       The classifier vendor is one of the tracked models. Gemini 2.5 Flash classifies posts about Gemini's
       competitors and itself, so self-bias remains a measurement risk. If the classifier were biased toward

@@ -96,7 +96,7 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     slug: "how-llm-vibes-classifies-sentiment",
     title: "How LLM Vibes Classifies Sentiment",
     publishedAt: "2026-04-25",
-    updatedAt: "2026-04-26",
+    updatedAt: "2026-05-16",
     summary:
       "The full pipeline from scraper to score. Five platforms, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we've documented but not yet solved.",
     author: "David Kelly",
