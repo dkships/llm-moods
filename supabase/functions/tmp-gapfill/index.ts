@@ -4,7 +4,9 @@ declare const Deno: { env: { get(n: string): string | undefined }; serve: (h: (r
 
 Deno.serve(async (req) => {
   const body = await req.text();
-  const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/historical-gap-fill`;
+  const u = new URL(req.url);
+  const target = u.searchParams.get("target") ?? "historical-gap-fill";
+  const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/${target}`;
   const res = await fetch(url, {
     method: "POST",
     headers: {
