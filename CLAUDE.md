@@ -49,7 +49,7 @@ Functions safe to leave ungated (called by pg_cron with anon key): `aggregate-vi
 | State | TanStack React Query 5.83 |
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Edge Functions | 11 Deno functions (5 active scrapers + utilities) |
+| Edge Functions | 15 Deno functions (5 active scrapers + utilities) |
 | Sentiment AI | Gemini 2.5 Flash via Google AI API (batch classification, 25 posts/call) |
 
 ## Key Routes
