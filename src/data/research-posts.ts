@@ -55,6 +55,24 @@ export interface ResearchPost {
  */
 export const RESEARCH_POSTS: ResearchPost[] = [
   {
+    slug: "surface-segmentation-march-may-2026",
+    title: "Claude Code lost 19 points during the cache bug. The rest of Claude lost 4.",
+    publishedAt: "2026-05-16",
+    summary:
+      "Aggregate model scores treat each frontier model as one product. Sliced by product surface across 60 days of public posts, Claude Code and ChatGPT.com are where the conversation actually happens, and the same model's scores diverge sharply by surface during a regression.",
+    author: "David Kelly",
+    tags: ["methodology", "cross-model", "case-study", "claude", "chatgpt"],
+    ogImage: "/research/surface-segmentation-march-may-2026/og.png",
+    dataset: {
+      label: "Daily per-surface LLM Vibes scores · Mar 15 – May 14, 2026 (CSV)",
+      path: "/research/surface-segmentation-march-may-2026/data.csv",
+      description:
+        "Daily volume-weighted sentiment score per (model, product surface) with positive / negative / neutral counts and top-complaint label. Surface tagging via the lexical detector at src/lib/product-surface.ts.",
+      publishedAt: "2026-05-16",
+      license: "MIT",
+    },
+  },
+  {
     slug: "claude-april-2026",
     title: "We Caught Claude's March Slide 28 Days Before Anthropic Confirmed It",
     publishedAt: "2026-04-25",

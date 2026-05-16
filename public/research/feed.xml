@@ -6,7 +6,20 @@
     <atom:link href="https://llmvibes.ai/research/feed.xml" rel="self" type="application/rss+xml" />
     <description>Independent analysis of AI model quality and incidents from the LLM Vibes data set.</description>
     <language>en-us</language>
-    <lastBuildDate>Sat, 25 Apr 2026 12:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Sat, 16 May 2026 12:00:00 GMT</lastBuildDate>
+    <item>
+      <title>Claude Code lost 19 points during the cache bug. The rest of Claude lost 4.</title>
+      <link>https://llmvibes.ai/research/surface-segmentation-march-may-2026</link>
+      <guid isPermaLink="true">https://llmvibes.ai/research/surface-segmentation-march-may-2026</guid>
+      <description>Aggregate model scores treat each frontier model as one product. Sliced by product surface across 60 days of public posts, Claude Code and ChatGPT.com are where the conversation actually happens, and the same model&apos;s scores diverge sharply by surface during a regression.</description>
+      <author>noreply@llmvibes.ai (David Kelly)</author>
+      <pubDate>Sat, 16 May 2026 12:00:00 GMT</pubDate>
+      <category>methodology</category>
+      <category>cross-model</category>
+      <category>case-study</category>
+      <category>claude</category>
+      <category>chatgpt</category>
+    </item>
     <item>
       <title>We Caught Claude&apos;s March Slide 28 Days Before Anthropic Confirmed It</title>
       <link>https://llmvibes.ai/research/claude-april-2026</link>

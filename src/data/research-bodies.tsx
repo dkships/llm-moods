@@ -3,6 +3,7 @@ import type { ComponentType } from "react";
 import ClaudeApril2026Body from "./research/claude-april-2026";
 import HowLlmVibesClassifiesSentimentBody from "./research/how-llm-vibes-classifies-sentiment";
 import CrossModelDeltasBody from "./research/cross-model-deltas-march-april-2026";
+import SurfaceSegmentationBody from "./research/surface-segmentation-march-may-2026";
 
 /**
  * Slug -> body component lookup. Kept separate from `research-posts.ts`
@@ -17,6 +18,7 @@ export const RESEARCH_BODIES: Record<string, ComponentType> = {
   "claude-april-2026": ClaudeApril2026Body,
   "how-llm-vibes-classifies-sentiment": HowLlmVibesClassifiesSentimentBody,
   "cross-model-deltas-march-april-2026": CrossModelDeltasBody,
+  "surface-segmentation-march-may-2026": SurfaceSegmentationBody,
 };
 
 export function getResearchBody(slug: string): ComponentType | undefined {
