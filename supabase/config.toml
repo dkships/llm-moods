@@ -56,3 +56,6 @@ verify_jwt = false
 
 [functions.pipeline-watchdog]
 verify_jwt = false
+
+[functions.audit-may16]
+verify_jwt = false
