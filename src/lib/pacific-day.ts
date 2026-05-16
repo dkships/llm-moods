@@ -52,7 +52,7 @@ function getTimeZoneOffsetMs(date: Date, timeZone: string): number {
   return asUtc - date.getTime();
 }
 
-function getUtcInstantForPacificMidnight(label: string): Date {
+export function getUtcInstantForPacificMidnight(label: string): Date {
   const [y, m, d] = label.split("-").map(Number);
   const utcBase = Date.UTC(y, m - 1, d, 0, 0, 0, 0);
   let guess = utcBase;

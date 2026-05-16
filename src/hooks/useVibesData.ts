@@ -254,15 +254,33 @@ export function useModelDetail(slug: string | undefined) {
   });
 }
 
-export function useVibesHistory(modelId: string | undefined, period: string, range: string) {
+/** Optional fixed-range override for useVibesHistory. When provided, the hook
+ * filters period_start to [sinceISO, untilISO] exactly, ignoring the `range`
+ * string. Used by research-article embedded charts that need to stay pinned to
+ * a historical window regardless of when the article is read. */
+interface VibesHistoryOptions {
+  sinceISO?: string;
+  untilISO?: string;
+}
+
+export function useVibesHistory(
+  modelId: string | undefined,
+  period: string,
+  range: string,
+  options?: VibesHistoryOptions,
+) {
+  const sinceOverride = options?.sinceISO ?? null;
+  const untilOverride = options?.untilISO ?? null;
   return useQuery({
-    queryKey: ["vibes-history", modelId, period, range],
+    queryKey: ["vibes-history", modelId, period, range, sinceOverride, untilOverride],
     enabled: !!modelId,
     staleTime: 60_000,
     queryFn: async () => {
       const now = new Date();
       let sinceISO: string;
-      if (period === "daily") {
+      if (sinceOverride) {
+        sinceISO = sinceOverride;
+      } else if (period === "daily") {
         const match = range.match(/^(\d+)d$/);
         const daysBack = range === "7d" ? 6 : match ? Number(match[1]) - 1 : 29;
         sinceISO = getPacificDayWindowSince(daysBack, now);
@@ -274,14 +292,18 @@ export function useVibesHistory(modelId: string | undefined, period: string, ran
         sinceISO = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
       }
 
-      const { data, error } = await supabase
+      let query = supabase
         .from("vibes_scores")
         .select("*")
         .eq("model_id", modelId!)
         .eq("period", period)
         .gte("period_start", sinceISO)
         .order("period_start", { ascending: true })
-        .limit(90);
+        .limit(120);
+      if (untilOverride) {
+        query = query.lte("period_start", untilOverride);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data || [];
     },

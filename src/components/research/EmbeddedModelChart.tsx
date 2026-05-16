@@ -2,30 +2,60 @@ import { lazy, Suspense } from "react";
 import Surface from "@/components/Surface";
 import { useModelDetail, useVibesHistory } from "@/hooks/useVibesData";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
+import { getUtcInstantForPacificMidnight } from "@/lib/pacific-day";
 
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
 interface EmbeddedModelChartProps {
   modelSlug: string;
-  /** Number of inclusive days to render. Defaults to 30. */
+  /** Number of inclusive days to render. Defaults to 30. Ignored when both
+   * startDate and endDate are provided. */
   daysBack?: number;
+  /** Pin the chart to a fixed historical window (YYYY-MM-DD, inclusive on both
+   * sides, Pacific-day boundaries). Use together with `endDate` so the chart
+   * stays aligned with article prose even after months have passed. */
+  startDate?: string;
+  /** End of the pinned window (YYYY-MM-DD, inclusive). */
+  endDate?: string;
+  /** Optional caption rendered above the chart, replacing the default
+   * "last N days" label. Useful for articles that want "March 10 – April 25". */
+  caption?: string;
+}
+
+function daysBetweenInclusive(startLabel: string, endLabel: string): number {
+  const [sy, sm, sd] = startLabel.split("-").map(Number);
+  const [ey, em, ed] = endLabel.split("-").map(Number);
+  const startMs = Date.UTC(sy, sm - 1, sd);
+  const endMs = Date.UTC(ey, em - 1, ed);
+  return Math.round((endMs - startMs) / (24 * 60 * 60 * 1000)) + 1;
 }
 
 /**
- * A live model chart embedded inside research articles.
+ * Live model chart embedded inside research articles. Uses the same
+ * vibes_scores fetch path as ModelDetail and renders the vendor-events
+ * overlay so an article's hero chart stays current.
  *
- * Uses the same vibes_scores fetch path as ModelDetail and renders the
- * vendor-events overlay so an article's hero chart stays current with the
- * underlying data instead of relying on a screenshot.
+ * Pass startDate + endDate to pin the window to a specific historical period.
+ * Otherwise the chart shows the trailing `daysBack` days from today.
  */
-const EmbeddedModelChart = ({ modelSlug, daysBack }: EmbeddedModelChartProps) => {
-  const days = daysBack ?? 30;
+const EmbeddedModelChart = ({ modelSlug, daysBack, startDate, endDate, caption }: EmbeddedModelChartProps) => {
+  const isPinned = Boolean(startDate && endDate);
+  const days = isPinned ? daysBetweenInclusive(startDate!, endDate!) : (daysBack ?? 30);
+  const sinceISO = isPinned ? getUtcInstantForPacificMidnight(startDate!).toISOString() : undefined;
+  const untilISO = isPinned ? getUtcInstantForPacificMidnight(endDate!).toISOString() : undefined;
+  const anchorDate = isPinned ? getUtcInstantForPacificMidnight(endDate!) : undefined;
+
   const { data: model } = useModelDetail(modelSlug);
-  const { data: vibesHistory, isLoading, isError } = useVibesHistory(model?.id, "daily", `${days}d`);
+  const { data: vibesHistory, isLoading, isError } = useVibesHistory(
+    model?.id,
+    "daily",
+    `${days}d`,
+    isPinned ? { sinceISO, untilISO } : undefined,
+  );
 
   const accent = model?.accent_color || "#888";
 
-  const { chartData, dateLabels } = useDailyChartData(vibesHistory, days);
+  const { chartData, dateLabels } = useDailyChartData(vibesHistory, days, anchorDate);
   const chartEvents = useChartEvents(modelSlug, dateLabels);
 
   if (isError) {
@@ -36,11 +66,17 @@ const EmbeddedModelChart = ({ modelSlug, daysBack }: EmbeddedModelChartProps) =>
     );
   }
 
+  const headerLabel = caption
+    ? caption
+    : isPinned
+      ? `${model?.name ?? modelSlug} · daily score · ${startDate} → ${endDate}`
+      : `${model?.name ?? modelSlug} · daily score · last ${days} days`;
+
   return (
     <Surface className="my-6">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="font-mono text-sm uppercase tracking-wide text-text-tertiary">
-          {model?.name ?? modelSlug} · daily score · last {days} days
+          {headerLabel}
         </h3>
       </div>
       <div className="h-56 sm:h-64">

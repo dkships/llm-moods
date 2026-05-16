@@ -42,14 +42,21 @@ export interface DailyChartData {
  * Build a complete N-day daily chart from a sparse vibes_scores history.
  * Missing days render as null gaps. The most recent Pacific day is labeled "Today".
  *
- * Used by both /model/:slug (7d/30d ranges) and the embedded chart on
- * research articles. The 24h hourly view computes its own data inline since
- * it has different label semantics.
+ * Used by /model/:slug (7d/30d ranges) and the embedded chart on research
+ * articles. The 24h hourly view computes its own data inline since it has
+ * different label semantics.
+ *
+ * When `anchorDate` is provided, the day grid is generated N days back from
+ * that anchor (inclusive) rather than from `new Date()`. Research articles use
+ * this to pin a chart to a fixed historical window so the visual stays aligned
+ * with the article's prose even years later.
  */
 export function useDailyChartData(
   history: VibesHistoryRow[] | undefined,
   days: number,
+  anchorDate?: Date,
 ): DailyChartData {
+  const anchorMs = anchorDate?.getTime() ?? null;
   return useMemo(() => {
     const rows = history ?? [];
     const emptyLabels: Record<string, string> = {};
@@ -61,12 +68,12 @@ export function useDailyChartData(
       rowByDate.set(key, v);
     }
 
-    const now = new Date();
-    const todayPacific = getPacificDateLabel(now);
+    const anchor = anchorMs != null ? new Date(anchorMs) : new Date();
+    const todayPacific = getPacificDateLabel(new Date());
     const result: DailyChartPoint[] = [];
     const labels: Record<string, string> = {};
     for (let i = days - 1; i >= 0; i--) {
-      const d = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() - i));
+      const d = new Date(Date.UTC(anchor.getUTCFullYear(), anchor.getUTCMonth(), anchor.getUTCDate() - i));
       const key = d.toISOString().slice(0, 10);
       const label =
         key === todayPacific
@@ -86,7 +93,7 @@ export function useDailyChartData(
       labels[key] = label;
     }
     return { chartData: result, dateLabels: labels };
-  }, [history, days]);
+  }, [history, days, anchorMs]);
 }
 
 /**
