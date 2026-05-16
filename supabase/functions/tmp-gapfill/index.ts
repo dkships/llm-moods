@@ -1,0 +1,18 @@
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+
+declare const Deno: { env: { get(n: string): string | undefined }; serve: (h: (r: Request) => Response | Promise<Response>) => void };
+
+Deno.serve(async (req) => {
+  const body = await req.text();
+  const url = `${Deno.env.get("SUPABASE_URL")}/functions/v1/historical-gap-fill`;
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")}`,
+    },
+    body,
+  });
+  const text = await res.text();
+  return new Response(text, { status: res.status, headers: { "Content-Type": "application/json" } });
+});
