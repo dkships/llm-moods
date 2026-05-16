@@ -15,35 +15,38 @@ const ExternalLink = ({ href, children }: { href: string; children: React.ReactN
 
 const CrossModelDeltasBody = () => (
   <>
-    <h2>Reading absolute scores will mislead you</h2>
+    <h2>Watch the recovery shape, not the drop</h2>
     <p>
-      The most common misread of a multi-model dashboard like LLM Vibes is comparing two model scores at a
-      single point in time. <em>"Claude is 48, ChatGPT is 31, so Claude is better."</em> That number says less
-      than it looks like.
+      How a model's score recovers after a known fix tells you more than the depth of the original drop. In
+      the <a href="/research/claude-april-2026">March–April 2026 Claude incident</a>, ChatGPT drifted back
+      toward its baseline once Anthropic's fix shipped. Gemini stayed roughly flat. Claude kept falling, the
+      deepest of the four. That post-fix divergence is what singled Claude out as actually broken — not its
+      bug-window delta, and definitely not its absolute score in any single day.
+    </p>
+    <p>
+      The most common misread of a multi-model dashboard like LLM Vibes is comparing two scores at a single
+      moment. <em>"Claude is 48, ChatGPT is 31, so Claude is better."</em> That number says less than it looks
+      like.
     </p>
     <p>
       What it actually says is: at this moment, in the population of posts we scraped, the volume-weighted
       positive share for Claude is higher than for ChatGPT. Models attract different audiences with different
       complaint cultures. Reddit's r/ChatGPT runs hotter than r/ClaudeAI on any given day. A snapshot doesn't
-      tell you whether a model is improving, regressing, or holding steady. Only the delta from its own baseline
-      does that.
-    </p>
-    <p>
-      This is the lesson the <a href="/research/claude-april-2026">March–April 2026 Claude incident</a> made
-      unmissable.
+      tell you whether a model is improving, regressing, or holding steady. Only the delta from its own
+      baseline does, and the cross-model incident below shows even that delta can mislead.
     </p>
 
     <h2>The four models, side by side</h2>
 
-    <EmbeddedModelChart modelSlug="claude" />
-    <EmbeddedModelChart modelSlug="chatgpt" />
-    <EmbeddedModelChart modelSlug="gemini" />
-    <EmbeddedModelChart modelSlug="grok" />
+    <EmbeddedModelChart modelSlug="claude" startDate="2026-02-10" endDate="2026-04-25" />
+    <EmbeddedModelChart modelSlug="chatgpt" startDate="2026-02-10" endDate="2026-04-25" />
+    <EmbeddedModelChart modelSlug="gemini" startDate="2026-02-10" endDate="2026-04-25" />
+    <EmbeddedModelChart modelSlug="grok" startDate="2026-02-10" endDate="2026-04-25" />
 
     <p>
-      These are live charts, not snapshots. Each one shows the model's own daily score against its own history.
-      The Claude chart is shaded with the three Anthropic-confirmed bug windows. The other three are not shaded
-      because their vendors have not published comparable postmortems for the same period.
+      Each chart shows the model's own daily score, February 10 through April 25, 2026 — the publication
+      window. The Claude chart is shaded with the three Anthropic-confirmed bug windows. The other three are
+      not shaded because their vendors have not published comparable postmortems for the same period.
     </p>
 
     <h2>The numbers that matter</h2>
@@ -64,41 +67,41 @@ const CrossModelDeltasBody = () => (
         <tbody>
           <tr>
             <td>Claude</td>
-            <td>48.2</td>
+            <td>47.6</td>
             <td>71.0</td>
             <td>
               <strong>−23</strong>
             </td>
             <td>
-              <strong>33</strong>
+              <strong>36</strong>
             </td>
           </tr>
           <tr>
             <td>ChatGPT</td>
-            <td>31.1</td>
-            <td>80.6</td>
+            <td>32.0</td>
+            <td>80.8</td>
             <td>
-              <strong>−50</strong>
+              <strong>−49</strong>
             </td>
-            <td>49</td>
+            <td>46</td>
           </tr>
           <tr>
             <td>Gemini</td>
-            <td>36.9</td>
+            <td>38.4</td>
             <td>76.0</td>
             <td>
-              <strong>−39</strong>
+              <strong>−38</strong>
             </td>
-            <td>38</td>
+            <td>36</td>
           </tr>
           <tr>
             <td>Grok</td>
-            <td>33.6</td>
-            <td>48.4</td>
+            <td>34.6</td>
+            <td>48.5</td>
             <td>
-              <strong>−15</strong>
+              <strong>−14</strong>
             </td>
-            <td>24</td>
+            <td>26</td>
           </tr>
         </tbody>
       </table>
@@ -109,10 +112,10 @@ const CrossModelDeltasBody = () => (
       baselines. By either reading, Claude looked fine.
     </p>
     <p>
-      The signal was in the post-fix shape. ChatGPT recovered toward its baseline (31 → 49) after Anthropic
-      confirmed the fix on April 10. Gemini stayed flat (37 → 38). Claude kept sliding (48 → 33). That recovery
-      divergence is what identifies Claude as the actually-broken model, not the depth of any single number or
-      the delta-from-baseline during the breakage.
+      The signal was in the post-fix shape. ChatGPT recovered toward its baseline (32 → 46) after Anthropic
+      confirmed the fix on April 10. Gemini drifted slightly down (38 → 36). Claude kept sliding the deepest
+      of the four (48 → 36). That recovery divergence is what identifies Claude as the actually-broken model,
+      not the depth of any single number or the delta-from-baseline during the breakage.
     </p>
 
     <h2>Why the recovery shape matters more than the bug-window delta</h2>
@@ -134,9 +137,26 @@ const CrossModelDeltasBody = () => (
     </p>
     <p>
       Vendor-wide trends. When all four models drop together during the same week, that's industry sentiment,
-      not a single model's quality. The cross-vendor median delta during the bug window was around −31. Claude's
-      −23 is well inside that band. The bug-window deltas alone do not single Claude out. Only the recovery
+      not a single model's quality. The cross-vendor median delta during the bug window was about −30. Claude's
+      −23 is the smallest of the four. The bug-window deltas alone do not single Claude out. Only the recovery
       column does.
+    </p>
+
+    <h2>Caveats</h2>
+    <p>
+      The Feb baseline numbers in the table above (71.0, 80.6, 76.0, 48.4) come from approximately four days of
+      meaningful pre-bug coverage (Feb 15–18). The Feb 19 – Mar 7 scraper-volume gap erased the rest of
+      February. Each baseline therefore carries roughly ±3 points of sampling noise. The deltas are accurate
+      to the underlying data; the baselines themselves are the weakest part of the table.
+    </p>
+    <p>
+      The classifier is Gemini 2.5 Flash, which scores all four models including itself. We measured the
+      self-bias risk directly in April 2026, and the current validation check is Gemini-only: it samples recent
+      low-confidence or incomplete posts, reruns them through approved free-tier Gemini candidates, and reports
+      sentiment and complaint agreement without writing public scores. That does not remove self-bias risk, but
+      it makes classifier upgrades auditable without Anthropic or OpenAI keys. Full method and category caveats
+      are in the{" "}
+      <a href="/research/how-llm-vibes-classifies-sentiment">methodology post</a>.
     </p>
 
     <h2>How to read the dashboard</h2>
@@ -177,22 +197,6 @@ const CrossModelDeltasBody = () => (
       the repository.
     </p>
 
-    <h2>Caveats</h2>
-    <p>
-      The Feb baseline numbers in the table above (71.0, 80.6, 76.0, 48.4) come from approximately four days of
-      meaningful pre-bug coverage (Feb 15–18). The Feb 19 – Mar 7 scraper-volume gap erased the rest of
-      February. Each baseline therefore carries roughly ±3 points of sampling noise. The deltas are accurate
-      to the underlying data; the baselines themselves are the weakest part of the table.
-    </p>
-    <p>
-      The classifier is Gemini 2.5 Flash, which scores all four models including itself. We measured the
-      self-bias risk directly in April 2026, and the current validation check is Gemini-only: it samples recent
-      low-confidence or incomplete posts, reruns them through approved free-tier Gemini candidates, and reports
-      sentiment and complaint agreement without writing public scores. That does not remove self-bias risk, but
-      it makes classifier upgrades auditable without Anthropic or OpenAI keys. Full method and category caveats
-      are in the{" "}
-      <a href="/research/how-llm-vibes-classifies-sentiment">methodology post</a>.
-    </p>
     <p>
       The lesson from March 2026: LLM Vibes caught Claude breaking by watching what happened <em>after</em>{" "}
       Anthropic said it was fixed. One model's score didn't behave like the other three. Build the same instinct

@@ -19,18 +19,17 @@ const ClaudeApril2026Body = () => (
   <>
     <h2 id="the-28-day-gap">The 28-day gap</h2>
     <p>
-      On March 26, 2026, Anthropic shipped a thinking-cache regression into Claude Sonnet 4.6 and Opus 4.6. The
-      same day, an LLM Vibes scraper logged a{" "}
+      On March 26, 2026, a Bluesky user posted: "Restart session, clear conversations, clear claude md, give it
+      specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf."{" "}
       <ExternalLink href="https://bsky.app/profile/tetrac-official.bsky.social/post/3mhxg72ka722t">
-        Bluesky post
+        That post
       </ExternalLink>{" "}
-      from <code>@tetrac-official.bsky.social</code> that read, in full: "Restart session, clear conversations,
-      clear claude md, give it specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf."
+      went up the same day Anthropic shipped a thinking-cache regression into Claude Sonnet 4.6 and Opus 4.6.
       Anthropic{" "}
       <ExternalLink href="https://www.anthropic.com/engineering/april-23-postmortem">
         confirmed the bug 28 days later
       </ExternalLink>
-      , on April 23. We logged the grumbling on day zero. We just couldn't tell you so in real time.
+      , on April 23. Our scrapers logged the grumbling on day zero. We just couldn't tell you so in real time.
     </p>
     <p>
       This piece is the receipts. What our data shows, where it lined up with Anthropic's postmortem, and where
@@ -44,12 +43,12 @@ const ClaudeApril2026Body = () => (
       ]}
     />
 
-    <EmbeddedModelChart modelSlug="claude" daysBack={46} />
+    <EmbeddedModelChart modelSlug="claude" startDate="2026-03-10" endDate="2026-04-25" />
     <p className="mt-2 text-sm text-foreground/65">
       <em>
-        Claude's daily sentiment score, March 14 through today. Shaded bands are Anthropic's three confirmed
-        bug windows from the April 23 postmortem. The amber line marks March 27, the user-visible inflection
-        day.
+        Claude's daily sentiment score, March 10 through April 25, 2026 (the publication window). Shaded bands
+        are Anthropic's three confirmed bug windows from the April 23 postmortem. The amber line marks March
+        27, the user-visible inflection day.
       </em>
     </p>
 
@@ -134,8 +133,8 @@ const ClaudeApril2026Body = () => (
       handle="r/ClaudeAI"
       platform="Reddit"
       timestamp="2026-03-27 21:36 UTC"
-      href="https://www.reddit.com/r/ClaudeAI/comments/1s5hfa4/"
-      archivedHref="https://web.archive.org/web/2026/https://www.reddit.com/r/ClaudeAI/comments/1s5hfa4/"
+      href="https://www.reddit.com/r/ClaudeAI/comments/1s5hfa4/27_of_the_5hour_tokens_usage_consumed_in_an/"
+      archivedHref="https://web.archive.org/web/2026/https://www.reddit.com/r/ClaudeAI/comments/1s5hfa4/27_of_the_5hour_tokens_usage_consumed_in_an/"
     />
     <PullQuote
       text="Paying for Claude Max 20x and the token limits still tank mid-session on heavy coding work. If you're selling a premium tier for power users, actually build for power users."
@@ -168,15 +167,15 @@ const ClaudeApril2026Body = () => (
     </p>
     <p>
       The cross-model isolation also held up, but not in the way the bug-window numbers alone would tell you.
-      During the cache-bug window (March 26 – April 10), Claude scored 48.2, ChatGPT 31.1, Gemini 36.9, Grok
-      32.6. Claude was still ahead in absolute terms. Bug-window deltas don't differentiate it either: Claude
-      dropped 23, ChatGPT dropped 50, Gemini dropped 39, Grok dropped 16. By that read, ChatGPT looked far
+      During the cache-bug window (March 26 – April 10), Claude scored 47.6, ChatGPT 32.0, Gemini 38.4, Grok
+      34.6. Claude was still ahead in absolute terms. Bug-window deltas don't differentiate it either: Claude
+      dropped 23, ChatGPT dropped 49, Gemini dropped 38, Grok dropped 14. By that read, ChatGPT looked far
       worse than Claude. The signal that singled Claude out is the <em>post-fix recovery shape</em>. Between
-      April 11 and April 15, ChatGPT moved back toward its baseline (31 → 48), Gemini also recovered
-      (37 → 42), and Claude fell another 14 points to 34. (Grok kept sliding on much thinner post volume;
-      Claude's drop is the only one with high-volume support.) That post-fix divergence is the strongest
-      evidence we have that the underlying issue was Claude-specific rather than the press cycle hitting every
-      model.
+      April 11 and April 15, ChatGPT moved back toward its baseline (32 → 46), Gemini drifted slightly down
+      (38 → 36), and Claude fell another 12 points to 36 — then kept going. (Grok also slid on much thinner
+      post volume; Claude's drop is the only one with high-volume support.) That post-fix divergence is the
+      strongest evidence we have that the underlying issue was Claude-specific rather than the press cycle
+      hitting every model.
     </p>
 
     <h2 id="what-we-got-wrong">What we got wrong</h2>
@@ -184,20 +183,22 @@ const ClaudeApril2026Body = () => (
       Three things, in order of how much they undercut the dashboard.
     </p>
     <p>
-      The April 11–15 trough (score 34, the lowest single-window average on Claude's chart through April 24)
-      landed{" "}
-      <em>after</em> Anthropic fixed the cache bug on April 10 and <em>before</em> the verbosity-prompt bug on
-      April 16. That window is press-cycle echo, not silent-bug detection. The Register published on April 13,
-      VentureBeat and Hacker News followed, and our scrapers captured the resulting wave of "Claude is broken"
-      posts. Many of those came from users whose actual issues had already been fixed. The dashboard looks more
-      like an early-grumble detector than a clean leading indicator.
+      The April 11–15 trough (single-day low of 29, window average 36 — the lowest sustained stretch on
+      Claude's chart through April 24) landed{" "}
+      <em>after</em> Anthropic fixed the cache bug on April 10 and <em>before</em> the verbosity-prompt bug
+      on April 16. That window is press-cycle echo, not silent-bug detection. The Register published on April
+      13, VentureBeat and Hacker News followed, and our scrapers captured the resulting wave of "Claude is
+      broken" posts. Many of those came from users whose actual issues had already been fixed. The dashboard
+      looks more like an early-grumble detector than a clean leading indicator.
     </p>
     <p>
       The February 19 – March 7 volume gap is on us. The scraper orchestrator was committed in early March
-      but ran on manual triggers only; the hourly cron schedule landed April 22. For 14 of the 35 days when
-      Bug 1 was silently active in production, our scrapers captured fewer than 10 Claude posts per day. We
-      had no operational alarm telling us post volume had collapsed. That means the "Feb 15–18 baseline" is
-      four days of meaningful data, not a robust statistical floor.
+      but ran on manual triggers only; the hourly cron schedule landed April 22. After a May 2026
+      reclassification pass that recovered previously-failed posts, the gap is smaller than our April
+      retrospective reported, but the "Feb 15–18 baseline" still stands on only four days of meaningful data
+      — not a robust statistical floor. The operational miss was less expensive than we feared, and worth
+      naming anyway because shipping a leading-indicator with manual-trigger scrapers is the kind of mistake
+      that doesn't show up until you need the indicator.
     </p>
     <p>
       The classifier itself is one of the tracked models. Sentiment runs through Gemini 2.5 Flash, classifying
@@ -220,6 +221,13 @@ const ClaudeApril2026Body = () => (
       published its postmortem 28 days after the bug shipped. That lag, from internal detection to external
       confirmation, is the gap independent telemetry fills. The user-side signal was visible the day the bug
       shipped.
+    </p>
+    <p>
+      For a frontier-model team, the value of an outside signal isn't trusting the score. It's having one.
+      Internal evals measure what the model can do on curated tasks. A noisy public-grumble dataset measures
+      what users feel when those tasks meet their workflows. The two answer different questions, but if they
+      diverge for a week, the divergence itself is the bug report — and the retro doesn't have to wait 28
+      days.
     </p>
     <p>
       AI accountability needs more sources of telemetry that don't sit inside the lab's CI pipeline. We share
