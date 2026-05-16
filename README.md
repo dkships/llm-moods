@@ -82,7 +82,7 @@ src/
 └── integrations/   # Supabase client config (auto-generated types)
 
 supabase/
-├── functions/      # 14 deployable Deno edge functions (5 active scrapers + utilities)
+├── functions/      # 16 deployable Deno edge functions (5 active scrapers + utilities)
 └── migrations/     # Database schema migrations
 ```
 
