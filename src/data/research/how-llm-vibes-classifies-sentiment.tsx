@@ -116,9 +116,10 @@ content_multiplier = 0.6 if title-only else 1.0`}</code>
     </p>
     <p>
       Each source (<code>reddit</code>, <code>bluesky</code>, <code>twitter</code>, etc.) is then capped at no
-      more than 50% of total weight. If Bluesky alone produces enough volume to dominate a day's score, the cap
-      rescales it down. This is the most important guardrail against sentiment shifts that come from one
-      platform's local culture rather than a real model-quality change.
+      more than 50% of total weight. If Bluesky alone produces enough volume to dominate a day's score, the
+      cap rescales it down. This is the deliberate trade-off: less reactive to local Bluesky or Reddit
+      subculture shifts, more robust to a single platform's sudden moderation policy change. We picked the
+      second.
     </p>
     <p>After capping, the per-day score is:</p>
     <pre>
@@ -170,15 +171,16 @@ score = round((effective_positive / total_weight) × 100)`}</code>
     <p>Three caveats that anyone reading the dashboard should know.</p>
     <p>
       The classifier vendor is one of the tracked models. Gemini 2.5 Flash classifies posts about Gemini's
-      competitors and itself, so self-bias remains a measurement risk. The current check fixture lives at{" "}
+      competitors and itself, so self-bias remains a measurement risk. If the classifier were biased toward
+      Gemini, we'd expect Claude to underperform Gemini in scoring. We observe the opposite: across the
+      windows we've examined, Claude often outscores Gemini. The current check fixture lives at{" "}
       <code>supabase/functions/check-gemini-self-bias</code>. It samples up to 150 recent stored posts from
       the past 21 days that are unclassified, low-confidence, or missing a negative complaint category, then
       reruns them through approved Gemini candidates (<code>gemini-2.5-flash</code>,{" "}
       <code>gemini-3-flash-preview</code>, and <code>gemini-3.1-flash-lite-preview</code>). The canary reports
-      sentiment-match and complaint-match rates without writing public scores. This keeps validation inside the
-      Gemini free tier and removes the need for Anthropic or OpenAI keys. Across the windows we've examined,
-      Claude often scores higher than Gemini, the opposite of what classifier favoritism toward Gemini would
-      produce, but the canary is the guardrail we use before changing the production classifier.
+      sentiment-match and complaint-match rates without writing public scores, which keeps validation inside
+      the Gemini free tier and removes the need for Anthropic or OpenAI keys. This is the kind of check any
+      team running a single-vendor classifier should be doing on themselves.
     </p>
     <p>
       Volume gaps are part of the record. The Feb 19 – Mar 7, 2026 gap (no scheduled cron, manual triggers only)
@@ -193,6 +195,10 @@ score = round((effective_positive / total_weight) × 100)`}</code>
       visible.
     </p>
     <p>The repo is MIT-licensed. Read it, fork it, file a PR if you have a better classifier prompt.</p>
+    <p>
+      The longer goal is the same one frontier labs have for safety: telemetry that doesn't sit inside the
+      system it's measuring.
+    </p>
 
     <AuthorBio />
   </>
