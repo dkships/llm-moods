@@ -222,12 +222,11 @@ describe("public app routes", () => {
     await renderAt("/model/chatgpt");
 
     expect(await screen.findByText(/updated\b/i)).toBeInTheDocument();
-    expect(screen.getAllByText("Low confidence").length).toBeGreaterThan(0);
     expect(screen.getByLabelText("2 scored posts")).toBeInTheDocument();
-    expect(screen.getByText("2 scored")).toBeInTheDocument();
-    expect(screen.getByText("328 collected · 7d")).toBeInTheDocument();
-    expect(screen.getByText("100% classified")).toBeInTheDocument();
+    expect(screen.getByText("2 SCORED · 328 COLLECTED · 7D")).toBeInTheDocument();
     expect(screen.getByText(/^latest classified post\b/i)).toBeInTheDocument();
+    expect(screen.queryByText(/^low confidence$/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/100% classified/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/daily score based on/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^score recalculated\b/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/limited sample in the latest window/i)).not.toBeInTheDocument();
