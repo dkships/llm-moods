@@ -16,7 +16,6 @@ interface TrendingItem {
   pct_change: number;
 }
 
-const MONO_CAP = "font-mono text-[11px] font-medium uppercase tracking-[0.06em]";
 const GRID_COLS = "grid grid-cols-[1.4fr_88px_1fr_56px] items-center gap-4";
 
 function useTrendingComplaints() {
@@ -78,11 +77,11 @@ const TrendingComplaints = () => {
     <Surface size="tight" motion="fade">
       <SectionHeader
         title="Trending complaints"
-        action={<span className={`${MONO_CAP} text-text-tertiary`}>vs prior week</span>}
+        action={<span className={`text-mono-cap text-text-tertiary`}>vs prior week</span>}
       />
 
       <div className="mt-2">
-        <div className={`${GRID_COLS} border-b border-border pb-2 ${MONO_CAP} text-text-tertiary`}>
+        <div className={`${GRID_COLS} border-b border-border pb-2 text-mono-cap text-text-tertiary`}>
           <span>Topic</span>
           <span className="text-right">Mentions</span>
           <span>Volume</span>
@@ -102,11 +101,11 @@ const TrendingComplaints = () => {
                 className={`${GRID_COLS} py-2.5`}
               >
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-foreground">{label}</p>
-                  <p className={`${MONO_CAP} text-text-tertiary`}>{item.model_name}</p>
+                  <p className="truncate text-body font-medium text-foreground">{label}</p>
+                  <p className="text-mono-cap text-text-tertiary">{item.model_name}</p>
                 </div>
 
-                <span className={`text-right ${MONO_CAP} text-text-secondary`}>
+                <span className={`text-right text-mono-cap text-text-secondary`}>
                   {item.this_week.toLocaleString()}
                 </span>
 

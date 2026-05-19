@@ -73,9 +73,9 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
           >
             {severityLabel(event.severity)}
           </Badge>
-          <span className="font-mono text-xs text-text-tertiary">{dateLabel}</span>
+          <span className="text-meta text-text-tertiary">{dateLabel}</span>
         </div>
-        <p className="mt-1.5 text-sm text-text-secondary leading-snug">{event.title}</p>
+        <p className="mt-1.5 text-body text-text-secondary">{event.title}</p>
         {topCorrelations.length > 0 && (
           <ul className="mt-2 space-y-1" aria-label="Correlated LLM Vibes anomalies">
             {topCorrelations.map((a) => (
@@ -139,7 +139,7 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
             href={data.publicUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 font-mono text-xs text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex items-center gap-1 text-meta text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             aria-label={`Open ${vendorName} status page`}
           >
             status page
@@ -151,17 +151,17 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
       {isLoading ? (
         <BarsSkeleton count={3} />
       ) : isError ? (
-        <div className="flex items-center gap-2 text-sm text-text-tertiary">
+        <div className="flex items-center gap-2 text-body text-text-tertiary">
           <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span>Status data temporarily unavailable.</span>
         </div>
       ) : !data?.supported ? (
-        <p className="text-sm text-text-tertiary">
+        <p className="text-body text-text-tertiary">
           {data?.message ?? "No public status feed published by this vendor."}
         </p>
       ) : data.events.length === 0 ? (
         <>
-          <div className="flex items-center gap-2 text-sm text-text-secondary">
+          <div className="flex items-center gap-2 text-body text-text-secondary">
             <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <span>All operational over the last 30 days</span>
           </div>
@@ -179,7 +179,7 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
             ))}
           </ul>
           {correlatedEvents.every((event) => event.correlatedAnomalies.length === 0) && (
-            <p className="mt-3 text-sm text-text-tertiary">
+            <p className="mt-3 text-body text-text-tertiary">
               No matching score drop found.
             </p>
           )}

@@ -41,14 +41,14 @@ const ResearchIndex = () => {
           <section className="container pt-10 pb-8 animate-fade-in">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <h1 className="text-3xl sm:text-4xl font-bold text-foreground">Research</h1>
-                <p className="mt-2 text-sm text-text-secondary font-mono">
+                <h1 className="text-page text-foreground">Research</h1>
+                <p className="mt-2 text-meta text-text-secondary">
                   Independent analysis of AI model quality, sourced from the LLM Vibes data set.
                 </p>
               </div>
               <a
                 href="/research/feed.xml"
-                className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 font-mono text-xs uppercase tracking-wide text-text-tertiary transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-mono-cap text-text-tertiary transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 aria-label="Subscribe to the LLM Vibes Research RSS feed"
               >
                 <Rss className="h-3.5 w-3.5" aria-hidden="true" />
@@ -76,23 +76,21 @@ const ResearchIndex = () => {
                       className="h-full"
                     >
                       <div className="flex items-center gap-3">
-                        <p className="font-mono text-xs uppercase tracking-wide text-text-tertiary">
+                        <p className="text-mono-cap text-text-tertiary">
                           {formatDate(post.publishedAt)}
                         </p>
                         {isFeatured && (
-                          <span className="font-mono text-[10px] uppercase tracking-wide text-primary">
+                          <span className="text-mono-cap text-primary">
                             Latest
                           </span>
                         )}
                       </div>
                       <h2
-                        className={`mt-2 font-display font-bold text-foreground ${
-                          isFeatured ? "text-2xl sm:text-3xl" : "text-xl"
-                        }`}
+                        className={`mt-2 text-foreground ${isFeatured ? "text-page" : "text-section"}`}
                       >
                         {post.title}
                       </h2>
-                      <p className="mt-3 text-sm text-text-secondary leading-relaxed">{post.summary}</p>
+                      <p className="mt-3 text-body text-text-secondary">{post.summary}</p>
                       <div className="mt-4 flex flex-wrap items-center gap-2">
                         {post.tags.slice(0, 3).map((tag) => (
                           <Badge

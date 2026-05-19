@@ -8,7 +8,7 @@ const GitHubIcon = ({ className }: { className?: string }) => (
 
 const Footer = () => (
   <footer className="border-t border-border">
-    <div className="container flex flex-wrap items-center justify-center gap-x-3 gap-y-2 py-6 text-xs text-text-tertiary">
+    <div className="container flex flex-wrap items-center justify-center gap-x-3 gap-y-2 py-6 text-meta text-text-tertiary">
       <span>Built for the AI-obsessed. LLM Vibes 2026.</span>
       <span aria-hidden="true">·</span>
       <span className="inline-flex items-center gap-1">

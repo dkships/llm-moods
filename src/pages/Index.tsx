@@ -12,7 +12,6 @@ import { getVibeStatus, formatComplaintLabel } from "@/lib/vibes";
 import { CardSkeleton } from "@/components/Skeletons";
 
 const PLATFORM_COUNT = 5;
-const MONO_CAP = "font-mono text-[11px] font-medium uppercase tracking-[0.06em]";
 
 const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }>(
   ({ m, onHover }, ref) => {
@@ -41,29 +40,29 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
         <Surface size="bare" motion="fade" className="overflow-hidden h-full">
           <div className="h-1.5" style={{ background: vibe.color }} />
           <div className="p-6">
-            <p className={`${MONO_CAP} text-text-tertiary`}>{vibe.label}</p>
+            <p className="text-mono-cap text-text-tertiary">{vibe.label}</p>
             <div className="mt-1 flex items-start justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
                 <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: brandColor }} />
-                <p className="truncate font-display text-lg font-semibold text-foreground">{m.name}</p>
+                <p className="truncate text-section text-foreground">{m.name}</p>
               </div>
               <p
-                className="shrink-0 font-mono text-5xl font-extrabold leading-none"
+                className="shrink-0 text-score"
                 style={{ color: vibe.color }}
               >
                 {m.latestScore}
               </p>
             </div>
 
-            <p className={`mt-3 ${MONO_CAP}`}>
+            <p className="mt-3 text-mono-cap">
               <span className="text-text-secondary">{trendCaption}</span>
               <span className="text-text-tertiary"> · {postsCaption}</span>
             </p>
 
             {m.topComplaint && (
               <div className="mt-4 flex items-center gap-3 border-t border-border pt-3">
-                <span className={`${MONO_CAP} shrink-0 text-text-tertiary`}>Top</span>
-                <span className="truncate text-sm font-medium text-foreground">
+                <span className="text-mono-cap shrink-0 text-text-tertiary">Top</span>
+                <span className="truncate text-body font-medium text-foreground">
                   {formatComplaintLabel(m.topComplaint)}
                 </span>
               </div>
@@ -158,8 +157,8 @@ const Index = () => {
                 ].map((step) => (
                   <div key={step.title} className="text-center sm:text-left">
                     <step.Icon className="h-7 w-7 text-primary mb-3 mx-auto sm:mx-0" aria-hidden="true" />
-                    <p className="font-display text-lg font-semibold text-foreground">{step.title}</p>
-                    <p className="mt-2 text-sm text-text-secondary leading-relaxed">{step.body}</p>
+                    <p className="text-section text-foreground">{step.title}</p>
+                    <p className="mt-2 text-body text-text-secondary">{step.body}</p>
                   </div>
                 ))}
               </div>

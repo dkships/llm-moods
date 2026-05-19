@@ -23,8 +23,6 @@ import TrendingComplaints from "@/components/TrendingComplaints";
 
 const LazySparkline = lazy(() => import("@/components/Sparkline"));
 
-const MONO_CAP = "font-mono text-[11px] font-medium uppercase tracking-[0.06em]";
-
 /** Memoized model card */
 const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }) => {
   const vibe = getVibeStatus(m.latestScore);
@@ -52,7 +50,7 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
       <Surface size="bare" motion="fade" className="overflow-hidden h-full">
         <div className="h-1.5" style={{ background: vibe.color }} />
         <div className="p-6">
-          <p className={`${MONO_CAP} text-text-tertiary`}>{vibe.label}</p>
+          <p className={`text-mono-cap text-text-tertiary`}>{vibe.label}</p>
           <div className="mt-1 flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: brandColor }} />
@@ -61,13 +59,13 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
             <Tooltip>
               <TooltipTrigger asChild>
                 <p
-                  className="shrink-0 cursor-help font-mono text-5xl font-extrabold leading-none"
+                  className="shrink-0 cursor-help text-score"
                   style={{ color: vibe.color }}
                 >
                   {m.latestScore}
                 </p>
               </TooltipTrigger>
-              <TooltipContent side="left" className="font-mono text-xs">
+              <TooltipContent side="left" className="text-meta">
                 0 = everyone's complaining, 100 = pure good vibes
               </TooltipContent>
             </Tooltip>
@@ -81,14 +79,14 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
             </div>
           )}
 
-          <p className={`mt-3 ${MONO_CAP}`}>
+          <p className={`mt-3 text-mono-cap`}>
             <span className="text-text-secondary">{trendCaption}</span>
             <span className="text-text-tertiary"> · {postsCaption}</span>
           </p>
 
           {m.topComplaint && (
             <div className="mt-4 flex items-center gap-3 border-t border-border pt-3">
-              <span className={`${MONO_CAP} shrink-0 text-text-tertiary`}>Top</span>
+              <span className={`text-mono-cap shrink-0 text-text-tertiary`}>Top</span>
               <span className="truncate text-sm font-medium text-foreground">
                 {formatComplaintLabel(m.topComplaint)}
               </span>
@@ -116,7 +114,7 @@ const ChatterPost = memo(({ post }: { post: RecentChatterPost; i: number }) => {
   const content = (
     <div className="flex flex-col gap-2">
       <p
-        className="font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-text-tertiary"
+        className="text-mono-cap text-text-tertiary"
         title={post.posted_at ? `Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}` : undefined}
       >
         {metaPieces.join(" · ")}
@@ -221,7 +219,7 @@ const Dashboard = () => {
 
           {/* Page Header */}
           <section className="container pt-10 pb-8">
-            <h1 className="font-display text-3xl font-bold text-foreground sm:text-4xl">
+            <h1 className="text-page text-foreground">
               Current Vibes
             </h1>
             <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -230,7 +228,7 @@ const Dashboard = () => {
                 aria-hidden="true"
               />
               <p
-                className="font-mono text-xs text-text-tertiary"
+                className="text-meta text-text-tertiary"
                 role="status"
                 aria-live="polite"
               >
