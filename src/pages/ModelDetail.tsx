@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { TrendingUp, TrendingDown, Minus, ArrowLeft, ArrowRight, BookOpen, ExternalLink, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ArrowRight, BookOpen, ExternalLink, AlertTriangle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -24,9 +24,11 @@ import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
   SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
-  sentimentBorderClass, formatScoreConfidence, scoreConfidenceTone,
+  sentimentBorderClass,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
+
+const MONO_CAP = "font-mono text-[11px] font-medium uppercase tracking-[0.06em]";
 
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
@@ -77,28 +79,26 @@ const ModelDetail = () => {
   const failedPosts = enriched?.failedPosts ?? 0;
   const coveragePct = Math.round((enriched?.classificationCoverage ?? 1) * 100);
   const scoreConfidence = enriched?.scoreConfidence ?? "low";
-  const confidenceLabel = formatScoreConfidence(scoreConfidence);
   const scoreBasisStatus = enriched?.scoreBasisStatus ?? "measured";
   const latestDataUpdatedAt = enriched?.latestPostIngestedAt ?? enriched?.latestPostPostedAt ?? null;
   const scoreComputedAt = enriched?.scoreComputedAt ?? null;
   const scoreComputedLabel = scoreComputedAt ? formatTimeAgo(scoreComputedAt) : null;
   const scoreComputedAbsolute = scoreComputedAt ? formatAbsoluteTimestamp(scoreComputedAt) : null;
   const hasNoEligiblePosts = !enriched?.isLatestCarryForward && scoreBasisStatus === "no_eligible_posts" && latestScoreTotalPosts > 0;
-  const hasPartialCoverage = scoreBasisStatus === "partial_coverage" || queuedPosts > 0 || scoreConfidence === "low" || Boolean(enriched?.isStale);
-  const scoredPostsTitle = [
+  const metaLineTitle = [
     hasNoEligiblePosts
       ? "Posts were found in the latest window, but none met the high-confidence scoring threshold."
       : `${latestEligiblePosts.toLocaleString()} scored of ${latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`,
     `${coveragePct}% classified for scoring.`,
     queuedPosts > 0 ? `${queuedPosts.toLocaleString()} queued for Gemini classification.` : null,
     failedPosts > 0 ? `${failedPosts.toLocaleString()} abandoned after max retries.` : null,
+    `Score confidence: ${scoreConfidence}.`,
     enriched?.isStale ? "No measured score exists for the current Pacific day yet." : null,
     scoreComputedLabel && scoreComputedAbsolute
       ? `Score recomputed ${scoreComputedLabel} (${scoreComputedAbsolute}).`
       : null,
   ].filter(Boolean).join(" ");
   const vibe = getVibeStatus(latestScore);
-  const VibeIcon = vibe.icon;
   const accent = model?.accent_color || "#888";
 
   // Lexical product-surface tagging on recent posts. Same regex map applies to all four
@@ -216,6 +216,15 @@ const ModelDetail = () => {
 
   const trendDown = !enriched?.isLatestCarryForward && !enriched?.isStale && trend.direction === "down";
   const trendUp = !enriched?.isLatestCarryForward && !enriched?.isStale && trend.direction === "up";
+  const trendCaption = enriched?.isStale
+    ? "STALE SCORE"
+    : enriched?.isLatestCarryForward
+    ? "NO NEW POSTS"
+    : trendUp
+    ? `+${trend.pts} PTS FROM YESTERDAY`
+    : trendDown
+    ? `-${trend.pts} PTS FROM YESTERDAY`
+    : "FLAT FROM YESTERDAY";
 
   return (
     <PageTransition>
@@ -226,85 +235,51 @@ const ModelDetail = () => {
           <section className="container pt-10 pb-8 animate-fade-in">
             <Link
               to="/dashboard"
-              className="mb-6 inline-flex items-center gap-1.5 rounded-md text-sm text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="mb-5 inline-flex items-center gap-1.5 rounded-md font-mono text-xs text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
-              <ArrowLeft className="h-4 w-4" />
-              Back to Dashboard
+              <ArrowLeft className="h-3.5 w-3.5" />
+              Dashboard
             </Link>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-4 sm:gap-6">
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-1.5 rounded-full" style={{ background: accent }} />
-                <h1 className="text-3xl sm:text-4xl font-bold text-foreground">{model.name}</h1>
-              </div>
-              <div className="flex items-center gap-2">
-                <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
-                <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
-              </div>
+            <p className={`${MONO_CAP} text-text-tertiary`}>{vibe.label}</p>
+            <div className="mt-1 flex items-center gap-3">
+              <div className="h-10 w-1.5 shrink-0 rounded-full" style={{ background: accent }} />
+              <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{model.name}</h1>
             </div>
-            <div className="mt-4 flex flex-col sm:flex-row sm:items-end gap-4">
-              <p className="text-5xl sm:text-6xl font-bold font-mono text-foreground" style={{ textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}>{latestScore}<span className="text-xl text-text-tertiary ml-1">/ 100</span></p>
-              <div className="flex items-center gap-2 pb-2">
-                {trendUp ? (
-                  <TrendingUp className="h-4 w-4 text-primary" />
-                ) : trendDown ? (
-                  <TrendingDown className="h-4 w-4 text-destructive" />
-                ) : (
-                  <Minus className="h-4 w-4 text-text-tertiary" />
+            <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-5">
+              <p
+                className="font-mono text-6xl font-extrabold leading-none sm:text-[80px]"
+                style={{ color: vibe.color, textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}
+              >
+                {latestScore}
+              </p>
+              <p className={`pb-2 ${MONO_CAP} text-text-secondary`}>{trendCaption}</p>
+            </div>
+            <p
+              className={`mt-3 ${MONO_CAP} text-text-tertiary`}
+              title={metaLineTitle}
+              aria-label={`${latestEligiblePosts.toLocaleString()} scored posts`}
+            >
+              {latestEligiblePosts.toLocaleString()} SCORED · {recentPosts7d.toLocaleString()} COLLECTED · 7D
+            </p>
+            {(failedPosts > 0 || enriched?.isStale) && (
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                {failedPosts > 0 && (
+                  <ScoreMetaBadge
+                    tone="warning"
+                    icon={AlertTriangle}
+                    title={`${failedPosts.toLocaleString()} posts in the latest 7-day window exhausted classification retries. Recoverable via reclassify-posts?mode=reset_failed.`}
+                  >
+                    {failedPosts.toLocaleString()} abandoned
+                  </ScoreMetaBadge>
                 )}
-                <span
-                  className={`text-sm font-mono ${
-                    trendUp
-                      ? "text-primary"
-                      : trendDown
-                      ? "text-destructive"
-                      : "text-text-tertiary"
-                  }`}
-                >
-                  {enriched?.isStale
-                    ? "latest measured score is stale"
-                    : enriched?.isLatestCarryForward
-                    ? "no scored posts in latest window"
-                    : trend.direction === "flat"
-                    ? "no change from yesterday"
-                    : `${trendUp ? "up" : "down"} ${trend.pts} pts from yesterday`}
-                </span>
+                {enriched?.isStale && (
+                  <ScoreMetaBadge tone="warning" icon={AlertTriangle} title="No current Pacific-day measured score yet.">
+                    Stale score
+                  </ScoreMetaBadge>
+                )}
               </div>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <ScoreMetaBadge
-                tone={scoreConfidenceTone(scoreConfidence)}
-                icon={hasNoEligiblePosts || hasPartialCoverage ? AlertTriangle : undefined}
-                title={scoredPostsTitle}
-                ariaLabel={confidenceLabel}
-              >
-                {confidenceLabel}
-              </ScoreMetaBadge>
-              <ScoreMetaBadge
-                title={`${latestEligiblePosts.toLocaleString()} scored of ${latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`}
-                ariaLabel={`${latestEligiblePosts.toLocaleString()} scored posts`}
-              >
-                {latestEligiblePosts.toLocaleString()} scored
-              </ScoreMetaBadge>
-              <ScoreMetaBadge title="Collected posts from the last 7 days.">
-                {recentPosts7d.toLocaleString()} collected · 7d
-              </ScoreMetaBadge>
-              <ScoreMetaBadge title={scoredPostsTitle}>
-                {coveragePct}% classified
-              </ScoreMetaBadge>
-              {failedPosts > 0 && (
-                <ScoreMetaBadge
-                  tone="warning"
-                  icon={AlertTriangle}
-                  title={`${failedPosts.toLocaleString()} posts in the latest 7-day window exhausted classification retries. Recoverable via reclassify-posts?mode=reset_failed.`}
-                >
-                  {failedPosts.toLocaleString()} abandoned
-                </ScoreMetaBadge>
-              )}
-              {enriched?.isStale && (
-                <ScoreMetaBadge tone="warning" icon={AlertTriangle} title="No current Pacific-day measured score yet.">
-                  Stale score
-                </ScoreMetaBadge>
-              )}
+            )}
+            <div className="mt-3">
               <DataFreshnessIndicator lastUpdated={latestDataUpdatedAt} />
             </div>
           </section>
