@@ -7,7 +7,7 @@ const CHART_COLORS = {
   mutedForeground: "hsl(220 10% 50%)",  // --muted-foreground
   card: "hsl(220 18% 10%)",             // --card
   border: "hsl(220 14% 18%)",           // --border
-  referenceLine: "hsl(220 10% 25%)",    // between --border and --muted-foreground
+  referenceLine: "hsl(220 14% 18%)",    // --border (polish rule 1 — neutral midline)
 } as const;
 
 export interface ChartEventMarker {

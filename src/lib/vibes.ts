@@ -1,20 +1,14 @@
-import { Sun, CloudSun, CloudLightning } from "lucide-react";
 import {
   PUBLIC_COMPLAINT_LABELS,
   getPublicComplaintLabel,
 } from "@/shared/public-taxonomy";
 
-// Muted-text convention (apply across all public pages):
-//   text-foreground       — primary statements, headings, score numbers
-//   text-text-secondary   — body copy, default paragraph tone
-//   text-text-tertiary    — meta, captions, timestamps, "/100", filter labels
-// Avoid arbitrary `text-foreground/{60..90}` opacities in new code; route
-// through one of these three. Tokens defined in tailwind.config.ts.
-
-// Single source of truth for sentiment colors. Mirrors --primary, --warning,
-// --destructive HSL triplets in src/index.css. Recharts and inline `style`
-// consumers need raw HSL strings (not Tailwind classes), which is why a JS
-// map exists alongside the CSS vars.
+// Single source of truth for sentiment colors. Per the UX polish rules,
+// sentiment hue may appear in exactly three places site-wide: the score
+// number text, the 6px top accent bar on a ModelCard, and the single chart
+// line stroke on VibesChart. Anywhere else (vibe label, trend caption,
+// sparkline, complaint percent, etc.) routes through the neutral
+// `text-foreground` / `text-text-secondary` / `text-text-tertiary` scale.
 const SENTIMENT_HSL = {
   good: "hsl(142 72% 50%)",
   mixed: "hsl(38 92% 50%)",
@@ -38,16 +32,10 @@ export const SOURCE_LABELS: Record<string, string> = {
   twitter: "𝕏",
 };
 
-export const SENTIMENT_STYLES: Record<string, { label: string; classes: string }> = {
-  positive: { label: "Positive", classes: "bg-primary/15 text-primary border-primary/20" },
-  negative: { label: "Negative", classes: "bg-destructive/15 text-destructive border-destructive/30" },
-  neutral: { label: "Neutral", classes: "bg-muted text-muted-foreground border-border" },
-};
-
 export function getVibeStatus(score: number) {
-  if (score <= 40) return { label: "Bad Vibes", icon: CloudLightning, color: SENTIMENT_HSL.bad };
-  if (score <= 65) return { label: "Mixed Signals", icon: CloudSun, color: SENTIMENT_HSL.mixed };
-  return { label: "Good Vibes", icon: Sun, color: SENTIMENT_HSL.good };
+  if (score <= 40) return { label: "Bad Vibes", color: SENTIMENT_HSL.bad };
+  if (score <= 65) return { label: "Mixed Signals", color: SENTIMENT_HSL.mixed };
+  return { label: "Good Vibes", color: SENTIMENT_HSL.good };
 }
 
 // Sample-size warning threshold for asymmetric "Limited sample" notes on
@@ -55,29 +43,6 @@ export function getVibeStatus(score: number) {
 // vibes-scoring.ts: below this floor the smoothing weights tip heavily
 // toward the previous day, so the surfaced score is mostly inertia.
 export const LIMITED_SAMPLE_THRESHOLD = 5;
-
-export type ScoreConfidence = "high" | "medium" | "low";
-
-export function formatScoreConfidence(confidence: ScoreConfidence): string {
-  if (confidence === "high") return "High confidence";
-  if (confidence === "medium") return "Medium confidence";
-  return "Low confidence";
-}
-
-export function scoreConfidenceTone(confidence: ScoreConfidence): "muted" | "primary" | "warning" {
-  if (confidence === "high") return "primary";
-  if (confidence === "medium") return "muted";
-  return "warning";
-}
-
-// Maps a post sentiment to the unified left-border accent class. Used by
-// chatter posts and recent-posts list items so the border-color language is
-// consistent with `border-l-primary` (incident card, research featured card).
-export function sentimentBorderClass(sentiment: string | null | undefined): string {
-  if (sentiment === "positive") return "border-l-primary";
-  if (sentiment === "negative") return "border-l-destructive";
-  return "border-l-border";
-}
 
 export function formatTimeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
