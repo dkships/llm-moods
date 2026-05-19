@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
-import PageHeader from "@/components/PageHeader";
 import SectionHeader from "@/components/SectionHeader";
 import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
@@ -18,7 +17,6 @@ import {
   type ModelWithVibes,
   type RecentChatterPost,
 } from "@/hooks/useVibesData";
-import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import StalenessBanner from "@/components/StalenessBanner";
 import { getVibeStatus, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities, sentimentBorderClass } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
@@ -243,12 +241,24 @@ const Dashboard = () => {
 
           {/* Page Header */}
           <section className="container pt-10 pb-8">
-            <PageHeader
-              title="Current Vibes"
-              meta={today}
-              description="Latest daily sentiment score with recent chatter from Reddit, Hacker News, Bluesky, Mastodon, and X."
-              freshness={<DataFreshnessIndicator lastUpdated={latestScoreUpdate} />}
-            />
+            <h1 className="font-display text-3xl font-bold text-foreground sm:text-4xl">
+              Current Vibes
+            </h1>
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/40"
+                aria-hidden="true"
+              />
+              <p
+                className="font-mono text-xs text-text-tertiary"
+                role="status"
+                aria-live="polite"
+              >
+                {latestScoreUpdate
+                  ? `Updated ${formatTimeAgo(latestScoreUpdate)} · ${today}`
+                  : today}
+              </p>
+            </div>
           </section>
 
           {/* Model Cards */}
