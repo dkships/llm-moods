@@ -1,7 +1,6 @@
-import { MessageSquare, ExternalLink } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { memo, useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
@@ -18,7 +17,7 @@ import {
   type RecentChatterPost,
 } from "@/hooks/useVibesData";
 import StalenessBanner from "@/components/StalenessBanner";
-import { getVibeStatus, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities, sentimentBorderClass } from "@/lib/vibes";
+import { getVibeStatus, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
 
@@ -104,29 +103,30 @@ ModelCard.displayName = "ModelCard";
 
 /** Memoized chatter post */
 const ChatterPost = memo(({ post }: { post: RecentChatterPost; i: number }) => {
-  const sentiment = post.sentiment || "neutral";
-  const s = SENTIMENT_STYLES[sentiment];
   const src = formatSourceDisplay(post.source);
   const modelData = post.models;
   const sourceUrl = post.source_url ?? undefined;
-  const cardClasses = `flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderClass(sentiment)}`;
-  const linkClasses = sourceUrl
-    ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-    : "";
+
+  const metaPieces = [
+    `${src.emoji} ${src.label}`,
+    modelData?.name,
+    post.posted_at ? formatTimeAgo(post.posted_at) : null,
+  ].filter(Boolean) as string[];
 
   const content = (
-    <>
-      <div className="flex items-center gap-3 shrink-0">
-        <span className="text-xs font-mono text-foreground px-2 py-0.5 rounded bg-secondary border border-border">
-          {src.emoji} {src.label}
-        </span>
-      </div>
-      <p className="text-sm text-foreground flex-1 leading-relaxed line-clamp-2">
+    <div className="flex flex-col gap-2">
+      <p
+        className="font-mono text-[11px] font-medium uppercase tracking-[0.06em] text-text-tertiary"
+        title={post.posted_at ? `Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}` : undefined}
+      >
+        {metaPieces.join(" · ")}
+      </p>
+      <p className="line-clamp-2 text-sm leading-[1.55] text-foreground">
         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
         {post.original_language && (
           <Tooltip>
             <TooltipTrigger asChild>
-              <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-text-tertiary bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
+              <span className="ml-1.5 inline-flex cursor-help items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 font-mono text-[10px] text-text-tertiary">
                 Translated from {post.original_language.toUpperCase()}
               </span>
             </TooltipTrigger>
@@ -136,27 +136,7 @@ const ChatterPost = memo(({ post }: { post: RecentChatterPost; i: number }) => {
           </Tooltip>
         )}
       </p>
-      <div className="flex items-center gap-2 shrink-0 flex-wrap">
-        {modelData && (
-          <>
-            <span className="h-2 w-2 rounded-full shrink-0" style={{ background: modelData.accent_color || "#888" }} />
-            <span className="text-xs font-mono text-foreground">{modelData.name}</span>
-          </>
-        )}
-        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
-          {s.label}
-        </Badge>
-        {post.posted_at && (
-          <span
-            className="text-xs text-text-tertiary font-mono"
-            title={`Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}`}
-          >
-            {formatTimeAgo(post.posted_at)}
-          </span>
-        )}
-        {sourceUrl && <ExternalLink className="h-3 w-3 text-text-tertiary shrink-0" />}
-      </div>
-    </>
+    </div>
   );
 
   if (sourceUrl) {
@@ -168,7 +148,7 @@ const ChatterPost = memo(({ post }: { post: RecentChatterPost; i: number }) => {
         href={sourceUrl}
         target="_blank"
         rel="noopener noreferrer"
-        className={`${cardClasses} ${linkClasses}`.trim()}
+        className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         {content}
       </Surface>
@@ -176,7 +156,7 @@ const ChatterPost = memo(({ post }: { post: RecentChatterPost; i: number }) => {
   }
 
   return (
-    <Surface size="compact" motion="fade" className={cardClasses}>
+    <Surface size="compact" motion="fade">
       {content}
     </Surface>
   );
