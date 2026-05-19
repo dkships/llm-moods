@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Flame, TrendingUp, TrendingDown } from "lucide-react";
 import Surface from "@/components/Surface";
 import SectionHeader from "@/components/SectionHeader";
 import { formatComplaintLabel } from "@/lib/vibes";
@@ -17,6 +16,9 @@ interface TrendingItem {
   pct_change: number;
 }
 
+const MONO_CAP = "font-mono text-[11px] font-medium uppercase tracking-[0.06em]";
+const GRID_COLS = "grid grid-cols-[1.4fr_88px_1fr_56px] items-center gap-4";
+
 function useTrendingComplaints() {
   return useQuery({
     queryKey: ["trending-complaints"],
@@ -31,7 +33,6 @@ function useTrendingComplaints() {
   });
 }
 
-// Pick the biggest mover per model
 function pickTopPerModel(items: TrendingItem[]): TrendingItem[] {
   const seen = new Map<string, TrendingItem>();
   for (const item of items) {
@@ -42,15 +43,22 @@ function pickTopPerModel(items: TrendingItem[]): TrendingItem[] {
   return Array.from(seen.values());
 }
 
+function changeToneClass(pct: number): string {
+  if (pct > 30) return "text-destructive";
+  if (pct > 0) return "text-warning";
+  if (pct < 0) return "text-primary";
+  return "text-text-secondary";
+}
+
 const TrendingComplaints = () => {
   const { data, isLoading } = useTrendingComplaints();
 
   if (isLoading) {
     return (
       <Surface size="tight" className="animate-pulse">
-        <div className="h-5 w-48 bg-secondary/50 rounded mb-4" />
+        <div className="mb-4 h-5 w-48 rounded bg-secondary/50" />
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-10 bg-secondary/40 rounded" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="h-8 rounded bg-secondary/40" />)}
         </div>
       </Surface>
     );
@@ -64,52 +72,64 @@ const TrendingComplaints = () => {
     return null;
   }
 
+  const maxVolume = topMovers.reduce((m, row) => Math.max(m, row.this_week), 0);
+
   return (
     <Surface size="tight" motion="fade">
       <SectionHeader
-        title="Trending Complaints"
-        icon={Flame}
-        action={<span className="font-mono text-[10px] text-text-tertiary">vs last week</span>}
+        title="Trending complaints"
+        action={<span className={`${MONO_CAP} text-text-tertiary`}>vs prior week</span>}
       />
 
-      <div className="max-h-[280px] overflow-y-auto scrollbar-thin space-y-2">
-        {topMovers.map((item) => {
-          const isSpike = item.pct_change > 50;
-          const isUp = item.pct_change > 0;
-          const label = formatComplaintLabel(item.category);
+      <div className="mt-2">
+        <div className={`${GRID_COLS} border-b border-border pb-2 ${MONO_CAP} text-text-tertiary`}>
+          <span>Topic</span>
+          <span className="text-right">Mentions</span>
+          <span>Volume</span>
+          <span className="text-right">Change</span>
+        </div>
 
-          return (
-            <div
-              key={`${item.model_id}-${item.category}`}
-              className="flex items-center gap-3 py-2 px-3 rounded-lg bg-secondary/30 border border-border/50"
-            >
-              <div className="flex items-center gap-2 shrink-0 w-24">
-                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: item.accent_color || "#888" }} />
-                <span className="text-xs font-mono text-foreground truncate">{item.model_name}</span>
-              </div>
+        <ul className="divide-y divide-border/60">
+          {topMovers.map((item) => {
+            const label = formatComplaintLabel(item.category);
+            const pct = item.pct_change;
+            const sign = pct > 0 ? "+" : pct < 0 ? "" : "";
+            const widthPct = maxVolume > 0 ? Math.max(4, (item.this_week / maxVolume) * 100) : 0;
 
-              <span className="text-xs text-text-secondary flex-1 truncate">{label}</span>
+            return (
+              <li
+                key={`${item.model_id}-${item.category}`}
+                className={`${GRID_COLS} py-2.5`}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-foreground">{label}</p>
+                  <p className={`${MONO_CAP} text-text-tertiary`}>{item.model_name}</p>
+                </div>
 
-              <div className="flex items-center gap-1.5 shrink-0">
-                {isSpike && <span className="text-xs">🔥</span>}
-                {isUp ? (
-                  <TrendingUp className="h-3 w-3 text-destructive" />
-                ) : (
-                  <TrendingDown className="h-3 w-3 text-primary" />
-                )}
-                <span className={`text-xs font-mono font-medium ${
-                  isUp ? "text-destructive" : "text-primary"
-                }`}>
-                  {isUp ? "↑" : "↓"} {Math.abs(item.pct_change)}%
+                <span className={`text-right ${MONO_CAP} text-text-secondary`}>
+                  {item.this_week.toLocaleString()}
                 </span>
-              </div>
 
-              <span className="text-[10px] font-mono text-text-tertiary shrink-0 w-16 text-right">
-                {item.this_week} posts
-              </span>
-            </div>
-          );
-        })}
+                <div
+                  className="h-1 w-full overflow-hidden rounded-full bg-border/60"
+                  aria-hidden="true"
+                >
+                  <div
+                    className="h-full rounded-full bg-foreground/30"
+                    style={{ width: `${widthPct}%` }}
+                  />
+                </div>
+
+                <span
+                  className={`text-right font-mono text-[13px] font-semibold ${changeToneClass(pct)}`}
+                  aria-label={`${pct >= 0 ? "up" : "down"} ${Math.abs(pct)} percent`}
+                >
+                  {sign}{pct}%
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </Surface>
   );
