@@ -47,7 +47,7 @@ const Sparkline = memo(({ data, accent }: SparklineProps) => (
         type="monotone"
         dataKey="score"
         stroke={accent}
-        strokeWidth={2}
+        strokeWidth={1.5}
         dot={renderCarryForwardDot(accent)}
       />
     </LineChart>

@@ -192,8 +192,8 @@ describe("public app routes", () => {
 
     expect(await screen.findByRole("heading", { name: /is your ai having a bad day/i })).toBeInTheDocument();
     expect(screen.getByText(/skip to main content/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /chatgpt mixed signals 59/i })).toBeInTheDocument();
-    expect(screen.getByText("328 posts · 7d")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /mixed signals.*chatgpt.*59/i })).toBeInTheDocument();
+    expect(screen.getAllByText(/328 POSTS/).length).toBeGreaterThan(0);
   });
 
   it("renders the dashboard route with freshness status", async () => {
@@ -204,10 +204,9 @@ describe("public app routes", () => {
       /^updated\b/i.test(element.textContent || ""),
     );
     expect(freshnessStatus).toBeDefined();
-    expect(screen.getAllByText("Low confidence").length).toBeGreaterThan(0);
-    expect(screen.getByLabelText("2 scored posts")).toBeInTheDocument();
-    expect(screen.getByText("328 collected · 7d")).toBeInTheDocument();
+    expect(screen.getAllByText(/328 POSTS/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/recent volume:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/^low confidence$/i)).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /recent community chatter/i })).toBeInTheDocument();
   });
 

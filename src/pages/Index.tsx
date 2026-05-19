@@ -1,31 +1,36 @@
-import { TrendingUp, TrendingDown, Minus, ArrowRight, Radar, Brain, LineChart } from "lucide-react";
+import { ArrowRight, Radar, Brain, LineChart } from "lucide-react";
 import { Link } from "react-router-dom";
 import { memo, useCallback, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import Surface from "@/components/Surface";
-import ScoreMetaBadge from "@/components/ScoreMetaBadge";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import { useModelsWithLatestVibes, usePrefetchModelDetail, type ModelWithVibes } from "@/hooks/useVibesData";
-import { getVibeStatus } from "@/lib/vibes";
+import { getVibeStatus, formatComplaintLabel } from "@/lib/vibes";
 import { CardSkeleton } from "@/components/Skeletons";
 
 const PLATFORM_COUNT = 5;
-
-const TrendIcon = forwardRef<SVGSVGElement, { trend: string }>(({ trend, ...props }, ref) => {
-  if (trend === "up") return <TrendingUp ref={ref} className="h-4 w-4 text-primary" {...props} />;
-  if (trend === "down") return <TrendingDown ref={ref} className="h-4 w-4 text-destructive" {...props} />;
-  return <Minus ref={ref} className="h-4 w-4 text-text-tertiary" {...props} />;
-});
-TrendIcon.displayName = "TrendIcon";
+const MONO_CAP = "font-mono text-[11px] font-medium uppercase tracking-[0.06em]";
 
 const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }>(
   ({ m, onHover }, ref) => {
     const vibe = getVibeStatus(m.latestScore);
-    const VibeIcon = vibe.icon;
     const brandColor = m.accent_color || "#888";
+    const trendUp = m.trend.direction === "up" && !m.isLatestCarryForward && !m.isStale;
+    const trendDown = m.trend.direction === "down" && !m.isLatestCarryForward && !m.isStale;
+    const trendCaption = m.isStale
+      ? "STALE SCORE"
+      : m.isLatestCarryForward
+      ? "NO NEW POSTS"
+      : trendUp
+      ? `+${m.trend.pts} PTS`
+      : trendDown
+      ? `-${m.trend.pts} PTS`
+      : "0 PTS";
+    const postsCaption = `${(m.totalPosts || 0).toLocaleString()} POSTS`;
+
     return (
       <Link
         ref={ref}
@@ -36,25 +41,33 @@ const LandingModelCard = memo(forwardRef<HTMLAnchorElement, { m: ModelWithVibes;
         <Surface size="bare" motion="fade" className="overflow-hidden h-full">
           <div className="h-1.5" style={{ background: vibe.color }} />
           <div className="p-6">
-            <div className="flex items-start justify-between">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: brandColor }} />
-                  <p className="font-display text-sm font-semibold text-foreground">{m.name}</p>
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
-                  <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
-                </div>
+            <p className={`${MONO_CAP} text-text-tertiary`}>{vibe.label}</p>
+            <div className="mt-1 flex items-start justify-between gap-3">
+              <div className="flex min-w-0 items-center gap-2">
+                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: brandColor }} />
+                <p className="truncate font-display text-lg font-semibold text-foreground">{m.name}</p>
               </div>
-              <p className="text-3xl font-extrabold font-mono text-foreground leading-none">{m.latestScore}</p>
+              <p
+                className="shrink-0 font-mono text-5xl font-extrabold leading-none"
+                style={{ color: vibe.color }}
+              >
+                {m.latestScore}
+              </p>
             </div>
-            <div className="mt-3 flex items-center justify-between">
-              <TrendIcon trend={m.trend.direction} />
-              <ScoreMetaBadge title={m.isStale ? "Latest measured score is older than the current Pacific day." : "Classified posts from the last 7 days."}>
-                {m.isStale ? "Stale score" : m.totalPosts > 0 ? `${m.totalPosts.toLocaleString()} posts · 7d` : "Tracking"}
-              </ScoreMetaBadge>
-            </div>
+
+            <p className={`mt-3 ${MONO_CAP}`}>
+              <span className="text-text-secondary">{trendCaption}</span>
+              <span className="text-text-tertiary"> · {postsCaption}</span>
+            </p>
+
+            {m.topComplaint && (
+              <div className="mt-4 flex items-center gap-3 border-t border-border pt-3">
+                <span className={`${MONO_CAP} shrink-0 text-text-tertiary`}>Top</span>
+                <span className="truncate text-sm font-medium text-foreground">
+                  {formatComplaintLabel(m.topComplaint)}
+                </span>
+              </div>
+            )}
           </div>
         </Surface>
       </Link>

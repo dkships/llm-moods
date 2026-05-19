@@ -1,4 +1,4 @@
-import { TrendingUp, TrendingDown, Minus, MessageSquare, Zap, ExternalLink, AlertTriangle } from "lucide-react";
+import { MessageSquare, ExternalLink } from "lucide-react";
 import { memo, useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
@@ -20,30 +20,31 @@ import {
 } from "@/hooks/useVibesData";
 import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
 import StalenessBanner from "@/components/StalenessBanner";
-import { getVibeStatus, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities, sentimentBorderClass, formatScoreConfidence, scoreConfidenceTone } from "@/lib/vibes";
+import { getVibeStatus, SENTIMENT_STYLES, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities, sentimentBorderClass } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
-import ScoreMetaBadge from "@/components/ScoreMetaBadge";
 
 const LazySparkline = lazy(() => import("@/components/Sparkline"));
+
+const MONO_CAP = "font-mono text-[11px] font-medium uppercase tracking-[0.06em]";
 
 /** Memoized model card */
 const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }) => {
   const vibe = getVibeStatus(m.latestScore);
-  const VibeIcon = vibe.icon;
   const brandColor = m.accent_color || "#888";
 
-  const trendDown = m.trend.direction === "down" && !m.isLatestCarryForward && !m.isStale;
   const trendUp = m.trend.direction === "up" && !m.isLatestCarryForward && !m.isStale;
-  const confidenceLabel = formatScoreConfidence(m.scoreConfidence);
-  const coveragePct = Math.round((m.classificationCoverage ?? 1) * 100);
-  const hasPartialCoverage = m.scoreBasisStatus === "partial_coverage" || m.queuedPosts > 0 || m.scoreConfidence === "low" || m.isStale;
-  const confidenceTitle = [
-    `${m.eligiblePosts.toLocaleString()} scored of ${m.latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`,
-    `${coveragePct}% classified for scoring.`,
-    m.queuedPosts > 0 ? `${m.queuedPosts.toLocaleString()} queued for Gemini classification.` : null,
-    m.isStale ? "No measured score exists for the current Pacific day yet." : null,
-  ].filter(Boolean).join(" ");
+  const trendDown = m.trend.direction === "down" && !m.isLatestCarryForward && !m.isStale;
+  const trendCaption = m.isStale
+    ? "STALE SCORE"
+    : m.isLatestCarryForward
+    ? "NO NEW POSTS"
+    : trendUp
+    ? `+${m.trend.pts} PTS`
+    : trendDown
+    ? `-${m.trend.pts} PTS`
+    : "0 PTS";
+  const postsCaption = `${(m.totalPosts || 0).toLocaleString()} POSTS`;
 
   return (
     <Link
@@ -54,99 +55,46 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
       <Surface size="bare" motion="fade" className="overflow-hidden h-full">
         <div className="h-1.5" style={{ background: vibe.color }} />
         <div className="p-6">
-          <div className="flex items-start justify-between">
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: brandColor }} />
-                <p className="font-display text-base font-semibold text-foreground">{m.name}</p>
-              </div>
-              <div className="mt-2 flex items-center gap-2">
-                <VibeIcon className="h-5 w-5" style={{ color: vibe.color }} />
-                <span className="font-mono text-sm" style={{ color: vibe.color }}>{vibe.label}</span>
-              </div>
+          <p className={`${MONO_CAP} text-text-tertiary`}>{vibe.label}</p>
+          <div className="mt-1 flex items-start justify-between gap-3">
+            <div className="flex min-w-0 items-center gap-2">
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: brandColor }} />
+              <p className="truncate font-display text-lg font-semibold text-foreground">{m.name}</p>
             </div>
-            <div className="text-right">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <p className="text-5xl font-extrabold font-mono text-foreground cursor-help leading-none">{m.latestScore}</p>
-                </TooltipTrigger>
-                <TooltipContent side="left" className="text-xs font-mono">
-                  0 = everyone's complaining, 100 = pure good vibes
-                </TooltipContent>
-              </Tooltip>
-              <p className="text-xs text-text-tertiary font-mono mt-0.5">/ 100</p>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <p
+                  className="shrink-0 cursor-help font-mono text-5xl font-extrabold leading-none"
+                  style={{ color: vibe.color }}
+                >
+                  {m.latestScore}
+                </p>
+              </TooltipTrigger>
+              <TooltipContent side="left" className="font-mono text-xs">
+                0 = everyone's complaining, 100 = pure good vibes
+              </TooltipContent>
+            </Tooltip>
           </div>
 
-          {/* Sparkline — lazy loaded */}
           {m.sparkline.length > 1 && (
-            <div className="mt-4 h-12 cursor-pointer" aria-hidden="true">
+            <div className="mt-4 h-12" aria-hidden="true">
               <Suspense fallback={<div className="h-12 animate-pulse rounded bg-secondary/40" />}>
-                <LazySparkline data={m.sparkline} accent={vibe.color} />
+                <LazySparkline data={m.sparkline} accent="hsl(var(--foreground) / 0.55)" />
               </Suspense>
             </div>
           )}
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
-            <div className="flex items-center gap-1.5">
-              {trendUp ? (
-                <TrendingUp className="h-3.5 w-3.5 text-primary" />
-              ) : trendDown ? (
-                <TrendingDown className="h-3.5 w-3.5 text-destructive" />
-              ) : (
-                <Minus className="h-3.5 w-3.5 text-text-tertiary" />
-              )}
-              <span
-                className={
-                  m.isLatestCarryForward || m.isStale
-                    ? "text-text-tertiary"
-                    : trendUp
-                    ? "text-primary"
-                    : trendDown
-                    ? "text-destructive"
-                    : "text-text-tertiary"
-                }
-              >
-                {m.isStale
-                  ? "latest measured score is stale"
-                  : m.isLatestCarryForward
-                  ? "no scored posts in latest window"
-                  : m.trend.direction === "flat"
-                  ? "no change from yesterday"
-                  : `${trendUp ? "up" : "down"} ${m.trend.pts} pts from yesterday`}
-              </span>
-            </div>
-            <div className="flex flex-wrap items-center gap-1.5">
-              <ScoreMetaBadge
-                tone={scoreConfidenceTone(m.scoreConfidence)}
-                icon={hasPartialCoverage ? AlertTriangle : undefined}
-                title={confidenceTitle}
-                ariaLabel={confidenceLabel}
-              >
-                {confidenceLabel}
-              </ScoreMetaBadge>
-              <ScoreMetaBadge
-                title={`${m.eligiblePosts.toLocaleString()} scored of ${m.latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`}
-                ariaLabel={`${m.eligiblePosts.toLocaleString()} scored posts`}
-              >
-                {m.eligiblePosts.toLocaleString()} scored
-              </ScoreMetaBadge>
-              <ScoreMetaBadge title="Collected posts from the last 7 days.">
-                {(m.totalPosts || 0).toLocaleString()} collected · 7d
-              </ScoreMetaBadge>
-              {m.isStale && (
-                <ScoreMetaBadge tone="warning" icon={AlertTriangle} title="No current Pacific-day measured score yet.">
-                  Stale score
-                </ScoreMetaBadge>
-              )}
-            </div>
-          </div>
+          <p className={`mt-3 ${MONO_CAP}`}>
+            <span className="text-text-secondary">{trendCaption}</span>
+            <span className="text-text-tertiary"> · {postsCaption}</span>
+          </p>
 
           {m.topComplaint && (
-            <div className="mt-3 flex items-center gap-2 text-xs">
-              <Zap className="h-3.5 w-3.5 text-text-tertiary" />
-              <span className="text-text-tertiary">Top complaint:</span>
-              <span className="text-foreground font-medium">{formatComplaintLabel(m.topComplaint)}</span>
+            <div className="mt-4 flex items-center gap-3 border-t border-border pt-3">
+              <span className={`${MONO_CAP} shrink-0 text-text-tertiary`}>Top</span>
+              <span className="truncate text-sm font-medium text-foreground">
+                {formatComplaintLabel(m.topComplaint)}
+              </span>
             </div>
           )}
         </div>
