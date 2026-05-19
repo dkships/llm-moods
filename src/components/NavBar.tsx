@@ -14,7 +14,7 @@ const NavBar = () => {
   const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/model/");
 
   const navLinkClass = (active: boolean) =>
-    `rounded-md px-2 py-1 font-mono text-xs uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+    `rounded-md px-2 py-1 text-mono-cap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
       active ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-foreground"
     }`;
 
@@ -26,7 +26,7 @@ const NavBar = () => {
       <div className="container flex h-16 items-center justify-between">
         <Link
           to="/"
-          className="rounded-md font-display text-base font-semibold tracking-tight text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="rounded-md text-section text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           🌊 LLM <span className="text-primary">Vibes</span>
         </Link>

@@ -74,6 +74,47 @@
 }
 
 @layer utilities {
+  /* Five-rung type ladder (plus score-xl + meta + mono-cap). The whole site
+     should pick from this set — see "ONE RHYTHM" in the UX & UI polish doc.
+     Anything outside the ladder (text-3xl, text-2xl, text-xl, text-base) is a
+     drift signal during PR review. */
+  .text-score-xl {
+    @apply font-mono font-extrabold;
+    font-size: 72px;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+  .text-score {
+    @apply font-mono font-extrabold;
+    font-size: 48px;
+    line-height: 1;
+    letter-spacing: -0.02em;
+  }
+  .text-page {
+    @apply font-display font-bold;
+    font-size: 36px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+  }
+  .text-section {
+    @apply font-display font-semibold;
+    font-size: 18px;
+  }
+  .text-body {
+    @apply font-body font-normal;
+    font-size: 14px;
+    line-height: 1.55;
+  }
+  .text-meta {
+    @apply font-mono font-normal;
+    font-size: 12px;
+  }
+  .text-mono-cap {
+    @apply font-mono font-medium uppercase;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+  }
+
   .glow-text {
     text-shadow: 0 0 20px hsl(var(--glow) / 0.4), 0 0 60px hsl(var(--glow) / 0.15);
   }

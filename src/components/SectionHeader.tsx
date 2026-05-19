@@ -20,10 +20,7 @@ const SectionHeader = ({
   level = "card",
   className = "",
 }: SectionHeaderProps) => {
-  const titleClass =
-    level === "page"
-      ? "text-xl font-bold text-foreground"
-      : "text-lg font-semibold text-foreground";
+  const titleClass = level === "page" ? "text-page text-foreground" : "text-section text-foreground";
   return (
     <header className={`mb-4 ${className}`.trim()}>
       <div className="flex items-center justify-between gap-3">
@@ -33,7 +30,7 @@ const SectionHeader = ({
         </div>
         {action}
       </div>
-      {meta && <p className="mt-1 font-mono text-xs text-text-tertiary">{meta}</p>}
+      {meta && <p className="mt-1 text-meta text-text-tertiary">{meta}</p>}
     </header>
   );
 };

@@ -26,7 +26,6 @@ import {
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
-const MONO_CAP = "font-mono text-[11px] font-medium uppercase tracking-[0.06em]";
 
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
@@ -175,7 +174,7 @@ const ModelDetail = () => {
       <PageTransition>
         <div className="min-h-screen bg-background flex items-center justify-center">
           <div className="text-center">
-            <p className="text-2xl font-bold text-foreground mb-4">Model not found</p>
+            <p className="text-page text-foreground mb-4">Model not found</p>
             <Button asChild variant="outline" className="font-mono text-sm">
               <Link to="/dashboard">Back to Dashboard</Link>
             </Button>
@@ -233,27 +232,27 @@ const ModelDetail = () => {
           <section className="container pt-10 pb-8 animate-fade-in">
             <Link
               to="/dashboard"
-              className="mb-5 inline-flex items-center gap-1.5 rounded-md font-mono text-xs text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="mb-5 inline-flex items-center gap-1.5 rounded-md text-meta text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Dashboard
             </Link>
-            <p className={`${MONO_CAP} text-text-tertiary`}>{vibe.label}</p>
+            <p className={`text-mono-cap text-text-tertiary`}>{vibe.label}</p>
             <div className="mt-1 flex items-center gap-3">
               <div className="h-10 w-1.5 shrink-0 rounded-full" style={{ background: accent }} />
-              <h1 className="font-display text-3xl font-bold tracking-tight text-foreground sm:text-4xl">{model.name}</h1>
+              <h1 className="text-page text-foreground">{model.name}</h1>
             </div>
             <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-5">
               <p
-                className="font-mono text-6xl font-extrabold leading-none sm:text-[80px]"
+                className="text-score sm:text-score-xl"
                 style={{ color: vibe.color, textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}
               >
                 {latestScore}
               </p>
-              <p className={`pb-2 ${MONO_CAP} text-text-secondary`}>{trendCaption}</p>
+              <p className={`pb-2 text-mono-cap text-text-secondary`}>{trendCaption}</p>
             </div>
             <p
-              className={`mt-3 ${MONO_CAP} text-text-tertiary`}
+              className={`mt-3 text-mono-cap text-text-tertiary`}
               title={metaLineTitle}
               aria-label={`${latestEligiblePosts.toLocaleString()} scored posts`}
             >
@@ -303,10 +302,10 @@ const ModelDetail = () => {
                   >
                     <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                     <div className="min-w-0 flex-1">
-                      <p className="font-mono text-xs uppercase tracking-wide text-text-tertiary">
+                      <p className="text-mono-cap text-text-tertiary">
                         Recent incident analysis
                       </p>
-                      <p className="mt-1 font-display text-sm font-semibold text-foreground sm:truncate sm:text-base">
+                      <p className="mt-1 text-section text-foreground sm:truncate">
                         {featured.title}
                       </p>
                     </div>
@@ -324,7 +323,7 @@ const ModelDetail = () => {
               <div className="lg:col-span-2 space-y-6">
                 <Surface motion="fade">
                   {historyError ? (
-                    <p className="py-8 text-center text-sm text-text-tertiary" role="status" aria-live="polite">
+                    <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
                       Failed to load data
                     </p>
                   ) : historyLoading ? (
@@ -355,10 +354,10 @@ const ModelDetail = () => {
                       </div>
                       {chartEvents.length > 0 && (
                         <div className="mt-4 border-t border-border/40 pt-3">
-                          <p className="mb-2 font-mono text-xs text-text-tertiary">Known events on this chart</p>
+                          <p className="mb-2 text-meta text-text-tertiary">Known events on this chart</p>
                           <ul className="space-y-1">
                             {chartEvents.map((evt, i) => (
-                              <li key={`legend-${i}`} className="flex items-center gap-2 text-xs">
+                              <li key={`legend-${i}`} className="flex items-center gap-2 text-meta">
                                 <span
                                   className="inline-block h-2 w-3 shrink-0 rounded-sm"
                                   style={{ background: evt.color, opacity: 0.7 }}
@@ -409,7 +408,7 @@ const ModelDetail = () => {
                       {negativeSurfaceRows.map((row) => (
                         <li
                           key={row.label}
-                          className="flex justify-between font-mono text-xs text-text-tertiary"
+                          className="flex justify-between text-meta text-text-tertiary"
                         >
                           <span>{row.label}</span>
                           <span>{row.pct}%</span>
@@ -422,14 +421,14 @@ const ModelDetail = () => {
                 <Surface motion="fade">
                   <SectionHeader title="Complaint Breakdown" meta="Last 30 days" />
                   {complaintsError ? (
-                    <p className="text-sm text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
+                    <p className="text-body text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
                   ) : complaintsLoading ? (
                     <BarsSkeleton count={5} />
                   ) : complaints && complaints.length > 0 ? (
                     <div className="space-y-3">
                       {complaints.map((c) => (
                         <div key={c.category}>
-                          <div className="flex justify-between text-xs font-mono mb-1">
+                          <div className="flex justify-between text-meta mb-1">
                             <span className="text-text-tertiary">{formatComplaintLabel(c.category)}</span>
                             <span className="text-foreground">{c.pct}%</span>
                           </div>
@@ -443,21 +442,21 @@ const ModelDetail = () => {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-text-tertiary">No complaint data yet</p>
+                    <p className="text-body text-text-tertiary">No complaint data yet</p>
                   )}
                 </Surface>
 
                 <Surface motion="fade">
                   <SectionHeader title="Sources" meta="Share of posts over the last 30 days" />
                   {sourcesError ? (
-                    <p className="text-sm text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
+                    <p className="text-body text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
                   ) : sourcesLoading ? (
                     <BarsSkeleton count={3} />
                   ) : sources && sources.filter((s) => s.pct > 0).length > 0 ? (
                     <div className="space-y-3">
                       {sources.filter((s) => s.pct > 0).map((s) => (
                         <div key={s.source}>
-                          <div className="flex justify-between text-xs font-mono mb-1">
+                          <div className="flex justify-between text-meta mb-1">
                             <span className="text-text-tertiary">{SOURCE_LABELS[s.source] || s.source}</span>
                             <span className="text-foreground">{s.pct}%</span>
                           </div>
@@ -471,7 +470,7 @@ const ModelDetail = () => {
                       ))}
                     </div>
                   ) : (
-                    <p className="text-sm text-text-tertiary">No source data yet</p>
+                    <p className="text-body text-text-tertiary">No source data yet</p>
                   )}
                 </Surface>
               </div>
@@ -513,7 +512,7 @@ const ModelDetail = () => {
             )}
 
             {postsError ? (
-              <p className="py-8 text-center text-sm text-text-tertiary" role="status" aria-live="polite">
+              <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
                 Failed to load data
               </p>
             ) : postsLoading ? (
@@ -521,11 +520,11 @@ const ModelDetail = () => {
                 {Array.from({ length: 5 }).map((_, i) => <ChatterSkeleton key={i} />)}
               </div>
             ) : filteredPostsWithSurface.length === 0 && surfaceFilter !== "all" ? (
-              <p className="py-8 text-center text-sm text-text-tertiary">
+              <p className="py-8 text-center text-body text-text-tertiary">
                 No recent posts match the {surfaceFilter} filter. Try another surface.
               </p>
             ) : filteredPostsWithSurface.length === 0 ? (
-              <p className="py-8 text-center text-sm text-text-tertiary">
+              <p className="py-8 text-center text-body text-text-tertiary">
                 No posts in the last 7 days.
               </p>
             ) : (
@@ -541,12 +540,12 @@ const ModelDetail = () => {
                   const content = (
                     <div className="flex flex-col gap-2">
                       <p
-                        className={`${MONO_CAP} text-text-tertiary`}
+                        className={`text-mono-cap text-text-tertiary`}
                         title={post.posted_at ? `Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}` : undefined}
                       >
                         {metaPieces.join(" · ")}
                       </p>
-                      <p className="line-clamp-2 text-sm leading-[1.55] text-foreground">
+                      <p className="line-clamp-2 text-body text-foreground">
                         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
                         {post.original_language && (
                           <Tooltip>
@@ -556,7 +555,7 @@ const ModelDetail = () => {
                               </span>
                             </TooltipTrigger>
                             <TooltipContent side="top" className="max-w-sm">
-                              <p className="text-xs">{decodeHTMLEntities(post.content?.slice(0, 300) || "")}</p>
+                              <p className="text-meta">{decodeHTMLEntities(post.content?.slice(0, 300) || "")}</p>
                             </TooltipContent>
                           </Tooltip>
                         )}
