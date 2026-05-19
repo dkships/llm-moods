@@ -1,6 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BookOpen, ExternalLink, AlertTriangle } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, ArrowRight, BookOpen, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState, lazy, Suspense } from "react";
@@ -23,8 +22,7 @@ import ScoreMetaBadge from "@/components/ScoreMetaBadge";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
-  SENTIMENT_STYLES, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
-  sentimentBorderClass,
+  formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
@@ -533,34 +531,27 @@ const ModelDetail = () => {
             ) : (
               <div className="space-y-3">
                 {filteredPostsWithSurface.map(({ post, surface }) => {
-                  const sentiment = post.sentiment || "neutral";
-                  const s = SENTIMENT_STYLES[sentiment];
                   const src = formatSourceDisplay(post.source);
-                  const cardClasses = `flex flex-col sm:flex-row sm:items-center gap-3 border-l-2 ${sentimentBorderClass(sentiment)}`;
-                  const linkClasses = post.source_url
-                    ? "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    : "";
+                  const metaPieces = [
+                    `${src.emoji} ${src.label}`,
+                    surface?.label,
+                    post.posted_at ? formatTimeAgo(post.posted_at) : null,
+                  ].filter(Boolean) as string[];
 
                   const content = (
-                    <>
-                      <span className="text-xs font-mono text-foreground px-2 py-0.5 rounded bg-secondary border border-border shrink-0">
-                        {src.emoji} {src.label}
-                      </span>
-                      {surface && (
-                        <Badge
-                          variant="outline"
-                          className="text-[10px] font-mono px-1.5 py-0 shrink-0 text-text-tertiary border-border bg-secondary/40"
-                          title="Detected from post text"
-                        >
-                          {surface.label}
-                        </Badge>
-                      )}
-                      <p className="text-sm text-foreground flex-1 leading-relaxed line-clamp-2">
+                    <div className="flex flex-col gap-2">
+                      <p
+                        className={`${MONO_CAP} text-text-tertiary`}
+                        title={post.posted_at ? `Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}` : undefined}
+                      >
+                        {metaPieces.join(" · ")}
+                      </p>
+                      <p className="line-clamp-2 text-sm leading-[1.55] text-foreground">
                         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
                         {post.original_language && (
                           <Tooltip>
                             <TooltipTrigger asChild>
-                              <span className="ml-1.5 inline-flex items-center text-[10px] font-mono text-text-tertiary bg-secondary/50 px-1 py-0.5 rounded border border-border/30 cursor-help whitespace-nowrap">
+                              <span className="ml-1.5 inline-flex cursor-help items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 font-mono text-[10px] text-text-tertiary">
                                 Translated from {post.original_language.toUpperCase()}
                               </span>
                             </TooltipTrigger>
@@ -570,21 +561,7 @@ const ModelDetail = () => {
                           </Tooltip>
                         )}
                       </p>
-                      <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                        <Badge variant="outline" className={`text-[10px] px-1.5 py-0 ${s.classes}`}>
-                          {s.label}
-                        </Badge>
-                        {post.posted_at && (
-                          <span
-                            className="text-xs text-text-tertiary font-mono"
-                            title={`Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}`}
-                          >
-                            {formatTimeAgo(post.posted_at)}
-                          </span>
-                        )}
-                        {post.source_url && <ExternalLink className="h-3 w-3 text-text-tertiary shrink-0" />}
-                      </div>
-                    </>
+                    </div>
                   );
 
                   return post.source_url ? (
@@ -596,7 +573,7 @@ const ModelDetail = () => {
                       href={post.source_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={`${cardClasses} ${linkClasses}`.trim()}
+                      className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       {content}
                     </Surface>
@@ -605,7 +582,6 @@ const ModelDetail = () => {
                       key={post.id}
                       size="compact"
                       motion="fade"
-                      className={cardClasses}
                     >
                       {content}
                     </Surface>
