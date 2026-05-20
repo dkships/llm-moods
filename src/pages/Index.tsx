@@ -1,4 +1,4 @@
-import { ArrowRight, Radar, Brain, LineChart } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { memo, useCallback, forwardRef } from "react";
 import { Button } from "@/components/ui/button";
@@ -102,7 +102,7 @@ const Index = () => {
                 a <span className="text-primary glow-text">bad day</span>?
               </h1>
               <p className="mt-5 text-lg sm:text-xl text-text-secondary max-w-xl leading-relaxed">
-                Community sentiment for Claude, ChatGPT, Gemini, and Grok. Know when the vibes are off.
+                A daily read on community sentiment, before the AI Twitter discourse catches up.
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-4">
                 <Button asChild size="lg" className="font-mono text-sm gap-2 group">
@@ -135,33 +135,36 @@ const Index = () => {
           </section>
 
           {/* How it works */}
-          <section className="border-y border-border bg-card/40">
+          <section className="border-t border-border">
             <div className="container py-12 sm:py-16">
-              <div className="grid grid-cols-1 gap-8 sm:gap-10 md:grid-cols-3 animate-fade-in">
+              <ol className="grid grid-cols-1 gap-8 sm:gap-10 md:grid-cols-3">
                 {[
                   {
-                    Icon: Radar,
                     title: "Scrape",
                     body: `${PLATFORM_COUNT} social platforms checked throughout the day — Reddit, Hacker News, Bluesky, X/Twitter, Mastodon.`,
                   },
                   {
-                    Icon: Brain,
                     title: "Classify",
                     body: "Each post sentiment-labeled by Gemini 2.5 Flash into 12 complaint categories.",
                   },
                   {
-                    Icon: LineChart,
                     title: "Score",
                     body: "Volume-weighted into a 0–100 daily vibe per model. Higher means happier users.",
                   },
-                ].map((step) => (
-                  <div key={step.title} className="text-center sm:text-left">
-                    <step.Icon className="h-7 w-7 text-primary mb-3 mx-auto sm:mx-0" aria-hidden="true" />
-                    <p className="text-section text-foreground">{step.title}</p>
-                    <p className="mt-2 text-body text-text-secondary">{step.body}</p>
-                  </div>
+                ].map((step, i) => (
+                  <li key={step.title} className="text-left">
+                    <p className="text-mono-cap text-text-tertiary">
+                      0{i + 1}
+                    </p>
+                    <p className="mt-2 text-section text-foreground">
+                      {step.title}
+                    </p>
+                    <p className="mt-2 text-body text-text-secondary">
+                      {step.body}
+                    </p>
+                  </li>
                 ))}
-              </div>
+              </ol>
             </div>
           </section>
         </main>
