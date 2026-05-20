@@ -72,7 +72,6 @@ const ResearchIndex = () => {
                     <Surface
                       as="article"
                       motion="fade"
-                      tone={isFeatured ? "accent" : "default"}
                       className="h-full"
                     >
                       <div className="flex items-center gap-3">
@@ -80,7 +79,7 @@ const ResearchIndex = () => {
                           {formatDate(post.publishedAt)}
                         </p>
                         {isFeatured && (
-                          <span className="text-mono-cap text-primary">
+                          <span className="text-mono-cap text-text-tertiary">
                             Latest
                           </span>
                         )}

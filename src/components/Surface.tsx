@@ -7,18 +7,11 @@ const sizeClasses = {
   bare: "rounded-xl",
 } as const;
 
-const toneClasses = {
-  default: "",
-  accent: "border-l-2 border-l-primary",
-} as const;
-
 export type SurfaceSize = keyof typeof sizeClasses;
-export type SurfaceTone = keyof typeof toneClasses;
 
 type SurfaceOwnProps<T extends ElementType> = {
   as?: T;
   size?: SurfaceSize;
-  tone?: SurfaceTone;
   motion?: "fade" | false;
   className?: string;
   children?: ReactNode;
@@ -32,7 +25,6 @@ const HOVER = "transition-colors duration-200 hover:border-border/80";
 function Surface<T extends ElementType = "div">({
   as,
   size = "default",
-  tone = "default",
   motion = false,
   className,
   children,
@@ -42,7 +34,6 @@ function Surface<T extends ElementType = "div">({
   const classes = [
     "glass",
     sizeClasses[size],
-    toneClasses[tone],
     HOVER,
     motion === "fade" && "animate-fade-in",
     className,
