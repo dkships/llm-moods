@@ -1,7 +1,6 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, BookOpen, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ArrowRight, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useState, lazy, Suspense } from "react";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
@@ -300,7 +299,6 @@ const ModelDetail = () => {
                     motion="fade"
                     className="flex items-center gap-4 sm:gap-5"
                   >
-                    <BookOpen className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                     <div className="min-w-0 flex-1">
                       <p className="text-mono-cap text-text-tertiary">
                         Recent incident analysis
@@ -539,25 +537,15 @@ const ModelDetail = () => {
 
                   const content = (
                     <div className="flex flex-col gap-2">
-                      <p
-                        className={`text-mono-cap text-text-tertiary`}
-                        title={post.posted_at ? `Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}` : undefined}
-                      >
+                      <p className={`text-mono-cap text-text-tertiary`}>
                         {metaPieces.join(" · ")}
                       </p>
                       <p className="line-clamp-2 text-body text-foreground">
                         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
                         {post.original_language && (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="ml-1.5 inline-flex cursor-help items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 font-mono text-[10px] text-text-tertiary">
-                                Translated from {post.original_language.toUpperCase()}
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top" className="max-w-sm">
-                              <p className="text-meta">{decodeHTMLEntities(post.content?.slice(0, 300) || "")}</p>
-                            </TooltipContent>
-                          </Tooltip>
+                          <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 font-mono text-[10px] text-text-tertiary">
+                            Translated from {post.original_language.toUpperCase()}
+                          </span>
                         )}
                       </p>
                     </div>
