@@ -243,7 +243,6 @@ const ModelDetail = () => {
                   <Surface
                     as="article"
                     size="tight"
-                    tone="accent"
                     motion="fade"
                     className="flex items-center gap-4 sm:gap-5"
                   >
@@ -255,7 +254,7 @@ const ModelDetail = () => {
                         {featured.title}
                       </p>
                     </div>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    <ArrowRight className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
                   </Surface>
                 </Link>
               </section>
