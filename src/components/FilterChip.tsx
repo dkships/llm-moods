@@ -1,35 +1,20 @@
 import type { ButtonHTMLAttributes, ReactNode } from "react";
 
-type FilterChipVariant = "rect" | "pill";
-
 interface FilterChipProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   pressed: boolean;
-  variant?: FilterChipVariant;
   children: ReactNode;
 }
 
-const SHAPE_CLASSES: Record<FilterChipVariant, string> = {
-  rect: "rounded-md px-3 py-1.5",
-  pill: "rounded-full px-3 py-1",
-};
-
-const FilterChip = ({
-  pressed,
-  variant = "rect",
-  className = "",
-  children,
-  ...rest
-}: FilterChipProps) => {
+const FilterChip = ({ pressed, className = "", children, ...rest }: FilterChipProps) => {
   const state = pressed
-    ? "bg-primary/15 text-primary border-primary/30"
-    : "border-border text-text-secondary hover:bg-secondary/50 hover:text-foreground";
+    ? "bg-foreground/10 text-foreground border-foreground/20"
+    : "bg-transparent text-text-tertiary border-border hover:text-foreground hover:border-foreground/30";
   return (
     <button
       type="button"
       aria-pressed={pressed}
       className={[
-        "shrink-0 border font-mono text-xs transition-colors",
-        SHAPE_CLASSES[variant],
+        "shrink-0 rounded-md border px-3 py-1.5 font-mono text-xs transition-colors",
         state,
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         className,

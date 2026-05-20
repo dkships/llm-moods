@@ -337,14 +337,12 @@ const ModelDetail = () => {
                           <LazyVibesChart chartData={chartData} accent={accent} timeRange={timeRange} events={chartEvents} />
                         </Suspense>
                       </div>
-                      <div className="mt-4 flex gap-2">
+                      <div className="mt-4 flex gap-2" role="group" aria-label="Chart time range">
                         {TIME_RANGES.map((r) => (
                           <FilterChip
                             key={r}
-                            variant="rect"
                             pressed={timeRange === r}
                             onClick={() => setTimeRange(r)}
-                            title={`Show ${r}`}
                           >
                             {r}
                           </FilterChip>
@@ -490,7 +488,6 @@ const ModelDetail = () => {
                 aria-label="Filter recent posts by product surface"
               >
                 <FilterChip
-                  variant="pill"
                   pressed={surfaceFilter === "all"}
                   onClick={() => setSurfaceFilter("all")}
                 >
@@ -499,7 +496,6 @@ const ModelDetail = () => {
                 {availableSurfaceLabels.map((label) => (
                   <FilterChip
                     key={label}
-                    variant="pill"
                     pressed={surfaceFilter === label}
                     onClick={() => setSurfaceFilter(label)}
                   >
