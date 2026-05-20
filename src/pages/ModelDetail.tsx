@@ -16,6 +16,7 @@ import {
 import { getResearchPostsForModel } from "@/data/research-posts";
 import { detectProductSurface } from "@/lib/product-surface";
 import StatusCard from "@/components/StatusCard";
+import BarList from "@/components/BarList";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
@@ -104,7 +105,6 @@ const ModelDetail = () => {
     .sort((a, b) => b[1] - a[1])
     .map(([label, count]) => ({
       label,
-      count,
       pct: totalNegativePosts > 0 ? Math.round((count / totalNegativePosts) * 100) : 0,
     }));
 
@@ -331,34 +331,12 @@ const ModelDetail = () => {
                       title="Negative posts by surface"
                       meta="Loaded 7-day recent-post window"
                     />
-                    <div className="flex h-2 w-full overflow-hidden rounded-full bg-secondary">
-                      {negativeSurfaceRows.map((row, i) => {
-                        const ramp = [0.85, 0.65, 0.45, 0.3, 0.2];
-                        return (
-                          <div
-                            key={row.label}
-                            className="h-full"
-                            style={{
-                              width: `${row.pct}%`,
-                              background: accent,
-                              opacity: ramp[Math.min(i, ramp.length - 1)],
-                            }}
-                            title={`${row.label}: ${row.count} (${row.pct}%)`}
-                          />
-                        );
-                      })}
-                    </div>
-                    <ul className="mt-2 space-y-0.5">
-                      {negativeSurfaceRows.map((row) => (
-                        <li
-                          key={row.label}
-                          className="flex justify-between text-meta text-text-tertiary"
-                        >
-                          <span>{row.label}</span>
-                          <span>{row.pct}%</span>
-                        </li>
-                      ))}
-                    </ul>
+                    <BarList
+                      ramp
+                      max={100}
+                      accent={accent}
+                      items={negativeSurfaceRows.map((row) => ({ label: row.label, value: row.pct }))}
+                    />
                   </Surface>
                 )}
 
@@ -369,22 +347,11 @@ const ModelDetail = () => {
                   ) : complaintsLoading ? (
                     <BarsSkeleton count={5} />
                   ) : complaints && complaints.length > 0 ? (
-                    <div className="space-y-3">
-                      {complaints.map((c) => (
-                        <div key={c.category}>
-                          <div className="flex justify-between text-meta mb-1">
-                            <span className="text-text-tertiary">{formatComplaintLabel(c.category)}</span>
-                            <span className="text-foreground">{c.pct}%</span>
-                          </div>
-                          <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{ width: `${c.pct}%`, background: accent }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <BarList
+                      max={100}
+                      accent={accent}
+                      items={complaints.map((c) => ({ label: formatComplaintLabel(c.category), value: c.pct }))}
+                    />
                   ) : (
                     <p className="text-body text-text-tertiary">No complaint data yet</p>
                   )}
@@ -397,22 +364,11 @@ const ModelDetail = () => {
                   ) : sourcesLoading ? (
                     <BarsSkeleton count={3} />
                   ) : sources && sources.filter((s) => s.pct > 0).length > 0 ? (
-                    <div className="space-y-3">
-                      {sources.filter((s) => s.pct > 0).map((s) => (
-                        <div key={s.source}>
-                          <div className="flex justify-between text-meta mb-1">
-                            <span className="text-text-tertiary">{SOURCE_LABELS[s.source] || s.source}</span>
-                            <span className="text-foreground">{s.pct}%</span>
-                          </div>
-                          <div className="h-2 rounded-full bg-secondary overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all duration-500"
-                              style={{ width: `${s.pct}%`, background: accent, opacity: 0.7 }}
-                            />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
+                    <BarList
+                      max={100}
+                      accent={accent}
+                      items={sources.filter((s) => s.pct > 0).map((s) => ({ label: SOURCE_LABELS[s.source] || s.source, value: s.pct }))}
+                    />
                   ) : (
                     <p className="text-body text-text-tertiary">No source data yet</p>
                   )}
