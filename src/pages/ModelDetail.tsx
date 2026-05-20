@@ -1,5 +1,5 @@
 import { useParams, Link } from "react-router-dom";
-import { ArrowLeft, ArrowRight, AlertTriangle } from "lucide-react";
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, lazy, Suspense } from "react";
 import NavBar from "@/components/NavBar";
@@ -16,8 +16,6 @@ import {
 import { getResearchPostsForModel } from "@/data/research-posts";
 import { detectProductSurface } from "@/lib/product-surface";
 import StatusCard from "@/components/StatusCard";
-import DataFreshnessIndicator from "@/components/DataFreshnessIndicator";
-import ScoreMetaBadge from "@/components/ScoreMetaBadge";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
@@ -29,15 +27,6 @@ import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skele
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
 const TIME_RANGES = ["24h", "7d", "30d"] as const;
-
-function formatAbsoluteTimestamp(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return new Intl.DateTimeFormat("en-US", {
-    dateStyle: "medium",
-    timeStyle: "short",
-  }).format(date);
-}
 
 const ModelDetail = () => {
   const { slug } = useParams<{ slug: string }>();
@@ -69,31 +58,15 @@ const ModelDetail = () => {
   const latestScore = enriched?.latestScore ?? 50;
   const trend = enriched?.trend ?? { direction: "up" as const, pts: 0 };
   const recentPosts7d = enriched?.recentPosts7d ?? enriched?.totalPosts ?? 0;
-  const latestScoreTotalPosts = enriched?.latestScoreTotalPosts ?? 0;
   const latestEligiblePosts = enriched?.eligiblePosts ?? 0;
-  const queuedPosts = enriched?.queuedPosts ?? 0;
   const failedPosts = enriched?.failedPosts ?? 0;
-  const coveragePct = Math.round((enriched?.classificationCoverage ?? 1) * 100);
-  const scoreConfidence = enriched?.scoreConfidence ?? "low";
-  const scoreBasisStatus = enriched?.scoreBasisStatus ?? "measured";
-  const latestDataUpdatedAt = enriched?.latestPostIngestedAt ?? enriched?.latestPostPostedAt ?? null;
-  const scoreComputedAt = enriched?.scoreComputedAt ?? null;
-  const scoreComputedLabel = scoreComputedAt ? formatTimeAgo(scoreComputedAt) : null;
-  const scoreComputedAbsolute = scoreComputedAt ? formatAbsoluteTimestamp(scoreComputedAt) : null;
-  const hasNoEligiblePosts = !enriched?.isLatestCarryForward && scoreBasisStatus === "no_eligible_posts" && latestScoreTotalPosts > 0;
-  const metaLineTitle = [
-    hasNoEligiblePosts
-      ? "Posts were found in the latest window, but none met the high-confidence scoring threshold."
-      : `${latestEligiblePosts.toLocaleString()} scored of ${latestScoreTotalPosts.toLocaleString()} collected in the latest score window.`,
-    `${coveragePct}% classified for scoring.`,
-    queuedPosts > 0 ? `${queuedPosts.toLocaleString()} queued for Gemini classification.` : null,
-    failedPosts > 0 ? `${failedPosts.toLocaleString()} abandoned after max retries.` : null,
-    `Score confidence: ${scoreConfidence}.`,
-    enriched?.isStale ? "No measured score exists for the current Pacific day yet." : null,
-    scoreComputedLabel && scoreComputedAbsolute
-      ? `Score recomputed ${scoreComputedLabel} (${scoreComputedAbsolute}).`
-      : null,
-  ].filter(Boolean).join(" ");
+  const metaParts = [
+    `${latestEligiblePosts.toLocaleString()} SCORED`,
+    `${recentPosts7d.toLocaleString()} COLLECTED`,
+    "7D",
+    failedPosts > 0 ? `${failedPosts.toLocaleString()} ABANDONED` : null,
+    enriched?.isStale ? "STALE" : null,
+  ].filter(Boolean);
   const vibe = getVibeStatus(latestScore);
   const accent = model?.accent_color || "#888";
 
@@ -238,7 +211,7 @@ const ModelDetail = () => {
             </Link>
             <p className={`text-mono-cap text-text-tertiary`}>{vibe.label}</p>
             <div className="mt-1 flex items-center gap-3">
-              <div className="h-10 w-1.5 shrink-0 rounded-full" style={{ background: accent }} />
+              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: accent }} />
               <h1 className="text-page text-foreground">{model.name}</h1>
             </div>
             <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-5">
@@ -250,34 +223,9 @@ const ModelDetail = () => {
               </p>
               <p className={`pb-2 text-mono-cap text-text-secondary`}>{trendCaption}</p>
             </div>
-            <p
-              className={`mt-3 text-mono-cap text-text-tertiary`}
-              title={metaLineTitle}
-              aria-label={`${latestEligiblePosts.toLocaleString()} scored posts`}
-            >
-              {latestEligiblePosts.toLocaleString()} SCORED · {recentPosts7d.toLocaleString()} COLLECTED · 7D
+            <p className="mt-3 text-mono-cap text-text-tertiary">
+              {metaParts.join(" · ")}
             </p>
-            {(failedPosts > 0 || enriched?.isStale) && (
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {failedPosts > 0 && (
-                  <ScoreMetaBadge
-                    tone="warning"
-                    icon={AlertTriangle}
-                    title={`${failedPosts.toLocaleString()} posts in the latest 7-day window exhausted classification retries. Recoverable via reclassify-posts?mode=reset_failed.`}
-                  >
-                    {failedPosts.toLocaleString()} abandoned
-                  </ScoreMetaBadge>
-                )}
-                {enriched?.isStale && (
-                  <ScoreMetaBadge tone="warning" icon={AlertTriangle} title="No current Pacific-day measured score yet.">
-                    Stale score
-                  </ScoreMetaBadge>
-                )}
-              </div>
-            )}
-            <div className="mt-3">
-              <DataFreshnessIndicator lastUpdated={latestDataUpdatedAt} />
-            </div>
           </section>
 
           {/* Recent incident analysis — only when a research post references this model */}
