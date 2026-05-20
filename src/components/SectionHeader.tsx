@@ -1,4 +1,3 @@
-import type { LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 
 type SectionHeaderLevel = "card" | "page";
@@ -6,7 +5,6 @@ type SectionHeaderLevel = "card" | "page";
 interface SectionHeaderProps {
   title: string;
   meta?: string;
-  icon?: LucideIcon;
   action?: ReactNode;
   level?: SectionHeaderLevel;
   className?: string;
@@ -15,7 +13,6 @@ interface SectionHeaderProps {
 const SectionHeader = ({
   title,
   meta,
-  icon: Icon,
   action,
   level = "card",
   className = "",
@@ -24,10 +21,7 @@ const SectionHeader = ({
   return (
     <header className={`mb-4 ${className}`.trim()}>
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
-          {Icon && <Icon className="h-4 w-4 text-primary" aria-hidden="true" />}
-          <h2 className={titleClass}>{title}</h2>
-        </div>
+        <h2 className={titleClass}>{title}</h2>
         {action}
       </div>
       {meta && <p className="mt-1 text-meta text-text-tertiary">{meta}</p>}

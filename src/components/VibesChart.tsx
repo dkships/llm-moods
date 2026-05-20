@@ -1,4 +1,4 @@
-import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip, ReferenceLine, ReferenceArea } from "recharts";
+import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip as RechartsTooltip, ReferenceLine, ReferenceArea } from "recharts";
 import { memo } from "react";
 import { LIMITED_SAMPLE_THRESHOLD } from "@/lib/vibes";
 
@@ -180,7 +180,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
         tickLine={false}
         width={30}
       />
-      <Tooltip
+      <RechartsTooltip
         content={(props) => <CarryForwardTooltip {...(props as CarryForwardTooltipProps)} accent={accent} />}
       />
       {showMidlineRef && (

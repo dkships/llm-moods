@@ -1,4 +1,3 @@
-import { MessageSquare } from "lucide-react";
 import { memo, useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -8,7 +7,6 @@ import SectionHeader from "@/components/SectionHeader";
 import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   useModelsWithLatestVibes,
   useRecentChatter,
@@ -56,19 +54,9 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: brandColor }} />
               <p className="truncate font-display text-lg font-semibold text-foreground">{m.name}</p>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <p
-                  className="shrink-0 cursor-help text-score"
-                  style={{ color: vibe.color }}
-                >
-                  {m.latestScore}
-                </p>
-              </TooltipTrigger>
-              <TooltipContent side="left" className="text-meta">
-                0 = everyone's complaining, 100 = pure good vibes
-              </TooltipContent>
-            </Tooltip>
+            <p className="shrink-0 text-score" style={{ color: vibe.color }}>
+              {m.latestScore}
+            </p>
           </div>
 
           {m.sparkline.length > 1 && (
@@ -113,25 +101,15 @@ const ChatterPost = memo(({ post }: { post: RecentChatterPost; i: number }) => {
 
   const content = (
     <div className="flex flex-col gap-2">
-      <p
-        className="text-mono-cap text-text-tertiary"
-        title={post.posted_at ? `Posted on ${src.label} at ${new Date(post.posted_at).toLocaleString()}` : undefined}
-      >
+      <p className="text-mono-cap text-text-tertiary">
         {metaPieces.join(" · ")}
       </p>
       <p className="line-clamp-2 text-sm leading-[1.55] text-foreground">
         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
         {post.original_language && (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span className="ml-1.5 inline-flex cursor-help items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 font-mono text-[10px] text-text-tertiary">
-                Translated from {post.original_language.toUpperCase()}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="top" className="max-w-sm">
-              <p className="text-xs">{post.content?.slice(0, 300)}</p>
-            </TooltipContent>
-          </Tooltip>
+          <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 font-mono text-[10px] text-text-tertiary">
+            Translated from {post.original_language.toUpperCase()}
+          </span>
         )}
       </p>
     </div>
@@ -256,6 +234,9 @@ const Dashboard = () => {
                 ))}
               </div>
             )}
+            <p className="mt-3 text-mono-cap text-text-tertiary">
+              Scores are 0–100 · higher means happier users
+            </p>
           </section>
 
           {/* Trending Complaints */}
@@ -267,7 +248,6 @@ const Dashboard = () => {
           <section className="container pb-12" ref={chatterRef}>
             <SectionHeader
               level="page"
-              icon={MessageSquare}
               title="Recent Community Chatter"
             />
 
