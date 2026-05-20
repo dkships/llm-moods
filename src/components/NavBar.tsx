@@ -7,6 +7,26 @@ const GitHubIcon = ({ className }: { className?: string }) => (
   </svg>
 );
 
+const SvgMark = () => (
+  <svg viewBox="0 0 16 16" className="h-4 w-4 text-primary" aria-hidden="true">
+    <path
+      d="M1 6 C 3 4, 5 8, 7 6 S 11 4, 13 6 S 15 6, 15 6"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+    />
+    <path
+      d="M1 10 C 3 8, 5 12, 7 10 S 11 8, 13 10 S 15 10, 15 10"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.5"
+      strokeLinecap="round"
+      opacity="0.5"
+    />
+  </svg>
+);
+
 const NavBar = () => {
   const { pathname } = useLocation();
   const showResearchLink = RESEARCH_POSTS.length > 0;
@@ -26,9 +46,12 @@ const NavBar = () => {
       <div className="container flex h-16 items-center justify-between">
         <Link
           to="/"
-          className="rounded-md text-section text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="inline-flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          🌊 LLM <span className="text-primary">Vibes</span>
+          <SvgMark />
+          <span className="text-section text-foreground">
+            LLM <span className="text-primary">Vibes</span>
+          </span>
         </Link>
         <div className="flex items-center gap-3 sm:gap-5">
           <Link to="/dashboard" className={navLinkClass(isDashboardActive)}>
