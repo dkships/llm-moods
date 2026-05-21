@@ -1,92 +1,23 @@
-import { memo, useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
-import { Link } from "react-router-dom";
+import { memo, useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import SectionHeader from "@/components/SectionHeader";
 import Surface from "@/components/Surface";
 import Tag from "@/components/Tag";
+import ModelCard from "@/components/ModelCard";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import {
   useModelsWithLatestVibes,
   useRecentChatter,
   usePrefetchModelDetail,
-  type ModelWithVibes,
   type RecentChatterPost,
 } from "@/hooks/useVibesData";
 import StalenessBanner from "@/components/StalenessBanner";
-import { getVibeStatus, formatComplaintLabel, formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
+import { formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
-
-const LazySparkline = lazy(() => import("@/components/Sparkline"));
-
-/** Memoized model card */
-const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover: (slug: string, id: string) => void }) => {
-  const vibe = getVibeStatus(m.latestScore);
-  const brandColor = m.accent_color || "#888";
-
-  const trendUp = m.trend.direction === "up" && !m.isLatestCarryForward && !m.isStale;
-  const trendDown = m.trend.direction === "down" && !m.isLatestCarryForward && !m.isStale;
-  const trendCaption = m.isStale
-    ? "STALE SCORE"
-    : m.isLatestCarryForward
-    ? "NO NEW POSTS"
-    : trendUp
-    ? `+${m.trend.pts} PTS`
-    : trendDown
-    ? `-${m.trend.pts} PTS`
-    : "0 PTS";
-  const postsCaption = `${(m.totalPosts || 0).toLocaleString()} POSTS`;
-
-  return (
-    <Link
-      to={`/model/${m.slug}`}
-      className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-      onMouseEnter={() => onHover(m.slug, m.id)}
-    >
-      <Surface size="bare" motion="fade" className="overflow-hidden h-full">
-        <div className="h-1.5" style={{ background: vibe.color }} />
-        <div className="p-6">
-          <p className={`text-mono-cap text-text-tertiary`}>{vibe.label}</p>
-          <div className="mt-1 flex items-start justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: brandColor }} />
-              <p className="truncate text-section text-foreground">{m.name}</p>
-            </div>
-            <p className="shrink-0 text-score" style={{ color: vibe.color }}>
-              {m.latestScore}
-            </p>
-          </div>
-
-          {m.sparkline.length > 1 && (
-            <div className="mt-4 h-12" aria-hidden="true">
-              <Suspense fallback={<div className="h-12 animate-pulse rounded bg-secondary/40" />}>
-                <LazySparkline data={m.sparkline} accent="hsl(var(--foreground) / 0.55)" />
-              </Suspense>
-            </div>
-          )}
-
-          <p className={`mt-3 text-mono-cap`}>
-            <span className="text-text-secondary">{trendCaption}</span>
-            <span className="text-text-tertiary"> · {postsCaption}</span>
-          </p>
-
-          {m.topComplaint && (
-            <div className="mt-4 flex items-center gap-3 border-t border-border pt-3">
-              <span className={`text-mono-cap shrink-0 text-text-tertiary`}>Top</span>
-              <span className="truncate text-body font-medium text-foreground">
-                {formatComplaintLabel(m.topComplaint)}
-              </span>
-            </div>
-          )}
-        </div>
-      </Surface>
-    </Link>
-  );
-});
-ModelCard.displayName = "ModelCard";
 
 /** Memoized chatter post */
 const ChatterPost = memo(({ post }: { post: RecentChatterPost; i: number }) => {
@@ -230,8 +161,8 @@ const Dashboard = () => {
               </p>
             ) : (
               <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 animate-fade-in">
-                {(models || []).map((m, i) => (
-                  <ModelCard key={m.id} m={m} i={i} onHover={handleHover} />
+                {(models || []).map((m) => (
+                  <ModelCard key={m.id} m={m} showSparkline onHover={handleHover} />
                 ))}
               </div>
             )}
