@@ -1,5 +1,5 @@
 import { memo, useMemo } from "react";
-import { ExternalLink, CheckCircle2, AlertCircle } from "lucide-react";
+import { ExternalLink } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BarsSkeleton } from "@/components/Skeletons";
 import Surface from "@/components/Surface";
@@ -23,13 +23,10 @@ const VENDOR_LABEL: Record<string, string> = {
 
 function severityClasses(severity: StatusSeverity): string {
   if (severity === "critical" || severity === "major") {
-    return "text-destructive bg-destructive/10 border-destructive/20";
+    return "text-foreground bg-destructive/10 border-destructive/30";
   }
   if (severity === "minor") {
-    return "text-warning bg-warning/10 border-warning/20";
-  }
-  if (severity === "maintenance") {
-    return "text-text-tertiary bg-secondary/40 border-border";
+    return "text-foreground bg-warning/10 border-warning/30";
   }
   return "text-text-tertiary bg-secondary/40 border-border";
 }
@@ -86,7 +83,7 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
                 <span>
                   Possible overlap · {formatAnomalyDate(a.periodStart)} {a.severity}
                 </span>
-                <span className={a.z < 0 ? "text-destructive" : "text-primary"}>
+                <span className="text-text-secondary">
                   z={a.z >= 0 ? "+" : ""}{a.z.toFixed(1)}
                 </span>
               </li>
@@ -150,20 +147,18 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
       {isLoading ? (
         <BarsSkeleton count={3} />
       ) : isError ? (
-        <div className="flex items-center gap-2 text-body text-text-tertiary">
-          <AlertCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>Status data temporarily unavailable.</span>
-        </div>
+        <p className="text-body text-text-tertiary">
+          Status data temporarily unavailable.
+        </p>
       ) : !data?.supported ? (
         <p className="text-body text-text-tertiary">
           {data?.message ?? "No public status feed published by this vendor."}
         </p>
       ) : data.events.length === 0 ? (
         <>
-          <div className="flex items-center gap-2 text-body text-text-secondary">
-            <CheckCircle2 className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-            <span>All operational over the last 30 days</span>
-          </div>
+          <p className="text-body text-text-secondary">
+            All operational over the last 30 days
+          </p>
           {data.fetchedAt && (
             <p className="mt-3 text-mono-cap text-text-tertiary">
               Last checked {formatTimeAgo(data.fetchedAt)}
