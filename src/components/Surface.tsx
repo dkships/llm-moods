@@ -1,10 +1,9 @@
 import type { ElementType, ReactNode, ComponentPropsWithoutRef } from "react";
 
 const sizeClasses = {
-  default: "rounded-xl p-6",
-  compact: "rounded-lg p-4",
-  tight: "rounded-lg p-5",
-  bare: "rounded-xl",
+  default: "rounded-xl p-6", // standard card
+  compact: "rounded-lg p-4", // chatter rows, dense rows
+  bare: "rounded-xl", // wrappers that own their own padding
 } as const;
 
 export type SurfaceSize = keyof typeof sizeClasses;
