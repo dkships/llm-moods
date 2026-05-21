@@ -21,7 +21,6 @@ import BarList from "@/components/BarList";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
-  formatTimeAgo,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
@@ -91,7 +90,6 @@ const ModelDetail = () => {
   const filteredPostsWithSurface = surfaceFilter === "all"
     ? postsWithSurface
     : postsWithSurface.filter(({ surface }) => surface?.label === surfaceFilter);
-  const latestRecentPostAt = postsWithSurface[0]?.post.posted_at ?? null;
 
   // Surface distribution among negative posts in the loaded recent window.
   const negativeBySurface = new Map<string, number>();
@@ -276,10 +274,7 @@ const ModelDetail = () => {
                     <ChartSkeleton />
                   ) : (
                     <>
-                      <SectionHeader
-                        title="Vibes Over Time"
-                        meta={timeRange === "24h" ? "Hourly vibes score" : "Daily vibes score"}
-                      />
+                      <SectionHeader title="Vibes over time" />
                       <div className="h-64">
                         <Suspense fallback={<div className="h-64 animate-pulse rounded bg-secondary/40" />}>
                           <LazyVibesChart chartData={chartData} accent={accent} timeRange={timeRange} events={chartEvents} />
@@ -327,10 +322,7 @@ const ModelDetail = () => {
               <div className="space-y-6">
                 {negativeSurfaceRows.length > 0 && (
                   <Surface motion="fade">
-                    <SectionHeader
-                      title="Negative posts by surface"
-                      meta="Loaded 7-day recent-post window"
-                    />
+                    <SectionHeader title="Negative posts by surface" />
                     <BarList
                       ramp
                       max={100}
@@ -341,7 +333,7 @@ const ModelDetail = () => {
                 )}
 
                 <Surface motion="fade">
-                  <SectionHeader title="Complaint Breakdown" meta="Last 30 days" />
+                  <SectionHeader title="Complaint breakdown" meta="Last 30 days" />
                   {complaintsError ? (
                     <p className="text-body text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
                   ) : complaintsLoading ? (
@@ -381,8 +373,7 @@ const ModelDetail = () => {
           <section className="container pb-12">
             <SectionHeader
               level="page"
-              title={`Recent Posts about ${model.name}`}
-              meta={latestRecentPostAt ? `Latest classified post ${formatTimeAgo(latestRecentPostAt)}` : undefined}
+              title={`Recent posts about ${model.name}`}
               className="mb-3"
             />
             {availableSurfaceLabels.length > 0 && (
