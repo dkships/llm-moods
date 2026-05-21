@@ -54,7 +54,7 @@ const TrendingComplaints = () => {
 
   if (isLoading) {
     return (
-      <Surface size="tight" className="animate-pulse">
+      <Surface className="animate-pulse">
         <div className="mb-4 h-5 w-48 rounded bg-secondary/50" />
         <div className="space-y-3">
           {[1, 2, 3].map((i) => <div key={i} className="h-8 rounded bg-secondary/40" />)}
@@ -74,7 +74,7 @@ const TrendingComplaints = () => {
   const maxVolume = topMovers.reduce((m, row) => Math.max(m, row.this_week), 0);
 
   return (
-    <Surface size="tight" motion="fade">
+    <Surface motion="fade">
       <SectionHeader
         title="Trending complaints"
         action={<span className={`text-mono-cap text-text-tertiary`}>vs prior week</span>}

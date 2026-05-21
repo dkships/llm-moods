@@ -243,7 +243,7 @@ const ModelDetail = () => {
                 >
                   <Surface
                     as="article"
-                    size="tight"
+                    size="compact"
                     motion="fade"
                     className="flex items-center gap-4 sm:gap-5"
                   >
