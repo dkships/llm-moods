@@ -17,9 +17,12 @@ export default function StalenessBanner({ mostRecentScoreAt, staleAfterHours = S
   return (
     <div
       role="status"
-      className="border-l-2 border-yellow-400/60 bg-yellow-400/5 px-4 py-3 font-mono text-xs text-yellow-200/90"
+      className="border-y border-warning/30 bg-warning/5 px-4 py-3"
     >
-      Scores last refreshed {formatTimeAgo(mostRecentScoreAt)}. Pipeline may be catching up — newer numbers will appear automatically.
+      <p className="text-meta text-text-secondary">
+        <span className="text-warning">Scores stale.</span>{" "}
+        Last refreshed {formatTimeAgo(mostRecentScoreAt)}. Newer numbers will appear automatically.
+      </p>
     </div>
   );
 }
