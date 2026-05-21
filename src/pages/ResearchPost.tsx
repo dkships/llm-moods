@@ -92,20 +92,20 @@ const ResearchPostPage = () => {
             <div className="mx-auto max-w-3xl animate-fade-in">
               <Link
                 to="/research"
-                className="mb-6 inline-flex items-center gap-1.5 rounded-md text-sm text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="mb-6 inline-flex items-center gap-1.5 rounded-md text-meta text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Research
               </Link>
 
               <header className="mb-8 border-b border-border pb-8">
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-xs uppercase tracking-wide text-text-tertiary">
+                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-mono-cap text-text-tertiary">
                   <span>
                     {formatDate(post.publishedAt)} · {post.author}
                   </span>
                   {post.updatedAt && post.updatedAt !== post.publishedAt && (
                     <span
-                      className="rounded-full border border-border px-2 py-0.5 text-[10px] tracking-[0.1em]"
+                      className="rounded-full border border-border px-2 py-0.5 text-mono-cap"
                       title={`Last updated ${formatDate(post.updatedAt)}`}
                     >
                       Updated · {formatDate(post.updatedAt)}
@@ -121,7 +121,7 @@ const ResearchPostPage = () => {
                     <Badge
                       key={tag}
                       variant="outline"
-                      className="text-[10px] font-mono uppercase tracking-wide"
+                      className="text-mono-cap"
                     >
                       {tag}
                     </Badge>
