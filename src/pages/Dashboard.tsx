@@ -76,23 +76,17 @@ const Dashboard = () => {
           {/* Page Header */}
           <section className="container pt-10 pb-8">
             <h1 className="text-page text-foreground">
-              Current Vibes
+              Current vibes
             </h1>
-            <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full bg-foreground/40"
-                aria-hidden="true"
-              />
-              <p
-                className="text-meta text-text-tertiary"
-                role="status"
-                aria-live="polite"
-              >
-                {latestScoreUpdate
-                  ? `Updated ${formatTimeAgo(latestScoreUpdate)} · ${today}`
-                  : today}
-              </p>
-            </div>
+            <p
+              className="mt-2 text-meta text-text-tertiary"
+              role="status"
+              aria-live="polite"
+            >
+              {latestScoreUpdate
+                ? `Updated ${formatTimeAgo(latestScoreUpdate)} · ${today}`
+                : today}
+            </p>
           </section>
 
           {/* Model Cards */}
@@ -126,7 +120,7 @@ const Dashboard = () => {
           <section className="container pb-12" ref={chatterRef}>
             <SectionHeader
               level="page"
-              title="Recent Community Chatter"
+              title="Recent community chatter"
             />
 
             {chatterError ? (

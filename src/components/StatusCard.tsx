@@ -117,7 +117,7 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
   return (
     <Surface as="section" motion="fade" aria-label={`Official status for ${vendorName}`}>
       <SectionHeader
-        title="Official Status"
+        title="Official status"
         meta={vendorName}
         action={data?.publicUrl && (
           <a
