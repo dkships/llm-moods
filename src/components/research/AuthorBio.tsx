@@ -12,7 +12,7 @@ const BIO_LINKS: ReadonlyArray<{ label: string; href: string; external: boolean 
 
 const AuthorBio = () => (
   <aside className="mt-12 rounded-lg border border-border bg-secondary/30 px-6 py-5">
-    <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-text-tertiary">
+    <p className="text-mono-cap text-text-tertiary">
       About the author
     </p>
     <p className="mt-2 text-body text-foreground">
@@ -21,7 +21,7 @@ const AuthorBio = () => (
       builds llmvibes.ai independently, and advises on product, growth, and AI tooling for AppSumo Originals,
       FOUND, and Table22.
     </p>
-    <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 font-mono text-xs text-text-secondary">
+    <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-meta text-text-secondary">
       {BIO_LINKS.map((link) => (
         <li key={link.href}>
           <a

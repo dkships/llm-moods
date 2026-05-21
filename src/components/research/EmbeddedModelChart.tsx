@@ -75,7 +75,7 @@ const EmbeddedModelChart = ({ modelSlug, daysBack, startDate, endDate, caption }
   return (
     <Surface className="my-6">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="font-mono text-sm uppercase tracking-wide text-text-tertiary">
+        <h3 className="text-mono-cap text-text-tertiary">
           {headerLabel}
         </h3>
       </div>

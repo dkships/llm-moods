@@ -30,7 +30,7 @@ const PullQuote = ({ text, handle, platform, timestamp, href, archivedHref }: Pu
         ”
       </span>
     </blockquote>
-    <figcaption className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 font-mono text-[11px] uppercase tracking-[0.1em] text-text-tertiary">
+    <figcaption className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-mono-cap text-text-tertiary">
       <a
         href={href}
         target="_blank"
