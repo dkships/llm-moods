@@ -5,7 +5,7 @@ import NavBar from "@/components/NavBar";
 import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
-import { Badge } from "@/components/ui/badge";
+import Tag from "@/components/Tag";
 import { getResearchPost } from "@/data/research-posts";
 import { getResearchBody } from "@/data/research-bodies";
 import { PROSE_CLASS_NAME } from "@/lib/prose-styles";
@@ -104,12 +104,7 @@ const ResearchPostPage = () => {
                     {formatDate(post.publishedAt)} · {post.author}
                   </span>
                   {post.updatedAt && post.updatedAt !== post.publishedAt && (
-                    <span
-                      className="rounded-full border border-border px-2 py-0.5 text-mono-cap"
-                      title={`Last updated ${formatDate(post.updatedAt)}`}
-                    >
-                      Updated · {formatDate(post.updatedAt)}
-                    </span>
+                    <Tag shape="pill">Updated · {formatDate(post.updatedAt)}</Tag>
                   )}
                 </div>
                 <h1 className="mt-3 text-page text-foreground">
@@ -118,13 +113,7 @@ const ResearchPostPage = () => {
                 <p className="mt-4 text-body text-text-secondary">{post.summary}</p>
                 <div className="mt-5 flex flex-wrap items-center gap-2">
                   {post.tags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="outline"
-                      className="text-mono-cap"
-                    >
-                      {tag}
-                    </Badge>
+                    <Tag key={tag} shape="pill">{tag}</Tag>
                   ))}
                 </div>
                 {post.dataset && (

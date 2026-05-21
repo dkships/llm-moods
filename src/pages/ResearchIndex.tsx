@@ -5,7 +5,7 @@ import Footer from "@/components/Footer";
 import PageTransition from "@/components/PageTransition";
 import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
-import { Badge } from "@/components/ui/badge";
+import Tag from "@/components/Tag";
 import { RESEARCH_POSTS } from "@/data/research-posts";
 import NotFound from "@/pages/NotFound";
 
@@ -92,13 +92,7 @@ const ResearchIndex = () => {
                       <p className="mt-3 text-body text-text-secondary">{post.summary}</p>
                       <div className="mt-4 flex flex-wrap items-center gap-2">
                         {post.tags.slice(0, 3).map((tag) => (
-                          <Badge
-                            key={tag}
-                            variant="outline"
-                            className="text-mono-cap"
-                          >
-                            {tag}
-                          </Badge>
+                          <Tag key={tag} shape="pill">{tag}</Tag>
                         ))}
                       </div>
                     </Surface>

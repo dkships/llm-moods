@@ -7,6 +7,7 @@ import PageTransition from "@/components/PageTransition";
 import Surface from "@/components/Surface";
 import SectionHeader from "@/components/SectionHeader";
 import FilterChip from "@/components/FilterChip";
+import Tag from "@/components/Tag";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import {
@@ -442,9 +443,9 @@ const ModelDetail = () => {
                       <p className="line-clamp-2 text-body text-foreground">
                         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
                         {post.original_language && (
-                          <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 text-mono-cap text-text-tertiary">
+                          <Tag className="ml-1.5">
                             Translated from {post.original_language.toUpperCase()}
-                          </span>
+                          </Tag>
                         )}
                       </p>
                     </div>

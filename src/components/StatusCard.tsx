@@ -1,6 +1,6 @@
 import { memo, useMemo } from "react";
 import { ExternalLink } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import Tag, { type TagTone } from "@/components/Tag";
 import { BarsSkeleton } from "@/components/Skeletons";
 import Surface from "@/components/Surface";
 import SectionHeader from "@/components/SectionHeader";
@@ -21,14 +21,10 @@ const VENDOR_LABEL: Record<string, string> = {
   xai: "xAI",
 };
 
-function severityClasses(severity: StatusSeverity): string {
-  if (severity === "critical" || severity === "major") {
-    return "text-foreground bg-destructive/10 border-destructive/30";
-  }
-  if (severity === "minor") {
-    return "text-foreground bg-warning/10 border-warning/30";
-  }
-  return "text-text-tertiary bg-secondary/40 border-border";
+function severityTone(severity: StatusSeverity): TagTone {
+  if (severity === "critical" || severity === "major") return "destructive";
+  if (severity === "minor") return "warning";
+  return "neutral";
 }
 
 function severityLabel(severity: StatusSeverity): string {
@@ -63,29 +59,22 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
     <li className="flex items-start justify-between gap-3 py-3 border-b border-border/40 last:border-b-0">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge
-            variant="outline"
-            className={`shrink-0 text-mono-cap ${severityClasses(event.severity)}`}
-            aria-label={`Severity: ${severityLabel(event.severity)}`}
-          >
+          <Tag tone={severityTone(event.severity)} className="shrink-0">
             {severityLabel(event.severity)}
-          </Badge>
+          </Tag>
           <span className="text-meta text-text-tertiary">{dateLabel}</span>
         </div>
         <p className="mt-1.5 text-body text-text-secondary">{event.title}</p>
         {topCorrelations.length > 0 && (
           <ul className="mt-2 space-y-1" aria-label="Correlated LLM Vibes anomalies">
             {topCorrelations.map((a) => (
-              <li
-                key={`${a.modelSlug}-${a.periodStart}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-2 py-0.5 text-mono-cap text-text-secondary mr-1.5"
-              >
-                <span>
+              <li key={`${a.modelSlug}-${a.periodStart}`}>
+                <Tag shape="pill">
                   Possible overlap · {formatAnomalyDate(a.periodStart)} {a.severity}
-                </span>
-                <span className="text-text-secondary">
-                  z={a.z >= 0 ? "+" : ""}{a.z.toFixed(1)}
-                </span>
+                  <span className="text-text-secondary">
+                    z={a.z >= 0 ? "+" : ""}{a.z.toFixed(1)}
+                  </span>
+                </Tag>
               </li>
             ))}
             {remainingCount > 0 && (
