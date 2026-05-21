@@ -120,7 +120,7 @@ const TrendingComplaints = () => {
                 </div>
 
                 <span
-                  className={`text-right font-mono text-[13px] font-semibold ${changeToneClass(pct)}`}
+                  className={`text-right text-meta font-semibold ${changeToneClass(pct)}`}
                   aria-label={`${pct >= 0 ? "up" : "down"} ${Math.abs(pct)} percent`}
                 >
                   {sign}{pct}%

@@ -442,7 +442,7 @@ const ModelDetail = () => {
                       <p className="line-clamp-2 text-body text-foreground">
                         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
                         {post.original_language && (
-                          <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 font-mono text-[10px] text-text-tertiary">
+                          <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 text-mono-cap text-text-tertiary">
                             Translated from {post.original_language.toUpperCase()}
                           </span>
                         )}

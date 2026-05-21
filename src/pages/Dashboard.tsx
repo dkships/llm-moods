@@ -52,7 +52,7 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
           <div className="mt-1 flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: brandColor }} />
-              <p className="truncate font-display text-lg font-semibold text-foreground">{m.name}</p>
+              <p className="truncate text-section text-foreground">{m.name}</p>
             </div>
             <p className="shrink-0 text-score" style={{ color: vibe.color }}>
               {m.latestScore}
@@ -75,7 +75,7 @@ const ModelCard = memo(({ m, onHover }: { m: ModelWithVibes; i: number; onHover:
           {m.topComplaint && (
             <div className="mt-4 flex items-center gap-3 border-t border-border pt-3">
               <span className={`text-mono-cap shrink-0 text-text-tertiary`}>Top</span>
-              <span className="truncate text-sm font-medium text-foreground">
+              <span className="truncate text-body font-medium text-foreground">
                 {formatComplaintLabel(m.topComplaint)}
               </span>
             </div>
@@ -104,10 +104,10 @@ const ChatterPost = memo(({ post }: { post: RecentChatterPost; i: number }) => {
       <p className="text-mono-cap text-text-tertiary">
         {metaPieces.join(" · ")}
       </p>
-      <p className="line-clamp-2 text-sm leading-[1.55] text-foreground">
+      <p className="line-clamp-2 text-body text-foreground">
         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
         {post.original_language && (
-          <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 font-mono text-[10px] text-text-tertiary">
+          <span className="ml-1.5 inline-flex items-center whitespace-nowrap rounded border border-border/30 bg-secondary/50 px-1 py-0.5 text-mono-cap text-text-tertiary">
             Translated from {post.original_language.toUpperCase()}
           </span>
         )}

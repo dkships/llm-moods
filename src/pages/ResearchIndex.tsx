@@ -95,7 +95,7 @@ const ResearchIndex = () => {
                           <Badge
                             key={tag}
                             variant="outline"
-                            className="text-[10px] font-mono uppercase tracking-wide"
+                            className="text-mono-cap"
                           >
                             {tag}
                           </Badge>

@@ -97,11 +97,11 @@ const Index = () => {
           <section className="container pt-12 sm:pt-20 pb-10 relative overflow-hidden">
             <div className="absolute -top-24 right-[-10%] w-[520px] h-[520px] rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.12)_0%,_transparent_65%)] pointer-events-none" />
             <div className="max-w-3xl relative animate-fade-in">
-              <h1 className="text-4xl sm:text-6xl font-bold tracking-tight text-foreground leading-[1.1]">
+              <h1 className="text-hero text-foreground">
                 Is your AI having<br />
                 a <span className="text-primary glow-text">bad day</span>?
               </h1>
-              <p className="mt-5 text-lg text-text-secondary max-w-xl leading-relaxed">
+              <p className="mt-5 text-body text-text-secondary max-w-xl">
                 A daily read on community sentiment, before the AI Twitter discourse catches up.
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-4">

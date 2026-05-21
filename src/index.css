@@ -74,10 +74,24 @@
 }
 
 @layer utilities {
-  /* Five-rung type ladder (plus score-xl + meta + mono-cap). The whole site
-     should pick from this set — see "ONE RHYTHM" in the UX & UI polish doc.
-     Anything outside the ladder (text-3xl, text-2xl, text-xl, text-base) is a
-     drift signal during PR review. */
+  /* Eight-rung type ladder: hero, score-xl, score, page, section, body, meta,
+     mono-cap. This set is the entire type universe — every piece of text on the
+     site picks exactly one rung. Anything outside it (text-3xl/2xl/xl/lg/base,
+     text-[10px]/[11px]/[13px], font-mono text-xs as metadata, "text-xs uppercase
+     tracking-wide") is type drift and gets replaced mechanically during review.
+     See "ONE RHYTHM" in the UX & UI polish doc. */
+  .text-hero {
+    @apply font-display font-bold;
+    font-size: 36px;
+    line-height: 1.1;
+    letter-spacing: -0.02em;
+  }
+  @media (min-width: 640px) {
+    .text-hero {
+      font-size: 64px;
+      line-height: 1.05;
+    }
+  }
   .text-score-xl {
     @apply font-mono font-extrabold;
     font-size: 72px;

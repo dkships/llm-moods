@@ -68,7 +68,7 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
         <div className="flex flex-wrap items-center gap-2">
           <Badge
             variant="outline"
-            className={`shrink-0 text-[10px] font-mono uppercase tracking-wide ${severityClasses(event.severity)}`}
+            className={`shrink-0 text-mono-cap ${severityClasses(event.severity)}`}
             aria-label={`Severity: ${severityLabel(event.severity)}`}
           >
             {severityLabel(event.severity)}
@@ -81,7 +81,7 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
             {topCorrelations.map((a) => (
               <li
                 key={`${a.modelSlug}-${a.periodStart}`}
-                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-2 py-0.5 font-mono text-[10px] text-text-secondary mr-1.5"
+                className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-2 py-0.5 text-mono-cap text-text-secondary mr-1.5"
               >
                 <span>
                   Possible overlap · {formatAnomalyDate(a.periodStart)} {a.severity}
@@ -92,7 +92,7 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
               </li>
             ))}
             {remainingCount > 0 && (
-              <span className="font-mono text-[10px] text-text-tertiary">
+              <span className="text-mono-cap text-text-tertiary">
                 +{remainingCount} more
               </span>
             )}
@@ -165,7 +165,7 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
             <span>All operational over the last 30 days</span>
           </div>
           {data.fetchedAt && (
-            <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-text-tertiary">
+            <p className="mt-3 text-mono-cap text-text-tertiary">
               Last checked {formatTimeAgo(data.fetchedAt)}
             </p>
           )}
@@ -183,7 +183,7 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
             </p>
           )}
           {data.fetchedAt && (
-            <p className="mt-3 font-mono text-[10px] uppercase tracking-wide text-text-tertiary">
+            <p className="mt-3 text-mono-cap text-text-tertiary">
               Last checked {formatTimeAgo(data.fetchedAt)}
             </p>
           )}
