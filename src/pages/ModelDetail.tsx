@@ -7,7 +7,7 @@ import PageTransition from "@/components/PageTransition";
 import Surface from "@/components/Surface";
 import SectionHeader from "@/components/SectionHeader";
 import FilterChip from "@/components/FilterChip";
-import Tag from "@/components/Tag";
+import ChatterPost from "@/components/ChatterPost";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import {
@@ -21,7 +21,7 @@ import BarList from "@/components/BarList";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
-  formatTimeAgo, formatSourceDisplay, decodeHTMLEntities,
+  formatTimeAgo,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 
@@ -427,53 +427,14 @@ const ModelDetail = () => {
               </p>
             ) : (
               <div className="space-y-3">
-                {filteredPostsWithSurface.map(({ post, surface }) => {
-                  const src = formatSourceDisplay(post.source);
-                  const metaPieces = [
-                    `${src.emoji} ${src.label}`,
-                    surface?.label,
-                    post.posted_at ? formatTimeAgo(post.posted_at) : null,
-                  ].filter(Boolean) as string[];
-
-                  const content = (
-                    <div className="flex flex-col gap-2">
-                      <p className={`text-mono-cap text-text-tertiary`}>
-                        {metaPieces.join(" · ")}
-                      </p>
-                      <p className="line-clamp-2 text-body text-foreground">
-                        {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
-                        {post.original_language && (
-                          <Tag className="ml-1.5">
-                            Translated from {post.original_language.toUpperCase()}
-                          </Tag>
-                        )}
-                      </p>
-                    </div>
-                  );
-
-                  return post.source_url ? (
-                    <Surface
-                      key={post.id}
-                      as="a"
-                      size="compact"
-                      motion="fade"
-                      href={post.source_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="block focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    >
-                      {content}
-                    </Surface>
-                  ) : (
-                    <Surface
-                      key={post.id}
-                      size="compact"
-                      motion="fade"
-                    >
-                      {content}
-                    </Surface>
-                  );
-                })}
+                {filteredPostsWithSurface.map(({ post, surface }) => (
+                  <ChatterPost
+                    key={post.id}
+                    post={post}
+                    extraMeta={surface?.label ?? null}
+                    hideModel
+                  />
+                ))}
               </div>
             )}
           </section>
