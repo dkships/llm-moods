@@ -274,7 +274,7 @@ const ScraperMonitor = () => {
       <div className="min-h-screen bg-background">
         <NavBar />
         <main className="container py-12">
-          <h1 className="mb-2 text-2xl font-bold text-foreground">Scraper Monitor</h1>
+          <h1 className="mb-2 text-page text-foreground">Scraper Monitor</h1>
           <p className="mb-8 font-mono text-sm text-muted-foreground">
             Window runs and scraper-level summaries. Refreshes every 30s.
           </p>
@@ -283,7 +283,7 @@ const ScraperMonitor = () => {
             {summaryCards.map((card) => (
               <div key={card.label} className="glass rounded-lg p-4">
                 <p className="font-mono text-xs text-muted-foreground">{card.label}</p>
-                <p className="text-xl font-bold text-foreground">{card.value}</p>
+                <p className="text-section text-foreground">{card.value}</p>
               </div>
             ))}
           </div>
