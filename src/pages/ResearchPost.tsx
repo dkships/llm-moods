@@ -120,7 +120,7 @@ const ResearchPostPage = () => {
                   <a
                     href={post.dataset.path}
                     download
-                    className="mt-5 inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/10 px-4 py-2 font-mono text-xs text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="mt-5 inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/40 px-4 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     aria-label={`Download ${post.dataset.label}`}
                   >
                     <Download className="h-3.5 w-3.5" aria-hidden="true" />
