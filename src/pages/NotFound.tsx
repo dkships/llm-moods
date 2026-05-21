@@ -15,7 +15,7 @@ const NotFound = () => {
         <NavBar />
         <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center scroll-mt-24">
           <div className="text-center">
-            <p className="text-score-xl text-primary glow-text mb-4">404</p>
+            <p className="text-score-xl text-primary mb-4">404</p>
             <p className="text-section text-text-secondary mb-8">
               This page doesn't exist.
             </p>

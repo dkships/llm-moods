@@ -101,7 +101,7 @@ const Index = () => {
                 Is your AI having<br />
                 a <span className="text-primary glow-text">bad day</span>?
               </h1>
-              <p className="mt-5 text-lg sm:text-xl text-text-secondary max-w-xl leading-relaxed">
+              <p className="mt-5 text-lg text-text-secondary max-w-xl leading-relaxed">
                 A daily read on community sentiment, before the AI Twitter discourse catches up.
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-4">

@@ -112,10 +112,10 @@ const ResearchPostPage = () => {
                     </span>
                   )}
                 </div>
-                <h1 className="mt-3 text-3xl sm:text-4xl font-bold text-foreground">
+                <h1 className="mt-3 text-page text-foreground">
                   {post.title}
                 </h1>
-                <p className="mt-4 text-base text-text-secondary leading-relaxed">{post.summary}</p>
+                <p className="mt-4 text-body text-text-secondary">{post.summary}</p>
                 <div className="mt-5 flex flex-wrap items-center gap-2">
                   {post.tags.map((tag) => (
                     <Badge

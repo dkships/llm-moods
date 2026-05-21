@@ -15,7 +15,7 @@ const AuthorBio = () => (
     <p className="font-mono text-[11px] uppercase tracking-[0.12em] text-text-tertiary">
       About the author
     </p>
-    <p className="mt-2 text-base text-foreground">
+    <p className="mt-2 text-body text-foreground">
       <strong className="font-semibold">David Kelly</strong> is a product and growth contractor focused on
       consumer AI tools, currently exploring product roles in AI safety and frontier-model reliability. He
       builds llmvibes.ai independently, and advises on product, growth, and AI tooling for AppSumo Originals,

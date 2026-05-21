@@ -1,5 +1,5 @@
 import { memo, useMemo } from "react";
-import { ExternalLink, CheckCircle2, AlertCircle, ArrowLeftRight } from "lucide-react";
+import { ExternalLink, CheckCircle2, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { BarsSkeleton } from "@/components/Skeletons";
 import Surface from "@/components/Surface";
@@ -83,7 +83,6 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
                 key={`${a.modelSlug}-${a.periodStart}`}
                 className="inline-flex items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-2 py-0.5 font-mono text-[10px] text-text-secondary mr-1.5"
               >
-                <ArrowLeftRight className="h-3 w-3 text-primary" aria-hidden="true" />
                 <span>
                   Possible overlap · {formatAnomalyDate(a.periodStart)} {a.severity}
                 </span>
