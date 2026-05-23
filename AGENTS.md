@@ -1,7 +1,7 @@
 # LLM Moods (LLM Vibes) — Agent Instructions
 
 ## What This Is
-Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 7 social platforms. Scores models 0-100 daily. Live at llmvibes.ai.
+Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Claude, ChatGPT, Gemini, Grok) across 5 social platforms. Scores models 0-100 daily. Live at llmvibes.ai.
 
 ## Tech Stack
 - React 18 + TypeScript + Vite (SWC) + shadcn/ui + Tailwind + Recharts
