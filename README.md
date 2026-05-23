@@ -14,14 +14,15 @@ AI sentiment dashboard updated throughout the day for Claude, ChatGPT, Gemini, a
 
 ## Why this exists
 
-Every day, thousands of developers share their real experiences with AI models across Reddit, Hacker News, Bluesky, Mastodon, and more. But there's no easy way to see the big picture: which models are loved, which are frustrating people, and what's trending.
+Every day, thousands of developers share their real experiences with AI models across Reddit, Hacker News, Bluesky, Mastodon, and Twitter/X. But there's no easy way to see the big picture: which models are loved, which are frustrating people, and what's trending.
 
 **LLM Vibes** scrapes 5 social platforms, classifies sentiment with AI, and scores each model in daily 0-100 windows that refresh throughout the day. No surveys, no voting — just real conversations from real developers.
 
 ## Features
 
 - 📊 **Vibes dashboard updated throughout the day** for 4 AI models (Claude, ChatGPT, Gemini, Grok)
-- 📈 **30-day historical charts** with per-model detail pages
+- 📈 **30-day historical charts** with per-model detail pages — vendor-event overlays, official status cards, and anomaly correlation
+- 📝 **Research articles** — long-form analyses with live embedded charts and CSV + Dataset (JSON-LD) export
 - 🏷️ **Complaint breakdowns** — lazy responses, hallucinations, refusals, coding quality, speed, general drop, pricing/value, censorship, context window, API reliability, multimodal quality, reasoning
 - 🌐 **Source diversity tracking** across 5 platforms
 - ⚡ **Automated pipeline** with source-specific scrape windows throughout the day — no manual intervention needed
@@ -77,7 +78,7 @@ Every day, thousands of developers share their real experiences with AI models a
 src/
 ├── components/     # React components (model cards, charts, chatter feed)
 ├── hooks/          # React Query hooks for data fetching
-├── pages/          # Route pages (landing, dashboard, model detail)
+├── pages/          # Route pages (landing, dashboard, model detail, research)
 ├── lib/            # Utilities, constants, sentiment scale
 └── integrations/   # Supabase client config (auto-generated types)
 
