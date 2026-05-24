@@ -534,6 +534,16 @@ export type Database = {
           count: number
         }[]
       }
+      get_critical_alerts: {
+        Args: { hours_back?: number }
+        Returns: {
+          context: string
+          created_at: string
+          error_message: string
+          function_name: string
+          id: string
+        }[]
+      }
       get_landing_vibes: {
         Args: never
         Returns: {
@@ -567,6 +577,105 @@ export type Database = {
           top_complaint: string
           total_posts: number
           unclassified_posts: number
+        }[]
+      }
+      get_public_failed_classification_summary: {
+        Args: { days_back?: number }
+        Returns: {
+          count: number
+          error_group: string
+          model_slugs: string[]
+          oldest_failed_at: string
+        }[]
+      }
+      get_public_model_by_slug: {
+        Args: { p_slug: string }
+        Returns: {
+          accent_color: string
+          id: string
+          name: string
+          slug: string
+        }[]
+      }
+      get_public_model_posts: {
+        Args: { p_limit?: number; p_model_id: string; p_since: string }
+        Returns: {
+          complaint_category: string
+          content: string
+          id: string
+          model_id: string
+          original_language: string
+          posted_at: string
+          sentiment: string
+          source: string
+          source_url: string
+          title: string
+          translated_content: string
+        }[]
+      }
+      get_public_recent_chatter: {
+        Args: { page_cursor?: string; page_size?: number }
+        Returns: {
+          accent_color: string
+          content: string
+          id: string
+          model_id: string
+          model_name: string
+          model_slug: string
+          original_language: string
+          posted_at: string
+          source: string
+          source_url: string
+          title: string
+          translated_content: string
+        }[]
+      }
+      get_public_score_anomaly_inputs: {
+        Args: { lookback_days?: number; recent_days?: number }
+        Returns: {
+          accent_color: string
+          classification_coverage: number
+          eligible_posts: number
+          model_id: string
+          model_name: string
+          model_slug: string
+          period_start: string
+          score: number
+          score_basis_status: string
+          top_complaint: string
+          total_posts: number
+        }[]
+      }
+      get_public_vibes_history: {
+        Args: {
+          p_limit?: number
+          p_model_id: string
+          p_period: string
+          p_since: string
+          p_until?: string
+        }
+        Returns: {
+          classification_coverage: number
+          eligible_posts: number
+          failed_posts: number
+          model_id: string
+          period_start: string
+          queued_posts: number
+          score: number
+          score_basis_status: string
+          total_posts: number
+        }[]
+      }
+      get_public_vibes_sparkline: {
+        Args: { days_back?: number }
+        Returns: {
+          classification_coverage: number
+          eligible_posts: number
+          model_id: string
+          period_start: string
+          score: number
+          score_basis_status: string
+          total_posts: number
         }[]
       }
       get_recent_errors: {
@@ -640,6 +749,7 @@ export type Database = {
         Args: { p_lock_key: string; p_owner: string }
         Returns: undefined
       }
+      safe_public_url: { Args: { url: string }; Returns: string }
       try_claim_service_lock: {
         Args: { p_lock_key: string; p_owner: string; p_ttl_seconds?: number }
         Returns: boolean
