@@ -454,7 +454,8 @@ DROP POLICY IF EXISTS "Anyone can read models" ON public.models;
 DROP POLICY IF EXISTS "Anyone can read scraped_posts" ON public.scraped_posts;
 DROP POLICY IF EXISTS "Anyone can read vibes_scores" ON public.vibes_scores;
 DROP POLICY IF EXISTS "Anyone can read model_keywords" ON public.model_keywords;
-DROP POLICY IF EXISTS "Anyone can read user_reports" ON public.user_reports;
+-- user_reports table was removed in an earlier migration; DROP POLICY ... ON a
+-- missing table errors (42P01) even with IF EXISTS, so there is nothing to drop.
 
 DO $migration$
 DECLARE
