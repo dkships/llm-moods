@@ -33,6 +33,9 @@ verify_jwt = false
 [functions.cleanup-old-posts]
 verify_jwt = false
 
+[functions.drain-classification-queue]
+verify_jwt = false
+
 [functions.run-scrapers]
 verify_jwt = false
 
@@ -49,6 +52,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.reaggregate-vibes]
+verify_jwt = false
+
+[functions.check-gemini-self-bias]
 verify_jwt = false
 
 [functions.pipeline-watchdog]

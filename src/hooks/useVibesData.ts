@@ -37,6 +37,85 @@ type ModelRow = Database["public"]["Tables"]["models"]["Row"];
 
 const QUERY_STALE_TIME = 60_000;
 
+interface PublicModelRow {
+  id: string;
+  name: string;
+  slug: string;
+  accent_color: string | null;
+}
+
+interface PublicVibesScoreRow {
+  model_id: string;
+  period_start: string;
+  score: number;
+  total_posts: number | null;
+  eligible_posts: number | null;
+  score_basis_status?: string | null;
+  queued_posts?: number | null;
+  failed_posts?: number | null;
+  classification_coverage?: number | null;
+}
+
+interface PublicChatterRow {
+  id: string;
+  model_id: string;
+  model_name: string | null;
+  model_slug: string | null;
+  accent_color: string | null;
+  source: string;
+  source_url: string | null;
+  title: string | null;
+  content: string | null;
+  translated_content: string | null;
+  original_language: string | null;
+  posted_at: string | null;
+}
+
+interface PublicModelPostRow {
+  id: string;
+  model_id: string;
+  source: string;
+  source_url: string | null;
+  title: string | null;
+  content: string | null;
+  translated_content: string | null;
+  original_language: string | null;
+  posted_at: string | null;
+  sentiment: string | null;
+  complaint_category: string | null;
+}
+
+interface PublicRpcClient {
+  rpc(
+    fn: "get_public_vibes_sparkline",
+    args: { days_back: number },
+  ): Promise<{ data: PublicVibesScoreRow[] | null; error: { message: string } | null }>;
+  rpc(
+    fn: "get_public_recent_chatter",
+    args: { page_cursor: string | null; page_size: number },
+  ): Promise<{ data: PublicChatterRow[] | null; error: { message: string } | null }>;
+  rpc(
+    fn: "get_public_model_by_slug",
+    args: { p_slug: string },
+  ): Promise<{ data: PublicModelRow[] | null; error: { message: string } | null }>;
+  rpc(
+    fn: "get_public_vibes_history",
+    args: {
+      p_model_id: string;
+      p_period: string;
+      p_since: string;
+      p_until: string | null;
+      p_limit: number;
+    },
+  ): Promise<{ data: PublicVibesScoreRow[] | null; error: { message: string } | null }>;
+  rpc(
+    fn: "get_public_model_posts",
+    args: { p_model_id: string; p_since: string; p_limit: number },
+  ): Promise<{ data: PublicModelPostRow[] | null; error: { message: string } | null }>;
+}
+
+const publicRpc = supabase as unknown as PublicRpcClient;
+
 export interface SparklinePoint {
   score: number;
   isCarryForward: boolean;
@@ -112,18 +191,7 @@ export function useModelsWithLatestVibes() {
       const { data: landing, error: lErr } = await supabase.rpc("get_landing_vibes");
       if (lErr) throw lErr;
 
-      // Pull the last 10 daily vibes_scores rows per model directly so we can
-      // surface total_posts alongside the score — get_sparkline_scores doesn't
-      // return total_posts, and we need it to flag carry-forward days.
-      const sinceISO = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: sparkRows, error: sErr } = await supabase
-        .from("vibes_scores")
-        // eligible_posts column added by migration 20260426230000_score_integrity_fixes;
-        // pre-backfill historic rows have NULL — coerced to 0 ("Preliminary") in the chip.
-        .select("model_id, period_start, score, total_posts, eligible_posts, score_basis_status, classification_coverage")
-        .eq("period", "daily")
-        .gte("period_start", sinceISO)
-        .order("period_start", { ascending: true });
+      const { data: sparkRows, error: sErr } = await publicRpc.rpc("get_public_vibes_sparkline", { days_back: 10 });
       if (sErr) throw sErr;
 
       const sparkByModel = new Map<
@@ -217,18 +285,26 @@ export function useRecentChatter(enabled = true) {
     enabled,
     initialPageParam: null as string | null,
     queryFn: async ({ pageParam }) => {
-      let query = supabase
-        .from("scraped_posts")
-        .select("*, models(name, accent_color, slug)")
-        .filter("classification_status", "eq", "classified")
-        .order("posted_at", { ascending: false })
-        .limit(CHATTER_PAGE_SIZE);
-      if (pageParam) {
-        query = query.lt("posted_at", pageParam);
-      }
-      const { data, error } = await query;
+      const { data, error } = await publicRpc.rpc("get_public_recent_chatter", {
+        page_cursor: (pageParam as string | null) ?? null,
+        page_size: CHATTER_PAGE_SIZE,
+      });
       if (error) throw error;
-      return (data || []) as RecentChatterPost[];
+      return (data || []).map((row) => ({
+        id: row.id,
+        model_id: row.model_id,
+        source: row.source,
+        source_url: row.source_url,
+        title: row.title,
+        content: row.content,
+        translated_content: row.translated_content,
+        original_language: row.original_language,
+        posted_at: row.posted_at,
+        classification_status: "classified",
+        models: row.model_name && row.model_slug
+          ? { name: row.model_name, accent_color: row.accent_color, slug: row.model_slug }
+          : null,
+      })) as RecentChatterPost[];
     },
     getNextPageParam: (lastPage) => {
       if (lastPage.length < CHATTER_PAGE_SIZE) return undefined;
@@ -244,12 +320,9 @@ export function useModelDetail(slug: string | undefined) {
     enabled: !!slug,
     staleTime: QUERY_STALE_TIME,
     queryFn: async () => {
-      const { data: model, error: mErr } = await supabase
-        .from("models")
-        .select("*")
-        .eq("slug", slug!)
-        .maybeSingle();
+      const { data, error: mErr } = await publicRpc.rpc("get_public_model_by_slug", { p_slug: slug! });
       if (mErr) throw mErr;
+      const model = data?.[0] ?? null;
       if (!model) return null;
       return model;
     },
@@ -294,18 +367,13 @@ export function useVibesHistory(
         sinceISO = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString();
       }
 
-      let query = supabase
-        .from("vibes_scores")
-        .select("*")
-        .eq("model_id", modelId!)
-        .eq("period", period)
-        .gte("period_start", sinceISO)
-        .order("period_start", { ascending: true })
-        .limit(120);
-      if (untilOverride) {
-        query = query.lte("period_start", untilOverride);
-      }
-      const { data, error } = await query;
+      const { data, error } = await publicRpc.rpc("get_public_vibes_history", {
+        p_model_id: modelId!,
+        p_period: period,
+        p_since: sinceISO,
+        p_until: untilOverride,
+        p_limit: 120,
+      });
       if (error) throw error;
       return data || [];
     },
@@ -381,16 +449,16 @@ export function useModelPosts(modelId: string | undefined, limit = 25, enabled =
     staleTime: QUERY_STALE_TIME,
     queryFn: async () => {
       const sinceISO = new Date(Date.now() - RECENT_POSTS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
-        .from("scraped_posts")
-        .select("*")
-        .eq("model_id", modelId!)
-        .filter("classification_status", "eq", "classified")
-        .gte("posted_at", sinceISO)
-        .order("posted_at", { ascending: false })
-        .limit(limit);
+      const { data, error } = await publicRpc.rpc("get_public_model_posts", {
+        p_model_id: modelId!,
+        p_since: sinceISO,
+        p_limit: limit,
+      });
       if (error) throw error;
-      return (data || []) as ScrapedPostRow[];
+      return (data || []).map((row) => ({
+        ...row,
+        classification_status: "classified",
+      })) as ScrapedPostRow[];
     },
   });
 }
@@ -408,14 +476,13 @@ export function usePrefetchModelDetail() {
       staleTime: QUERY_STALE_TIME,
       queryFn: async () => {
         const sinceISO = getPacificDayWindowSince(29);
-        const { data } = await supabase
-          .from("vibes_scores")
-          .select("*")
-          .eq("model_id", modelId)
-          .eq("period", "daily")
-          .gte("period_start", sinceISO)
-          .order("period_start", { ascending: true })
-          .limit(90);
+        const { data } = await publicRpc.rpc("get_public_vibes_history", {
+          p_model_id: modelId,
+          p_period: "daily",
+          p_since: sinceISO,
+          p_until: null,
+          p_limit: 90,
+        });
         return data || [];
       },
     });
@@ -437,15 +504,15 @@ export function usePrefetchModelDetail() {
       staleTime: QUERY_STALE_TIME,
       queryFn: async () => {
         const sinceISO = new Date(Date.now() - RECENT_POSTS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
-        const { data } = await supabase
-          .from("scraped_posts")
-          .select("*")
-          .eq("model_id", modelId)
-          .filter("classification_status", "eq", "classified")
-          .gte("posted_at", sinceISO)
-          .order("posted_at", { ascending: false })
-          .limit(25);
-        return (data || []) as ScrapedPostRow[];
+        const { data } = await publicRpc.rpc("get_public_model_posts", {
+          p_model_id: modelId,
+          p_since: sinceISO,
+          p_limit: 25,
+        });
+        return (data || []).map((row) => ({
+          ...row,
+          classification_status: "classified",
+        })) as ScrapedPostRow[];
       },
     });
   }, [queryClient]);

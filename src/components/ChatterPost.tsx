@@ -21,9 +21,19 @@ interface ChatterPostProps {
   hideModel?: boolean;
 }
 
+function getSafeExternalUrl(sourceUrl?: string | null): string | undefined {
+  if (!sourceUrl) return undefined;
+  try {
+    const url = new URL(sourceUrl);
+    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 const ChatterPost = memo(({ post, extraMeta, hideModel = false }: ChatterPostProps) => {
   const src = formatSourceDisplay(post.source);
-  const sourceUrl = post.source_url ?? undefined;
+  const sourceUrl = getSafeExternalUrl(post.source_url);
 
   const metaPieces = [
     `${src.emoji} ${src.label}`,
