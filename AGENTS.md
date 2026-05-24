@@ -38,7 +38,7 @@ See `~/.agents/AGENTS.md`. For llm-moods: sources = code and model API responses
 
 ## Definition Of Done
 - Changes build successfully (`npm run build`)
-- All tables have RLS enabled; anon key can only SELECT
+- All tables have RLS enabled with no anon read policies; public reads go through `SECURITY DEFINER` `get_public_*` RPCs (a direct anon `.from()` table SELECT returns `[]`). Anon key still cannot write.
 - Edge functions use service role key via `Deno.env.get()`, never hardcoded
 
 ## Maintenance

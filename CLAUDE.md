@@ -29,13 +29,13 @@ If a one-shot reclassify or backfill is needed, the supported invocation path is
 2. Invoke the helper via Lovable's `curl_edge_functions` (which sends user JWT, but the helper itself uses the service-role key for the downstream call).
 3. Delete the helper from the deployed function list after the run completes.
 
-**Why not raw SQL:** `current_setting('app.settings.service_role_key', true)` returns NULL in this Supabase environment, and Vault is empty. Pg_cron jobs get away with using the anon key only because their target endpoints (`run-scrapers`, `aggregate-vibes`, `cleanup-old-posts`) are intentionally ungated. The service-role key lives only in the edge-function runtime — verified Phase 12.
+**Why not raw SQL:** `current_setting('app.settings.service_role_key', true)` returns NULL in this Supabase environment, and Vault is empty. Pg_cron jobs invoke their target endpoints (`run-scrapers`, `aggregate-vibes`, `cleanup-old-posts`) with the anon key plus an explicit `{scheduler:"pg_cron", pipeline:"<source>"}` body that each function's `isSchedulerRequest` gate accepts — those three were hardened from ungated to this scheduler-body gate in PR #38 (2026-05-24). The service-role key lives only in the edge-function runtime — verified Phase 12.
 
 Do NOT remove the application-layer gate from these functions to work around invocation friction.
 
 Functions that should stay gated: `reclassify-posts`, anything else that calls Gemini/Apify or performs unbounded writes.
 
-Functions safe to leave ungated (called by pg_cron with anon key): `aggregate-vibes`, `reaggregate-vibes`, `cleanup-old-posts`, `run-scrapers`. Their operations are bounded and idempotent; an attacker hammering them can't escalate beyond what's already exposed via the public REST API.
+Functions gated against bare anon (as of PR #38, 2026-05-24): `aggregate-vibes`, `cleanup-old-posts`, and `run-scrapers` accept a service-role JWT **or** the pg_cron scheduler body `{scheduler:"pg_cron", pipeline:"<source>"}` (via `isSchedulerRequest` in `_shared/runtime.ts`); `reaggregate-vibes` requires service-role. A bare anon call with no scheduler body returns 403. The scheduler-body path is what lets the public-repo migration schedule these crons without leaking service-role — see the cron bodies in `20260523120000_public_rpc_security_hardening.sql`. Their operations are still bounded and idempotent, so an attacker who forged the body couldn't escalate beyond the public RPCs anyway.
 
 ## Tech Stack
 
@@ -167,7 +167,7 @@ Sentiment is classified via Google Gemini API (`gemini-2.5-flash`). Single-model
 **Security notes:**
 - Repo is **public** on GitHub — never commit service role keys, API tokens, or passwords
 - `.gitignore` uses `.env*` glob with `!.env.example` whitelist
-- All tables have RLS enabled; anon key can only SELECT (no write policies)
+- All tables have RLS enabled. As of PR #38 (2026-05-24) there are **no anon read policies** on `models` / `scraped_posts` / `vibes_scores` / `model_keywords` — a direct anon `.from()` SELECT returns `[]`. Public reads go through `SECURITY DEFINER` `get_public_*` RPCs (defined in `20260523120000_public_rpc_security_hardening.sql`); any new public data needs a new such RPC, not a direct table read.
 - All edge functions use service role key via `Deno.env.get()`, never hardcoded
 
 ## Development
