@@ -47,12 +47,6 @@ interface QueueHealth {
   next_attempt_at: string | null;
 }
 
-interface FailedPostRow {
-  last_classification_error: string | null;
-  posted_at: string;
-  models: { slug: string | null } | { slug: string | null }[] | null;
-}
-
 interface FailedPostsByError {
   error: string;
   count: number;
@@ -66,6 +60,13 @@ interface CriticalAlert {
   error_message: string;
   context: string | null;
   created_at: string;
+}
+
+interface FailedClassificationSummaryRow {
+  error_group: string;
+  count: number;
+  model_slugs: string[] | null;
+  oldest_failed_at: string | null;
 }
 
 interface MonitorRpcClient {
@@ -84,7 +85,11 @@ interface MonitorRpcClient {
     ((
       fn: "get_critical_alerts",
       args: { hours_back: number },
-    ) => Promise<{ data: CriticalAlert[] | null; error: { message: string } | null }>);
+    ) => Promise<{ data: CriticalAlert[] | null; error: { message: string } | null }>) &
+    ((
+      fn: "get_public_failed_classification_summary",
+      args: { days_back: number },
+    ) => Promise<{ data: FailedClassificationSummaryRow[] | null; error: { message: string } | null }>);
 }
 
 // Contexts logged to error_log that aren't actually errors — completion
@@ -176,37 +181,23 @@ const ScraperMonitor = () => {
     refetchInterval: 60_000,
     staleTime: 60_000,
     queryFn: async () => {
-      const sinceIso = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString();
-      const { data, error } = await supabase
-        .from("scraped_posts")
-        .select("last_classification_error, posted_at, models(slug)")
-        .eq("classification_status", "failed")
-        .gte("posted_at", sinceIso)
-        .order("posted_at", { ascending: false })
-        .limit(1000);
+      const { data, error } = await (supabase as unknown as MonitorRpcClient).rpc("get_public_failed_classification_summary", { days_back: 14 });
       if (error) throw error;
-      return (data || []) as FailedPostRow[];
+      return (data || []) as FailedClassificationSummaryRow[];
     },
   });
   const failedSummary: { total: number; byError: FailedPostsByError[] } = (() => {
     const rows = failedPostsRows ?? [];
-    const buckets = new Map<string, { count: number; models: Set<string>; oldestFailedAt: string | null }>();
-    for (const row of rows) {
-      const key = (row.last_classification_error ?? "(no error string)").slice(0, 120);
-      const bucket = buckets.get(key) ?? { count: 0, models: new Set<string>(), oldestFailedAt: null };
-      bucket.count++;
-      const modelSlug = Array.isArray(row.models) ? row.models[0]?.slug : row.models?.slug;
-      if (modelSlug) bucket.models.add(modelSlug);
-      if (!bucket.oldestFailedAt || new Date(row.posted_at) < new Date(bucket.oldestFailedAt)) {
-        bucket.oldestFailedAt = row.posted_at;
-      }
-      buckets.set(key, bucket);
-    }
-    const byError = Array.from(buckets.entries())
-      .map(([error, b]) => ({ error, count: b.count, models: Array.from(b.models).sort(), oldestFailedAt: b.oldestFailedAt }))
+    const byError = rows
+      .map((row) => ({
+        error: row.error_group,
+        count: Number(row.count ?? 0),
+        models: row.model_slugs ?? [],
+        oldestFailedAt: row.oldest_failed_at,
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 5);
-    return { total: rows.length, byError };
+    return { total: byError.reduce((sum, row) => sum + row.count, 0), byError };
   })();
   const latestCritical = criticalAlerts?.[0];
   const recentErrors = (rawErrors ?? []).filter(
@@ -339,7 +330,7 @@ const ScraperMonitor = () => {
             <table className="min-w-[840px] w-full text-sm">
               <thead>
                 <tr className="border-b border-border font-mono text-xs text-muted-foreground">
-                  <th className="px-4 py-3 text-left whitespace-nowrap">Last error</th>
+                  <th className="px-4 py-3 text-left whitespace-nowrap">Error group</th>
                   <th className="px-4 py-3 text-right whitespace-nowrap">Count</th>
                   <th className="px-4 py-3 text-left whitespace-nowrap">Models affected</th>
                   <th className="px-4 py-3 text-left whitespace-nowrap">Oldest post</th>

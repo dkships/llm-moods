@@ -5,9 +5,15 @@ import {
   releaseServiceLock,
   type ModelRow,
 } from "../_shared/score-refresh.ts";
+import {
+  internalOnlyResponse,
+  isInternalServiceRequest,
+  isRunPipelineTriggerRequest,
+  isSchedulerRequest,
+  readJsonBody,
+} from "../_shared/runtime.ts";
 
-// Cron currently calls this function with the public anon JWT. Keep handler
-// auth compatible with pg_cron and use service-role credentials only from env.
+const SOURCE = "aggregate-vibes";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -17,6 +23,15 @@ const corsHeaders = {
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const body = await readJsonBody(req);
+  if (
+    !isInternalServiceRequest(req)
+    && !isRunPipelineTriggerRequest(req)
+    && !isSchedulerRequest(body, SOURCE)
+  ) {
+    return internalOnlyResponse(corsHeaders);
+  }
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   let lockOwner: string | null = null;
@@ -48,7 +63,7 @@ Deno.serve(async (req) => {
     });
 
     await supabase.from("error_log").insert({
-      function_name: "aggregate-vibes",
+      function_name: SOURCE,
       error_message: `Score refresh complete: daily=${summary.daily_rows} hourly=${summary.hourly_rows}`,
       context: JSON.stringify({
         posts_scanned: summary.posts_scanned,
@@ -64,11 +79,13 @@ Deno.serve(async (req) => {
     const message = e instanceof Error ? e.message : "Unknown";
     try {
       await supabase.from("error_log").insert({
-        function_name: "aggregate-vibes",
+        function_name: SOURCE,
         error_message: message,
         context: "top-level error",
       });
-    } catch {}
+    } catch (logError) {
+      console.error("Failed to log aggregate-vibes error", logError);
+    }
     return new Response(JSON.stringify({ error: message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },

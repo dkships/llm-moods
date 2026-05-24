@@ -34,6 +34,9 @@ export interface UseScoreAnomaliesOptions {
 
 interface ScoreRow {
   model_id: string;
+  model_slug: string;
+  model_name: string;
+  accent_color: string | null;
   score: number;
   period_start: string;
   total_posts: number | null;
@@ -43,11 +46,11 @@ interface ScoreRow {
   top_complaint: string | null;
 }
 
-interface ModelRow {
-  id: string;
-  slug: string;
-  name: string;
-  accent_color: string | null;
+interface PublicAnomalyRpcClient {
+  rpc(
+    fn: "get_public_score_anomaly_inputs",
+    args: { recent_days: number; lookback_days: number },
+  ): Promise<{ data: ScoreRow[] | null; error: { message: string } | null }>;
 }
 
 function classify(z: number, watch: number, breach: number): AnomalySeverity {
@@ -91,28 +94,13 @@ export function useScoreAnomalies(options: UseScoreAnomaliesOptions = {}) {
     refetchIntervalInBackground: false,
     staleTime: 5 * 60 * 1000,
     queryFn: async () => {
-      const totalDays = recentDays + lookbackDays + 1;
-      const since = new Date(Date.now() - totalDays * 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await (supabase as unknown as PublicAnomalyRpcClient).rpc(
+        "get_public_score_anomaly_inputs",
+        { recent_days: recentDays, lookback_days: lookbackDays },
+      );
+      if (error) throw error;
 
-      const [scoresResult, modelsResult] = await Promise.all([
-        supabase
-          .from("vibes_scores")
-          .select("model_id, score, period_start, total_posts, eligible_posts, score_basis_status, classification_coverage, top_complaint")
-          .eq("period", "daily")
-          .gte("period_start", since)
-          .order("period_start", { ascending: true })
-          .limit(200),
-        supabase.from("models").select("id, slug, name, accent_color"),
-      ]);
-
-      if (scoresResult.error) throw scoresResult.error;
-      if (modelsResult.error) throw modelsResult.error;
-
-      const rows = (scoresResult.data ?? []) as ScoreRow[];
-      const modelMap = new Map<string, ModelRow>();
-      for (const m of (modelsResult.data ?? []) as ModelRow[]) {
-        modelMap.set(m.id, m);
-      }
+      const rows = data ?? [];
 
       const byModel = new Map<string, ScoreRow[]>();
       for (const row of rows) {
@@ -125,8 +113,7 @@ export function useScoreAnomalies(options: UseScoreAnomaliesOptions = {}) {
       const anomalies: ScoreAnomaly[] = [];
 
       for (const [modelId, modelRows] of byModel.entries()) {
-        const model = modelMap.get(modelId);
-        if (!model) continue;
+        const model = modelRows[0];
 
         const sorted = [...modelRows].sort(
           (a, b) => new Date(a.period_start).getTime() - new Date(b.period_start).getTime(),
@@ -167,8 +154,8 @@ export function useScoreAnomalies(options: UseScoreAnomaliesOptions = {}) {
 
           anomalies.push({
             modelId,
-            modelSlug: model.slug,
-            modelName: model.name,
+            modelSlug: model.model_slug,
+            modelName: model.model_name,
             accentColor: model.accent_color,
             periodStart: row.period_start,
             score: row.score,

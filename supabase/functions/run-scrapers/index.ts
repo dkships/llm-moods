@@ -6,6 +6,7 @@ import {
   internalOnlyResponse,
   isInternalServiceRequest,
   isMaintenanceRequestAllowed,
+  isSchedulerRequest,
   isUniqueViolation,
   loadScraperConfig,
   readJsonBody,
@@ -26,6 +27,7 @@ const SCRAPERS = [
   "scrape-mastodon",
 ];
 
+const SOURCE = "run-scrapers";
 const NIGHTLY_REAGGREGATE_TIME = "02:30";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -336,10 +338,12 @@ Deno.serve(async (req) => {
 
   const body = await readJsonBody(req);
   const isInternal = isInternalServiceRequest(req);
+  const isScheduler = isSchedulerRequest(body, SOURCE);
 
   if (!isMaintenanceRequestAllowed(body.maintenance, isInternal)) {
     return internalOnlyResponse(corsHeaders);
   }
+  if (!isInternal && !isScheduler) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const config = await loadScraperConfig(supabase, "run-scrapers");

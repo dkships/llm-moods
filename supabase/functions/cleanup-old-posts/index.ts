@@ -1,4 +1,12 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
+import {
+  internalOnlyResponse,
+  isInternalServiceRequest,
+  isSchedulerRequest,
+  readJsonBody,
+} from "../_shared/runtime.ts";
+
+const SOURCE = "cleanup-old-posts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -6,12 +14,13 @@ const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-// No auth gate: pg_cron triggers this weekly with the anon key (matching the
-// run-scrapers pattern). Operation is idempotent — deletes scraped_posts
-// older than 90 days and error_log entries older than 14 days. An attacker
-// hitting this endpoint can't escalate beyond a bounded no-op cleanup.
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  const body = await readJsonBody(req);
+  if (!isInternalServiceRequest(req) && !isSchedulerRequest(body, SOURCE)) {
+    return internalOnlyResponse(corsHeaders);
+  }
 
   try {
     const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
@@ -47,7 +56,7 @@ Deno.serve(async (req) => {
     }
 
     await supabase.from("error_log").insert({
-      function_name: "cleanup-old-posts",
+      function_name: SOURCE,
       error_message: `Cleanup done: ${summary.postsDeleted} posts deleted, ${summary.errorLogsDeleted} logs deleted`,
       context: summary.errors.length > 0 ? summary.errors.join("; ") : null,
     });
@@ -59,8 +68,10 @@ Deno.serve(async (req) => {
     const msg = e instanceof Error ? e.message : "Unknown";
     try {
       const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-      await supabase.from("error_log").insert({ function_name: "cleanup-old-posts", error_message: msg, context: "top-level error" });
-    } catch {}
+      await supabase.from("error_log").insert({ function_name: SOURCE, error_message: msg, context: "top-level error" });
+    } catch (logError) {
+      console.error("Failed to log cleanup-old-posts error", logError);
+    }
     return new Response(JSON.stringify({ error: msg }), { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
