@@ -241,14 +241,14 @@ const ModelDetail = () => {
               <section className="container pb-6">
                 <Link
                   to={`/research/${featured.slug}`}
-                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   aria-label={`Read research analysis: ${featured.title}`}
                 >
                   <Surface
                     as="article"
                     size="compact"
                     motion="fade"
-                    className="flex items-center gap-4 sm:gap-5"
+                    className="flex items-center gap-4 transition-colors group-hover:bg-surface-hover sm:gap-5"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-mono-cap text-text-tertiary">
@@ -258,7 +258,7 @@ const ModelDetail = () => {
                         {featured.title}
                       </p>
                     </div>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
+                    <ArrowRight className="h-4 w-4 shrink-0 text-text-tertiary transition-all group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden="true" />
                   </Surface>
                 </Link>
               </section>
