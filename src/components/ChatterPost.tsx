@@ -36,7 +36,7 @@ const ChatterPost = memo(({ post, extraMeta, hideModel = false }: ChatterPostPro
   const sourceUrl = getSafeExternalUrl(post.source_url);
 
   const metaPieces = [
-    `${src.emoji} ${src.label}`,
+    src.label,
     hideModel ? null : post.models?.name ?? null,
     extraMeta ?? null,
     post.posted_at ? formatTimeAgo(post.posted_at) : null,
