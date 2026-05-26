@@ -75,18 +75,18 @@ const Dashboard = () => {
 
           {/* Page Header */}
           <section className="container pt-10 pb-8">
-            <h1 className="text-page text-foreground">
-              Current vibes
-            </h1>
-            <p
-              className="mt-2 text-meta text-text-tertiary"
-              role="status"
-              aria-live="polite"
-            >
-              {latestScoreUpdate
-                ? `Updated ${formatTimeAgo(latestScoreUpdate)} · ${today}`
-                : today}
-            </p>
+            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
+              <h1 className="text-page text-foreground">Current vibes</h1>
+              <p
+                className="text-meta text-text-tertiary"
+                role="status"
+                aria-live="polite"
+              >
+                {latestScoreUpdate
+                  ? `Updated ${formatTimeAgo(latestScoreUpdate)} · ${today}`
+                  : today}
+              </p>
+            </div>
           </section>
 
           {/* Model Cards */}
