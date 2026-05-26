@@ -18,6 +18,7 @@ import { getResearchPostsForModel } from "@/data/research-posts";
 import { detectProductSurface } from "@/lib/product-surface";
 import StatusCard from "@/components/StatusCard";
 import BarList from "@/components/BarList";
+import Tag from "@/components/Tag";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
@@ -65,9 +66,8 @@ const ModelDetail = () => {
     `${latestEligiblePosts.toLocaleString()} SCORED`,
     `${recentPosts7d.toLocaleString()} COLLECTED`,
     "7D",
-    failedPosts > 0 ? `${failedPosts.toLocaleString()} ABANDONED` : null,
     enriched?.isStale ? "STALE" : null,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
   const vibe = getVibeStatus(latestScore);
   const accent = model?.accent_color || "#888";
 
@@ -222,9 +222,14 @@ const ModelDetail = () => {
               </p>
               <p className={`pb-2 text-mono-cap text-text-secondary`}>{trendCaption}</p>
             </div>
-            <p className="mt-3 text-mono-cap text-text-tertiary">
-              {metaParts.join(" · ")}
-            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-mono-cap text-text-tertiary">
+              <span>{metaParts.join(" · ")}</span>
+              {failedPosts > 0 && (
+                <Tag tone="warning" shape="pill">
+                  {failedPosts.toLocaleString()} abandoned
+                </Tag>
+              )}
+            </div>
           </section>
 
           {/* Recent incident analysis — only when a research post references this model */}
