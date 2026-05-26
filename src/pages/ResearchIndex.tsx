@@ -74,16 +74,9 @@ const ResearchIndex = () => {
                       motion="fade"
                       className="h-full"
                     >
-                      <div className="flex items-center gap-3">
-                        <p className="text-mono-cap text-text-tertiary">
-                          {formatDate(post.publishedAt)}
-                        </p>
-                        {isFeatured && (
-                          <span className="text-mono-cap text-text-tertiary">
-                            Latest
-                          </span>
-                        )}
-                      </div>
+                      <p className="text-mono-cap text-text-tertiary">
+                        {formatDate(post.publishedAt)}
+                      </p>
                       <h2
                         className={`mt-2 text-foreground ${isFeatured ? "text-page" : "text-section"}`}
                       >
