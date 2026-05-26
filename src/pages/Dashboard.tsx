@@ -137,9 +137,40 @@ const Dashboard = () => {
               </p>
             ) : (
               <div className="space-y-3">
-                {(chatterData?.pages ?? []).flatMap((page) => page).map((post) => (
-                  <ChatterPost key={post.id} post={post} />
-                ))}
+                {(() => {
+                  // Dedupe multi-model fanout: the same scraped post is stored
+                  // once per matched model, so the feed otherwise shows the
+                  // exact same text twice in a row. Collapse to one row and
+                  // collect the matched model names into the meta line.
+                  const rows = (chatterData?.pages ?? []).flatMap((p) => p);
+                  const seen = new Map<string, { post: typeof rows[number]; models: string[] }>();
+                  for (const post of rows) {
+                    const key =
+                      post.source_url ||
+                      `${post.source}::${(post.translated_content || post.content || post.title || "").slice(0, 200)}`;
+                    const existing = seen.get(key);
+                    const modelName = post.models?.name ?? null;
+                    if (existing) {
+                      if (modelName && !existing.models.includes(modelName)) {
+                        existing.models.push(modelName);
+                      }
+                    } else {
+                      seen.set(key, {
+                        post,
+                        models: modelName ? [modelName] : [],
+                      });
+                    }
+                  }
+                  return Array.from(seen.values()).map(({ post, models }) => (
+                    <ChatterPost
+                      key={post.id}
+                      post={{
+                        ...post,
+                        models: models.length > 0 ? { name: models.join(", ") } : post.models,
+                      }}
+                    />
+                  ));
+                })()}
               </div>
             )}
 
