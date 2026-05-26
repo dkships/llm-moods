@@ -42,10 +42,10 @@ const Index = () => {
                 A daily read on community sentiment, before the AI Twitter discourse catches up.
               </p>
               <div className="mt-7 flex flex-wrap items-center gap-4">
-                <Button asChild size="lg" className="font-mono text-sm gap-2 group">
+                <Button asChild size="lg" variant="outline" className="font-mono text-sm gap-2 group border-primary/40 text-foreground hover:bg-primary/10 hover:text-foreground">
                   <Link to="/dashboard">
                     Check the Vibes
-                    <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                    <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-1" />
                   </Link>
                 </Button>
               </div>
@@ -65,7 +65,7 @@ const Index = () => {
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-fade-in">
                 {(models || []).map((m) => (
-                  <ModelCard key={m.id} m={m} onHover={handleHover} />
+                  <ModelCard key={m.id} m={m} showSparkline onHover={handleHover} />
                 ))}
               </div>
             )}

@@ -18,6 +18,7 @@ import { getResearchPostsForModel } from "@/data/research-posts";
 import { detectProductSurface } from "@/lib/product-surface";
 import StatusCard from "@/components/StatusCard";
 import BarList from "@/components/BarList";
+import Tag from "@/components/Tag";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
@@ -65,9 +66,8 @@ const ModelDetail = () => {
     `${latestEligiblePosts.toLocaleString()} SCORED`,
     `${recentPosts7d.toLocaleString()} COLLECTED`,
     "7D",
-    failedPosts > 0 ? `${failedPosts.toLocaleString()} ABANDONED` : null,
     enriched?.isStale ? "STALE" : null,
-  ].filter(Boolean);
+  ].filter(Boolean) as string[];
   const vibe = getVibeStatus(latestScore);
   const accent = model?.accent_color || "#888";
 
@@ -222,9 +222,14 @@ const ModelDetail = () => {
               </p>
               <p className={`pb-2 text-mono-cap text-text-secondary`}>{trendCaption}</p>
             </div>
-            <p className="mt-3 text-mono-cap text-text-tertiary">
-              {metaParts.join(" · ")}
-            </p>
+            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-mono-cap text-text-tertiary">
+              <span>{metaParts.join(" · ")}</span>
+              {failedPosts > 0 && (
+                <Tag tone="warning" shape="pill">
+                  {failedPosts.toLocaleString()} abandoned
+                </Tag>
+              )}
+            </div>
           </section>
 
           {/* Recent incident analysis — only when a research post references this model */}
@@ -236,14 +241,14 @@ const ModelDetail = () => {
               <section className="container pb-6">
                 <Link
                   to={`/research/${featured.slug}`}
-                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   aria-label={`Read research analysis: ${featured.title}`}
                 >
                   <Surface
                     as="article"
                     size="compact"
                     motion="fade"
-                    className="flex items-center gap-4 sm:gap-5"
+                    className="flex items-center gap-4 transition-colors group-hover:bg-surface-hover sm:gap-5"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-mono-cap text-text-tertiary">
@@ -253,7 +258,7 @@ const ModelDetail = () => {
                         {featured.title}
                       </p>
                     </div>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
+                    <ArrowRight className="h-4 w-4 shrink-0 text-text-tertiary transition-all group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden="true" />
                   </Surface>
                 </Link>
               </section>

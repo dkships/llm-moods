@@ -35,8 +35,14 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
       onMouseEnter={() => onHover?.(m.slug, m.id)}
       className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      <Surface size="bare" motion="fade" className="overflow-hidden h-full">
-        <div className="h-1.5" style={{ background: vibe.color }} />
+      <Surface size="bare" motion="fade" className="relative overflow-hidden h-full">
+        {/* Sentiment cue: 3px top bar on >=sm (grid layouts), 2px left rail on mobile
+            stacks so four cards don't read as a barcode of stacked color bars. */}
+        <div
+          className="absolute inset-y-0 left-0 w-[3px] sm:inset-x-0 sm:bottom-auto sm:h-1.5 sm:w-auto"
+          style={{ background: vibe.color }}
+          aria-hidden="true"
+        />
         <div className="p-6">
           <p className="text-mono-cap text-text-tertiary">{vibe.label}</p>
           <div className="mt-1 flex items-start justify-between gap-3">
@@ -63,8 +69,8 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
           </p>
 
           {m.topComplaint && (
-            <div className="mt-4 flex items-center gap-3 border-t border-border pt-3">
-              <span className="text-mono-cap shrink-0 text-text-tertiary">Top</span>
+            <div className="mt-4 flex items-baseline gap-2 border-t border-border pt-3">
+              <span className="shrink-0 text-mono-cap text-text-tertiary">Mostly</span>
               <span className="truncate text-body font-medium text-foreground">
                 {formatComplaintLabel(m.topComplaint)}
               </span>
