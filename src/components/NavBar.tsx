@@ -67,7 +67,7 @@ const NavBar = () => {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub repository"
-            className="rounded-md text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
           >
             <GitHubIcon className="h-5 w-5" />
           </a>
