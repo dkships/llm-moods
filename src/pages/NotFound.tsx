@@ -25,6 +25,17 @@ const NotFound = () => {
                 Back to Home
               </Link>
             </Button>
+            <p className="mt-6 text-meta text-text-tertiary">
+              Or jump to the{" "}
+              <Link to="/dashboard" className="text-foreground underline underline-offset-2 hover:text-primary">
+                dashboard
+              </Link>{" "}
+              or{" "}
+              <Link to="/research" className="text-foreground underline underline-offset-2 hover:text-primary">
+                latest research
+              </Link>
+              .
+            </p>
           </div>
         </main>
         <Footer />
