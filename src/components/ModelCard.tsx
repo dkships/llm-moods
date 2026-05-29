@@ -58,7 +58,7 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
           {showSparkline && m.sparkline.length > 1 && (
             <div className="mt-4 h-12" aria-hidden="true">
               <Suspense fallback={<div className="h-12 animate-pulse rounded bg-secondary/40" />}>
-                <LazySparkline data={m.sparkline} accent="hsl(var(--foreground) / 0.55)" />
+                <LazySparkline data={m.sparkline} accent="hsl(var(--foreground) / 0.7)" />
               </Suspense>
             </div>
           )}
