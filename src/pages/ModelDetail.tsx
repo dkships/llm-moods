@@ -329,7 +329,7 @@ const ModelDetail = () => {
 
               {/* Right Column — Negative-by-surface (conditional) + Complaints + Sources */}
               <div className="space-y-6">
-                {negativeSurfaceRows.length > 0 && (
+                {hasMeaningfulSurfaceRows && (
                   <Surface motion="fade">
                     <SectionHeader title="Negative posts by surface" />
                     <BarList
