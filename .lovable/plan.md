@@ -1,45 +1,31 @@
-# End-to-end visual & UX polish audit
+## End-to-end visual polish — second pass
 
-## Goal
-Walk every public surface of llmvibes.ai at desktop and mobile widths, screenshot each, and produce a prioritized list of polish opportunities — type, spacing, color, hierarchy, motion, responsive behavior, accessibility, and consistency against the design system documented in AGENTS.md (8-rung type ladder, Surface primitive, Tag/FilterChip, sentiment color tokens, single page-level fade, restraint).
+I walked `/`, `/dashboard`, `/model/claude`, `/research`, and `/404` at desktop (1440) and mobile (390). The site is in strong shape after the last round — type ladder, sentiment colors, calm motion, and accessibility (44px GitHub target, skip link, focus rings) all hold up. This pass fixes the few real issues that remain.
 
-No code changes in this pass — output is a written audit + ranked backlog. You then pick what to fix.
+### Critical
 
-## Surfaces to review
-1. `/` — landing (hero + 4 model cards + "how it works")
-2. `/dashboard` — all models, sparklines, chatter feed, trending complaints, staleness banner
-3. `/model/:slug` — pick 2 (one healthy, one with anomalies/limited sample) to cover chart, vendor events, status card, complaint/source bar lists, recent posts, surface tags, "abandoned" chip
-4. `/research` — index
-5. `/research/:slug` — pick 1 long-form article (embedded chart, pull quote, stat callout, author bio)
-6. `/404`
-7. Global: NavBar, Footer, skip link, focus states, reduced motion
+**1. Model cards have a large empty void (all surfaces)**
+Landing, dashboard, and the card grid all show a tall blank gap between the score row and the "−N PTS · POSTS" line. The cause is the sparkline slot: `ModelCard` reserves an `h-12` sparkline block whenever `sparkline.length > 1`, but the line renders as empty space (no visible trend) — so every card carries ~90px of dead air, worst on mobile.
+Fix: make the sparkline reliably visible (verify the Recharts series actually paints with the muted foreground stroke and a sensible Y domain), and collapse the reserved slot entirely when there is no usable multi-point series so cards stay compact instead of hollow.
 
-## Method
-For each surface:
-1. Screenshot at desktop (1440) and mobile (390) via browser tools
-2. Crop into hero, mid, and footer regions where useful
-3. Note issues against these checklists:
-   - **Type ladder** — any `text-lg/xl/2xl/3xl`, hand-rolled `text-[Npx]`, or `text-xs uppercase tracking-wide` drift outside the 8 rungs
-   - **Color tokens** — any raw hex, `text-foreground/{60..90}` opacities, or non-sentiment use of accent hue
-   - **Spacing rhythm** — inconsistent card padding, gap, section vertical rhythm
-   - **Hierarchy** — scan-depth clarity: what's the first thing the eye lands on, is it the right thing
-   - **Density** — empty space vs cramped zones, especially mobile
-   - **Consistency** — Surface vs hand-rolled `glass rounded-xl`, Tag vs raw Badge, FilterChip vs ad-hoc buttons, ModelCard / ChatterPost reuse
-   - **Motion** — single page fade only, no per-section stagger, calm hover
-   - **Accessibility** — alt text, aria-labels on icon buttons, focus-visible rings, 44px tap targets on mobile, heading order, `h-dvh` over `h-screen`
-   - **Responsive** — overflow, wrap behavior, chart legibility, sticky/banner stacking
-   - **Editorial register** — research surface keeps its accent links / blockquote rule (intentional), dashboard stays calm
+### Polish
 
-## Deliverable
-A single written audit grouped by severity:
-- **Critical** (broken, inaccessible, or off-brand)
-- **Polish** (clear improvement, low risk)
-- **Nice-to-have** (subjective taste calls)
+**2. NavBar wordmark wraps on mobile** (`NavBar.tsx`)
+"LLM Vibes" breaks onto two lines at 390px. Add `whitespace-nowrap` (and `shrink-0`) to the wordmark so it stays on one line; let the nav links absorb the spacing.
 
-Each item: surface · what · why it matters · suggested fix (one line). No code written this pass. After you read it you pick which items to send back as build tasks.
+**3. "Negative posts by surface" shows "Unknown 100%"** (`ModelDetail.tsx`)
+When every negative post falls in the catch-all bucket, the panel renders a single meaningless "Unknown 100%" bar. Suppress the panel when the only row is "Unknown" (or when there's a single row that carries no real surface signal) — matches the project's asymmetric "only show caveats when meaningful" convention.
 
-## Out of scope
-- Backend, classifier, scrapers, cron, RLS
-- Dev-only routes (`/admin/scrapers`, `/og/:slug`)
-- Copy rewrites beyond obvious typos
-- Adding new features
+### Nice-to-have
+
+**4. Research index trailing gap**
+The 3-article grid leaves an empty cell in the last row. Low priority and only visible with an odd article count — leave as-is unless you want a subtle full-width treatment for the final card.
+
+### Technical notes
+- All changes are frontend/presentation only — no backend, RPC, or data changes.
+- Card fix lives in `src/components/ModelCard.tsx` (and verify `src/components/Sparkline.tsx` renders); both Index and Dashboard consume the shared card, so one edit covers both.
+- Reuse existing tokens/primitives (Surface, type ladder, sentiment colors) — no new colors or hand-rolled classes.
+- Verify by re-screenshotting `/`, `/dashboard`, and `/model/claude` at desktop and mobile after the edits.
+
+### Out of scope
+Backend, classifier, scrapers, cron, RLS, dev-only routes, copy rewrites, new features.

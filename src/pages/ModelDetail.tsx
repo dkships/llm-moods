@@ -107,6 +107,10 @@ const ModelDetail = () => {
       pct: totalNegativePosts > 0 ? Math.round((count / totalNegativePosts) * 100) : 0,
     }));
 
+  // Only surface this panel when there is a real product-surface signal — a
+  // lone "Unknown 100%" bar carries no information (asymmetric-caveat pattern).
+  const hasMeaningfulSurfaceRows = negativeSurfaceRows.some((r) => r.label !== "Unknown");
+
   useHead({
     title: model ? `${model.name} Vibes — LLM Vibes` : "Loading — LLM Vibes",
     description: model
@@ -325,7 +329,7 @@ const ModelDetail = () => {
 
               {/* Right Column — Negative-by-surface (conditional) + Complaints + Sources */}
               <div className="space-y-6">
-                {negativeSurfaceRows.length > 0 && (
+                {hasMeaningfulSurfaceRows && (
                   <Surface motion="fade">
                     <SectionHeader title="Negative posts by surface" />
                     <BarList

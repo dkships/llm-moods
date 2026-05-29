@@ -49,7 +49,7 @@ const NavBar = () => {
           className="inline-flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <SvgMark />
-          <span className="text-section text-foreground">
+          <span className="whitespace-nowrap text-section text-foreground">
             LLM <span className="text-primary">Vibes</span>
           </span>
         </Link>
