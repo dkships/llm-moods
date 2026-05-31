@@ -7,7 +7,11 @@ import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
 
 const NotFound = () => {
-  useHead({ title: "Page Not Found — LLM Vibes" });
+  useHead({
+    title: "Page Not Found — LLM Vibes",
+    description:
+      "The page you're looking for doesn't exist. Browse the live AI sentiment dashboard or the latest LLM Vibes research.",
+  });
 
   return (
     <PageTransition>
