@@ -37,6 +37,12 @@ export interface ResearchPost {
   updatedAt?: string;
   /** 1-2 sentence plain-text used in the index card and OG description */
   summary: string;
+  /**
+   * Optional ≤160-char description used ONLY for the meta description /
+   * og / twitter tags. Keeps the visible `summary` copy untouched while
+   * staying within search-snippet limits. Falls back to `summary`.
+   */
+  metaDescription?: string;
   author: string;
   tags: ResearchTag[];
   /** Drives the "Recent incident analysis" card on /model/:slug */
