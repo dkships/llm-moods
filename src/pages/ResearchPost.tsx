@@ -10,6 +10,7 @@ import { getResearchPost } from "@/data/research-posts";
 import { getResearchBody } from "@/data/research-bodies";
 import { PROSE_CLASS_NAME } from "@/lib/prose-styles";
 import NotFound from "@/pages/NotFound";
+import { AUTHOR_NAME, AUTHOR_SAMEAS } from "@/components/research/AuthorBio";
 
 const formatDate = (iso: string) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", {
@@ -35,7 +36,11 @@ const ResearchPostPage = () => {
       dateModified: post.updatedAt ?? post.publishedAt,
       url,
       mainEntityOfPage: { "@type": "WebPage", "@id": url },
-      author: { "@type": "Person", name: post.author },
+      author: {
+        "@type": "Person",
+        name: post.author,
+        ...(post.author === AUTHOR_NAME ? { sameAs: AUTHOR_SAMEAS } : {}),
+      },
       publisher: {
         "@type": "Organization",
         name: "LLM Vibes",
@@ -44,7 +49,16 @@ const ResearchPostPage = () => {
       keywords: post.tags.join(", "),
     };
 
-    const graph: Record<string, unknown>[] = [article];
+    const breadcrumb: Record<string, unknown> = {
+      "@type": "BreadcrumbList",
+      itemListElement: [
+        { "@type": "ListItem", position: 1, name: "Home", item: "https://llmvibes.ai/" },
+        { "@type": "ListItem", position: 2, name: "Research", item: "https://llmvibes.ai/research" },
+        { "@type": "ListItem", position: 3, name: post.title, item: url },
+      ],
+    };
+
+    const graph: Record<string, unknown>[] = [article, breadcrumb];
 
     if (post.dataset) {
       graph.push({
@@ -65,17 +79,22 @@ const ResearchPostPage = () => {
       });
     }
 
-    if (graph.length === 1) {
-      return { "@context": "https://schema.org", ...article };
-    }
     return { "@context": "https://schema.org", "@graph": graph };
   }, [post]);
 
   useHead({
     title: post ? `${post.title} — LLM Vibes` : "Research — LLM Vibes",
-    description: post?.summary,
+    description: post?.metaDescription ?? post?.summary,
     url: post ? `/research/${post.slug}` : undefined,
     ogImage: post?.ogImage,
+    ogType: post ? "article" : undefined,
+    article: post
+      ? {
+          publishedTime: post.publishedAt,
+          modifiedTime: post.updatedAt ?? post.publishedAt,
+          author: post.author,
+        }
+      : undefined,
     jsonLd,
   });
 
