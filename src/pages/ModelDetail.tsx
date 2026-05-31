@@ -117,6 +117,17 @@ const ModelDetail = () => {
       ? `Latest community sentiment and complaint trends for ${model.name}.`
       : undefined,
     url: slug ? `/model/${slug}` : undefined,
+    jsonLd: model && slug
+      ? {
+          "@context": "https://schema.org",
+          "@type": "BreadcrumbList",
+          itemListElement: [
+            { "@type": "ListItem", position: 1, name: "Home", item: "https://llmvibes.ai/" },
+            { "@type": "ListItem", position: 2, name: "Dashboard", item: "https://llmvibes.ai/dashboard" },
+            { "@type": "ListItem", position: 3, name: model.name, item: `https://llmvibes.ai/model/${slug}` },
+          ],
+        }
+      : undefined,
   });
 
   // Daily chart hooks must run unconditionally (above any early-return) to
