@@ -11,6 +11,21 @@ interface HeadConfig {
    */
   ogImage?: string;
   /**
+   * og:type for the route. Defaults to "website"; research articles
+   * pass "article" so social/answer engines classify them correctly.
+   */
+  ogType?: string;
+  /**
+   * Optional article metadata. Emitted as article:* Open Graph tags
+   * (published/modified time, author) on routes that pass it, and
+   * removed automatically on routes that don't.
+   */
+  article?: {
+    publishedTime?: string;
+    modifiedTime?: string;
+    author?: string;
+  };
+  /**
    * Optional JSON-LD structured data block. Injected into a single
    * <script id="page-json-ld" type="application/ld+json"> tag in the
    * document head. Cleared automatically on routes that don't pass one.
@@ -28,6 +43,25 @@ const JSON_LD_ID = "page-json-ld";
 function setMetaContent(selector: string, content: string) {
   const el = document.querySelector<HTMLMetaElement>(selector);
   if (el) el.content = content;
+}
+
+/**
+ * Set (creating if needed) a property-based meta tag, or remove it when
+ * `content` is undefined. Used for og:* / article:* tags that may not
+ * exist in the static index.html head.
+ */
+function setOrRemovePropertyMeta(property: string, content: string | undefined) {
+  let el = document.querySelector<HTMLMetaElement>(`meta[property="${property}"]`);
+  if (content === undefined) {
+    if (el) el.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute("property", property);
+    document.head.appendChild(el);
+  }
+  el.content = content;
 }
 
 function setLinkHref(selector: string, href: string) {
@@ -58,7 +92,7 @@ function resolveOgImage(image?: string): string {
   return `${BASE_URL}${image.startsWith("/") ? image : `/${image}`}`;
 }
 
-const useHead = ({ title, description, url, ogImage, jsonLd }: HeadConfig) => {
+const useHead = ({ title, description, url, ogImage, ogType, article, jsonLd }: HeadConfig) => {
   useEffect(() => {
     const desc = description ?? DEFAULT_DESCRIPTION;
     const fullUrl = url ? `${BASE_URL}${url}` : BASE_URL;
@@ -75,9 +109,14 @@ const useHead = ({ title, description, url, ogImage, jsonLd }: HeadConfig) => {
     setMetaContent('meta[name="twitter:description"]', desc);
     setMetaContent('meta[name="twitter:image"]', fullOgImage);
 
+    setOrRemovePropertyMeta("og:type", ogType ?? "website");
+    setOrRemovePropertyMeta("article:published_time", article?.publishedTime);
+    setOrRemovePropertyMeta("article:modified_time", article?.modifiedTime);
+    setOrRemovePropertyMeta("article:author", article?.author);
+
     setLinkHref('link[rel="canonical"]', fullUrl);
     setJsonLd(jsonLd);
-  }, [title, description, url, ogImage, jsonLd]);
+  }, [title, description, url, ogImage, ogType, article, jsonLd]);
 };
 
 export default useHead;

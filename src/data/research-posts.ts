@@ -37,6 +37,12 @@ export interface ResearchPost {
   updatedAt?: string;
   /** 1-2 sentence plain-text used in the index card and OG description */
   summary: string;
+  /**
+   * Optional ≤160-char description used ONLY for the meta description /
+   * og / twitter tags. Keeps the visible `summary` copy untouched while
+   * staying within search-snippet limits. Falls back to `summary`.
+   */
+  metaDescription?: string;
   author: string;
   tags: ResearchTag[];
   /** Drives the "Recent incident analysis" card on /model/:slug */
@@ -99,6 +105,8 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     updatedAt: "2026-05-16",
     summary:
       "The full pipeline from scraper to score. Five platforms, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we've documented but not yet solved.",
+    metaDescription:
+      "How LLM Vibes turns posts into scores: five platforms, 12 complaint categories, a volume-weighted 0–100 score, and its known failure modes.",
     author: "David Kelly",
     tags: ["methodology"],
     ogImage: "/research/how-llm-vibes-classifies-sentiment/og.png",
@@ -110,6 +118,8 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     updatedAt: "2026-04-26",
     summary:
       "Comparing absolute scores or even bug-window deltas across LLM Vibes models can mislead you. What actually caught Claude's March 2026 regression was the post-fix recovery shape: ChatGPT recovered, Gemini stayed flat, Claude kept sliding.",
+    metaDescription:
+      "Why cross-model score deltas mislead — and how the post-fix recovery shape, not the absolute drop, caught Claude's March 2026 regression.",
     author: "David Kelly",
     tags: ["cross-model", "case-study", "claude", "chatgpt", "gemini", "grok"],
     ogImage: "/research/cross-model-deltas-march-april-2026/og.png",

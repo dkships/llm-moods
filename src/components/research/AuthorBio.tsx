@@ -10,6 +10,14 @@ const BIO_LINKS: ReadonlyArray<{ label: string; href: string; external: boolean 
   { label: "github.com/dkships", href: "https://github.com/dkships", external: true },
 ];
 
+/**
+ * Author identity used by Article JSON-LD (`author.sameAs`). Single
+ * source of truth shared with the visible bio links above so the
+ * structured-data entity and the on-page links never drift.
+ */
+export const AUTHOR_NAME = "David Kelly";
+export const AUTHOR_SAMEAS: readonly string[] = BIO_LINKS.map((l) => l.href);
+
 const AuthorBio = () => (
   <aside className="mt-12 rounded-lg border border-border bg-secondary/30 px-6 py-5">
     <p className="text-mono-cap text-text-tertiary">
