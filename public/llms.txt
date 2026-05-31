@@ -1,0 +1,26 @@
+# LLM Vibes
+
+> A real-time dashboard tracking community sentiment about AI model quality. It answers "Is this LLM acting dumber today, or is it just me?" by scraping and AI-classifying public posts about Claude, ChatGPT, Gemini, and Grok, then scoring each model 0–100 daily.
+
+LLM Vibes is 100% automated — there are no user-submitted reports or votes. Sentiment is drawn from five social platforms (Reddit, Hacker News, Bluesky, X/Twitter, Mastodon) and classified into 12 complaint categories, then aggregated into a volume-weighted daily score per model.
+
+## Pages
+
+- [Home](https://llmvibes.ai/): What LLM Vibes is and a live preview of current model sentiment.
+- [Dashboard](https://llmvibes.ai/dashboard): All tracked models with current scores, trends, sparklines, and recent community chatter.
+- [Claude](https://llmvibes.ai/model/claude): Community sentiment history, complaint breakdown, and incidents for Claude.
+- [ChatGPT](https://llmvibes.ai/model/chatgpt): Community sentiment history, complaint breakdown, and incidents for ChatGPT.
+- [Gemini](https://llmvibes.ai/model/gemini): Community sentiment history, complaint breakdown, and incidents for Gemini.
+- [Grok](https://llmvibes.ai/model/grok): Community sentiment history, complaint breakdown, and incidents for Grok.
+- [Research](https://llmvibes.ai/research): Independent long-form analysis of AI model quality and incidents.
+
+## Research
+
+- [Claude Code lost 19 points during the cache bug](https://llmvibes.ai/research/surface-segmentation-march-may-2026): Per-product-surface sentiment shows the same model's scores diverge sharply by surface during a regression.
+- [We Caught Claude's March Slide 28 Days Before Anthropic Confirmed It](https://llmvibes.ai/research/claude-april-2026): Independent sentiment data caught Claude Code's regression the day Anthropic shipped the cache bug.
+- [How LLM Vibes Classifies Sentiment](https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment): The full pipeline from scraper to score, including documented failure modes.
+- [When One AI Cracks: Cross-Model Sentiment, March–April 2026](https://llmvibes.ai/research/cross-model-deltas-march-april-2026): Why cross-model score deltas mislead, and what the post-fix recovery shape reveals.
+
+## Optional
+
+- [RSS feed](https://llmvibes.ai/research/feed.xml): Subscribe to new LLM Vibes research.
