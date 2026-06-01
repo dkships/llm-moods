@@ -79,8 +79,8 @@ const HowLlmVibesClassifiesSentimentBody = () => (
 
     <h2>How sentiment gets classified</h2>
     <p>
-      Every relevant post is sent to <strong>Gemini 2.5 Flash</strong> via the Google AI API in batches of
-      25. The classifier returns six fields per post: <code>relevant</code>, <code>sentiment</code> (positive /
+      Every relevant post is sent to <strong>Claude Haiku 4.5</strong> via the Anthropic Messages API in
+      batches. The classifier returns six fields per post: <code>relevant</code>, <code>sentiment</code> (positive /
       negative / neutral), <code>complaint_category</code> (one of 12 if negative), <code>praise_category</code>{" "}
       (one of 10 if positive), <code>confidence</code> (0.0–1.0), and a translation if the post is non-English.
     </p>
@@ -170,9 +170,10 @@ score = round((effective_positive / total_weight) × 100)`}</code>
     <h2>What this analysis assumes</h2>
     <p>Four caveats that anyone reading the dashboard should know.</p>
     <p>
-      The pipeline has changed underneath. Three classifier transitions happened in March–April 2026: a switch
+      The pipeline has changed underneath. Several classifier transitions happened in 2026: a switch
       from the Lovable AI gateway to the Google Gemini API on March 20, an upgrade through 2.5 Flash-Lite and
-      3.1 Flash-Lite Preview in the following days, and a final move to 2.5 Flash on April 25. Each transition
+      3.1 Flash-Lite Preview in the following days, a move to 2.5 Flash on April 25, and a switch to Anthropic's
+      Claude Haiku 4.5 on June 1. Each transition
       produced a visible step-change in the positive / negative / neutral mix — most dramatically a one-week,
       roughly 25-percentage-point drop in neutral share across all four tracked models the week of the API
       switch. Numbers cited in the{" "}
@@ -183,17 +184,15 @@ score = round((effective_positive / total_weight) × 100)`}</code>
       directly comparable to anything in the live dashboard.
     </p>
     <p>
-      The classifier vendor is one of the tracked models. Gemini 2.5 Flash classifies posts about Gemini's
-      competitors and itself, so self-bias remains a measurement risk. If the classifier were biased toward
-      Gemini, we'd expect Claude to underperform Gemini in scoring. We observe the opposite: across the
-      windows we've examined, Claude often outscores Gemini. The current check fixture lives at{" "}
-      <code>supabase/functions/check-gemini-self-bias</code>. It samples up to 150 recent stored posts from
-      the past 21 days that are unclassified, low-confidence, or missing a negative complaint category, then
-      reruns them through approved Gemini candidates (<code>gemini-2.5-flash</code>,{" "}
-      <code>gemini-3-flash-preview</code>, and <code>gemini-3.1-flash-lite-preview</code>). The canary reports
-      sentiment-match and complaint-match rates without writing public scores, which keeps validation inside
-      the Gemini free tier and removes the need for Anthropic or OpenAI keys. This is the kind of check any
-      team running a single-vendor classifier should be doing on themselves.
+      The classifier vendor is one of the tracked models. Claude Haiku 4.5 now grades all four models,
+      including Claude itself, so pro-Claude bias is the measurement risk. An April 2026 comparison between the
+      Gemini and Claude classifiers found about 92% agreement on sentiment, which suggests vendor identity
+      isn't the main driver of scores, but that isn't a substitute for an ongoing cross-vendor check. The check
+      fixture lives at <code>supabase/functions/check-gemini-self-bias</code>. It samples up to 150 recent
+      stored posts from the past 21 days that are unclassified, low-confidence, or missing a negative complaint
+      category, then reruns them through a free-tier Gemini as an independent second grader and compares those
+      labels against the stored Claude labels. It reports sentiment-match and complaint-match rates without
+      writing public scores. The check isn't on a schedule today; we run it before trusting a classifier change.
     </p>
     <p>
       Volume gaps are part of the record. The Feb 19 – Mar 7, 2026 gap (no scheduled cron, manual triggers only)

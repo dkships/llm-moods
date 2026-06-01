@@ -324,7 +324,7 @@ const SurfaceSegmentationBody = () => (
       raw counts so a reader can recompute either way.
     </p>
     <p>
-      Sentiment runs through Gemini 2.5 Flash via the Google AI API, classifying posts about its competitors.
+      Sentiment runs through Claude Haiku 4.5 via the Anthropic API, classifying posts about its competitors.
       <sup id="ref-1">
         <a href="#note-1" aria-label="See footnote 1">
           [1]
@@ -359,12 +359,12 @@ const SurfaceSegmentationBody = () => (
       >
         [1]
       </a>{" "}
-      Classifier self-bias risk. Gemini 2.5 Flash classifies posts about its three competitors and itself. We
-      run a Gemini-only canary against recent uncertain posts before any classifier upgrade. The canary doesn't
-      prove neutrality, and we name it here because surface segmentation makes the bias risk easier to
-      misread — a low Gemini coverage rate could look like classifier sandbagging if you squint at it. It
-      isn't. Posts simply don't name Gemini's surfaces in plain English often enough for the detector to
-      bucket them.
+      Classifier self-bias risk. Claude Haiku 4.5 classifies posts about its three competitors and itself, so
+      the risk to watch is a pro-Claude tilt. We cross-check a sample of recent uncertain posts against an
+      independent free-tier Gemini grader around classifier changes. The cross-check doesn't prove neutrality,
+      and the surface-coverage numbers are a separate axis: Gemini's low surface-coverage rate could look like
+      classifier sandbagging if you squint at it. It isn't. Posts simply don't name Gemini's surfaces in plain
+      English often enough for the detector to bucket them.
     </p>
 
     <AuthorBio />

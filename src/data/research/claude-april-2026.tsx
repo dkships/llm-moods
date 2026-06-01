@@ -201,16 +201,15 @@ const ClaudeApril2026Body = () => (
       that doesn't show up until you need the indicator.
     </p>
     <p>
-      The classifier itself is one of the tracked models. Sentiment runs through Gemini 2.5 Flash, classifying
-      posts about its competitors, Claude included.
+      The classifier itself is one of the tracked models. Sentiment runs through Claude Haiku 4.5, classifying
+      posts about Claude, ChatGPT, Gemini, and Grok.
       <sup id="ref-1">
         <a href="#note-1" aria-label="See footnote 1">
           [1]
         </a>
       </sup>{" "}
-      In this dataset Claude often outscored Gemini, the opposite of what self-favoritism would produce, but
-      the structural risk is real. The current validation harness is a Gemini-only canary over recent stored
-      posts, used before changing the production classifier.
+      The structural risk is real: the classifier could favor Claude. We cross-check labels against an
+      independent free-tier Gemini grader before changing the production classifier.
     </p>
 
     <h2 id="what-this-changes">What this changes</h2>
@@ -243,7 +242,7 @@ const ClaudeApril2026Body = () => (
       model.
     </p>
     <p>
-      Each post is classified for sentiment and complaint category by Gemini 2.5 Flash via the Google AI
+      Each post is classified for sentiment and complaint category by Claude Haiku 4.5 via the Anthropic
       API, in batches of 25. Multi-model posts use a per-model targeted prompt so a sentence like "DeepSeek
       fixed Gemini's mess" scores correctly for each model. The daily score is volume-weighted negative-vs-
       positive on a 0–100 scale.
@@ -281,12 +280,12 @@ const ClaudeApril2026Body = () => (
       >
         [1]
       </a>{" "}
-      Self-bias risk on the classifier. Gemini 2.5 Flash is the model performing classification and is
-      also one of the four tracked models. Current mitigation: a Gemini-only canary samples recent uncertain
-      posts and reruns them through approved Gemini candidates before classifier upgrades. That does not prove
-      neutrality, but it makes model changes auditable without adding OpenAI or Anthropic keys. Across the
-      windows examined, Claude often outscored Gemini, the opposite of what classifier bias toward Gemini would
-      produce.
+      Self-bias risk on the classifier. Claude Haiku 4.5 is the model performing classification and is
+      also one of the four tracked models, so the risk now runs toward favoring Claude. Mitigation: around
+      classifier changes we rerun a sample of labels through an independent free-tier Gemini grader and compare.
+      That is a check, not an always-on monitor. An earlier comparison of the two graders found roughly 92%
+      agreement on sentiment, which suggests vendor identity isn't the main driver of the label, but it does
+      not prove neutrality.
     </p>
 
     <AuthorBio />

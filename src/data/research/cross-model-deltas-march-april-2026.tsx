@@ -150,12 +150,14 @@ const CrossModelDeltasBody = () => (
       to the underlying data; the baselines themselves are the weakest part of the table.
     </p>
     <p>
-      The classifier is Gemini 2.5 Flash, which scores all four models including itself. We measured the
-      self-bias risk directly in April 2026, and the current validation check is Gemini-only: it samples recent
-      low-confidence or incomplete posts, reruns them through approved free-tier Gemini candidates, and reports
-      sentiment and complaint agreement without writing public scores. That does not remove self-bias risk, but
-      it makes classifier upgrades auditable without Anthropic or OpenAI keys. Full method and category caveats
-      are in the{" "}
+      The classifier is Claude Haiku 4.5, which scores all four models including itself, so the risk to watch
+      is a pro-Claude tilt. The validation check samples recent low-confidence or incomplete posts, reruns them
+      through an independent free-tier Gemini grader, and compares its sentiment and complaint labels against
+      the stored Claude labels without writing public scores. We run it around classifier changes, not as an
+      always-on monitor. It does not remove self-bias risk, but it keeps a cutover auditable against a
+      different vendor's read. An earlier Gemini/Claude comparison in April 2026 found roughly 92% sentiment
+      agreement, which suggests the vendor behind the classifier isn't the main driver of a model's score.
+      Full method and category caveats are in the{" "}
       <a href="/research/how-llm-vibes-classifies-sentiment">methodology post</a>.
     </p>
 

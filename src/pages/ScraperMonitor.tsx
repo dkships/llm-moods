@@ -306,7 +306,7 @@ const ScraperMonitor = () => {
             Classifier health (24h):{" "}
             <span className="font-semibold">{errorsLoading ? "—" : classifierErrorCount}</span>{" "}
             API/parse failures across all scrapers.
-            {classifierStatus === "breach" && " — investigate Gemini quota or model rotation."}
+            {classifierStatus === "breach" && " — investigate classifier quota or model rotation."}
             {classifierStatus === "watch" && " — elevated error rate, monitor."}
             {classifierStatus === "ok" && classifierErrorCount === 0 && " — clean."}
           </div>
