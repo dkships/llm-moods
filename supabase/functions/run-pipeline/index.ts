@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { processPendingClassifications } from "../_shared/classification-state.ts";
+import { getClassifierApiKey } from "../_shared/classifier.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
@@ -176,9 +177,9 @@ Deno.serve(async (req) => {
       }
     }
 
-    const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
-    if (!dryRun && !geminiApiKey) throw new Error("GEMINI_API_KEY not configured");
-    const classification = await processPendingClassifications(supabase, geminiApiKey ?? "", {
+    const classifierApiKey = getClassifierApiKey();
+    if (!dryRun && !classifierApiKey) throw new Error("Classifier API key not configured");
+    const classification = await processPendingClassifications(supabase, classifierApiKey ?? "", {
       dryRun,
       limit: Number(body.classification_limit ?? Deno.env.get("PIPELINE_CLASSIFICATION_LIMIT") ?? 40),
       batchSize: Number(body.classification_batch_size ?? Deno.env.get("PIPELINE_CLASSIFICATION_BATCH_SIZE") ?? 20),

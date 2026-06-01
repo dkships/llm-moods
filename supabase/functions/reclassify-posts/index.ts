@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted, isClassifierFailure } from "../_shared/classifier.ts";
+import { classifyBatch, classifyBatchTargeted, getClassifierApiKey, isClassifierFailure } from "../_shared/classifier.ts";
 import { isInternalServiceRequest, internalOnlyResponse } from "../_shared/runtime.ts";
 
 const corsHeaders = {
@@ -18,7 +18,9 @@ Deno.serve(async (req) => {
   if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const apiKey = Deno.env.get("GEMINI_API_KEY")!;
+  // Match the active CLASSIFIER_MODEL's provider so manual reclassify runs hit
+  // the same model (and key) as the drain — otherwise classifier_version splits.
+  const apiKey = getClassifierApiKey() ?? "";
 
   const logError = async (msg: string, ctx?: string) => {
     try { await supabase.from("error_log").insert({ function_name: "reclassify-posts", error_message: msg, context: ctx || null }); } catch {}

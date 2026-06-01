@@ -9,7 +9,11 @@ import {
   isLikelyNonExperienceShare,
   isLikelyPromotionalShare,
 } from "../../supabase/functions/_shared/utils";
-import { buildClassificationStateUpdate } from "../../supabase/functions/_shared/classification-state";
+import {
+  buildClassificationStateUpdate,
+  processPendingClassifications,
+} from "../../supabase/functions/_shared/classification-state";
+import { providerForModel } from "../../supabase/functions/_shared/classifier";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -195,5 +199,165 @@ describe("model mention classification state", () => {
       last_classification_error: "minute_limit",
     });
     expect(update.next_classification_at).toBe("2026-05-08T16:00:30.000Z");
+  });
+});
+
+const CLAUDE_MODEL = "claude-haiku-4-5-20251001";
+
+function anthropicToolUseResponse(results: unknown[]) {
+  return new Response(JSON.stringify({
+    content: [{ type: "tool_use", name: "record_classifications", input: { results } }],
+    usage: { input_tokens: 120, output_tokens: 60, cache_read_input_tokens: 0 },
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+describe("provider routing", () => {
+  it("routes by model-id prefix", () => {
+    expect(providerForModel("claude-sonnet-4-6")).toBe("anthropic");
+    expect(providerForModel("claude-haiku-4-5-20251001")).toBe("anthropic");
+    expect(providerForModel("gemini-2.5-flash")).toBe("gemini");
+    expect(providerForModel("gemini-3-flash-preview")).toBe("gemini");
+  });
+});
+
+describe("Anthropic classifier path", () => {
+  it("sends a claude-* model to the Anthropic Messages API and parses tool_use output", async () => {
+    const fetchMock = vi.fn(async () => anthropicToolUseResponse([
+      { relevant: true, sentiment: "positive", complaint_category: null, praise_category: "output_quality", confidence: 0.92, language: null, english_translation: null },
+      { relevant: true, sentiment: "negative", complaint_category: "reasoning", praise_category: null, confidence: 0.81, language: null, english_translation: null },
+    ]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const results = await classifyBatch(
+      ["Claude is great at code", "Claude flubbed the reasoning"],
+      "anthropic-key",
+      25,
+      vi.fn(async () => {}),
+      { model: CLAUDE_MODEL },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toContain("api.anthropic.com/v1/messages");
+    expect((init.headers as Record<string, string>)["x-api-key"]).toBe("anthropic-key");
+    expect((init.headers as Record<string, string>)["anthropic-version"]).toBeTruthy();
+    const sentBody = JSON.parse(init.body as string);
+    expect(sentBody.model).toBe(CLAUDE_MODEL);
+    expect(sentBody.tool_choice).toMatchObject({ type: "tool" });
+    // Static instruction prefix is in the cached system block, not the user turn.
+    expect(sentBody.system[0].cache_control).toMatchObject({ type: "ephemeral" });
+
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({ sentiment: "positive", status: "classified" });
+    expect(results[1]).toMatchObject({ sentiment: "negative", complaint_category: "reasoning", status: "classified" });
+  });
+
+  it("defers (not fails) a 429 with no retry-after so the post is retried later", async () => {
+    const fetchMock = vi.fn(async () => new Response(
+      JSON.stringify({ type: "error", error: { type: "rate_limit_error", message: "slow down" } }),
+      { status: 429, headers: { "Content-Type": "application/json" } },
+    ));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const results = await classifyBatch(
+      ["Claude post a", "Claude post b"],
+      "anthropic-key",
+      25,
+      vi.fn(async () => {}),
+      { model: CLAUDE_MODEL },
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(results.every((r) => r.status === "quota_deferred")).toBe(true);
+  });
+});
+
+describe("free-Gemini spillover", () => {
+  interface MockUpdate { id: string; values: Record<string, unknown>; }
+
+  function mockSupabase(rows: unknown[], updates: MockUpdate[]) {
+    const builder = {
+      select: () => builder,
+      in: () => builder,
+      or: () => builder,
+      order: () => builder,
+      limit: async () => ({ data: rows, error: null }),
+      update: (values: Record<string, unknown>) => ({
+        eq: async (_col: string, id: string) => {
+          updates.push({ id, values });
+          return { error: null };
+        },
+      }),
+    };
+    return { from: () => builder } as never;
+  }
+
+  const claudeRows = [
+    { id: "1", model_id: "m", title: "t1", content: "Claude nailed this refactor", source_url: null, classification_attempts: 0, models: { slug: "claude" } },
+    { id: "2", model_id: "m", title: "t2", content: "Claude kept hallucinating", source_url: null, classification_attempts: 0, models: { slug: "claude" } },
+  ];
+
+  function stubClaudeEnv() {
+    vi.stubGlobal("Deno", {
+      env: {
+        get: (k: string) => (({
+          CLASSIFIER_MODEL: CLAUDE_MODEL,
+          ANTHROPIC_API_KEY: "ak",
+          GEMINI_FREE_API_KEY: "gk",
+        } as Record<string, string>)[k]),
+      },
+    });
+  }
+
+  const geminiSuccess = () => new Response(JSON.stringify({
+    choices: [{ message: { content: JSON.stringify({ results: [
+      { relevant: true, sentiment: "positive", complaint_category: null, praise_category: "output_quality", confidence: 0.9, language: null, english_translation: null },
+      { relevant: true, sentiment: "negative", complaint_category: "hallucinations", praise_category: null, confidence: 0.85, language: null, english_translation: null },
+    ] }) } }],
+    usage: { prompt_tokens: 10, completion_tokens: 5, total_tokens: 15 },
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+  const hardFailure = (vendor: "anthropic" | "gemini") => new Response(
+    JSON.stringify(vendor === "anthropic"
+      ? { type: "error", error: { type: "api_error", message: "boom" } }
+      : { error: { code: 400, status: "INVALID_ARGUMENT", message: "boom" } }),
+    { status: 400, headers: { "Content-Type": "application/json" } },
+  );
+
+  it("recovers transient Claude errors through the free Gemini key", async () => {
+    stubClaudeEnv();
+    const fetchMock = vi.fn(async (url: unknown) =>
+      String(url).includes("api.anthropic.com") ? hardFailure("anthropic") : geminiSuccess());
+    vi.stubGlobal("fetch", fetchMock);
+
+    const updates: MockUpdate[] = [];
+    const summary = await processPendingClassifications(mockSupabase(claudeRows, updates), "ak", {
+      limit: 10,
+      batchSize: 20,
+      logError: vi.fn(async () => {}),
+    });
+
+    expect(summary.classified).toBe(2);
+    expect(summary.retry).toBe(0);
+    expect(updates).toHaveLength(2);
+    expect(updates.every((u) => u.values.classification_status === "classified")).toBe(true);
+  });
+
+  it("leaves un-recovered items in retry when the free Gemini fallback also fails", async () => {
+    stubClaudeEnv();
+    const fetchMock = vi.fn(async (url: unknown) =>
+      hardFailure(String(url).includes("api.anthropic.com") ? "anthropic" : "gemini"));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const updates: MockUpdate[] = [];
+    const summary = await processPendingClassifications(mockSupabase(claudeRows, updates), "ak", {
+      limit: 10,
+      batchSize: 20,
+      logError: vi.fn(async () => {}),
+    });
+
+    expect(summary.classified).toBe(0);
+    expect(summary.retry).toBe(2);
+    expect(updates.every((u) => u.values.classification_status === "retry")).toBe(true);
   });
 });

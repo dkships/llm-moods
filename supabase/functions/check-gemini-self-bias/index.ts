@@ -2,23 +2,28 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import {
   classifyBatchTargeted,
   isClassifierFailure,
+  providerForModel,
   type ClassifyResult,
   type UsageSample,
 } from "../_shared/classifier.ts";
 import { internalOnlyResponse, isInternalServiceRequest, readJsonBody } from "../_shared/runtime.ts";
 
-// Gemini-only classifier canary for sentiment model upgrades. It keeps
-// evaluation inside the Gemini eval-quota budget, compares candidate Gemini
-// models against either a senior oracle model or the existing stored labels,
-// and never writes to scraped_posts or public scores.
+// Cross-vendor classifier canary for sentiment model upgrades. Compares candidate
+// models (Gemini and Claude) against either a senior oracle model or the existing
+// stored labels, and never writes to scraped_posts or public scores. Claude
+// candidates use ANTHROPIC_API_KEY; Gemini candidates use GEMINI_API_KEY (or
+// GEMINI_FREE_API_KEY when body.use_free_gemini is set, for the drift canary).
 
 const SOURCE = "check-gemini-self-bias";
 const DEFAULT_ORACLE = "gemini-2.5-pro";
+// Default candidate set is the Gemini→Claude migration comparison: the incumbent
+// Flash baseline head-to-head against the three Claude tiers. Override via the
+// `candidates` body param for other evaluations (e.g. the free-Gemini canary).
 const DEFAULT_CANDIDATES = [
   "gemini-2.5-flash",
-  "gemini-2.5-flash-lite",
-  "gemini-3.1-flash-lite",
-  "gemini-3-flash-preview",
+  "claude-haiku-4-5-20251001",
+  "claude-sonnet-4-6",
+  "claude-opus-4-8",
 ];
 const DEFAULT_SAMPLE_SIZE = 300;
 const MAX_SAMPLE_SIZE = 500;
@@ -31,8 +36,10 @@ const HARD_CONFIDENCE = 0.65;
 const TEXT_TRIM = 1200;
 const DISAGREEMENT_LIMIT = 5;
 
-// Per-million-token pricing (paid Tier 1, May 2026). Used for cost estimation
-// only; if `usage.prompt_tokens` is absent we report cost=null instead.
+// Per-million-token pricing (paid Tier 1, 2026). Used for cost estimation only;
+// if token usage is absent we report cost=null instead. Claude rows let the
+// migration smoke test compare cost head-to-head with Gemini; cache_read input is
+// priced at 0.1x in rollupUsage so cached Sonnet runs are scored fairly.
 const PRICING: Record<string, { input: number; output: number }> = {
   "gemini-2.5-pro": { input: 1.25, output: 10.0 },
   "gemini-2.5-flash": { input: 0.30, output: 2.50 },
@@ -41,7 +48,14 @@ const PRICING: Record<string, { input: number; output: number }> = {
   "gemini-3.1-flash-lite-preview": { input: 0.25, output: 1.50 },
   "gemini-3-flash-preview": { input: 0.50, output: 3.00 },
   "gemini-3.1-pro-preview": { input: 2.00, output: 12.0 },
+  "claude-haiku-4-5-20251001": { input: 1.0, output: 5.0 },
+  "claude-haiku-4-5": { input: 1.0, output: 5.0 },
+  "claude-sonnet-4-6": { input: 3.0, output: 15.0 },
+  "claude-opus-4-8": { input: 5.0, output: 25.0 },
 };
+
+// Anthropic prompt-cache read multiplier (vs base input price).
+const CACHE_READ_MULTIPLIER = 0.1;
 
 const MULTI_MODEL_PATTERNS: Record<string, RegExp> = {
   claude: /\bclaude\b/i,
@@ -310,13 +324,19 @@ function rollupUsage(model: string, samples: UsageSample[], sampleSize: number):
   const prompts = samples.map((s) => s.promptTokens);
   const completions = samples.map((s) => s.completionTokens);
   const totals = samples.map((s) => s.totalTokens);
+  const cacheReads = samples.map((s) => s.cacheReadTokens ?? null);
   const latencies = samples.map((s) => s.latencyMs).filter((n): n is number => Number.isFinite(n));
   const promptSum = sumOrNull(prompts);
   const completionSum = sumOrNull(completions);
   const totalSum = sumOrNull(totals);
+  const cacheReadSum = sumOrNull(cacheReads) ?? 0;
   const pricing = PRICING[model];
+  // promptSum is freshly-billed input (uncached); cache reads bill at 0.1x.
   const cost = pricing && promptSum !== null && completionSum !== null
-    ? Math.round(((promptSum * pricing.input + completionSum * pricing.output) / 1_000_000) * 1_000_000) / 1_000_000
+    ? Math.round((
+      (promptSum * pricing.input + cacheReadSum * pricing.input * CACHE_READ_MULTIPLIER + completionSum * pricing.output)
+      / 1_000_000
+    ) * 1_000_000) / 1_000_000
     : null;
   const costPer1k = cost !== null && sampleSize > 0
     ? Math.round((cost / sampleSize) * 1000 * 1_000_000) / 1_000_000
@@ -544,11 +564,6 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
   );
-  const apiKey = Deno.env.get("GEMINI_API_KEY");
-  if (!apiKey) {
-    return jsonResponse({ error: "GEMINI_API_KEY not configured" }, 500);
-  }
-
   const body = await readJsonBody(req);
   const mode: "oracle" | "agreement" = body.mode === "agreement" ? "agreement" : "oracle";
   const oracle = typeof body.oracle === "string" && body.oracle.length > 0 ? body.oracle : DEFAULT_ORACLE;
@@ -561,6 +576,18 @@ Deno.serve(async (req) => {
   const evalDailyLimit = typeof body.eval_daily_limit === "number" && body.eval_daily_limit > 0
     ? Math.floor(body.eval_daily_limit)
     : undefined;
+
+  // Per-provider keys. Gemini candidates use the free key when the drift canary
+  // asks for it; Claude candidates always use ANTHROPIC_API_KEY. Missing keys
+  // don't 500 — the affected models are skipped so a single-vendor run still works.
+  const useFreeGemini = body.use_free_gemini === true;
+  const geminiKey = useFreeGemini
+    ? (Deno.env.get("GEMINI_FREE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY"))
+    : Deno.env.get("GEMINI_API_KEY");
+  const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
+  if (!geminiKey && !anthropicKey) {
+    return jsonResponse({ error: "No classifier API key configured (need GEMINI_API_KEY and/or ANTHROPIC_API_KEY)" }, 500);
+  }
 
   const logError = async (msg: string, ctx?: string) => {
     await supabase.from("error_log").insert({
@@ -588,20 +615,31 @@ Deno.serve(async (req) => {
 
     const targetedItems = sample.map((p) => ({ text: p.text, targetModel: p.model_slug }));
 
+    // Gemini-only quirk: thinking models (gemini-*-pro) share max_tokens between
+    // reasoning and JSON output, so the 4096 default truncates mid-array. The
+    // regex never matches claude-*, so Claude takes the non-thinking branch.
     const isThinkingOnly = (model: string) => /^gemini-(?:2\.5|3(?:\.\d+)?)-pro/.test(model);
 
     const runModel = async (model: string) => {
       const usage: UsageSample[] = [];
+      const provider = providerForModel(model);
+      const key = provider === "anthropic" ? anthropicKey : geminiKey;
+      if (!key) {
+        await logError(
+          `Skipping ${model}: ${provider === "anthropic" ? "ANTHROPIC_API_KEY" : "GEMINI_API_KEY"} not configured`,
+          "model-key-missing",
+        );
+        return { results: [] as ClassifyResult[], usage };
+      }
       const thinking = isThinkingOnly(model);
-      // Thinking models share max_tokens between reasoning and structured
-      // output; the default 4096 budget gets truncated mid-JSON. "low"
-      // constrains reasoning; bigger token cap gives the JSON room.
-      // Non-thinking models also benefit from extra headroom because
-      // non-English posts with verbose translations can bloat the response.
+      // "low" constrains reasoning; bigger token cap gives the JSON room.
+      // Non-thinking models (incl. all Claude) also benefit from extra headroom
+      // because non-English posts with verbose translations bloat the response.
+      // reasoningEffort/quotaScope are ignored on the Anthropic path.
       const batchSize = thinking ? 15 : 25;
       const results = await classifyBatchTargeted(
         targetedItems,
-        apiKey,
+        key,
         batchSize,
         logError,
         {
@@ -705,7 +743,7 @@ Deno.serve(async (req) => {
       reports,
       pairwise,
       disagreements,
-      note: "Gemini-only historical canary; no public score writes.",
+      note: "Cross-vendor classifier canary (Gemini + Claude); no public score writes.",
     };
 
     await persistReport(supabase, report);

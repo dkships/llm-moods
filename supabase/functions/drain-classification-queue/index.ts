@@ -1,5 +1,6 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import { processPendingClassifications } from "../_shared/classification-state.ts";
+import { getClassifierApiKey } from "../_shared/classifier.ts";
 import {
   internalOnlyResponse,
   isInternalServiceRequest,
@@ -27,10 +28,12 @@ Deno.serve(async (req) => {
   }
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
-  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  // Key follows the active CLASSIFIER_MODEL: ANTHROPIC_API_KEY for claude-*,
+  // GEMINI_API_KEY otherwise. Avoids sending a Gemini key to the Anthropic API.
+  const apiKey = getClassifierApiKey();
   if (!apiKey) {
-    await logToErrorLog(supabase, SOURCE, "GEMINI_API_KEY not configured", "config");
-    return new Response(JSON.stringify({ status: "failed", error: "GEMINI_API_KEY not configured" }), {
+    await logToErrorLog(supabase, SOURCE, "Classifier API key not configured", "config");
+    return new Response(JSON.stringify({ status: "failed", error: "Classifier API key not configured" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

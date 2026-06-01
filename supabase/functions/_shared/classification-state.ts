@@ -1,10 +1,33 @@
 import {
   classifyBatchTargeted,
   isClassifierFailure,
+  providerForModel,
+  resolveClassifierModel,
   type ClassifyResult,
 } from "./classifier.ts";
 
-export const CURRENT_CLASSIFIER_VERSION = "targeted-gemini-2026-05-08";
+type DenoGlobal = typeof globalThis & {
+  Deno?: { env: { get(name: string): string | undefined } };
+};
+
+const CLASSIFIER_VERSION_DATE = "2026-06-01";
+
+// Provenance tag stored on each row. Derived from the active model so it tracks
+// the Gemini→Claude cutover automatically — setting CLASSIFIER_MODEL flips both
+// the model and this tag. Nothing reads it for scoring; it's an audit trail that
+// locates the model boundary in the data.
+export function currentClassifierVersion(model?: string): string {
+  return `targeted-${model ?? resolveClassifierModel()}-${CLASSIFIER_VERSION_DATE}`;
+}
+
+// Back-compat export; equals the env-resolved version at module load.
+export const CURRENT_CLASSIFIER_VERSION = currentClassifierVersion();
+
+// Free-tier Gemini spillover: when Claude is the active classifier, posts that
+// hit a transient classifier_error are retried through a separate non-billing
+// Gemini key so a Claude blip doesn't stall the queue.
+const FREE_GEMINI_MODEL = "gemini-2.5-flash";
+const FREE_GEMINI_QUOTA_KEY = "gemini-free";
 
 export type ModelMentionClassificationStatus = "pending" | "retry" | "classified" | "irrelevant" | "failed";
 
@@ -82,7 +105,7 @@ export function buildClassificationStateUpdate(
 ): Record<string, unknown> {
   const now = options.now ?? new Date();
   const nextAttempts = (row.classification_attempts ?? 0) + 1;
-  const classifierVersion = options.classifierVersion ?? CURRENT_CLASSIFIER_VERSION;
+  const classifierVersion = options.classifierVersion ?? currentClassifierVersion();
   const maxAttempts = options.maxAttempts ?? 5;
 
   if (isClassifierFailure(result)) {
@@ -134,6 +157,61 @@ function statusFromUpdate(payload: Record<string, unknown>): ModelMentionClassif
   return payload.classification_status as ModelMentionClassificationStatus;
 }
 
+// Mutates `results` in place: retries only the rows that came back as a transient
+// classifier_error through the free-tier Gemini key and merges any positive
+// recoveries. Returns the count recovered. No-op unless Claude is the active
+// classifier and GEMINI_FREE_API_KEY is set.
+//
+// Correctness guards (so a spillover blip can never corrupt good data):
+//   - Only classifier_error indices are retried. quota_deferred is left alone —
+//     it's a pacing signal, not a failure, and re-running it wastes free quota.
+//   - Only a `classified` spillover result replaces the original. A still-failing
+//     or (possibly truncation-padded) irrelevant result leaves Claude's error in
+//     place, so the row stays retry/failed and self-heals on the next drain —
+//     never silently overwritten with a padding sentinel.
+//   - Only the failed rows are re-sent, so Claude successes are never reprocessed
+//     or double-charged.
+async function applyFreeGeminiSpillover(
+  items: { text: string; targetModel: string }[],
+  results: ClassifyResult[],
+  batchSize: number,
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+): Promise<number> {
+  if (providerForModel(resolveClassifierModel()) !== "anthropic") return 0;
+  const freeKey = (globalThis as DenoGlobal).Deno?.env.get("GEMINI_FREE_API_KEY");
+  if (!freeKey) return 0;
+
+  const failedIdx: number[] = [];
+  for (let i = 0; i < results.length; i++) {
+    if (results[i]?.status === "classifier_error") failedIdx.push(i);
+  }
+  if (failedIdx.length === 0) return 0;
+
+  const spill = await classifyBatchTargeted(
+    failedIdx.map((idx) => items[idx]),
+    freeKey,
+    batchSize,
+    logError,
+    { model: FREE_GEMINI_MODEL, quotaKey: FREE_GEMINI_QUOTA_KEY },
+  );
+
+  let recovered = 0;
+  for (let k = 0; k < failedIdx.length; k++) {
+    const candidate = spill[k];
+    if (candidate && candidate.status === "classified") {
+      results[failedIdx[k]] = candidate;
+      recovered++;
+    }
+  }
+  if (recovered > 0 && logError) {
+    await logError(
+      `Free-Gemini spillover recovered ${recovered}/${failedIdx.length} Claude classifier errors`,
+      "spillover-recovered",
+    );
+  }
+  return recovered;
+}
+
 export async function processPendingClassifications(
   supabase: PendingClassificationClient,
   apiKey: string,
@@ -176,12 +254,12 @@ export async function processPendingClassifications(
   summary.selected = rows.length;
   if (rows.length === 0 || dryRun) return summary;
 
-  const results = await classifyBatchTargeted(
-    rows.map((row) => ({ text: modelMentionText(row), targetModel: targetModelLabel(row) })),
-    apiKey,
-    batchSize,
-    options.logError,
-  );
+  const items = rows.map((row) => ({ text: modelMentionText(row), targetModel: targetModelLabel(row) }));
+  const results = await classifyBatchTargeted(items, apiKey, batchSize, options.logError);
+
+  // Recover transient Claude errors via free-tier Gemini before writing, so each
+  // row is written exactly once with its final (possibly recovered) result.
+  await applyFreeGeminiSpillover(items, results, batchSize, options.logError);
 
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
@@ -190,7 +268,7 @@ export async function processPendingClassifications(
 
     const update = buildClassificationStateUpdate(row, result, {
       now,
-      classifierVersion: options.classifierVersion ?? CURRENT_CLASSIFIER_VERSION,
+      classifierVersion: options.classifierVersion ?? currentClassifierVersion(),
     });
     const status = statusFromUpdate(update);
     summary[status === "classified" ? "classified" : status === "irrelevant" ? "irrelevant" : status === "failed" ? "failed" : "retry"]++;

@@ -1,6 +1,8 @@
 import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "./taxonomy.ts";
 
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
+const ANTHROPIC_VERSION = "2023-06-01";
 const DEFAULT_MODEL = "gemini-2.5-flash";
 type DenoGlobal = typeof globalThis & {
   Deno?: { env: { get(name: string): string | undefined } };
@@ -30,7 +32,9 @@ const MINUTE_REQUEST_LIMIT = Number(envValue("GEMINI_MINUTE_REQUEST_LIMIT", "8")
 const EVAL_DAILY_REQUEST_LIMIT = Number(envValue("GEMINI_EVAL_DAILY_REQUEST_LIMIT", "20"));
 const EVAL_MINUTE_REQUEST_LIMIT = Number(envValue("GEMINI_EVAL_MINUTE_REQUEST_LIMIT", "2"));
 const MAX_REMOTE_429_RETRY_WAIT_MS = Number(envValue("GEMINI_429_MAX_RETRY_WAIT_MS", "65000"));
-const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504]);
+// 529 = Anthropic "overloaded"; treat as transient so overload events retry/defer
+// rather than dead-lettering posts as a non-retryable classifier_error.
+const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529]);
 const SAFE_ERROR_HEADERS = [
   "retry-after",
   "x-ratelimit-limit-requests",
@@ -41,6 +45,13 @@ const SAFE_ERROR_HEADERS = [
   "x-ratelimit-reset-tokens",
   "x-request-id",
   "x-goog-request-id",
+  "anthropic-ratelimit-requests-limit",
+  "anthropic-ratelimit-requests-remaining",
+  "anthropic-ratelimit-tokens-limit",
+  "anthropic-ratelimit-tokens-remaining",
+  "anthropic-ratelimit-input-tokens-remaining",
+  "anthropic-ratelimit-output-tokens-remaining",
+  "request-id",
 ];
 
 export interface UsageSample {
@@ -48,6 +59,9 @@ export interface UsageSample {
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
+  // Anthropic prompt-cache reads, billed at 0.1x input. Null for Gemini.
+  // Lets the eval harness price cached Sonnet runs fairly vs uncached Haiku.
+  cacheReadTokens?: number | null;
   latencyMs: number;
   mode: "single" | "batch";
 }
@@ -69,7 +83,32 @@ export interface ClassifyOptions {
 }
 
 function classifierModel(options: ClassifyOptions = {}): string {
-  return options.model ?? envValue("GEMINI_CLASSIFIER_MODEL", DEFAULT_MODEL);
+  // CLASSIFIER_MODEL is the provider-neutral knob; GEMINI_CLASSIFIER_MODEL is the
+  // legacy name kept as a fallback so an existing secret keeps working.
+  return options.model ?? envValue("CLASSIFIER_MODEL", envValue("GEMINI_CLASSIFIER_MODEL", DEFAULT_MODEL));
+}
+
+export type ClassifierProvider = "anthropic" | "gemini";
+
+// Provider is selected by model-id prefix alone, so setting CLASSIFIER_MODEL (or
+// passing options.model) is the only switch needed. claude-* → Anthropic native
+// Messages API; everything else → Gemini's OpenAI-compatible endpoint.
+export function providerForModel(model: string): ClassifierProvider {
+  return model.toLowerCase().startsWith("claude") ? "anthropic" : "gemini";
+}
+
+// The active production model (env-driven) unless an explicit model is passed.
+export function resolveClassifierModel(options: ClassifyOptions = {}): string {
+  return classifierModel(options);
+}
+
+// Returns the API key for the active (or given) model's provider. Callers use
+// this instead of reading GEMINI_API_KEY directly so a claude-* model gets the
+// Anthropic key rather than a mismatched Gemini key.
+export function getClassifierApiKey(model?: string): string | undefined {
+  const provider = providerForModel(model ?? classifierModel());
+  const env = (globalThis as DenoGlobal).Deno?.env;
+  return provider === "anthropic" ? env?.get("ANTHROPIC_API_KEY") : env?.get("GEMINI_API_KEY");
 }
 
 function quotaKeyFor(model: string, options: ClassifyOptions = {}): string {
@@ -364,6 +403,7 @@ async function emitUsage(
     promptTokens: usage ? readUsageField(usage.prompt_tokens) : null,
     completionTokens: usage ? readUsageField(usage.completion_tokens) : null,
     totalTokens: usage ? readUsageField(usage.total_tokens) : null,
+    cacheReadTokens: usage ? readUsageField(usage.cache_read_input_tokens) : null,
     latencyMs,
     mode,
   };
@@ -603,6 +643,45 @@ async function readGeminiFailure(res: Response): Promise<{
   };
 }
 
+// Anthropic errors are shaped {type:"error", error:{type, message}} — different
+// from Gemini's. Parse them so 429/529 carry a usable reason + retry-after rather
+// than being mis-read by readGeminiFailure and dropped to a non-retryable error.
+async function readAnthropicFailure(res: Response): Promise<{
+  reason: string;
+  statusText: string | null;
+  errorType: string | null;
+  retryAfterMs: number | null;
+  headers: Record<string, string>;
+}> {
+  const retryMs = retryAfterMs(res);
+  let parsed: unknown = null;
+  let raw: string | null = null;
+  try {
+    raw = await res.text();
+    parsed = raw ? JSON.parse(raw) : null;
+  } catch {
+    parsed = null;
+  }
+
+  const parsedRecord = isRecord(parsed) ? parsed : {};
+  const error = isRecord(parsedRecord.error) ? parsedRecord.error : parsedRecord;
+  const errorType = clipped(error.type ?? parsedRecord.type, 120);
+  const message = clipped(error.message ?? parsedRecord.message ?? raw, 260);
+  const headers = sanitizedHeaders(res);
+  const headerDetail = Object.entries(headers)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(" ");
+  const parts = [`HTTP ${res.status}`, errorType, message, headerDetail || null].filter(Boolean);
+
+  return {
+    reason: parts.join(" | "),
+    statusText: errorType,
+    errorType,
+    retryAfterMs: retryMs,
+    headers,
+  };
+}
+
 function nextMinuteDelayMs(): number {
   const msIntoMinute = Date.now() % 60_000;
   return (60_000 - msIntoMinute) + Math.round(Math.random() * 1_000);
@@ -731,6 +810,179 @@ async function fetchGemini(
   return makeSkippedResult("classifier_error", "retry_exhausted");
 }
 
+// Tool whose input_schema wraps results exactly as the Gemini path returns them
+// ({result} single / {results} batch), so the downstream JSON parser is shared.
+// Forcing this tool guarantees schema-shaped output without prose JSON.
+const ANTHROPIC_CLASSIFY_TOOL_NAME = "record_classifications";
+
+function anthropicTool(mode: "single" | "batch") {
+  const input_schema = mode === "single"
+    ? {
+      type: "object",
+      additionalProperties: false,
+      required: ["result"],
+      properties: { result: CLASSIFICATION_RESULT_SCHEMA },
+    }
+    : {
+      type: "object",
+      additionalProperties: false,
+      required: ["results"],
+      properties: { results: { type: "array", items: CLASSIFICATION_RESULT_SCHEMA } },
+    };
+  return {
+    name: ANTHROPIC_CLASSIFY_TOOL_NAME,
+    description: "Record the sentiment classification result(s) for the posts.",
+    input_schema,
+  };
+}
+
+function anthropicRequestBody(
+  instructions: string,
+  postsBlock: string,
+  maxTokens: number,
+  mode: "single" | "batch",
+  options: ClassifyOptions = {},
+): string {
+  return JSON.stringify({
+    model: classifierModel(options),
+    max_tokens: maxTokens,
+    temperature: 0,
+    // Static instruction prefix in a cached system block (1.5-2.5k tokens); the
+    // per-call posts go in the user turn so the cache prefix is identical each
+    // call. Sonnet/Opus (>=1024 min) cache; Haiku (4096 min) silently won't —
+    // that's fine, Haiku is cheap. cache_control after system also caches tools.
+    system: [{ type: "text", text: instructions, cache_control: { type: "ephemeral" } }],
+    messages: [{ role: "user", content: postsBlock }],
+    tools: [anthropicTool(mode)],
+    tool_choice: { type: "tool", name: ANTHROPIC_CLASSIFY_TOOL_NAME },
+  });
+}
+
+// Re-shape Claude's Messages response into the OpenAI envelope the callers already
+// parse: tool_use.input → JSON string at choices[0].message.content, and Anthropic
+// usage fields mapped onto prompt/completion/total (+ cache_read for cost).
+function anthropicAsOpenAiResponse(data: unknown): Response {
+  const record = isRecord(data) ? data : {};
+  const content = Array.isArray(record.content) ? record.content : [];
+  const toolUse = content.find((block) => isRecord(block) && block.type === "tool_use" && isRecord(block.input));
+  const input = isRecord(toolUse) ? toolUse.input : {};
+  const usage = isRecord(record.usage) ? record.usage : {};
+  const inputTokens = readUsageField(usage.input_tokens) ?? 0;
+  const cacheCreate = readUsageField(usage.cache_creation_input_tokens) ?? 0;
+  const cacheRead = readUsageField(usage.cache_read_input_tokens) ?? 0;
+  const outputTokens = readUsageField(usage.output_tokens);
+  // promptTokens = freshly-billed input (uncached + cache write). cache_read is
+  // carried separately so the harness can price it at 0.1x.
+  const promptTokens = inputTokens + cacheCreate;
+  const synthetic = {
+    choices: [{ message: { content: JSON.stringify(input) } }],
+    usage: {
+      prompt_tokens: promptTokens,
+      completion_tokens: outputTokens,
+      total_tokens: promptTokens + cacheRead + (outputTokens ?? 0),
+      cache_read_input_tokens: cacheRead,
+    },
+  };
+  return new Response(JSON.stringify(synthetic), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+async function fetchAnthropic(
+  instructions: string,
+  postsBlock: string,
+  apiKey: string,
+  maxTokens: number,
+  mode: "single" | "batch",
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
+): Promise<Response | ClassifyResult> {
+  const body = anthropicRequestBody(instructions, postsBlock, maxTokens, mode, options);
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let res: Response | null = null;
+    try {
+      res = await fetch(ANTHROPIC_API_URL, {
+        method: "POST",
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": ANTHROPIC_VERSION,
+          "Content-Type": "application/json",
+        },
+        body,
+      });
+    } catch (e) {
+      if (attempt === 2) return makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e));
+      await new Promise((r) => setTimeout(r, retryDelayMs(null, attempt)));
+      continue;
+    }
+
+    if (res.ok) return anthropicAsOpenAiResponse(await res.json());
+
+    if (res.status === 429 || res.status === 529) {
+      const details = await readAnthropicFailure(res);
+      const requestErrorId = nextRequestErrorId();
+      if (logError) {
+        await logError(`Anthropic ${res.status} (${requestErrorId}): ${details.reason}`, "classify-request-quota");
+      }
+      if (
+        details.retryAfterMs !== null
+        && details.retryAfterMs > 0
+        && details.retryAfterMs <= MAX_REMOTE_429_RETRY_WAIT_MS
+        && attempt < 2
+      ) {
+        await new Promise((r) => setTimeout(r, details.retryAfterMs!));
+        continue;
+      }
+      if (res.status === 529 && attempt < 2) {
+        // Overloaded with no usable retry-after: back off and retry rather than defer.
+        await new Promise((r) => setTimeout(r, retryDelayMs(res, attempt)));
+        continue;
+      }
+      return makeSkippedResult("quota_deferred", details.reason, {
+        error_type: details.errorType ?? "rate_limit_error",
+        request_error_id: requestErrorId,
+        retry_after_ms: details.retryAfterMs,
+      });
+    }
+
+    if (!TRANSIENT_STATUSES.has(res.status) || attempt === 2) {
+      const details = await readAnthropicFailure(res);
+      const requestErrorId = nextRequestErrorId();
+      if (logError) await logError(`Anthropic request failed (${requestErrorId}): ${details.reason}`, "classify-request-error");
+      return makeSkippedResult("classifier_error", details.reason, {
+        error_type: details.errorType,
+        request_error_id: requestErrorId,
+        retry_after_ms: details.retryAfterMs,
+      });
+    }
+
+    const waitMs = retryDelayMs(res, attempt);
+    if (logError) await logError(`Anthropic HTTP ${res.status}, retrying in ${waitMs}ms (attempt ${attempt + 1}/3)`, "classify-retry");
+    await new Promise((r) => setTimeout(r, waitMs));
+  }
+
+  return makeSkippedResult("classifier_error", "retry_exhausted");
+}
+
+// Single dispatch point: claude-* models go to the Anthropic native path (no
+// Gemini quota gate), everything else to Gemini. Gemini keeps its single
+// concatenated prompt; Anthropic gets the instruction/posts split for caching.
+function callClassifier(
+  instructions: string,
+  postsBlock: string,
+  apiKey: string,
+  maxTokens: number,
+  mode: "single" | "batch",
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
+): Promise<Response | ClassifyResult> {
+  if (providerForModel(classifierModel(options)) === "anthropic") {
+    return fetchAnthropic(instructions, postsBlock, apiKey, maxTokens, mode, logError, options);
+  }
+  return fetchGemini(instructions + postsBlock, apiKey, maxTokens, mode, logError, options);
+}
+
 export async function classifyPost(
   text: string,
   apiKey: string,
@@ -740,7 +992,7 @@ export async function classifyPost(
   const startedAt = performance.now();
   try {
     const singleTokens = options.maxTokensOverride && options.maxTokensOverride > 0 ? options.maxTokensOverride : 700;
-    const res = await fetchGemini(CLASSIFY_PROMPT + text.slice(0, 600), apiKey, singleTokens, "single", logError, options);
+    const res = await callClassifier(CLASSIFY_PROMPT, text.slice(0, 600), apiKey, singleTokens, "single", logError, options);
     if (!(res instanceof Response)) {
       if (logError) await logError(`AI gateway ${res.status}: ${res.error}`, "classify-error");
       return res;
@@ -777,7 +1029,7 @@ async function batchClassifyWithPrompt(
   // Canary harness (commit 7d49112) validated 8192 for translation-heavy posts;
   // production drain uses batchSize=40 and needs the same headroom.
   const batchTokens = options.maxTokensOverride && options.maxTokensOverride > 0 ? options.maxTokensOverride : 8192;
-  const res = await fetchGemini(prompt + numbered, apiKey, batchTokens, "batch", logError, options);
+  const res = await callClassifier(prompt, numbered, apiKey, batchTokens, "batch", logError, options);
   if (!(res instanceof Response)) {
     if (logError) await logError(`Batch classify ${res.status}: ${res.error}`, "batch-classify-error");
     return Array.from({ length: batchLength }, () => res);
