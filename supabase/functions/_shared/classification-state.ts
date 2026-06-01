@@ -24,10 +24,18 @@ export function currentClassifierVersion(model?: string): string {
 export const CURRENT_CLASSIFIER_VERSION = currentClassifierVersion();
 
 // Free-tier Gemini spillover: when Claude is the active classifier, posts that
-// hit a transient classifier_error are retried through a separate non-billing
-// Gemini key so a Claude blip doesn't stall the queue.
+// hit a transient classifier_error are retried through Gemini so a Claude blip
+// doesn't stall the queue. Uses GEMINI_FREE_API_KEY if set, else GEMINI_API_KEY
+// (intended to be a free-tier, non-billing key once production runs on Claude).
+// Paced to free-tier limits via its own quota bucket so it never bills.
 const FREE_GEMINI_MODEL = "gemini-2.5-flash";
 const FREE_GEMINI_QUOTA_KEY = "gemini-free";
+const FREE_GEMINI_MINUTE_LIMIT = Number(
+  (globalThis as DenoGlobal).Deno?.env.get("GEMINI_FREE_MINUTE_REQUEST_LIMIT") ?? "8",
+);
+const FREE_GEMINI_DAILY_LIMIT = Number(
+  (globalThis as DenoGlobal).Deno?.env.get("GEMINI_FREE_DAILY_REQUEST_LIMIT") ?? "200",
+);
 
 export type ModelMentionClassificationStatus = "pending" | "retry" | "classified" | "irrelevant" | "failed";
 
@@ -178,7 +186,8 @@ async function applyFreeGeminiSpillover(
   logError?: (msg: string, ctx?: string) => Promise<void>,
 ): Promise<number> {
   if (providerForModel(resolveClassifierModel()) !== "anthropic") return 0;
-  const freeKey = (globalThis as DenoGlobal).Deno?.env.get("GEMINI_FREE_API_KEY");
+  const env = (globalThis as DenoGlobal).Deno?.env;
+  const freeKey = env?.get("GEMINI_FREE_API_KEY") ?? env?.get("GEMINI_API_KEY");
   if (!freeKey) return 0;
 
   const failedIdx: number[] = [];
@@ -192,7 +201,12 @@ async function applyFreeGeminiSpillover(
     freeKey,
     batchSize,
     logError,
-    { model: FREE_GEMINI_MODEL, quotaKey: FREE_GEMINI_QUOTA_KEY },
+    {
+      model: FREE_GEMINI_MODEL,
+      quotaKey: FREE_GEMINI_QUOTA_KEY,
+      minuteLimit: FREE_GEMINI_MINUTE_LIMIT,
+      dailyLimit: FREE_GEMINI_DAILY_LIMIT,
+    },
   );
 
   let recovered = 0;
