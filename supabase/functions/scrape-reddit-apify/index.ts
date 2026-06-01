@@ -372,6 +372,20 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       }
     }
 
+    // A run that crawled nothing usable must not resolve as "success". When
+    // Reddit 403-blocked the old actor (May 29-31), the actor still returned a
+    // clean SUCCEEDED status with 0 posts, so deriveRunMetrics (which only
+    // downgrades on a non-empty errors[]) kept marking the run "success" and a
+    // 3-day ingest outage stayed invisible. Surface the zero-yield case as an
+    // error so the run is downgraded to failed and the watchdog's stale-scraper
+    // check can fire. Also catches a future actor output-schema change (items
+    // returned but none parse as posts) without us having to predict it.
+    if (summary.apify_items_fetched === 0) {
+      summary.errors.push("Apify returned 0 items - actor crawl produced no data (possible block/outage)");
+    } else if (summary.posts_found === 0) {
+      summary.errors.push(`Apify returned ${summary.apify_items_fetched} items but 0 parsed as posts - possible actor output schema change`);
+    }
+
     const derived = deriveRunMetrics(summary);
     const completedAt = new Date().toISOString();
     await updateRunRecord(supabase, runRecord!.id, {
