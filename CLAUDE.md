@@ -21,7 +21,7 @@ This is a Lovable-generated app synced bi-directionally with GitHub on `main`. T
 
 ### Edge function auth gates: keep them
 
-Edge functions that hit paid APIs (Gemini, Apify, etc.) MUST keep their `isInternalServiceRequest` gate. The repo and the anon key are public, so an ungated function is a public quota-burner. This came up in Phase 10B when Lovable's curl tool removed the gate from `reclassify-posts` to invoke it (the tool sends user JWT, not service-role) — Phase 11B re-added the gate after a $0.01-per-call attack vector was identified.
+Edge functions that hit paid APIs (Anthropic, Apify, Gemini, etc.) MUST keep their `isInternalServiceRequest` gate. The repo and the anon key are public, so an ungated function is a public quota-burner. This came up in Phase 10B when Lovable's curl tool removed the gate from `reclassify-posts` to invoke it (the tool sends user JWT, not service-role) — Phase 11B re-added the gate after a $0.01-per-call attack vector was identified.
 
 If a one-shot reclassify or backfill is needed, the supported invocation path is a **temporary helper edge function**, not raw SQL:
 
@@ -33,7 +33,7 @@ If a one-shot reclassify or backfill is needed, the supported invocation path is
 
 Do NOT remove the application-layer gate from these functions to work around invocation friction.
 
-Functions that should stay gated: `reclassify-posts`, anything else that calls Gemini/Apify or performs unbounded writes.
+Functions that should stay gated: `reclassify-posts`, anything else that calls Anthropic/Gemini/Apify or performs unbounded writes.
 
 Functions gated against bare anon (as of PR #38, 2026-05-24): `aggregate-vibes`, `cleanup-old-posts`, and `run-scrapers` accept a service-role JWT **or** the pg_cron scheduler body `{scheduler:"pg_cron", pipeline:"<source>"}` (via `isSchedulerRequest` in `_shared/runtime.ts`); `reaggregate-vibes` requires service-role. A bare anon call with no scheduler body returns 403. The scheduler-body path is what lets the public-repo migration schedule these crons without leaking service-role — see the cron bodies in `20260523120000_public_rpc_security_hardening.sql`. Their operations are still bounded and idempotent, so an attacker who forged the body couldn't escalate beyond the public RPCs anyway.
 
@@ -50,7 +50,7 @@ Functions gated against bare anon (as of PR #38, 2026-05-24): `aggregate-vibes`,
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
 | Edge Functions | 15 Deno functions (5 active scrapers + utilities) |
-| Sentiment AI | Gemini 2.5 Flash via Google AI API (batch classification, 25 posts/call) |
+| Sentiment AI | Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) via Anthropic Messages API (batch classification). Provider is pluggable via `CLASSIFIER_MODEL`; free-tier Gemini kept as fallback |
 
 ## Key Routes
 
@@ -87,7 +87,7 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 | `scrape-bluesky-3x` | `4 4,12,21 * * *` | +4 min | `scrape-bluesky` |
 | `scrape-twitter-3x` | `6 4,12,21 * * *` | +6 min | `scrape-twitter` |
 | `scrape-mastodon-3x` | `8 4,12,21 * * *` | +8 min | `scrape-mastodon` |
-| `drain-classification-queue-2min` | `*/2 * * * *` | every 2 min | `drain-classification-queue` (body: `limit=200`, `batch_size=20` → 10 Gemini calls/pass) |
+| `drain-classification-queue-2min` | `*/2 * * * *` | every 2 min | `drain-classification-queue` (body: `limit=200`, `batch_size=20` → 10 classifier calls/pass) |
 | `aggregate-vibes-q30` | `20,50 * * * *` | every 30 min, offset | `aggregate-vibes` (refreshes last 7 days; `queued_posts` heals as drain catches up, `failed_posts` only via `reclassify-posts?mode=reset_failed`) |
 | `pipeline-watchdog-1h` | `17 * * * *` | hourly at :17 | `pipeline-watchdog` |
 | `cleanup-stuck-scraper-runs` | `*/30 * * * *` | every 30 min | (SQL only — marks runs >30 min as failed) |
@@ -97,7 +97,7 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 
 Scraper auth gates accept three callers: service-role JWT, `RUN_PIPELINE_TRIGGER_SECRET` header, or anon JWT with body `{scheduler:"pg_cron", pipeline:"scrape-..."}`. The third path lets pg_cron invoke each scraper directly without leaking service-role into a public-repo migration.
 
-**Drain throughput (May 13 update).** Account on Gemini paid tier (Tier 1: 1000 RPM / 10K RPD); `GEMINI_DAILY_REQUEST_LIMIT` raised to 5000 and `GEMINI_MINUTE_REQUEST_LIMIT` to 300 in edge-function secrets. Drain cadence is 2 min, `limit=200`, `batch_size=20` (~6,000 posts/hr capacity vs ~500-650/day actual ingest — single-scraper-run dumps clear in one pass; current-day score is accurate within ~5 min of the last scraper). `batch_size` was halved from 40 to 20 on May 15 (`20260515160000_drain_batch_size_20.sql`) to cap Gemini batch JSON output size. `partial_coverage` is no longer the structural default — `score-refresh.ts` treats `queuedPosts > 5 || classification_coverage < 0.85` as the partial threshold, and `aggregate-vibes` refreshes the last 7 days so those flags heal once the queue catches up. Live cron diverges from migration history per the established pattern; check `cron.job` for actual state.
+**Drain throughput (June 1 update — classifier on Claude).** Production classifier is Claude Haiku 4.5 via the Anthropic Messages API (`CLASSIFIER_MODEL=claude-haiku-4-5-20251001`, `ANTHROPIC_API_KEY`). Anthropic Tier 1 limits dwarf our ~30 calls/day, so the Anthropic path has no Supabase quota gate. Drain cadence is 2 min, `limit=200`, `batch_size=20` (~6,000 posts/hr capacity vs ~500-650/day actual ingest — single-scraper-run dumps clear in one pass; current-day score is accurate within ~5 min of the last scraper). `batch_size` was halved from 40 to 20 on May 15 (`20260515160000_drain_batch_size_20.sql`) to cap batch JSON output size. (History: through May the classifier ran on Gemini 2.5 Flash paid Tier 1 with `GEMINI_DAILY_REQUEST_LIMIT`/`GEMINI_MINUTE_REQUEST_LIMIT` raised to 5000/300; those secrets now pace only the free-tier Gemini fallback.) `partial_coverage` is no longer the structural default — `score-refresh.ts` treats `queuedPosts > 5 || classification_coverage < 0.85` as the partial threshold, and `aggregate-vibes` refreshes the last 7 days so those flags heal once the queue catches up. Live cron diverges from migration history per the established pattern; check `cron.job` for actual state.
 
 **Failed-vs-queued split (May 15 update).** `vibes_scores.queued_posts` now counts only `pending + retry` (work the drain will attempt); `vibes_scores.failed_posts` is the dead-letter count (max attempts exhausted, drain ignores). `classification_coverage = classified / (classified + pending + retry)` so the ratio heals when failed posts are recovered. Recover transient failures with `reclassify-posts?mode=reset_failed&error_pattern=transient` (skips deterministic `parse_error`/`missing_*` patterns); confirm with `dry_run=1` first. UI surfaces `failed_posts` as an asymmetric "X abandoned" chip on `/model/:slug` and a top-5-error breakdown panel on `/admin/scrapers`. Pipeline watchdog alerts when posts hit failed status faster than 20/24h.
 
@@ -120,7 +120,7 @@ Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Api
 
 Shared utilities (keyword matching, dedup, error logging) are in `_shared/utils.ts` — scrapers import from there instead of duplicating code.
 
-Sentiment is classified via Google Gemini API (`gemini-2.5-flash`). Single-model posts use `classifyBatch()` (25/call); multi-model posts use `classifyBatchTargeted()` for per-model sentiment (e.g., "DeepSeek fixed Gemini's mess" → negative Gemini, positive DeepSeek). Both live in `_shared/classifier.ts`. 429 retry: 3 attempts, exponential backoff, 2s inter-batch delay. Non-English posts are translated by the classifier prompt; original in `content`, translation in `translated_content`, language code in `original_language`. Known limitation: Gemini classifies posts about itself (potential self-bias). Paid Tier 1: 1,000 RPM / 10K RPD cap; current usage ~30-50 calls/day at 500-650 posts/day ingest.
+Sentiment is classified by **Claude Haiku 4.5** (`claude-haiku-4-5-20251001`) via the Anthropic Messages API (forced-JSON via tool use; `temperature` is omitted — current Claude models reject it). `_shared/classifier.ts` routes by model-id prefix: `claude-*` → Anthropic native path, everything else → Gemini's OpenAI-compatible endpoint. The active model is `CLASSIFIER_MODEL` (falls back to legacy `GEMINI_CLASSIFIER_MODEL`, then `gemini-2.5-flash`); `getClassifierApiKey()` picks `ANTHROPIC_API_KEY` vs `GEMINI_API_KEY` to match — so a model swap is a pure config flip and **rollback = set `CLASSIFIER_MODEL=gemini-2.5-flash` (no redeploy; both providers stay live)**. Single-model posts use `classifyBatch()`; multi-model posts use `classifyBatchTargeted()` for per-model sentiment (e.g., "DeepSeek fixed Gemini's mess" → negative Gemini, positive DeepSeek). Retry: 3 attempts, exponential backoff, 2s inter-batch delay; Anthropic 429/529 are treated transient. Non-English posts are translated by the classifier prompt; original in `content`, translation in `translated_content`, language code in `original_language`. Prompt caching applies on Sonnet/Opus (≥1024-token cacheable prefix) but not Haiku (4096-token minimum) — fine, Haiku is cheap (~$8/mo modeled vs ~$22/mo Sonnet). Known limitation: the classifier (Claude) is itself a tracked model, so pro-Claude self-bias is the measurement risk; cross-checked via the free-tier Gemini second grader in `check-gemini-self-bias` (run around classifier changes, not always-on). On transient Claude errors `classification-state.ts` spills failed items over to free-tier Gemini (`GEMINI_FREE_API_KEY` or `GEMINI_API_KEY`). Verified live working 2026-06-01 (131 posts, 0 errors).
 
 `reclassify-posts` edge function supports `?mode=multi_model` to find and fix historical multi-model posts with identical sentiment. Run `reaggregate-vibes` after to recalculate scores.
 
@@ -158,7 +158,10 @@ Sentiment is classified via Google Gemini API (`gemini-2.5-flash`). Single-model
 
 **Edge Functions (Supabase secrets — never commit these):**
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-- `GEMINI_API_KEY` — Google AI API key for sentiment classification (all scrapers)
+- `ANTHROPIC_API_KEY` — production sentiment classifier (Claude Haiku 4.5); dedicated `llm-moods-classifier` key
+- `CLASSIFIER_MODEL` — active classifier model id (`claude-haiku-4-5-20251001`); the cutover/rollback switch
+- `GEMINI_API_KEY` — now the **free-tier fallback / second-opinion grader**, not the primary classifier. `GEMINI_DAILY_REQUEST_LIMIT`/`GEMINI_MINUTE_REQUEST_LIMIT` were deleted 2026-06-01 → code defaults (200/day, 8/min) pace it within free tier. Disable billing on its Google project to keep it free
+- `GEMINI_FREE_API_KEY` — optional dedicated non-billing Gemini key for spillover; not set today, so spillover falls back to `GEMINI_API_KEY`
 - `LOVABLE_API_KEY` — Lovable AI gateway key (no longer used by scrapers, kept for Lovable platform)
 - `APIFY_API_TOKEN`, `BSKY_HANDLE`, `BSKY_APP_PASSWORD`
 - `MASTODON_URL`, `MASTODON_TOKEN`
