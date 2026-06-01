@@ -11,6 +11,7 @@ import { getResearchBody } from "@/data/research-bodies";
 import { PROSE_CLASS_NAME } from "@/lib/prose-styles";
 import NotFound from "@/pages/NotFound";
 import { AUTHOR_NAME, AUTHOR_SAMEAS } from "@/components/research/AuthorBio";
+import ShareLinks from "@/components/research/ShareLinks";
 
 const formatDate = (iso: string) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", {
@@ -152,6 +153,7 @@ const ResearchPostPage = () => {
                 <Body />
               </div>
 
+              <ShareLinks url={`https://llmvibes.ai/research/${post.slug}`} title={post.title} />
             </div>
           </article>
         </main>

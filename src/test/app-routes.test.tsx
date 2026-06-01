@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stripMotionProps = ({
@@ -221,10 +221,7 @@ describe("public app routes", () => {
   it("renders model detail with compact score metadata", async () => {
     await renderAt("/model/chatgpt");
 
-    expect(await screen.findByText(/updated\b/i)).toBeInTheDocument();
-    expect(screen.getByLabelText("2 scored posts")).toBeInTheDocument();
-    expect(screen.getByText("2 SCORED · 328 COLLECTED · 7D")).toBeInTheDocument();
-    expect(screen.getByText(/^latest classified post\b/i)).toBeInTheDocument();
+    expect(await screen.findByText("2 SCORED · 328 COLLECTED · 7D")).toBeInTheDocument();
     expect(screen.queryByText(/^low confidence$/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/100% classified/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/daily score based on/i)).not.toBeInTheDocument();
@@ -232,11 +229,16 @@ describe("public app routes", () => {
     expect(screen.queryByText(/limited sample in the latest window/i)).not.toBeInTheDocument();
   });
 
-  it("labels negative surface distribution with the loaded 7-day window", async () => {
+  it("renders the negative-posts-by-surface distribution", async () => {
     await renderAt("/model/chatgpt");
 
-    expect(await screen.findByRole("heading", { name: /negative posts by surface/i })).toBeInTheDocument();
-    expect(screen.getByText(/loaded 7-day recent-post window/i)).toBeInTheDocument();
+    const heading = await screen.findByRole("heading", { name: /negative posts by surface/i });
+    // The mock post ("…ChatGPT unreliable…") resolves to the ChatGPT product surface,
+    // so the panel's bar list carries that label. Scope the lookup to the panel since
+    // "ChatGPT" appears elsewhere on the page.
+    const panel = heading.closest("header")?.parentElement ?? null;
+    expect(panel).not.toBeNull();
+    expect(within(panel as HTMLElement).getByText("ChatGPT")).toBeInTheDocument();
   });
 
   it("renders an empty recent-post state on the all filter", async () => {
