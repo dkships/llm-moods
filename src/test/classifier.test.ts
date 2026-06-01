@@ -244,6 +244,8 @@ describe("Anthropic classifier path", () => {
     const sentBody = JSON.parse(init.body as string);
     expect(sentBody.model).toBe(CLAUDE_MODEL);
     expect(sentBody.tool_choice).toMatchObject({ type: "tool" });
+    // Current Claude models reject `temperature` — it must not be sent.
+    expect(sentBody.temperature).toBeUndefined();
     // Static instruction prefix is in the cached system block, not the user turn.
     expect(sentBody.system[0].cache_control).toMatchObject({ type: "ephemeral" });
 

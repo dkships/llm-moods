@@ -846,7 +846,9 @@ function anthropicRequestBody(
   return JSON.stringify({
     model: classifierModel(options),
     max_tokens: maxTokens,
-    temperature: 0,
+    // No `temperature`: current Claude models (Haiku 4.5 / Sonnet 4.6 / Opus)
+    // reject it with "temperature is deprecated for this model". tool_choice
+    // forcing already makes the classification output stable enough.
     // Static instruction prefix in a cached system block (1.5-2.5k tokens); the
     // per-call posts go in the user turn so the cache prefix is identical each
     // call. Sonnet/Opus (>=1024 min) cache; Haiku (4096 min) silently won't —

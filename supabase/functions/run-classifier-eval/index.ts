@@ -13,6 +13,9 @@
 // never writes public scores.
 import { corsHeaders } from "../_shared/utils.ts";
 
+// Supabase Edge runtime global for keeping a worker alive past the response.
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -32,18 +35,34 @@ Deno.serve(async (req) => {
     body = {};
   }
 
-  const res = await fetch(`${supabaseUrl}/functions/v1/check-gemini-self-bias`, {
+  const runEval = fetch(`${supabaseUrl}/functions/v1/check-gemini-self-bias`, {
     method: "POST",
     headers: {
       Authorization: `Bearer ${serviceRoleKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-  });
+  }).then((r) => r.text()).catch(() => undefined);
 
-  const text = await res.text();
-  return new Response(text, {
-    status: res.status,
+  // The harness runs for minutes; Lovable's curl closes the connection at ~60s
+  // and the runtime tears down the worker. waitUntil keeps this worker alive so
+  // the background harness call completes and writes its error_log report
+  // regardless of the client connection. Read the result from error_log.
+  if (typeof EdgeRuntime !== "undefined" && EdgeRuntime?.waitUntil) {
+    EdgeRuntime.waitUntil(runEval);
+    return new Response(
+      JSON.stringify({
+        status: "started",
+        note: "Eval running in background; read error_log full-report rows in a few minutes.",
+      }),
+      { status: 202, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  }
+
+  // Fallback (no background runtime): run synchronously and return the report.
+  const text = await runEval;
+  return new Response(text ?? "{}", {
+    status: 200,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
 });
