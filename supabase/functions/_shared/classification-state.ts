@@ -275,29 +275,46 @@ export async function processPendingClassifications(
   // row is written exactly once with its final (possibly recovered) result.
   await applyFreeGeminiSpillover(items, results, batchSize, options.logError);
 
+  // Constant for the pass — hoisted out of the per-row loop.
+  const classifierVersion = options.classifierVersion ?? currentClassifierVersion();
+
+  // Build the updates sequentially (cheap; keeps the status-counter tallies
+  // deterministic), then fan the writes out with bounded concurrency. One
+  // sequential .update().eq() per row was up to 200 serialized PostgREST round
+  // trips (~5-10s) per pass; a bulk RPC is cleaner but needs a migration and the
+  // payloads aren't column-uniform across statuses, so concurrent single-row
+  // updates are the no-migration win that preserves exact per-row semantics.
+  const writes: { id: string; update: Record<string, unknown> }[] = [];
   for (let i = 0; i < rows.length; i++) {
     const row = rows[i];
     const result = results[i];
     if (!result) continue;
 
-    const update = buildClassificationStateUpdate(row, result, {
-      now,
-      classifierVersion: options.classifierVersion ?? currentClassifierVersion(),
-    });
+    const update = buildClassificationStateUpdate(row, result, { now, classifierVersion });
     const status = statusFromUpdate(update);
     summary[status === "classified" ? "classified" : status === "irrelevant" ? "irrelevant" : status === "failed" ? "failed" : "retry"]++;
-
-    const { error: updateError } = await supabase
-      .from("scraped_posts")
-      .update(update)
-      .eq("id", row.id);
-
-    if (updateError) {
-      summary.errors.push(`${row.id}: ${updateError.message}`);
-      continue;
-    }
-    summary.processed++;
+    writes.push({ id: row.id, update });
   }
+
+  const WRITE_CONCURRENCY = 12;
+  let nextWrite = 0;
+  const writer = async () => {
+    while (true) {
+      const idx = nextWrite++;
+      if (idx >= writes.length) return;
+      const w = writes[idx];
+      const { error: updateError } = await supabase
+        .from("scraped_posts")
+        .update(w.update)
+        .eq("id", w.id);
+      if (updateError) {
+        summary.errors.push(`${w.id}: ${updateError.message}`);
+      } else {
+        summary.processed++;
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(WRITE_CONCURRENCY, writes.length) }, () => writer()));
 
   return summary;
 }

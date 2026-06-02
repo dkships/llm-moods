@@ -492,7 +492,9 @@ const CLASSIFICATION_RESULT_SCHEMA = {
         null,
       ],
     },
-    confidence: { type: "number", minimum: 0, maximum: 1 },
+    // No numeric minimum/maximum: the strict-tool-use / structured-output JSON
+    // Schema subset rejects them (parseResult clamps confidence to [0,1] anyway).
+    confidence: { type: "number" },
     language: { type: ["string", "null"] },
     english_translation: { type: ["string", "null"] },
   },
@@ -832,6 +834,12 @@ function anthropicTool(mode: "single" | "batch") {
   return {
     name: ANTHROPIC_CLASSIFY_TOOL_NAME,
     description: "Record the sentiment classification result(s) for the posts.",
+    // strict: grammar-constrained sampling guarantees the tool input matches
+    // input_schema (enum values, types, required fields), which removes the
+    // parse_error / invalid-enum failure mode the retry+spillover path catches.
+    // GA, no beta header. Requires the structured-output JSON Schema subset, so
+    // CLASSIFICATION_RESULT_SCHEMA carries no numeric minimum/maximum.
+    strict: true,
     input_schema,
   };
 }
@@ -1025,11 +1033,12 @@ async function batchClassifyWithPrompt(
   options: ClassifyOptions = {},
 ): Promise<ClassifyResult[]> {
   const startedAt = performance.now();
-  // 4096 truncates ~40-post batches that include translations: each result is
-  // ~120-300 tokens (more when english_translation is populated), so a full
-  // batch easily exceeds 4096 and the JSON response cuts off mid-array.
-  // Canary harness (commit 7d49112) validated 8192 for translation-heavy posts;
-  // production drain uses batchSize=40 and needs the same headroom.
+  // 4096 truncates batches that include translations: each result is ~120-300
+  // tokens (more when english_translation is populated), so a full batch can
+  // exceed 4096 and the JSON response cuts off mid-array. Canary harness (commit
+  // 7d49112) validated 8192 for translation-heavy posts; the live drain uses
+  // batchSize=20 (May-15 migration) and keeps this headroom. On Anthropic
+  // max_tokens is a cap only (billed on actual output), so 8192 has no cost downside.
   const batchTokens = options.maxTokensOverride && options.maxTokensOverride > 0 ? options.maxTokensOverride : 8192;
   const res = await callClassifier(prompt, numbered, apiKey, batchTokens, "batch", logError, options);
   if (!(res instanceof Response)) {
@@ -1054,7 +1063,11 @@ async function batchClassifyWithPrompt(
   }
   const results: ClassifyResult[] = [];
   for (let j = 0; j < batchLength; j++) {
-    results.push(j < parsedResults.length ? parseResult(parsedResults[j]) : IRRELEVANT_RESULT);
+    // A short results array means the model truncated or dropped trailing posts.
+    // Treat the missing tail as a retryable parse_error, NOT IRRELEVANT_RESULT —
+    // padding with irrelevant writes an unclassified post to terminal `irrelevant`
+    // (never retried, invisible to coverage), silently dropping it from scoring.
+    results.push(j < parsedResults.length ? parseResult(parsedResults[j]) : makeSkippedResult("parse_error", "missing_result_index"));
   }
   return results;
 }
@@ -1067,6 +1080,99 @@ function fillRemainingFromStop(stopResult: ClassifyResult, count: number): Class
   return Array.from({ length: count }, () => ({ ...stopResult }));
 }
 
+// A pre-built batch: the numbered prompt body + how many posts it covers.
+interface BatchDescriptor {
+  numbered: string;
+  length: number;
+}
+
+// Anthropic has no quota gate and Tier 1 Haiku (50 RPM / 100k OTPM) dwarfs our
+// ~10 calls/pass, so batches run concurrently. The cap also bounds burst against
+// a concurrent reclassify sharing the account; 429/529 backoff is the safety net.
+const ANTHROPIC_BATCH_CONCURRENCY = Math.max(1, Number(envValue("ANTHROPIC_BATCH_CONCURRENCY", "4")));
+
+function batchExceptionResults(length: number, e: unknown): ClassifyResult[] {
+  return Array.from({ length }, () => makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e)));
+}
+
+// Anthropic path: bounded-concurrency workers, each writing its batch into the
+// descriptor's POSITIONAL slot (never completion order) so results[i] stays
+// aligned to rows[i] — the per-row update loop and spillover failedIdx mapping
+// both depend on that. No inter-batch sleep; no Gemini-only quota early-break.
+async function runBatchesConcurrent(
+  prompt: string,
+  descriptors: BatchDescriptor[],
+  apiKey: string,
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
+): Promise<ClassifyResult[]> {
+  const out: ClassifyResult[][] = new Array(descriptors.length);
+  let next = 0;
+  const worker = async () => {
+    while (true) {
+      const idx = next++;
+      if (idx >= descriptors.length) return;
+      const d = descriptors[idx];
+      try {
+        out[idx] = await batchClassifyWithPrompt(prompt, d.numbered, d.length, apiKey, logError, options);
+      } catch (e) {
+        if (logError) await logError(`Batch classify exception: ${e instanceof Error ? e.message : String(e)}`, "batch-classify-exception");
+        out[idx] = batchExceptionResults(d.length, e);
+      }
+    }
+  };
+  const lanes = Math.min(ANTHROPIC_BATCH_CONCURRENCY, descriptors.length);
+  await Promise.all(Array.from({ length: lanes }, () => worker()));
+  return out.flat();
+}
+
+// Gemini path: serial, with the 2s inter-batch pacing and the quota early-break
+// (a quota_deferred batch fans the stop sentinel across all remaining posts).
+async function runBatchesSerial(
+  prompt: string,
+  descriptors: BatchDescriptor[],
+  totalLength: number,
+  apiKey: string,
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
+): Promise<ClassifyResult[]> {
+  const allResults: ClassifyResult[] = [];
+  let consumed = 0;
+  for (const d of descriptors) {
+    consumed += d.length;
+    try {
+      const results = await batchClassifyWithPrompt(prompt, d.numbered, d.length, apiKey, logError, options);
+      allResults.push(...results);
+      const stopResult = shouldStopAfterBatch(results);
+      if (stopResult && consumed < totalLength) {
+        allResults.push(...fillRemainingFromStop(stopResult, totalLength - consumed));
+        break;
+      }
+      if (consumed < totalLength) {
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    } catch (e) {
+      if (logError) await logError(`Batch classify exception: ${e instanceof Error ? e.message : String(e)}`, "batch-classify-exception");
+      allResults.push(...batchExceptionResults(d.length, e));
+    }
+  }
+  return allResults;
+}
+
+function runBatches(
+  prompt: string,
+  descriptors: BatchDescriptor[],
+  totalLength: number,
+  apiKey: string,
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
+): Promise<ClassifyResult[]> {
+  if (descriptors.length === 0) return Promise.resolve([]);
+  return providerForModel(classifierModel(options)) === "anthropic"
+    ? runBatchesConcurrent(prompt, descriptors, apiKey, logError, options)
+    : runBatchesSerial(prompt, descriptors, totalLength, apiKey, logError, options);
+}
+
 export async function classifyBatch(
   texts: string[],
   apiKey: string,
@@ -1077,27 +1183,13 @@ export async function classifyBatch(
   if (texts.length === 0) return [];
   if (texts.length === 1) return [await classifyPost(texts[0], apiKey, logError, options)];
 
-  const allResults: ClassifyResult[] = [];
+  const descriptors: BatchDescriptor[] = [];
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
     const numbered = batch.map((t, j) => `Post ${j + 1}: "${t.slice(0, 600)}"`).join("\n\n");
-    try {
-      const results = await batchClassifyWithPrompt(BATCH_CLASSIFY_PROMPT, numbered, batch.length, apiKey, logError, options);
-      allResults.push(...results);
-      const stopResult = shouldStopAfterBatch(results);
-      if (stopResult && i + batchSize < texts.length) {
-        allResults.push(...fillRemainingFromStop(stopResult, texts.length - (i + batchSize)));
-        break;
-      }
-      if (i + batchSize < texts.length) {
-        await new Promise(r => setTimeout(r, 2000));
-      }
-    } catch (e) {
-      if (logError) await logError(`Batch classify exception: ${e instanceof Error ? e.message : String(e)}`, "batch-classify-exception");
-      allResults.push(...batch.map(() => makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e))));
-    }
+    descriptors.push({ numbered, length: batch.length });
   }
-  return allResults;
+  return runBatches(BATCH_CLASSIFY_PROMPT, descriptors, texts.length, apiKey, logError, options);
 }
 
 export async function classifyBatchTargeted(
@@ -1109,25 +1201,11 @@ export async function classifyBatchTargeted(
 ): Promise<ClassifyResult[]> {
   if (items.length === 0) return [];
 
-  const allResults: ClassifyResult[] = [];
+  const descriptors: BatchDescriptor[] = [];
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
     const numbered = batch.map((item, j) => `Post ${j + 1} [TARGET: ${item.targetModel}]: "${item.text.slice(0, 600)}"`).join("\n\n");
-    try {
-      const results = await batchClassifyWithPrompt(BATCH_CLASSIFY_TARGETED_PROMPT, numbered, batch.length, apiKey, logError, options);
-      allResults.push(...results);
-      const stopResult = shouldStopAfterBatch(results);
-      if (stopResult && i + batchSize < items.length) {
-        allResults.push(...fillRemainingFromStop(stopResult, items.length - (i + batchSize)));
-        break;
-      }
-      if (i + batchSize < items.length) {
-        await new Promise(r => setTimeout(r, 2000));
-      }
-    } catch (e) {
-      if (logError) await logError(`Targeted classify exception: ${e instanceof Error ? e.message : String(e)}`, "targeted-classify-exception");
-      allResults.push(...batch.map(() => makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e))));
-    }
+    descriptors.push({ numbered, length: batch.length });
   }
-  return allResults;
+  return runBatches(BATCH_CLASSIFY_TARGETED_PROMPT, descriptors, items.length, apiKey, logError, options);
 }

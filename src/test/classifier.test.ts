@@ -244,6 +244,10 @@ describe("Anthropic classifier path", () => {
     const sentBody = JSON.parse(init.body as string);
     expect(sentBody.model).toBe(CLAUDE_MODEL);
     expect(sentBody.tool_choice).toMatchObject({ type: "tool" });
+    // Strict tool use: grammar-constrained, schema-valid output.
+    expect(sentBody.tools[0].strict).toBe(true);
+    // Strict subset rejects numeric minimum/maximum on the confidence field.
+    expect(sentBody.tools[0].input_schema.properties.results.items.properties.confidence.minimum).toBeUndefined();
     // Current Claude models reject `temperature` — it must not be sent.
     expect(sentBody.temperature).toBeUndefined();
     // Static instruction prefix is in the cached system block, not the user turn.
@@ -271,6 +275,48 @@ describe("Anthropic classifier path", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(results.every((r) => r.status === "quota_deferred")).toBe(true);
+  });
+
+  it("marks a missing batch result as parse_error (retryable), not terminal irrelevant", async () => {
+    // Model returns only 1 result for a 2-post batch (truncation/omission).
+    const fetchMock = vi.fn(async () => anthropicToolUseResponse([
+      { relevant: true, sentiment: "positive", complaint_category: null, praise_category: "output_quality", confidence: 0.9, language: null, english_translation: null },
+    ]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const results = await classifyBatch(
+      ["Claude a", "Claude b"],
+      "anthropic-key",
+      25,
+      vi.fn(async () => {}),
+      { model: CLAUDE_MODEL },
+    );
+
+    expect(results).toHaveLength(2);
+    expect(results[0].status).toBe("classified");
+    expect(results[1].status).toBe("parse_error");
+    expect(isClassifierFailure(results[1])).toBe(true);
+  });
+
+  it("runs Anthropic batches concurrently and assembles results in positional order", async () => {
+    const fetchMock = vi.fn(async (_url: unknown, init: RequestInit) => {
+      const userText = JSON.parse(init.body as string).messages[0].content as string;
+      const isA = userText.includes('"a"');
+      return anthropicToolUseResponse([
+        isA
+          ? { relevant: true, sentiment: "positive", complaint_category: null, praise_category: "output_quality", confidence: 0.9, language: null, english_translation: null }
+          : { relevant: true, sentiment: "negative", complaint_category: "speed", praise_category: null, confidence: 0.8, language: null, english_translation: null },
+      ]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    // batchSize 1 → two batches; they fan out concurrently but must stay aligned.
+    const results = await classifyBatch(["a", "b"], "anthropic-key", 1, vi.fn(async () => {}), { model: CLAUDE_MODEL });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(results).toHaveLength(2);
+    expect(results[0].sentiment).toBe("positive");
+    expect(results[1].sentiment).toBe("negative");
   });
 });
 

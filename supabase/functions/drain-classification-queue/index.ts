@@ -47,9 +47,12 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Number(...) || DEFAULT guards a malformed body: a NaN limit/batch_size
+    // otherwise propagates through the Math.min/max clamps and silently no-ops
+    // the whole pass (the `i < NaN` slice loop never runs).
     const summary = await processPendingClassifications(supabase, apiKey, {
-      limit: Number(body.limit ?? DEFAULT_LIMIT),
-      batchSize: Number(body.batch_size ?? DEFAULT_BATCH_SIZE),
+      limit: Number(body.limit) || DEFAULT_LIMIT,
+      batchSize: Number(body.batch_size) || DEFAULT_BATCH_SIZE,
       dryRun: body.dry_run === true,
       logError: (msg, ctx) => logToErrorLog(supabase, SOURCE, msg, ctx ?? "classification"),
     });
