@@ -492,9 +492,7 @@ const CLASSIFICATION_RESULT_SCHEMA = {
         null,
       ],
     },
-    // No numeric minimum/maximum: the strict-tool-use / structured-output JSON
-    // Schema subset rejects them (parseResult clamps confidence to [0,1] anyway).
-    confidence: { type: "number" },
+    confidence: { type: "number", minimum: 0, maximum: 1 },
     language: { type: ["string", "null"] },
     english_translation: { type: ["string", "null"] },
   },
@@ -834,12 +832,12 @@ function anthropicTool(mode: "single" | "batch") {
   return {
     name: ANTHROPIC_CLASSIFY_TOOL_NAME,
     description: "Record the sentiment classification result(s) for the posts.",
-    // strict: grammar-constrained sampling guarantees the tool input matches
-    // input_schema (enum values, types, required fields), which removes the
-    // parse_error / invalid-enum failure mode the retry+spillover path catches.
-    // GA, no beta header. Requires the structured-output JSON Schema subset, so
-    // CLASSIFICATION_RESULT_SCHEMA carries no numeric minimum/maximum.
-    strict: true,
+    // NOTE: strict tool use (`strict: true`) is deliberately NOT enabled. Our
+    // schema uses nullable union types (`type: ["string","null"]`) and null-in-enum,
+    // which the structured-output / strict JSON Schema subset rejects with a 400
+    // (verified in prod 2026-06-02 — every batch failed). Forced tool_choice already
+    // yields schema-shaped output. Re-enabling strict needs an anyOf-based nullable
+    // rewrite + live-API testing; tracked as a follow-up, not a drop-in flag.
     input_schema,
   };
 }

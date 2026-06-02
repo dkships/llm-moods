@@ -244,10 +244,9 @@ describe("Anthropic classifier path", () => {
     const sentBody = JSON.parse(init.body as string);
     expect(sentBody.model).toBe(CLAUDE_MODEL);
     expect(sentBody.tool_choice).toMatchObject({ type: "tool" });
-    // Strict tool use: grammar-constrained, schema-valid output.
-    expect(sentBody.tools[0].strict).toBe(true);
-    // Strict subset rejects numeric minimum/maximum on the confidence field.
-    expect(sentBody.tools[0].input_schema.properties.results.items.properties.confidence.minimum).toBeUndefined();
+    // strict tool use stays OFF: the nullable-union schema 400s under the strict
+    // subset (see anthropicTool). Forced tool_choice carries the JSON shape.
+    expect(sentBody.tools[0].strict).toBeUndefined();
     // Current Claude models reject `temperature` — it must not be sent.
     expect(sentBody.temperature).toBeUndefined();
     // Static instruction prefix is in the cached system block, not the user turn.
