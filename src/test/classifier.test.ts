@@ -237,7 +237,7 @@ describe("Anthropic classifier path", () => {
     );
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
-    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(String(url)).toContain("api.anthropic.com/v1/messages");
     expect((init.headers as Record<string, string>)["x-api-key"]).toBe("anthropic-key");
     expect((init.headers as Record<string, string>)["anthropic-version"]).toBeTruthy();
