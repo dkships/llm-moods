@@ -12,6 +12,7 @@ type SurfaceOwnProps<T extends ElementType> = {
   as?: T;
   size?: SurfaceSize;
   motion?: "fade" | false;
+  elevation?: "none" | "card" | "lift";
   className?: string;
   children?: ReactNode;
 };
@@ -25,6 +26,7 @@ function Surface<T extends ElementType = "div">({
   as,
   size = "default",
   motion = false,
+  elevation = "card",
   className,
   children,
   ...rest
@@ -34,6 +36,8 @@ function Surface<T extends ElementType = "div">({
     "glass",
     sizeClasses[size],
     HOVER,
+    elevation === "card" && "surface-card",
+    elevation === "lift" && "surface-card surface-lift",
     motion === "fade" && "animate-fade-in",
     className,
   ]
