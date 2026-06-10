@@ -35,7 +35,7 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
       onMouseEnter={() => onHover?.(m.slug, m.id)}
       className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      <Surface size="bare" motion="fade" className="relative overflow-hidden h-full">
+      <Surface size="bare" motion="fade" elevation="lift" className="relative overflow-hidden h-full">
         {/* Sentiment cue: 3px top bar on >=sm (grid layouts), 2px left rail on mobile
             stacks so four cards don't read as a barcode of stacked color bars. */}
         <div
