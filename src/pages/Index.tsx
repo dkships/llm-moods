@@ -31,18 +31,19 @@ const Index = () => {
         <NavBar />
         <main id="main-content" tabIndex={-1} className="scroll-mt-24">
           {/* Hero */}
-          <section className="container pt-12 sm:pt-20 pb-10 relative overflow-hidden">
-            <div className="absolute -top-24 right-[-10%] w-[520px] h-[520px] rounded-full bg-[radial-gradient(ellipse_at_center,_rgba(16,185,129,0.12)_0%,_transparent_65%)] pointer-events-none" />
+          <section className="container pt-14 sm:pt-24 pb-12 relative overflow-hidden">
+            <div className="absolute -top-32 right-[-12%] w-[620px] h-[620px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.14)_0%,_transparent_62%)] blur-[2px] pointer-events-none" aria-hidden="true" />
+            <div className="absolute top-40 left-[-8%] w-[360px] h-[360px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.06)_0%,_transparent_70%)] pointer-events-none" aria-hidden="true" />
             <div className="max-w-3xl relative animate-fade-in">
               <h1 className="text-hero text-foreground">
                 Is your AI having<br />
                 a <span className="text-primary glow-text">bad day</span>?
               </h1>
-              <p className="mt-5 text-body text-text-secondary max-w-xl">
+              <p className="mt-6 text-body text-text-secondary max-w-xl">
                 A daily read on community sentiment, before the AI Twitter discourse catches up.
               </p>
-              <div className="mt-7 flex flex-wrap items-center gap-4">
-                <Button asChild size="lg" variant="outline" className="font-mono text-sm gap-2 group border-primary/40 text-foreground hover:bg-primary/10 hover:text-foreground">
+              <div className="mt-8 flex flex-wrap items-center gap-4">
+                <Button asChild size="lg" variant="outline" className="font-mono text-sm gap-2 group border-primary/40 text-foreground transition-all hover:bg-primary/10 hover:text-foreground hover:border-primary/60">
                   <Link to="/dashboard">
                     Check the Vibes
                     <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-1" />
