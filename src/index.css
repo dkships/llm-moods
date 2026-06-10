@@ -48,6 +48,14 @@
     --surface: 220 16% 12%;
     --surface-hover: 220 14% 16%;
     --warning: 38 92% 50%;
+
+    /* Elevation + surface depth tokens (additive — used via utilities below).
+       Layered soft shadows give cards gentle depth without breaking the flat,
+       restraint-first dark theme. */
+    --shadow-card: 0 1px 2px 0 hsl(220 40% 2% / 0.4), 0 1px 3px 0 hsl(220 40% 2% / 0.3);
+    --shadow-elevated: 0 4px 12px -2px hsl(220 40% 2% / 0.5), 0 12px 28px -8px hsl(220 40% 2% / 0.45);
+    /* Faint top highlight so card surfaces catch light at their upper edge. */
+    --gradient-surface: linear-gradient(180deg, hsl(0 0% 100% / 0.035) 0%, hsl(0 0% 100% / 0) 38%);
   }
 }
 
@@ -135,6 +143,26 @@
 
   .glass {
     @apply bg-card/60 backdrop-blur-xl border border-border;
+  }
+
+  /* Card elevation utilities (opt-in). `surface-card` adds a resting shadow and
+     the faint top highlight; `surface-lift` adds a calm shadow lift on hover for
+     interactive cards. Both compose with `.glass`. */
+  .surface-card {
+    box-shadow: var(--shadow-card);
+    background-image: var(--gradient-surface);
+  }
+  .surface-lift {
+    transition: box-shadow 0.25s ease, border-color 0.2s ease, transform 0.25s ease;
+  }
+  .surface-lift:hover {
+    box-shadow: var(--shadow-elevated);
+    transform: translateY(-2px);
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .surface-lift:hover {
+      transform: none;
+    }
   }
 
   .scrollbar-thin {

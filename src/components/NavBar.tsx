@@ -39,7 +39,7 @@ const NavBar = () => {
     }`;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-xl">
+    <header className="sticky top-0 z-50 border-b border-border/80 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55 shadow-[0_1px_0_0_hsl(0_0%_100%/0.02)]">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
