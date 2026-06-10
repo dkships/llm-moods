@@ -11,6 +11,7 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 ## Lovable Project
 
 This is a Lovable-generated app synced bi-directionally with GitHub on `main`. The Supabase instance is created and managed entirely through Lovable — there is no independent Supabase account. When editing locally:
+- **Push without being asked**: after a change builds (`npm run build`), commit AND push to `main` — Lovable only syncs from `main`, so unpushed work is invisible to David. Tell him it's pushed and whether an edge-function redeploy prompt is needed.
 - Push to `main` → Lovable auto-syncs frontend (other branches don't sync)
 - **Edge Function deploys require a Lovable-side trigger** — pushing to `main` syncs the code but may not redeploy edge functions automatically. Give the user a Lovable chat prompt to trigger redeployment.
 - Never suggest `supabase` CLI commands or Supabase dashboard steps — the user has no direct Supabase access
