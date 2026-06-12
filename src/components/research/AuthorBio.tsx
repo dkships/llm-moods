@@ -1,22 +1,12 @@
 /**
  * Author bio block rendered at the bottom of every research article.
- * Single source of truth for David's bio + contact links so updates
- * stay in one place. Edit BIO_LINKS to add or change contact channels.
+ * Bio + contact constants live in src/data/author.ts (JSX-free so the
+ * prerender plugin can import them); re-exported here for existing callers.
  */
 
-const BIO_LINKS: ReadonlyArray<{ label: string; href: string; external: boolean }> = [
-  { label: "dmkthinks.org", href: "https://dmkthinks.org", external: true },
-  { label: "linkedin.com/in/thedmkelly", href: "https://www.linkedin.com/in/thedmkelly/", external: true },
-  { label: "github.com/dkships", href: "https://github.com/dkships", external: true },
-];
+import { AUTHOR_NAME, AUTHOR_SAMEAS, BIO_LINKS } from "@/data/author";
 
-/**
- * Author identity used by Article JSON-LD (`author.sameAs`). Single
- * source of truth shared with the visible bio links above so the
- * structured-data entity and the on-page links never drift.
- */
-export const AUTHOR_NAME = "David Kelly";
-export const AUTHOR_SAMEAS: readonly string[] = BIO_LINKS.map((l) => l.href);
+export { AUTHOR_NAME, AUTHOR_SAMEAS };
 
 const AuthorBio = () => (
   <aside className="mt-12 rounded-lg border border-border bg-secondary/30 px-6 py-5">
