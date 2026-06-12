@@ -8,6 +8,7 @@ interface TagProps {
   shape?: TagShape; // default "square" (rounded-md)
   tone?: TagTone; // default "neutral"
   className?: string;
+  title?: string;
 }
 
 const SHAPE: Record<TagShape, string> = {
@@ -21,8 +22,9 @@ const TONE: Record<TagTone, string> = {
   warning: "text-foreground bg-warning/10 border-warning/30",
 };
 
-const Tag = ({ children, shape = "square", tone = "neutral", className = "" }: TagProps) => (
+const Tag = ({ children, shape = "square", tone = "neutral", className = "", title }: TagProps) => (
   <span
+    title={title}
     className={[
       "inline-flex items-center gap-1.5 border px-2 py-0.5 text-mono-cap",
       SHAPE[shape],

@@ -16,7 +16,10 @@ interface TrendingItem {
   pct_change: number;
 }
 
-const GRID_COLS = "grid grid-cols-[1.4fr_88px_1fr_56px] items-center gap-4";
+// The volume bar is hidden below `sm` — at 375px the four-column grid leaves
+// the topic label only a few characters before truncation.
+const GRID_COLS =
+  "grid grid-cols-[1.4fr_72px_56px] sm:grid-cols-[1.4fr_88px_1fr_56px] items-center gap-3 sm:gap-4";
 
 function useTrendingComplaints() {
   return useQuery({
@@ -84,7 +87,7 @@ const TrendingComplaints = () => {
         <div className={`${GRID_COLS} border-b border-border pb-2 text-mono-cap text-text-tertiary`}>
           <span>Topic</span>
           <span className="text-right">Mentions</span>
-          <span>Volume</span>
+          <span className="hidden sm:block">Volume</span>
           <span className="text-right">Change</span>
         </div>
 
@@ -110,7 +113,7 @@ const TrendingComplaints = () => {
                 </span>
 
                 <div
-                  className="h-1 w-full overflow-hidden rounded-full bg-border/60"
+                  className="hidden h-1 w-full overflow-hidden rounded-full bg-border/60 sm:block"
                   aria-hidden="true"
                 >
                   <div

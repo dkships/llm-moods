@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, lazy, Suspense } from "react";
 import NavBar from "@/components/NavBar";
+import NotFound from "@/pages/NotFound";
 import PageTransition from "@/components/PageTransition";
 import Surface from "@/components/Surface";
 import SectionHeader from "@/components/SectionHeader";
@@ -35,8 +36,8 @@ const ModelDetail = () => {
   const [timeRange, setTimeRange] = useState<typeof TIME_RANGES[number]>("30d");
   const [surfaceFilter, setSurfaceFilter] = useState<string>("all");
 
-  const { data: fetchedModel, isLoading: modelLoading } = useModelDetail(slug);
-  const { data: allModels } = useModelsWithLatestVibes();
+  const { data: fetchedModel, isLoading: modelLoading, isError: modelError } = useModelDetail(slug);
+  const { data: allModels, isError: landingError } = useModelsWithLatestVibes();
   const enriched = allModels?.find((m) => m.slug === slug);
 
   // Synthesize a model from the dashboard cache while useModelDetail is in flight.
@@ -155,19 +156,28 @@ const ModelDetail = () => {
     );
   }
 
-  if (!model) {
+  if (!model && modelError) {
     return (
       <PageTransition>
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="text-center">
-            <p className="text-page text-foreground mb-4">Model not found</p>
-            <Button asChild variant="outline" className="font-mono text-sm">
-              <Link to="/dashboard">Back to Dashboard</Link>
-            </Button>
-          </div>
+        <div className="min-h-screen bg-background flex flex-col">
+          <NavBar />
+          <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center scroll-mt-24">
+            <div className="text-center">
+              <p className="text-page text-foreground mb-4">Failed to load model data</p>
+              <p className="text-body text-text-secondary mb-8">Check your connection and reload the page.</p>
+              <Button asChild variant="outline" className="font-mono text-sm">
+                <Link to="/dashboard">Back to Dashboard</Link>
+              </Button>
+            </div>
+          </main>
+          <Footer />
         </div>
       </PageTransition>
     );
+  }
+
+  if (!model) {
+    return <NotFound />;
   }
 
   // The 24h hourly path uses different label semantics ("3pm", "Now") and has
@@ -192,7 +202,13 @@ const ModelDetail = () => {
         const h12 = h % 12 || 12;
         label = `${h12}${suffix}`;
       }
-      return { day: label, score: v.score };
+      return {
+        day: label,
+        score: v.score,
+        eligiblePosts: v.eligible_posts ?? null,
+        scoreBasisStatus: v.score_basis_status ?? null,
+        queuedPosts: v.queued_posts ?? null,
+      };
     });
     return { chartData: data, chartEvents: [] as ReturnType<typeof useChartEvents> };
   })();
@@ -223,28 +239,39 @@ const ModelDetail = () => {
               <ArrowLeft className="h-3.5 w-3.5" />
               Dashboard
             </Link>
-            <p className={`text-mono-cap text-text-tertiary`}>{vibe.label}</p>
+            {enriched && <p className={`text-mono-cap text-text-tertiary`}>{vibe.label}</p>}
             <div className="mt-1 flex items-center gap-3">
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: accent }} />
               <h1 className="text-page text-foreground">{model.name}</h1>
             </div>
-            <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-5">
-              <p
-                className="text-score sm:text-score-xl"
-                style={{ color: vibe.color, textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}
-              >
-                {latestScore}
-              </p>
-              <p className={`pb-2 text-mono-cap text-text-secondary`}>{trendCaption}</p>
-            </div>
-            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-mono-cap text-text-tertiary">
-              <span>{metaParts.join(" · ")}</span>
-              {failedPosts > 0 && (
-                <Tag tone="warning" shape="pill">
-                  {failedPosts.toLocaleString()} abandoned
-                </Tag>
-              )}
-            </div>
+            {enriched ? (
+              <>
+                <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-5">
+                  <p
+                    className="text-score sm:text-score-xl"
+                    style={{ color: vibe.color, textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}
+                  >
+                    {latestScore}
+                  </p>
+                  <p className={`pb-2 text-mono-cap text-text-secondary`}>{trendCaption}</p>
+                </div>
+                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-mono-cap text-text-tertiary">
+                  <span>{metaParts.join(" · ")}</span>
+                  {failedPosts > 0 && (
+                    <Tag tone="warning" shape="pill" title="Posts the classifier gave up on after max retries">
+                      {failedPosts.toLocaleString()} abandoned
+                    </Tag>
+                  )}
+                </div>
+              </>
+            ) : landingError ? (
+              <p className="mt-4 text-body text-text-secondary">Live score unavailable right now.</p>
+            ) : (
+              <div className="mt-4 animate-pulse space-y-3" role="status" aria-live="polite">
+                <div className="h-14 w-32 rounded bg-secondary/60" />
+                <div className="h-4 w-52 rounded bg-secondary/60" />
+              </div>
+            )}
           </section>
 
           {/* Recent incident analysis — only when a research post references this model */}

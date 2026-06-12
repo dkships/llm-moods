@@ -68,8 +68,11 @@ export function useDailyChartData(
       rowByDate.set(key, v);
     }
 
-    const anchor = anchorMs != null ? new Date(anchorMs) : new Date();
     const todayPacific = getPacificDateLabel(new Date());
+    // Live charts anchor on the current *Pacific* day, not the UTC day —
+    // from 5pm PT the UTC date is already tomorrow, which used to render a
+    // phantom empty rightmost day and push "Today" one slot in.
+    const anchor = anchorMs != null ? new Date(anchorMs) : new Date(`${todayPacific}T00:00:00Z`);
     const result: DailyChartPoint[] = [];
     const labels: Record<string, string> = {};
     for (let i = days - 1; i >= 0; i--) {
