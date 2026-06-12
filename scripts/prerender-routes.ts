@@ -212,7 +212,13 @@ function transformHtml(template: string, route: RouteMeta): string {
   html = replaceOnce(html, /(<meta\s+property="og:type"\s+content=")[^"]*(")/, attrReplacer(route.ogType), "og:type");
   html = replaceOnce(html, /(<link\s+rel="canonical"\s+href=")[^"]*(")/, attrReplacer(url), "canonical");
 
-  const injections: string[] = [];
+  const injections: string[] = [
+    // Lovable's host serves these files only at their literal .html paths
+    // (extensionless URLs always get the SPA shell — verified 2026-06-12), so
+    // shared links use the .html form. Normalize the path before React boots
+    // so the router matches the clean route and the address bar shows it.
+    `<script>(function(){var p=location.pathname;var c=p.replace(/\\/index\\.html$/,"").replace(/\\.html$/,"");if(c!==p)history.replaceState(null,"",(c||"/")+location.search+location.hash)})()</script>`,
+  ];
   if (route.article) {
     injections.push(
       `<meta property="article:published_time" content="${escapeHtml(route.article.publishedTime)}">`,
