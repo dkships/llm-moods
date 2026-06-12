@@ -1,5 +1,5 @@
 import React from "react";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const stripMotionProps = ({
@@ -199,11 +199,18 @@ describe("public app routes", () => {
   it("renders the dashboard route with freshness status", async () => {
     await renderAt("/dashboard");
 
-    expect(await screen.findByRole("heading", { name: /current vibes/i })).toBeInTheDocument();
-    const freshnessStatus = screen.getAllByRole("status").find((element) =>
-      /^updated\b/i.test(element.textContent || ""),
-    );
-    expect(freshnessStatus).toBeDefined();
+    // waitFor (re-querying each attempt) instead of a one-shot findByRole:
+    // the route tree can transiently remount under lazy + Suspense in jsdom,
+    // detaching the first matched node before the assertion runs.
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /current vibes/i })).toBeInTheDocument();
+    });
+    await waitFor(() => {
+      const freshnessStatus = screen.getAllByRole("status").find((element) =>
+        /^updated\b/i.test(element.textContent || ""),
+      );
+      expect(freshnessStatus).toBeDefined();
+    });
     expect(screen.getAllByText(/328 POSTS/).length).toBeGreaterThan(0);
     expect(screen.queryByText(/recent volume:/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/^low confidence$/i)).not.toBeInTheDocument();

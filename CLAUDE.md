@@ -60,6 +60,7 @@ Functions gated against bare anon (as of PR #38, 2026-05-24): `aggregate-vibes`,
 - `/model/:slug` — Model detail (history chart, complaint/source breakdown, posts, vendor events overlay, recent-incident card, official status card with anomaly correlation, surface-tagged recent posts)
 - `/research` — Research index (long-form articles index)
 - `/research/:slug` — Research article (live embedded charts via `chart-model` markdown sentinel; first article ships with CSV download + Dataset JSON-LD)
+- `/privacy` — Privacy & data practices + content-removal channel (GitHub issues / LinkedIn; no email on public surfaces)
 - `/admin/scrapers` — Scraper run monitor + score anomalies panel. **Dev-only** (gated on `import.meta.env.DEV`; production bundles physically exclude the chunk).
 - `/og/:slug` — Dev-only OG card preview at fixed 1200×630 for capturing per-article share images.
 

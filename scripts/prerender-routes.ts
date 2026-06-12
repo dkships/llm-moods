@@ -179,6 +179,15 @@ function buildRoutes(): RouteMeta[] {
       ogImage: defaultOgImage,
       ogType: "website",
     },
+    {
+      path: "/privacy",
+      // Mirrors the useHead call in src/pages/Privacy.tsx.
+      title: "Privacy & data practices — LLM Vibes",
+      description:
+        "What LLM Vibes collects, how long it keeps it, and how to request removal of a quoted post. No accounts, no cookies, no analytics.",
+      ogImage: defaultOgImage,
+      ogType: "website",
+    },
   ];
 
   return [...articles, ...models, ...indexes];

@@ -1,4 +1,5 @@
 import { Heart } from "lucide-react";
+import { Link } from "react-router-dom";
 
 const Footer = () => (
   <footer className="border-t border-border">
@@ -25,6 +26,26 @@ const Footer = () => (
       >
         Open Source on GitHub
       </a>
+      <span aria-hidden="true">·</span>
+      <Link
+        to="/research/how-llm-vibes-classifies-sentiment"
+        className="rounded-md underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        Methodology
+      </Link>
+      <span aria-hidden="true">·</span>
+      <Link
+        to="/privacy"
+        className="rounded-md underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+      >
+        Privacy &amp; removal
+      </Link>
+    </div>
+    <div className="container pb-6 -mt-2 text-center text-meta text-text-tertiary">
+      <p>
+        Not affiliated with or endorsed by Anthropic, OpenAI, Google, or xAI. Claude, ChatGPT, Gemini, and
+        Grok are trademarks of their respective owners.
+      </p>
     </div>
   </footer>
 );
