@@ -121,7 +121,7 @@ const ClaudeApril2026Body = () => (
       Verbatim from our <code>scraped_posts</code> table, paired with the postmortem dates.
     </p>
     <PullQuote
-      text="Restart session, clear conversations, clear claude md, give it specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf."
+      text="Restart session, clear conversations, clear claude md, give it specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf…"
       handle="@tetrac-official"
       platform="Bluesky"
       timestamp="2026-03-26 10:42 UTC"
@@ -238,12 +238,12 @@ const ClaudeApril2026Body = () => (
     <p>
       LLM Vibes scrapes posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across five social platforms:
       Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), and Mastodon (5
-      instances). The orchestrator runs once an hour and the scoring pipeline aggregates a daily 0–100 score per
-      model.
+      instances). Each scraper runs on its own cron three times a day, and the scoring pipeline aggregates a
+      daily 0–100 score per model.
     </p>
     <p>
       Each post is classified for sentiment and complaint category by Claude Haiku 4.5 via the Anthropic
-      API, in batches of 25. Multi-model posts use a per-model targeted prompt so a sentence like "DeepSeek
+      API, in batches of 20. Multi-model posts use a per-model targeted prompt so a sentence like "DeepSeek
       fixed Gemini's mess" scores correctly for each model. The daily score is volume-weighted negative-vs-
       positive on a 0–100 scale.
     </p>
@@ -258,8 +258,8 @@ const ClaudeApril2026Body = () => (
 
     <h2 id="what-you-can-do-next">What you can do next</h2>
     <p>
-      See the <a href="/model/claude">live Claude chart</a>. The three Anthropic bug bands are overlaid on the
-      score history, with annotation arrows on March 26 and April 11.
+      See the <a href="/model/claude">live Claude chart</a> for current sentiment. The Anthropic bug windows
+      from this article are marked as shaded bands on the embedded charts above.
     </p>
     <p>
       <ExternalLink href="https://github.com/dkships/llm-moods">Read or fork the source on GitHub</ExternalLink>.

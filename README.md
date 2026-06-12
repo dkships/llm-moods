@@ -51,7 +51,7 @@ Every day, thousands of developers share their real experiences with AI models a
 | State | TanStack React Query 5 |
 | Animations | Framer Motion 12 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Sentiment AI | Gemini 2.5 Flash by default via Google AI API |
+| Sentiment AI | Claude Haiku 4.5 via the Anthropic API (free-tier Gemini fallback) |
 
 ## Getting Started
 

@@ -154,13 +154,14 @@ const SurfaceSegmentationBody = () => (
 
     <p>
       Two patterns to notice. First, for Claude and ChatGPT, one surface dominates the named conversation. Of
-      the 1,321 Claude posts that named a surface, 92% named Claude Code. Of the 4,286 ChatGPT posts that
-      named a surface, 95% named ChatGPT.com or the mobile app. The Anthropic and OpenAI APIs together
-      contributed 20 posts in 60 days. SDK posts: zero. The API isn't where the public conversation happens.
+      the 1,197 Claude posts that named a surface, 98.8% named Claude Code. Of the 4,110 ChatGPT posts that
+      named a surface, 99.2% named ChatGPT.com or the mobile app. API and SDK mentions never cleared the
+      five-post daily floor, so they don't appear in the dataset at all. The API isn't where the public
+      conversation happens.
     </p>
     <p>
-      Second, for Gemini and Grok, almost no posts name a surface at all. The detector matched 5.5% of Gemini
-      posts and 0.5% of Grok posts. We don't think that's because Gemini and Grok users only use one surface.
+      Second, for Gemini and Grok, almost no posts name a surface at all. The detector matched 126 Gemini
+      posts (5.6%) and 10 Grok posts (0.5%) across the whole window — every one in a cell too thin to chart. We don't think that's because Gemini and Grok users only use one surface.
       We think it's a mix of two things: the detector has blind spots (no patterns for "Gemini Code Assist,"
       "Google AI Studio" matches but its users may call it something else), and the social conversation about
       those two vendors runs at the brand level rather than the surface level. Either way, we can't
@@ -232,10 +233,10 @@ const SurfaceSegmentationBody = () => (
 
     <h2 id="chatgpt-shows-the-same-shape">ChatGPT shows the same shape</h2>
     <p>
-      The dominant-surface pattern holds for ChatGPT too. Of the 4,286 ChatGPT posts that named a product
-      surface, 4,090 named ChatGPT.com or the mobile app. Codex (OpenAI's coding agent) had 193 lifetime
-      mentions across the 60 days, which is too thin to chart daily and barely enough for a window aggregate.
-      The OpenAI API had three mentions.
+      The dominant-surface pattern holds for ChatGPT too. Of the 4,110 ChatGPT posts that named a product
+      surface, 4,077 named ChatGPT.com or the mobile app. Codex (OpenAI's coding agent) had 33 mentions
+      across the 60 days, which is too thin to chart daily and barely enough for a window aggregate. The
+      OpenAI API never cleared the floor at all.
     </p>
     <PullQuote
       text="Decided to ask ChatGPT about something (ran out of Claude credits) and I got really grossed out by its default voice of lame LinkedIn influencer"
@@ -309,7 +310,7 @@ const SurfaceSegmentationBody = () => (
       <code>unknown</code>.
     </p>
     <p>
-      Window-wide coverage rates were 32.2% for Claude, 78.8% for ChatGPT, 5.5% for Gemini, and 0.5% for
+      Window-wide coverage rates were 30.2% for Claude, 79.1% for ChatGPT, 5.6% for Gemini, and 0.5% for
       Grok. ChatGPT's high rate is mostly because the patterns are loose for it (any post containing
       "chatgpt" matches). Claude's rate is honest: about a third of Claude posts name a specific surface,
       most of those name Claude Code. Gemini's and Grok's rates are too low to surface-segment, as discussed
@@ -321,7 +322,8 @@ const SurfaceSegmentationBody = () => (
       filtered to <code>confidence ≥ 0.65</code> and a (model, surface, day) cell skipped when eligible
       posts &lt; 5. The production dashboard score in <code>supabase/functions/_shared/vibes-scoring.ts</code>{" "}
       adds source-share capping and engagement weighting we don't replicate here. The downloadable CSV ships
-      raw counts so a reader can recompute either way.
+      the per-cell raw counts behind every charted number; cells below the five-post floor are omitted, so
+      window totals computed from the CSV reflect chartable volume, not raw scrape volume.
     </p>
     <p>
       Sentiment runs through Claude Haiku 4.5 via the Anthropic API, classifying posts about its competitors.
@@ -330,8 +332,8 @@ const SurfaceSegmentationBody = () => (
           [1]
         </a>
       </sup>{" "}
-      May 7 was a near-blackout day during a cron architecture rebuild — only 11 posts cleared classification
-      across all four models that day, so most (model, surface) cells were skipped. It shows up as a single
+      May 7 was a near-blackout day during a cron architecture rebuild — only one (model, surface) cell
+      cleared the five-post floor that day, so the rest were skipped. It shows up as a single
       day's gap in the chart, not as a sustained shift.
     </p>
 

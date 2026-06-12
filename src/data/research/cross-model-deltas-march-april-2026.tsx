@@ -144,7 +144,7 @@ const CrossModelDeltasBody = () => (
 
     <h2>Caveats</h2>
     <p>
-      The Feb baseline numbers in the table above (71.0, 80.6, 76.0, 48.4) come from approximately four days of
+      The Feb baseline numbers in the table above come from approximately four days of
       meaningful pre-bug coverage (Feb 15–18). The Feb 19 – Mar 7 scraper-volume gap erased the rest of
       February. Each baseline therefore carries roughly ±3 points of sampling noise. The deltas are accurate
       to the underlying data; the baselines themselves are the weakest part of the table.
@@ -175,8 +175,8 @@ const CrossModelDeltasBody = () => (
         resolved — regardless of which had the deepest absolute drop or the largest bug-window delta.
       </li>
       <li>
-        Treat a single ≥2σ daily deviation as a watch flag, not a verdict. The{" "}
-        <a href="/admin/scrapers">admin Anomalies panel</a> (dev-only) surfaces these automatically. A first-day
+        Treat a single ≥2σ daily deviation as a watch flag, not a verdict. The anomaly detector
+        (<code>src/hooks/useScoreAnomalies.ts</code>) surfaces these automatically in the dev build. A first-day
         regression is rarely the strongest signal. Sustained multi-day drops, especially through and after
         a confirmed fix, match what a real engineering bug looks like in user behavior.
       </li>
@@ -195,8 +195,8 @@ const CrossModelDeltasBody = () => (
       score continues to fall while peers recover. That's not built yet. If you want to read the data yourself
       in the meantime, the{" "}
       <a href="/research/claude-april-2026/data.csv">public CSV</a> for the Claude case study has the raw
-      scores; the other three models' scores are queryable via the public Supabase REST endpoint exposed in
-      the repository.
+      scores; the other three models' histories are queryable via the public <code>get_public_vibes_history</code>{" "}
+      RPC defined in the repository's migrations.
     </p>
 
     <p>

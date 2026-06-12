@@ -31,7 +31,7 @@ const HowLlmVibesClassifiesSentimentBody = () => (
     </p>
 
     <h2>What gets scraped</h2>
-    <p>Five platforms, five edge functions, one orchestrator.</p>
+    <p>Five platforms, five edge functions, five independent cron schedules.</p>
     <p>
       Reddit comes from the Apify <code>trudax~reddit-scraper-lite</code> actor, pulling 25 posts per run from
       five subreddits (r/ClaudeAI, r/ChatGPT, r/LocalLLaMA, r/GoogleGemini, r/artificial). Hacker News uses the
@@ -40,19 +40,21 @@ const HowLlmVibesClassifiesSentimentBody = () => (
       Mastodon uses the public API across five instances.
     </p>
     <p>
-      A coordinator function (<code>run-scrapers</code>) dispatches source-specific scraper windows. The schedule
-      lives in Supabase <code>pg_cron</code> and checks hourly, but each source only does a real fetch on its
-      configured Pacific-time windows. On other hourly invocations it returns{" "}
-      <code>{`{"status":"skipped","reason":"outside_window"}`}</code> in milliseconds, which keeps the cron
-      column legible without burning Apify credits.
+      Each scraper has its own Supabase <code>pg_cron</code> row, firing three times a day at the same
+      Pacific-time windows (05:00, 14:00, 21:00) and staggered by a couple of minutes so they never contend.
+      Classification is decoupled: scrapers insert posts as <code>pending</code>, a separate cron drains the
+      classification queue every two minutes, and a third refreshes aggregate scores every 30 minutes. No
+      orchestrator, no shared failure domain — a Reddit timeout can't take Mastodon down with it.
     </p>
     <p>
-      The orchestrator was committed in early March 2026 but ran on manual triggers only. The hourly cron
-      schedule landed April 22, 2026. That gap is documented in{" "}
+      It didn't start that way. The original design ran a single orchestrator function
+      (<code>run-scrapers</code>), committed in early March 2026 on manual triggers, with an hourly cron
+      schedule landing April 22 — that gap is documented in{" "}
       <ExternalLink href="https://github.com/dkships/llm-moods/blob/main/docs/llm-vibes-retrospective-april-2026.md">
         our retrospective
       </ExternalLink>
-      .
+      . On May 8, 2026 the merged pipeline blew the edge-function time budget and was decomposed into the
+      independent crons described above; the orchestrator stays in the repo as a manual debug tool only.
     </p>
 
     <h2>How posts get attributed to a model</h2>
@@ -101,7 +103,7 @@ const HowLlmVibesClassifiesSentimentBody = () => (
     <p>
       The score is volume-weighted and source-capped. The relevant code is at{" "}
       <ExternalLink href="https://github.com/dkships/llm-moods/blob/main/supabase/functions/_shared/vibes-scoring.ts">
-        <code>supabase/functions/_shared/vibes-scoring.ts</code> lines 231–325
+        <code>supabase/functions/_shared/vibes-scoring.ts</code> (<code>computeScore</code>)
       </ExternalLink>
       .
     </p>
