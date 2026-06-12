@@ -68,6 +68,7 @@ const ModelDetail = () => {
     `${recentPosts7d.toLocaleString()} COLLECTED`,
     "7D",
     enriched?.isStale ? "STALE" : null,
+    enriched?.scoreBasisStatus === "thin_sample" ? "LOW SAMPLE" : null,
   ].filter(Boolean) as string[];
   const vibe = getVibeStatus(latestScore);
   const accent = model?.accent_color || "#888";

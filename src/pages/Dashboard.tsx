@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
@@ -107,7 +108,13 @@ const Dashboard = () => {
               </div>
             )}
             <p className="mt-3 text-mono-cap text-text-tertiary">
-              Scores are 0–100 · higher means happier users
+              Scores are 0–100 · higher means happier users ·{" "}
+              <Link
+                to="/research/how-llm-vibes-classifies-sentiment"
+                className="rounded-md underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              >
+                How scoring works
+              </Link>
             </p>
           </section>
 

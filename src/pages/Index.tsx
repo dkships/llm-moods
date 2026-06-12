@@ -103,6 +103,17 @@ const Index = () => {
                   </li>
                 ))}
               </ol>
+              <p className="mt-10 text-body text-text-secondary">
+                The classifier is Claude scoring its own vendor's model among the four, so we cross-check it
+                against an independent second grader: 91.9% sentiment agreement in the April 2026 validation
+                run.{" "}
+                <Link
+                  to="/research/how-llm-vibes-classifies-sentiment"
+                  className="rounded-md text-foreground underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  Read the full methodology
+                </Link>
+              </p>
             </div>
           </section>
         </main>

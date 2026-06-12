@@ -66,6 +66,14 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
           <p className="mt-3 text-mono-cap">
             <span className="text-text-secondary">{trendCaption}</span>
             <span className="text-text-tertiary"> · {postsCaption}</span>
+            {m.scoreBasisStatus === "thin_sample" && (
+              <span
+                className="text-text-tertiary"
+                title="Today's score rests on a small number of high-confidence posts"
+              >
+                {" "}· LOW SAMPLE
+              </span>
+            )}
           </p>
 
           {m.topComplaint && (
