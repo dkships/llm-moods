@@ -432,7 +432,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
   if (
     !isInternalServiceRequest(req)
     && !isRunPipelineTriggerRequest(req)
-    && !isSchedulerRequest(body, "scrape-")
+    && !isSchedulerRequest(body, "scrape-twitter")
   ) {
     return internalOnlyResponse(corsHeaders);
   }

@@ -82,7 +82,7 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
   if (
     !isInternalServiceRequest(req)
     && !isRunPipelineTriggerRequest(req)
-    && !isSchedulerRequest(body, "scrape-")
+    && !isSchedulerRequest(body, "scrape-bluesky")
   ) {
     return internalOnlyResponse(corsHeaders);
   }

@@ -62,7 +62,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
   if (
     !isInternalServiceRequest(req)
     && !isRunPipelineTriggerRequest(req)
-    && !isSchedulerRequest(body, "scrape-")
+    && !isSchedulerRequest(body, "scrape-reddit-apify")
   ) {
     return internalOnlyResponse(corsHeaders);
   }

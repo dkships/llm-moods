@@ -93,7 +93,7 @@ export async function handleScrapeMastodon(req: Request): Promise<Response> {
   if (
     !isInternalServiceRequest(req)
     && !isRunPipelineTriggerRequest(req)
-    && !isSchedulerRequest(body, "scrape-")
+    && !isSchedulerRequest(body, "scrape-mastodon")
   ) {
     return internalOnlyResponse(corsHeaders);
   }
