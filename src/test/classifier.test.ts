@@ -124,6 +124,38 @@ describe("scraper relevance prefilters", () => {
       "I tested Claude on this refactor and it kept context across files. Learn more: https://example.com",
     )).toBe(false);
   });
+
+  it("filters benchmark/novelty stunts reported as news (no URL needed)", () => {
+    expect(isLikelyNonExperienceShare(
+      "ChatGPT loses at chess against an Atari 2600",
+      "The confrontation lasted 90 minutes and ChatGPT played poorly on easy mode.",
+    )).toBe(true);
+    expect(isLikelyNonExperienceShare(
+      "ChatGPT and DeepSeek were put to play chess against Stockfish",
+      "The chatbots were made to play chess against the specialized engine.",
+    )).toBe(true);
+  });
+
+  it("filters product/feature announcements even without a URL", () => {
+    expect(isLikelyNonExperienceShare(
+      "ChatGPT just rebuilt Scheduled Tasks into its own page (faster + easier)",
+      "Rolling out to paid plans on web and mobile.",
+    )).toBe(true);
+  });
+
+  it("filters news-outlet bylines", () => {
+    expect(isLikelyNonExperienceShare(
+      "Just entering 'Restore this photo' generates radical images - ChatGPT loophole discovered - CNET Japan",
+      "",
+    )).toBe(true);
+  });
+
+  it("keeps a genuine first-person novelty-adjacent experience post", () => {
+    expect(isLikelyNonExperienceShare(
+      "I tried playing chess with ChatGPT",
+      "I used ChatGPT for a few games and it kept making illegal moves — pretty disappointing.",
+    )).toBe(false);
+  });
 });
 
 describe("model mention classification state", () => {
@@ -350,7 +382,7 @@ describe("free-Gemini spillover", () => {
         get: (k: string) => (({
           CLASSIFIER_MODEL: CLAUDE_MODEL,
           ANTHROPIC_API_KEY: "ak",
-          GEMINI_FREE_API_KEY: "gk",
+          GEMINI_API_KEY: "gk",
         } as Record<string, string>)[k]),
       },
     });

@@ -25,22 +25,17 @@ import {
 } from "../_shared/utils.ts";
 
 const SOURCE = "scrape-bluesky";
-// Sentiment-targeted terms balance discovery across all four tracked models.
-// Without "Gemini sucks" / "Grok worse" style queries, Bluesky's sort=latest
-// returned far fewer relevant posts for those two — see Phase 10 audit.
+// Neutral brand terms only. The previous negative-skew queries ("Gemini sucks",
+// "Grok worse", etc.) had no positive counterpart, so they oversampled negative
+// posts and biased the headline score downward. Low-volume models (Gemini/Grok)
+// get their organic volume back from dedicated subreddits in the Reddit overhaul,
+// not by fishing for complaints here.
 const SEARCH_TERMS = [
   "Claude AI",
   "ChatGPT",
   "GPT-5",
   "Gemini AI",
   "Grok AI",
-  "Claude dumb",
-  "ChatGPT worse",
-  "Gemini bad",
-  "Gemini sucks",
-  "Grok worse",
-  "Grok sucks",
-  "Grok 4 worse",
 ];
 
 async function fetchWithTimeout(

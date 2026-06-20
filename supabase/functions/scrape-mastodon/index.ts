@@ -33,7 +33,10 @@ const MAIN_INSTANCE = "mastodon.social";
 const MAIN_HASHTAGS = ["chatgpt", "claudeai", "grok", "llm", "geminiai", "geminipro"];
 const TECH_INSTANCES = ["mastodon.online", "techhub.social", "sigmoid.social", "hachyderm.io"];
 const TECH_HASHTAGS = ["llm", "chatgpt"];
-const SEARCH_QUERIES = ["Claude AI", "ChatGPT", "GPT dumber", "Claude worse", "Gemini bad", "Gemini Pro", "Grok 4", "AI getting worse"];
+// Neutral brand/product terms only — negative-skew queries ("GPT dumber",
+// "Gemini bad", "AI getting worse") were removed to stop oversampling negativity
+// into the headline score (see Reddit overhaul for low-volume-model coverage).
+const SEARCH_QUERIES = ["Claude AI", "ChatGPT", "Gemini Pro", "Grok 4"];
 const SEARCH_INSTANCE = "mastodon.social";
 const ASTROLOGY_TERMS = [
   "horoscope",

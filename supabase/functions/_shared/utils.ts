@@ -139,8 +139,48 @@ export function isLikelyPromotionalShare(title: string, content: string): boolea
   return false;
 }
 
+// Direct-experience signal shared by the experience-vs-share heuristics: first
+// person actually using/comparing a model. Guards against false-dropping genuine
+// posts that happen to contain announcement/novelty words.
+function hasDirectExperienceSignal(lower: string): boolean {
+  return (
+    /\b(?:i|we)\s+(?:asked|connected|debugged|hooked up|noticed|prefer|prompted|ran|rely|switched|tested|tried|use|used)\b/i.test(lower) ||
+    /\bi(?:'ve| have| just)?\s+(?:asked|connected|debugged|hooked up|noticed|preferred|prompted|run|ran|relied|switched|tested|tried|used|been using)\b/i.test(lower) ||
+    /\b(?:my|our)\s+(?:code|project|prompt|prompts|refactor|setup|usage|workflow)\b/i.test(lower)
+  );
+}
+
+// Catches the leak classes the classifier prompt also lists but which slip
+// through when there's no URL: benchmark/novelty stunts reported as news,
+// news-outlet bylines, and third-person product/feature announcements. All
+// gated on the ABSENCE of a direct-experience signal so genuine posts survive.
+export function isLikelyNoveltyOrAnnouncement(title: string, content: string): boolean {
+  const text = `${title} ${content}`.replace(/\s+/g, " ").trim();
+  const lower = text.toLowerCase();
+  if (hasDirectExperienceSignal(lower)) return false;
+
+  // News-outlet byline suffix, e.g. "...- CNET Japan", "... | The Verge", "(Reuters)"
+  if (/[\s([|–—-]\s*(cnet|techcrunch|the verge|reuters|ars technica|engadget|zdnet|wired|bloomberg|cnbc|venturebeat|gizmodo|mashable|tom's (?:guide|hardware)|bbc|forbes|the information|axios)\b/i.test(lower)) {
+    return true;
+  }
+  // Benchmark / novelty stunt reported as a result ("X loses at chess to an Atari", "X plays chess vs Stockfish")
+  if (/\b(?:plays?|playing|lost|loses|losing|beat(?:en)?|defeat(?:ed|s)?|wins?|won)\b[^.!?]{0,25}\b(?:chess|checkers|tic[\s-]?tac[\s-]?toe|stockfish|atari|pok[eé]mon|doom|2048|wordle)\b/i.test(lower)) {
+    return true;
+  }
+  // Third-person product/feature announcement or changelog, even without a URL
+  // ("ChatGPT just rebuilt X into its own page, rolling out to paid plans")
+  if (/\b(?:chatgpt|claude|gemini|grok|openai|anthropic|google|gpt)\b[^.!?]{0,60}\b(?:rebuilt|rolling out|rolls? out|now (?:available|supports?|live)|introduc(?:ing|es)|unveil(?:s|ed)?|just launched|now in (?:beta|preview))\b/i.test(lower)) {
+    return true;
+  }
+  return false;
+}
+
 export function isLikelyNonExperienceShare(title: string, content: string): boolean {
-  return isLikelyNewsShare(title, content) || isLikelyPromotionalShare(title, content);
+  return (
+    isLikelyNewsShare(title, content) ||
+    isLikelyPromotionalShare(title, content) ||
+    isLikelyNoveltyOrAnnouncement(title, content)
+  );
 }
 
 export async function logToErrorLog(supabase: any, functionName: string, msg: string, ctx?: string) {

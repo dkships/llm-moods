@@ -23,11 +23,13 @@ export function currentClassifierVersion(model?: string): string {
 // Back-compat export; equals the env-resolved version at module load.
 export const CURRENT_CLASSIFIER_VERSION = currentClassifierVersion();
 
-// Free-tier Gemini spillover: when Claude is the active classifier, posts that
-// hit a transient classifier_error are retried through Gemini so a Claude blip
-// doesn't stall the queue. Uses GEMINI_FREE_API_KEY if set, else GEMINI_API_KEY
-// (intended to be a free-tier, non-billing key once production runs on Claude).
-// Paced to free-tier limits via its own quota bucket so it never bills.
+// Gemini spillover: when Claude is the active classifier, posts that hit a
+// transient classifier_error are retried through Gemini so a Claude blip doesn't
+// stall the queue. Uses the paid GEMINI_API_KEY (the production setup as of
+// 2026-06 — owner accepts the small cost; Gemini is cheap; there is no separate
+// free-tier key). Paced via its own quota bucket (defaults 8/min, 200/day) so
+// spillover stays bounded; raise GEMINI_FREE_MINUTE_REQUEST_LIMIT /
+// _DAILY_REQUEST_LIMIT (Lovable env, no redeploy) if a Claude incident needs more.
 const FREE_GEMINI_MODEL = "gemini-2.5-flash";
 const FREE_GEMINI_QUOTA_KEY = "gemini-free";
 const FREE_GEMINI_MINUTE_LIMIT = Number(
@@ -166,9 +168,9 @@ function statusFromUpdate(payload: Record<string, unknown>): ModelMentionClassif
 }
 
 // Mutates `results` in place: retries only the rows that came back as a transient
-// classifier_error through the free-tier Gemini key and merges any positive
+// classifier_error through Gemini (GEMINI_API_KEY) and merges any positive
 // recoveries. Returns the count recovered. No-op unless Claude is the active
-// classifier and GEMINI_FREE_API_KEY is set.
+// classifier and GEMINI_API_KEY is set.
 //
 // Correctness guards (so a spillover blip can never corrupt good data):
 //   - Only classifier_error indices are retried. quota_deferred is left alone —
@@ -187,8 +189,8 @@ async function applyFreeGeminiSpillover(
 ): Promise<number> {
   if (providerForModel(resolveClassifierModel()) !== "anthropic") return 0;
   const env = (globalThis as DenoGlobal).Deno?.env;
-  const freeKey = env?.get("GEMINI_FREE_API_KEY") ?? env?.get("GEMINI_API_KEY");
-  if (!freeKey) return 0;
+  const geminiKey = env?.get("GEMINI_API_KEY");
+  if (!geminiKey) return 0;
 
   const failedIdx: number[] = [];
   for (let i = 0; i < results.length; i++) {
@@ -198,7 +200,7 @@ async function applyFreeGeminiSpillover(
 
   const spill = await classifyBatchTargeted(
     failedIdx.map((idx) => items[idx]),
-    freeKey,
+    geminiKey,
     batchSize,
     logError,
     {

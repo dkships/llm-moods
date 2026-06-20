@@ -134,16 +134,18 @@ Is this post expressing a PERSONAL opinion about an AI model's quality, behavior
   Examples: "Claude keeps refusing my coding requests", "GPT-4 just hallucinated my bibliography", "Claude is way better than GPT for coding", "has anyone noticed Gemini getting worse?", "I switched from ChatGPT to Claude"
 - NOT RELEVANT:
   - News articles or research reporting: "PsyPost: ChatGPT acts as a cognitive crutch", "MIT Tech Review: 2025 is the year of AI hype correction", "ChatGPT Global Outage: OpenAI's Critical Disclosure"
-  - Societal/behavioral commentary about AI in general: "In 10 years will anyone know how to code?", "People are becoming dependent on AI", "A person spending 300 hours with ChatGPT going deranged"
+  - Novelty / benchmark stunts reported as news: "ChatGPT loses at chess to an Atari 2600", "ChatGPT and DeepSeek play chess against Stockfish"
+  - Societal/behavioral/policy commentary about AI in general: "In 10 years will anyone know how to code?", "People are becoming dependent on AI", "why schools should (not) allow LLMs", "A person spending 300 hours with ChatGPT going deranged"
+  - Product/feature announcements or changelogs: "ChatGPT rebuilt Scheduled Tasks into its own page, rolling out to paid plans", "Gemini now available on…", anything framed as "introducing / rolling out / now available"
   - Third-party business decisions that mention a model: "DeviantArt added a Grok video generator", "Company X is using ChatGPT for interviews"
   - Benchmark/spec reporting without personal opinion: "Gemini 3 Flash: 218 tokens/sec vs GPT-4.5: 125 t/s"
   - Pricing observations without quality judgment: "ChatGPT costs the same as a Starbucks drink"
   - Pure news/funding/company strategy: "OpenAI raised $6B", "Sam Altman tweeted about AGI"
   - Tutorials with no quality opinion: "Here's a tutorial on using the ChatGPT API"
-  - Ads, affiliate posts, newsletter promos, product launch/integration announcements, or company marketing unless the author gives direct model-quality experience
+  - Ads, affiliate posts, newsletter promos, or company marketing unless the author gives direct model-quality experience
   - Posts where the model is mentioned but the opinion is about something else entirely (a platform, a person, society)
 
-KEY TEST: Ask yourself "Is this person expressing satisfaction or frustration with the MODEL ITSELF based on using it?" If no → not relevant.
+KEY TEST: Ask yourself "Is this person expressing satisfaction or frustration with the MODEL ITSELF based on using it?" If no → not relevant. When unsure whether a post is personal experience vs. news/announcement/commentary, DEFAULT TO NOT RELEVANT.
 
 If not relevant, return {"relevant": false, "sentiment": null, "complaint_category": null, "praise_category": null, "confidence": 0.0, "language": null, "english_translation": null}
 
@@ -191,16 +193,17 @@ RELEVANCE: Is this post expressing a PERSONAL opinion about an AI model's qualit
 - RELEVANT: direct experience, quality complaints/praise, model comparisons, switching decisions, user-reported quality trends
   Examples: "Claude keeps refusing my coding requests", "GPT-4 just hallucinated my bibliography", "Claude is way better than GPT for coding", "has anyone noticed Gemini getting worse?", "I switched from ChatGPT to Claude"
 - NOT RELEVANT:
-  - News/research reporting: "PsyPost: ChatGPT acts as a cognitive crutch", "MIT Tech Review: 2025 is the year of AI hype correction"
-  - Societal/behavioral commentary: "In 10 years will anyone know how to code?", "People are becoming dependent on AI"
+  - News/research/novelty reporting, incl. benchmark stunts: "PsyPost: ChatGPT acts as a cognitive crutch", "ChatGPT loses at chess to an Atari 2600", "ChatGPT and DeepSeek play chess against Stockfish"
+  - Societal/behavioral/policy commentary: "In 10 years will anyone know how to code?", "People are becoming dependent on AI", "why schools should (not) allow LLMs"
+  - Product/feature announcements or changelogs: "ChatGPT rebuilt Scheduled Tasks into its own page, rolling out to paid plans", "Gemini now available on…", anything framed as "introducing / rolling out / now available"
   - Third-party business decisions mentioning a model: "DeviantArt added a Grok video generator"
   - Benchmark/spec comparisons without personal opinion: "Gemini 3 Flash: 218 tokens/sec vs GPT-4.5: 125 t/s"
   - Pricing observations without quality judgment: "ChatGPT costs the same as a Starbucks drink"
   - Pure news/funding/company strategy: "OpenAI raised $6B"
-  - Ads, affiliate posts, newsletter promos, product launch/integration announcements, or company marketing unless the author gives direct model-quality experience
+  - Ads, affiliate posts, newsletter promos, or company marketing unless the author gives direct model-quality experience
   - Posts where the model is mentioned but the opinion is about something else (a platform, a person, society)
 
-KEY TEST: "Is this person expressing satisfaction or frustration with the MODEL ITSELF based on using it?" If no → not relevant.
+KEY TEST: "Is this person expressing satisfaction or frustration with the MODEL ITSELF based on using it?" If no → not relevant. When unsure whether a post is personal experience vs. news/announcement/commentary, DEFAULT TO NOT RELEVANT.
 
 LANGUAGE: If a post is NOT in English, detect the language (ISO 639-1 code) and provide a concise English translation. Classify sentiment based on the translated meaning. If the post IS in English, set both to null.
 
@@ -248,8 +251,13 @@ DISAMBIGUATION RULE: When a sentence says "X is [adjective] which Y is not as go
 For EACH post, determine:
 
 RELEVANCE: Is this post expressing a PERSONAL opinion about the TARGET model's quality, behavior, or usefulness based on direct or reported experience? If the target model is only mentioned in passing with no opinion about it, mark as not relevant.
-- NOT RELEVANT: news/research reporting, societal commentary, third-party business decisions mentioning the model, benchmark/spec comparisons without personal opinion, ads/affiliate/newsletter/company marketing, product launch or integration announcements without direct model-quality experience, posts where the opinion is about something else (a platform, a person, society).
-- KEY TEST: "Is this person expressing satisfaction or frustration with the TARGET MODEL ITSELF based on using it?" If no → not relevant.
+- NOT RELEVANT (return relevant:false, sentiment:null even when a model name appears and the tone seems positive/negative):
+  - News / research / novelty reporting, incl. benchmark stunts: "ChatGPT loses at chess to an Atari 2600", "ChatGPT and DeepSeek play chess against Stockfish", "study finds ChatGPT acts as a cognitive crutch"
+  - Product / feature announcements or changelogs: "ChatGPT rebuilt Scheduled Tasks into its own page, rolling out to paid plans", "Gemini now available on…", anything framed as "introducing / rolling out / now available"
+  - Societal / policy / behavioral commentary: "why schools should (not) allow LLMs", "people are becoming dependent on AI", "in 10 years will anyone know how to code?"
+  - Third-party business decisions mentioning the model, benchmark/spec tables without personal opinion, pricing without a quality judgment, funding/company strategy, tutorials, ads/affiliate/newsletter/marketing.
+  - Posts where the model is named but the opinion is about something else (a platform, a person, society).
+- KEY TEST: "Is this person expressing satisfaction or frustration with the TARGET MODEL ITSELF based on using it?" If no → relevant:false. When unsure whether a post is personal experience vs. news/announcement/commentary, DEFAULT TO NOT RELEVANT.
 
 LANGUAGE: If a post is NOT in English, detect the language (ISO 639-1 code) and provide a concise English translation. Classify sentiment based on the translated meaning. If the post IS in English, set both to null.
 

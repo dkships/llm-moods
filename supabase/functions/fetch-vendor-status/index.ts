@@ -35,14 +35,16 @@ interface VendorStatusResponse {
 }
 
 const STATUS_URLS: Record<Vendor, string> = {
-  anthropic: "https://status.anthropic.com/history.atom",
+  // status.anthropic.com 302-redirects to status.claude.com (verified 2026-06-20);
+  // use the canonical host directly to avoid relying on redirect-following.
+  anthropic: "https://status.claude.com/history.atom",
   openai: "https://status.openai.com/history.atom",
   google: "https://status.cloud.google.com/incidents.json",
   xai: "https://status.x.ai/feed.xml",
 };
 
 const VENDOR_PUBLIC_URL: Record<Vendor, string> = {
-  anthropic: "https://status.anthropic.com",
+  anthropic: "https://status.claude.com",
   openai: "https://status.openai.com",
   google: "https://status.cloud.google.com",
   xai: "https://status.x.ai",

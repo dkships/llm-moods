@@ -11,8 +11,7 @@ import { internalOnlyResponse, isInternalServiceRequest, readJsonBody } from "..
 // Cross-vendor classifier canary for sentiment model upgrades. Compares candidate
 // models (Gemini and Claude) against either a senior oracle model or the existing
 // stored labels, and never writes to scraped_posts or public scores. Claude
-// candidates use ANTHROPIC_API_KEY; Gemini candidates use GEMINI_API_KEY (or
-// GEMINI_FREE_API_KEY when body.use_free_gemini is set, for the drift canary).
+// candidates use ANTHROPIC_API_KEY; Gemini candidates/oracle use GEMINI_API_KEY.
 
 const SOURCE = "check-gemini-self-bias";
 const DEFAULT_ORACLE = "gemini-2.5-pro";
@@ -577,13 +576,10 @@ Deno.serve(async (req) => {
     ? Math.floor(body.eval_daily_limit)
     : undefined;
 
-  // Per-provider keys. Gemini candidates use the free key when the drift canary
-  // asks for it; Claude candidates always use ANTHROPIC_API_KEY. Missing keys
+  // Per-provider keys. Gemini candidates/oracle use GEMINI_API_KEY (there is no
+  // separate free-tier key); Claude candidates use ANTHROPIC_API_KEY. Missing keys
   // don't 500 — the affected models are skipped so a single-vendor run still works.
-  const useFreeGemini = body.use_free_gemini === true;
-  const geminiKey = useFreeGemini
-    ? (Deno.env.get("GEMINI_FREE_API_KEY") ?? Deno.env.get("GEMINI_API_KEY"))
-    : Deno.env.get("GEMINI_API_KEY");
+  const geminiKey = Deno.env.get("GEMINI_API_KEY");
   const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
   if (!geminiKey && !anthropicKey) {
     return jsonResponse({ error: "No classifier API key configured (need GEMINI_API_KEY and/or ANTHROPIC_API_KEY)" }, 500);

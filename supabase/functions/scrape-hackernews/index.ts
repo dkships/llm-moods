@@ -26,19 +26,16 @@ import {
 
 const SOURCE = "scrape-hackernews";
 const ALGOLIA_BASE = "https://hn.algolia.com/api/v1/search_by_date";
-// HN Algolia does no sentiment-aware ranking, so equal-weight model terms
-// over-index neutral news (launches, benchmarks). Adding a few negative-leaning
-// queries roughly doubles complaint discoverability for the lowest-volume
-// models — pre-fix live data showed 0 Grok / 1 Gemini posts in 30d.
+// Neutral model/brand terms only. The negative-leaning queries ("Claude
+// hallucinates", "ChatGPT dumber", "Gemini fails") were removed: with no
+// positive counterpart they oversampled negativity (and HN skews news/benchmark
+// already). The relevance gate + pre-filters drop the news that slips through.
 const STORY_SEARCH_TERMS = [
   "Claude",
   "ChatGPT",
   "Gemini",
   "Grok",
   "OpenAI",
-  "Claude hallucinates",
-  "ChatGPT dumber",
-  "Gemini fails",
 ];
 
 function delay(ms: number) {
