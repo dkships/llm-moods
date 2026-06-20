@@ -1,10 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { abortApifyRun, apifyRunUrl, checkApifyBudget, scrubApifyRun } from "../_shared/apify-budget.ts";
+import { abortApifyRun, apifyRunUrl, checkApifyBudget } from "../_shared/apify-budget.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
   getConfigBoolean,
   getConfigNumber,
+  getConfigValue,
   getConfigValues,
   internalOnlyResponse,
   isInternalServiceRequest,
@@ -40,6 +41,7 @@ const DEFAULT_START_URLS = [
   "https://www.reddit.com/r/ClaudeCode/new/",
   "https://www.reddit.com/r/ChatGPT/new/",
   "https://www.reddit.com/r/OpenAI/new/",
+  "https://www.reddit.com/r/ChatGPTPro/new/",
   "https://www.reddit.com/r/GoogleGemini/new/",
   "https://www.reddit.com/r/GeminiAI/new/",
   "https://www.reddit.com/r/GoogleGeminiAI/new/",
@@ -69,6 +71,30 @@ const SUBREDDIT_MODEL_MAP: Record<string, string> = {
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// Extract the bare subreddit name from a configured start_url
+// ("https://www.reddit.com/r/grok/new/" -> "grok").
+function subredditFromUrl(u: string): string | null {
+  const m = u.match(/reddit\.com\/r\/([^/?#]+)/i);
+  return m ? m[1] : null;
+}
+
+// Bounded-concurrency map: runs `fn` over `items` with at most `limit` in flight.
+// Used to fan out one Apify run per subreddit (harshmaur exhausts a single run on
+// the first subreddit when comments are on, so one run per subreddit is required
+// for even coverage) without serializing the whole window.
+async function mapWithConcurrency<T, R>(items: T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const out: R[] = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const i = next++;
+      out[i] = await fn(items[i], i);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker));
+  return out;
 }
 
 export async function handleScrapeRedditApify(req: Request): Promise<Response> {
@@ -158,108 +184,101 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     }
 
     const { modelMap, keywords } = await loadKeywords(supabase);
+    // Subreddits to scrape: bare names parsed from the configured start_urls
+    // (fallback to defaults). Reddit killed its public .json API (403 since
+    // May 2026), so the old trudax-lite actor returns almost nothing; the
+    // configurable HTML-parsing actor below (harshmaur by default, residential
+    // proxy) is the bake-off winner. One run PER subreddit — harshmaur exhausts
+    // a single run on the first subreddit when comments are on — fanned out with
+    // bounded concurrency so the whole window still fits the function budget.
     const startUrls = getConfigValues(config, "start_url");
-    const apifyInput = {
-      startUrls: (startUrls.length > 0 ? startUrls : DEFAULT_START_URLS).map((url) => ({ url })),
-      skipComments: true,
-      maxItems: getConfigNumber(config, "max_items", 25),
-      maxPostCount: getConfigNumber(config, "max_post_count", 8),
-    };
-    const actorTimeoutSecs = Math.min(
-      getConfigNumber(config, "actor_timeout_secs", APIFY_ACTOR_TIMEOUT_SECS),
-      180,
-    );
-    const pollTimeoutSecs = Math.min(
-      getConfigNumber(config, "poll_timeout_secs", APIFY_POLL_TIMEOUT_SECS),
-      150,
-    );
+    const subreddits = Array.from(new Set(
+      (startUrls.length > 0 ? startUrls : DEFAULT_START_URLS)
+        .map(subredditFromUrl)
+        .filter((s): s is string => Boolean(s)),
+    ));
 
-    const startRes = await fetch(apifyRunUrl("trudax~reddit-scraper-lite", apifyToken, apifyInput.maxItems, {
-      timeoutSecs: actorTimeoutSecs,
-      maxTotalChargeUsd: APIFY_MAX_TOTAL_CHARGE_USD,
-    }), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(apifyInput),
-    });
+    const actorId = getConfigValue(config, "actor_id", "harshmaur/reddit-scraper").replace("/", "~");
+    const includeComments = getConfigBoolean(config, "include_comments", true);
+    const maxPostsPerSub = getConfigNumber(config, "max_posts_per_sub", 10);
+    const maxCommentsPerPost = getConfigNumber(config, "max_comments_per_post", 4);
+    const perRunMaxItems = getConfigNumber(config, "per_run_max_items", 90);
+    const perRunChargeUsd = getConfigNumber(config, "per_run_charge_usd", 0.25);
+    const actorTimeoutSecs = Math.min(getConfigNumber(config, "actor_timeout_secs", APIFY_ACTOR_TIMEOUT_SECS), 180);
+    const pollTimeoutSecs = Math.min(getConfigNumber(config, "poll_timeout_secs", APIFY_POLL_TIMEOUT_SECS), 170);
+    const concurrency = Math.min(getConfigNumber(config, "actor_concurrency", 4), 8);
 
-    if (!startRes.ok) {
-      const errorText = await startRes.text().catch(() => "unknown");
-      await logToErrorLog(supabase, SOURCE, `Apify start failed HTTP ${startRes.status}: ${errorText.slice(0, 500)}`, "apify-error");
-      if (startRes.status === 402 || startRes.status === 403) {
-        const skipped = {
-          source: SOURCE,
-          status: "skipped",
-          skipped: true,
-          reason: `quota_or_auth_${startRes.status}`,
-          errors: [`Apify quota/auth error (HTTP ${startRes.status})`],
-        };
-        await updateRunRecord(supabase, runRecord!.id, {
-          status: "skipped",
-          errors: skipped.errors,
-          metadata: { reason: skipped.reason },
-          completed_at: new Date().toISOString(),
-        });
-        return new Response(JSON.stringify(skipped), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      throw new Error(`Apify start returned ${startRes.status}`);
-    }
-
-    const runData = await startRes.json();
-    const apifyRunId = runData.data?.id;
-    const datasetId = runData.data?.defaultDatasetId;
-    apifyRunMetadata = scrubApifyRun(runData.data);
-    if (!apifyRunId || !datasetId) {
-      await logToErrorLog(supabase, SOURCE, "No runId/datasetId", "apify-error");
-      throw new Error("Missing runId from Apify");
-    }
-
-    let runStatus = "";
-    let terminalRunData: any = null;
-    const pollDeadline = Date.now() + pollTimeoutSecs * 1000;
-    while (Date.now() < pollDeadline) {
-      await delay(Math.min(APIFY_POLL_INTERVAL_MS, Math.max(1, pollDeadline - Date.now())));
-      const statusRes = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${apifyToken}`);
-      if (!statusRes.ok) continue;
-      const statusData = await statusRes.json();
-      runStatus = statusData.data?.status || "";
-      if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(runStatus)) {
-        terminalRunData = statusData.data;
-        apifyRunMetadata = scrubApifyRun(terminalRunData);
-        break;
-      }
-    }
-
-    let apifyRunWarning: string | null = null;
-    if (runStatus !== "SUCCEEDED") {
-      let errorDetail = "";
-      if (!runStatus) {
-        const abortMetadata = await abortApifyRun(apifyToken, apifyRunId);
-        apifyRunMetadata = abortMetadata ?? apifyRunMetadata;
-        runStatus = "TIMED-OUT";
-      }
+    const runForSubreddit = async (sub: string): Promise<{ items: any[]; status: string; usageUsd: number; error?: string }> => {
       try {
-        const detailRes = await fetch(`https://api.apify.com/v2/actor-runs/${apifyRunId}?token=${apifyToken}`);
-        if (detailRes.ok) {
-          const detailData = await detailRes.json();
-          apifyRunMetadata = scrubApifyRun(detailData.data);
-          errorDetail = detailData.data?.statusMessage || detailData.data?.exitCode || "";
+        const input = {
+          subredditUrls: [`r/${sub}`],
+          searchSort: "new",
+          maxPostsCount: maxPostsPerSub,
+          crawlCommentsPerPost: includeComments,
+          maxCommentsPerPost,
+          fastMode: true,
+          proxy: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
+        };
+        const startRes = await fetch(apifyRunUrl(actorId, apifyToken, perRunMaxItems, {
+          timeoutSecs: actorTimeoutSecs,
+          maxTotalChargeUsd: perRunChargeUsd,
+        }), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(input),
+        });
+        if (!startRes.ok) {
+          const t = await startRes.text().catch(() => "");
+          return { items: [], status: `start_${startRes.status}`, usageUsd: 0, error: `r/${sub} start HTTP ${startRes.status}: ${t.slice(0, 160)}` };
         }
-      } catch {}
-      await logToErrorLog(supabase, SOURCE, `Apify run status: ${runStatus || "TIMEOUT"} detail: ${errorDetail}`, "apify-error");
-      const message = `Apify run status: ${runStatus || "TIMEOUT"}${errorDetail ? ` (${errorDetail})` : ""}`;
-      apifyRunWarning = message;
+        const runData = await startRes.json();
+        const runId = runData?.data?.id;
+        const datasetId = runData?.data?.defaultDatasetId;
+        if (!runId || !datasetId) return { items: [], status: "no_run", usageUsd: 0, error: `r/${sub} missing runId` };
+
+        let status = "";
+        let usageUsd = 0;
+        const deadline = Date.now() + pollTimeoutSecs * 1000;
+        while (Date.now() < deadline) {
+          await delay(Math.min(APIFY_POLL_INTERVAL_MS, Math.max(1000, deadline - Date.now())));
+          const sRes = await fetch(`https://api.apify.com/v2/actor-runs/${runId}?token=${apifyToken}`);
+          if (!sRes.ok) continue;
+          const sData = await sRes.json();
+          status = sData?.data?.status ?? "";
+          usageUsd = sData?.data?.usageTotalUsd ?? usageUsd;
+          if (["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(status)) break;
+        }
+        if (status && !["SUCCEEDED", "FAILED", "ABORTED", "TIMED-OUT"].includes(status)) {
+          await abortApifyRun(apifyToken, runId);
+          status = "TIMED-OUT";
+        }
+        const dRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json`);
+        const data = dRes.ok ? await dRes.json().catch(() => []) : [];
+        const runItems = Array.isArray(data) ? data : [];
+        const error = (status !== "SUCCEEDED" && runItems.length === 0) ? `r/${sub}: ${status || "no-status"}, 0 items` : undefined;
+        return { items: runItems, status, usageUsd, error };
+      } catch (e) {
+        return { items: [], status: "error", usageUsd: 0, error: `r/${sub}: ${e instanceof Error ? e.message : String(e)}` };
+      }
+    };
+
+    const runResults = await mapWithConcurrency(subreddits, concurrency, runForSubreddit);
+    const items: any[] = [];
+    const runErrors: string[] = [];
+    const perSubStatus: Record<string, string> = {};
+    let totalUsageUsd = 0;
+    for (let i = 0; i < subreddits.length; i++) {
+      const r = runResults[i];
+      if (r.items.length) items.push(...r.items);
+      totalUsageUsd += r.usageUsd || 0;
+      perSubStatus[subreddits[i]] = r.status;
+      if (r.error) runErrors.push(r.error);
     }
-
-    const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json`);
-    if (!datasetRes.ok) throw new Error("Failed to fetch dataset");
-
-    const items = await datasetRes.json();
-    if (!Array.isArray(items)) throw new Error("Invalid dataset response");
+    const apifyUsageSummary = { actor: actorId, subreddits: subreddits.length, per_subreddit_status: perSubStatus, total_usage_usd: Number(totalUsageUsd.toFixed(4)) };
+    apifyRunMetadata = apifyUsageSummary;
 
     const posts = items.filter((item: any) => item.dataType === "post");
+    const comments = items.filter((item: any) => item.dataType === "comment");
     const { data: existingData } = await supabase
       .from("scraped_posts")
       .select("source_url")
@@ -274,6 +293,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       backend: "apify",
       apify_items_fetched: items.length,
       posts_found: posts.length,
+      comments_found: comments.length,
       filtered_candidates: 0,
       classified: 0,
       net_new_rows: 0,
@@ -288,10 +308,10 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       dedupSkipped: 0,
       contentSkipped: 0,
       errors: [] as string[],
-      apifyUsage: scrubApifyRun(terminalRunData),
+      apifyUsage: apifyUsageSummary,
       apifyBudget: budget.usage,
     };
-    if (apifyRunWarning) summary.errors.push(`${apifyRunWarning}; salvaged dataset items when available`);
+    for (const e of runErrors) summary.errors.push(e);
 
     const candidates: {
       fullText: string;
@@ -324,7 +344,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       if (matchedSlugs.length === 0) continue;
       summary.filtered_candidates++;
 
-      const sourceUrl = post.url || "";
+      const sourceUrl = post.postUrl || post.url || "";
       if (!sourceUrl || existingUrls.has(sourceUrl)) {
         summary.duplicateSkipped++;
         continue;
@@ -387,6 +407,58 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       }
     }
 
+    // Comment ingestion: each scraped comment becomes its own scraped_posts row.
+    // Comments carry the bulk of the quality-sentiment signal ("anyone else seeing
+    // Claude get worse?" pile-ons), capped per post upstream (maxCommentsPerPost).
+    // Comments rarely name the model, so attribution leans on the subreddit via
+    // SUBREDDIT_MODEL_MAP with keyword fallback. Dedup is by a unique per-comment
+    // URL so many comments on one post don't collide. content_type "comment" gets
+    // full scoring weight (only "title_only" is down-weighted).
+    for (const c of comments) {
+      const createdAt = new Date(c.createdAt);
+      if (Number.isNaN(createdAt.getTime()) || createdAt < cutoff) continue;
+
+      const bodyText = (c.body || "").trim();
+      if (bodyText.length < 20) { summary.contentSkipped++; continue; }
+      if (isLikelyNonExperienceShare("", bodyText)) { summary.contentSkipped++; continue; }
+
+      const community = c.communityName || c.parsedCommunityName || "";
+      const matchedSlugs = matchModels(bodyText, keywords, SUBREDDIT_MODEL_MAP, community);
+      if (matchedSlugs.length === 0) continue;
+      summary.filtered_candidates++;
+
+      // Unique per-comment URL so multiple comments on the same post don't dedup-collide.
+      const baseUrl = c.commentUrl || c.permalink || c.url || c.postUrl || "";
+      const commentId = c.id != null ? String(c.id) : "";
+      const commentUrl = baseUrl
+        ? (commentId && !baseUrl.includes(commentId) ? `${baseUrl}#${commentId}` : baseUrl)
+        : "";
+      if (!commentUrl || existingUrls.has(commentUrl)) { summary.duplicateSkipped++; continue; }
+
+      for (const slug of matchedSlugs) {
+        const modelId = modelMap[slug];
+        if (!modelId) continue;
+        const upsertResult = await upsertPendingScrapedPost(supabase, {
+          model_id: modelId,
+          source: "reddit",
+          source_url: commentUrl,
+          title: null,
+          content: bodyText.slice(0, 2000),
+          content_type: "comment",
+          score: c.upVotes || c.score || 0,
+          posted_at: c.createdAt,
+        });
+        if (upsertResult.error) { summary.errors.push(`Comment insert: ${upsertResult.error}`); continue; }
+        if (upsertResult.inserted) {
+          summary.net_new_rows++;
+          summary.classificationQueued++;
+          existingUrls.add(commentUrl);
+        } else {
+          summary.duplicate_conflicts++;
+        }
+      }
+    }
+
     // A run that crawled nothing usable must not resolve as "success". When
     // Reddit 403-blocked the old actor (May 29-31), the actor still returned a
     // clean SUCCEEDED status with 0 posts, so deriveRunMetrics (which only
@@ -394,11 +466,11 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     // 3-day ingest outage stayed invisible. Surface the zero-yield case as an
     // error so the run is downgraded to failed and the watchdog's stale-scraper
     // check can fire. Also catches a future actor output-schema change (items
-    // returned but none parse as posts) without us having to predict it.
+    // returned but none parse as a post or comment) without us having to predict it.
     if (summary.apify_items_fetched === 0) {
       summary.errors.push("Apify returned 0 items - actor crawl produced no data (possible block/outage)");
-    } else if (summary.posts_found === 0) {
-      summary.errors.push(`Apify returned ${summary.apify_items_fetched} items but 0 parsed as posts - possible actor output schema change`);
+    } else if (summary.posts_found === 0 && summary.comments_found === 0) {
+      summary.errors.push(`Apify returned ${summary.apify_items_fetched} items but 0 parsed as posts/comments - possible actor output schema change`);
     }
 
     const derived = deriveRunMetrics(summary);
@@ -416,6 +488,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
         backend: "apify",
         duplicate_skipped: summary.duplicateSkipped,
         dedup_skipped: summary.dedupSkipped,
+        comments_found: summary.comments_found,
         content_skipped: summary.contentSkipped,
         irrelevant: summary.irrelevant,
         classifier_errors: summary.classifierErrors,
@@ -432,7 +505,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     await logToErrorLog(
       supabase,
       SOURCE,
-      `Completed: posts=${summary.posts_found} filtered=${summary.filtered_candidates} classified=${summary.classified} inserted=${summary.net_new_rows} duplicateConflicts=${summary.duplicate_conflicts}`,
+      `Completed: posts=${summary.posts_found} comments=${summary.comments_found} filtered=${summary.filtered_candidates} inserted=${summary.net_new_rows} duplicateConflicts=${summary.duplicate_conflicts}`,
       "summary",
     );
     await logZeroDataWarning(supabase, SOURCE, summary.posts_found);
