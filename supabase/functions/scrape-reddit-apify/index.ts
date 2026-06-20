@@ -37,19 +37,34 @@ const APIFY_MAX_TOTAL_CHARGE_USD = 0.35;
 
 const DEFAULT_START_URLS = [
   "https://www.reddit.com/r/ClaudeAI/new/",
+  "https://www.reddit.com/r/ClaudeCode/new/",
   "https://www.reddit.com/r/ChatGPT/new/",
-  "https://www.reddit.com/r/LocalLLaMA/new/",
+  "https://www.reddit.com/r/OpenAI/new/",
   "https://www.reddit.com/r/GoogleGemini/new/",
+  "https://www.reddit.com/r/GeminiAI/new/",
+  "https://www.reddit.com/r/GoogleGeminiAI/new/",
+  "https://www.reddit.com/r/grok/new/",
+  "https://www.reddit.com/r/LocalLLaMA/new/",
   "https://www.reddit.com/r/artificial/new/",
 ];
 
 const SUBREDDIT_MODEL_MAP: Record<string, string> = {
   "r/ClaudeAI": "claude",
   "r/claudeai": "claude",
+  "r/ClaudeCode": "claude",
+  "r/claudecode": "claude",
   "r/ChatGPT": "chatgpt",
   "r/chatgpt": "chatgpt",
+  "r/OpenAI": "chatgpt",
+  "r/openai": "chatgpt",
   "r/GoogleGemini": "gemini",
   "r/googlegemini": "gemini",
+  "r/GeminiAI": "gemini",
+  "r/geminiai": "gemini",
+  "r/GoogleGeminiAI": "gemini",
+  "r/googlegeminiai": "gemini",
+  "r/grok": "grok",
+  "r/Grok": "grok",
 };
 
 function delay(ms: number) {
