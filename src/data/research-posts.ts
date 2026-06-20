@@ -104,9 +104,9 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     publishedAt: "2026-04-25",
     updatedAt: "2026-05-16",
     summary:
-      "The full pipeline from scraper to score. Five platforms (with Reddit posts and comments), 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we've documented but not yet solved.",
+      "The full pipeline from scraper to score. Five platforms, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we've documented but not yet solved.",
     metaDescription:
-      "How LLM Vibes turns posts and comments into scores: five platforms, 12 complaint categories, a volume-weighted 0–100 score, and its known failure modes.",
+      "How LLM Vibes turns posts into scores: five platforms, 12 complaint categories, a volume-weighted 0–100 score, and its known failure modes.",
     author: "David Kelly",
     tags: ["methodology"],
     ogImage: "/research/how-llm-vibes-classifies-sentiment/og.png",

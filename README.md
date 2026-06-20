@@ -33,7 +33,7 @@ Every day, thousands of developers share their real experiences with AI models a
 
 | Source | Method | Auth Required |
 |--------|--------|--------------|
-| Reddit | Apify (`harshmaur/reddit-scraper`, HTML-parsing) — posts + comments | API token |
+| Reddit | Apify (`harshmaur/reddit-scraper`, HTML-parsing) | API token |
 | Hacker News | Algolia Search API | None |
 | Twitter/X | Apify scraper | API token |
 | Bluesky | AT Protocol search | App password |

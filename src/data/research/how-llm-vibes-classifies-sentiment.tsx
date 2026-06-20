@@ -35,9 +35,9 @@ const HowLlmVibesClassifiesSentimentBody = () => (
     <p>
       Reddit comes from the Apify <code>harshmaur/reddit-scraper</code> actor (HTML-parsing on residential
       proxies, adopted after Reddit shut down its public <code>.json</code> API in May 2026 and broke the
-      previous actor). It runs once per subreddit across eleven communities spanning the four models
-      (r/ClaudeAI, r/ClaudeCode, r/ChatGPT, r/OpenAI, r/ChatGPTPro, r/GoogleGemini, r/GeminiAI, r/GoogleGeminiAI,
-      r/grok, plus r/LocalLLaMA and r/artificial) and pulls both posts and their top comments. Hacker News uses
+      previous actor). It runs once per subreddit, in parallel, across eight communities spanning the four models
+      (r/ClaudeAI and r/ClaudeCode; r/ChatGPT, r/OpenAI, and r/ChatGPTPro; r/GoogleGemini and r/GeminiAI; r/grok),
+      pulling recent posts. Hacker News uses
       the Algolia API, free and rate-friendly. Bluesky uses the AT Protocol with an authenticated handle. Twitter/X
       uses the Apify <code>apidojo~tweet-scraper</code> actor, one combined latest-search query, 50 posts per run.
       Mastodon uses the public API across five instances.
