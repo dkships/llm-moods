@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
 import ModelCard from "@/components/ModelCard";
+import SectionHeader from "@/components/SectionHeader";
 import useHead from "@/hooks/useHead";
 import Footer from "@/components/Footer";
 import { useModelsWithLatestVibes, usePrefetchModelDetail } from "@/hooks/useVibesData";
@@ -75,6 +76,7 @@ const Index = () => {
           {/* How it works */}
           <section className="border-t border-border">
             <div className="container py-12 sm:py-16">
+              <SectionHeader title="How it works" className="mb-8 sm:mb-10" />
               <ol className="grid grid-cols-1 gap-8 sm:gap-10 md:grid-cols-3">
                 {[
                   {
@@ -103,17 +105,6 @@ const Index = () => {
                   </li>
                 ))}
               </ol>
-              <p className="mt-10 text-body text-text-secondary">
-                The classifier is Claude scoring its own vendor's model among the four, so we cross-check it
-                against an independent second grader: 91.9% sentiment agreement in the April 2026 validation
-                run.{" "}
-                <Link
-                  to="/research/how-llm-vibes-classifies-sentiment"
-                  className="rounded-md text-foreground underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                >
-                  Read the full methodology
-                </Link>
-              </p>
             </div>
           </section>
         </main>
