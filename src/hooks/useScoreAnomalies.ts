@@ -90,9 +90,9 @@ export function useScoreAnomalies(options: UseScoreAnomaliesOptions = {}) {
       watchThreshold,
       breachThreshold,
     ],
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: 30 * 60 * 1000,
     refetchIntervalInBackground: false,
-    staleTime: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
     queryFn: async () => {
       const { data, error } = await (supabase as unknown as PublicAnomalyRpcClient).rpc(
         "get_public_score_anomaly_inputs",

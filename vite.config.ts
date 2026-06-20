@@ -22,10 +22,13 @@ export default defineConfig(({ mode }) => ({
   build: {
     rollupOptions: {
       output: {
+        // recharts is intentionally NOT pinned to a manual chunk: it's only
+        // reached via the lazy VibesChart, so letting Rollup auto-split it keeps
+        // it out of the eager entry graph (a manual "vendor-charts" bucket
+        // dragged a shared util into it, forcing recharts to preload on every
+        // page). It now loads only on /model/:slug and chart-embedding articles.
         manualChunks: {
           "vendor-react": ["react", "react-dom", "react-router-dom"],
-          "vendor-charts": ["recharts"],
-          "vendor-motion": ["framer-motion"],
           "vendor-supabase": ["@supabase/supabase-js"],
           "vendor-query": ["@tanstack/react-query"],
         },

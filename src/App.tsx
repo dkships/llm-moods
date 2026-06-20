@@ -1,7 +1,6 @@
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { AnimatePresence, MotionConfig } from "framer-motion";
 import { lazy, Suspense, useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import Index from "./pages/Index";
@@ -57,38 +56,36 @@ const AnimatedRoutes = () => {
   return (
     <>
       <ScrollToTop />
-      <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          <Route path="/" element={<Index />} />
-          <Route path="/dashboard" element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
-          <Route path="/model/:slug" element={<Suspense fallback={<PageFallback />}><ModelDetail /></Suspense>} />
-          <Route path="/research" element={<Suspense fallback={<PageFallback />}><ResearchIndex /></Suspense>} />
-          <Route path="/research/:slug" element={<Suspense fallback={<PageFallback />}><ResearchPost /></Suspense>} />
-          <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
-          {ScraperMonitor && (
-            <Route path="/admin/scrapers" element={<Suspense fallback={<PageFallback />}><ScraperMonitor /></Suspense>} />
-          )}
-          {OgPreview && (
-            <Route path="/og/:slug" element={<Suspense fallback={<PageFallback />}><OgPreview /></Suspense>} />
-          )}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </AnimatePresence>
+      {/* key on Routes remounts the matched page per navigation, replaying the
+          CSS `animate-fade-in` in PageTransition (no framer-motion needed). */}
+      <Routes location={location} key={location.pathname}>
+        <Route path="/" element={<Index />} />
+        <Route path="/dashboard" element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
+        <Route path="/model/:slug" element={<Suspense fallback={<PageFallback />}><ModelDetail /></Suspense>} />
+        <Route path="/research" element={<Suspense fallback={<PageFallback />}><ResearchIndex /></Suspense>} />
+        <Route path="/research/:slug" element={<Suspense fallback={<PageFallback />}><ResearchPost /></Suspense>} />
+        <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
+        {ScraperMonitor && (
+          <Route path="/admin/scrapers" element={<Suspense fallback={<PageFallback />}><ScraperMonitor /></Suspense>} />
+        )}
+        {OgPreview && (
+          <Route path="/og/:slug" element={<Suspense fallback={<PageFallback />}><OgPreview /></Suspense>} />
+        )}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
     </>
   );
 };
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <MotionConfig reducedMotion="user">
-      <TooltipProvider>
-        <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
-          <ErrorBoundary>
-            <AnimatedRoutes />
-          </ErrorBoundary>
-        </BrowserRouter>
-      </TooltipProvider>
-    </MotionConfig>
+    <TooltipProvider>
+      <BrowserRouter future={{ v7_relativeSplatPath: true, v7_startTransition: true }}>
+        <ErrorBoundary>
+          <AnimatedRoutes />
+        </ErrorBoundary>
+      </BrowserRouter>
+    </TooltipProvider>
   </QueryClientProvider>
 );
 

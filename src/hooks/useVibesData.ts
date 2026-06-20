@@ -35,7 +35,10 @@ type LandingVibesRow = Database["public"]["Functions"]["get_landing_vibes"]["Ret
 type ScrapedPostRow = Database["public"]["Tables"]["scraped_posts"]["Row"];
 type ModelRow = Database["public"]["Tables"]["models"]["Row"];
 
-const QUERY_STALE_TIME = 60_000;
+// Scores are recomputed by the aggregate-vibes cron at most ~every 30 min, so a
+// 60s stale window only caused redundant refetch churn. 10 min keeps data fresh
+// without re-querying on every brief revisit.
+const QUERY_STALE_TIME = 10 * 60_000;
 
 interface PublicModelRow {
   id: string;
@@ -184,7 +187,7 @@ export interface ModelWithVibes {
 export function useModelsWithLatestVibes() {
   return useQuery<ModelWithVibes[]>({
     queryKey: ["models-with-vibes"],
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: 30 * 60 * 1000,
     refetchIntervalInBackground: false,
     staleTime: QUERY_STALE_TIME,
     queryFn: async () => {

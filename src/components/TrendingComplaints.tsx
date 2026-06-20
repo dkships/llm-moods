@@ -24,8 +24,8 @@ const GRID_COLS =
 function useTrendingComplaints() {
   return useQuery({
     queryKey: ["trending-complaints"],
-    staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    staleTime: 10 * 60 * 1000,
+    refetchInterval: 30 * 60 * 1000,
     refetchIntervalInBackground: false,
     queryFn: async () => {
       const { data, error } = await supabase.rpc("get_trending_complaints");
