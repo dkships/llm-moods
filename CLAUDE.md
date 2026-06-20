@@ -107,7 +107,7 @@ Scraper auth gates accept three callers: service-role JWT, `RUN_PIPELINE_TRIGGER
 
 ## Known reliability issues
 
-- **`scrape-reddit-apify` fails ~57%** of recent windows. The `trudax~reddit-scraper-lite` Apify actor times out or returns 0 items intermittently. Investigate before relying on Reddit-only signals.
+- **Reddit scraper swapped to `harshmaur/reddit-scraper` (June 2026, bake-off winner).** Root cause of the old failures: `trudax~reddit-scraper-lite` relied on Reddit's public `.json` API, which Reddit shut down (403) in May 2026 → ~75% degraded runs / ~14 items. harshmaur is HTML-parsing on residential proxies (bake-off: 100% success, fast, posts+comments). Actor is config-driven (`scraper_config.actor_id`); revert by setting it back to `trudax/reddit-scraper-lite`.
 
 ## Audit log
 
@@ -126,7 +126,7 @@ Sentiment is classified by **Claude Haiku 4.5** (`claude-haiku-4-5-20251001`) vi
 
 `reclassify-posts` edge function supports `?mode=multi_model` to find and fix historical multi-model posts with identical sentiment. Run `reaggregate-vibes` after to recalculate scores.
 
-**Reddit scraper** uses `trudax~reddit-scraper-lite` Apify actor. Fetches from 5 subreddits (ClaudeAI, ChatGPT, LocalLLaMA, GoogleGemini, artificial), maxItems 40.
+**Reddit scraper** uses the `harshmaur/reddit-scraper` Apify actor (HTML-parsing, residential proxy; config-driven via `scraper_config.actor_id`). One actor run **per subreddit**, fanned out with bounded concurrency (`actor_concurrency`), across 11 subreddits (ClaudeAI, ClaudeCode, ChatGPT, OpenAI, ChatGPTPro, GoogleGemini, GeminiAI, GoogleGeminiAI, grok, LocalLLaMA, artificial — per-sub runs are required because harshmaur exhausts a single run on the first subreddit when comments are on). Ingests **posts and top comments**; comments become their own `scraped_posts` rows (`content_type='comment'`, full scoring weight). Caps: `max_posts_per_sub` (10), `max_comments_per_post` (4). The old `trudax~reddit-scraper-lite` died with Reddit's `.json` API shutdown (May 2026).
 
 **Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input (4 terms, maxItems 50). Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Apify budget: $29/month, used for Reddit and Twitter.
 
