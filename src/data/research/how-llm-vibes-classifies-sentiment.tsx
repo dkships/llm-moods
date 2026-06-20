@@ -33,9 +33,12 @@ const HowLlmVibesClassifiesSentimentBody = () => (
     <h2>What gets scraped</h2>
     <p>Five platforms, five edge functions, five independent cron schedules.</p>
     <p>
-      Reddit comes from the Apify <code>trudax~reddit-scraper-lite</code> actor, pulling 25 posts per run from
-      five subreddits (r/ClaudeAI, r/ChatGPT, r/LocalLLaMA, r/GoogleGemini, r/artificial). Hacker News uses the
-      Algolia API, free and rate-friendly. Bluesky uses the AT Protocol with an authenticated handle. Twitter/X
+      Reddit comes from the Apify <code>harshmaur/reddit-scraper</code> actor (HTML-parsing on residential
+      proxies, adopted after Reddit shut down its public <code>.json</code> API in May 2026 and broke the
+      previous actor). It runs once per subreddit across eleven communities spanning the four models
+      (r/ClaudeAI, r/ClaudeCode, r/ChatGPT, r/OpenAI, r/ChatGPTPro, r/GoogleGemini, r/GeminiAI, r/GoogleGeminiAI,
+      r/grok, plus r/LocalLLaMA and r/artificial) and pulls both posts and their top comments. Hacker News uses
+      the Algolia API, free and rate-friendly. Bluesky uses the AT Protocol with an authenticated handle. Twitter/X
       uses the Apify <code>apidojo~tweet-scraper</code> actor, one combined latest-search query, 50 posts per run.
       Mastodon uses the public API across five instances.
     </p>
@@ -192,7 +195,7 @@ score = round((effective_positive / total_weight) × 100)`}</code>
       isn't the main driver of scores, but that isn't a substitute for an ongoing cross-vendor check. The check
       fixture lives at <code>supabase/functions/check-gemini-self-bias</code>. It samples up to 150 recent
       stored posts from the past 21 days that are unclassified, low-confidence, or missing a negative complaint
-      category, then reruns them through a free-tier Gemini as an independent second grader and compares those
+      category, then reruns them through Gemini as an independent second grader and compares those
       labels against the stored Claude labels. It reports sentiment-match and complaint-match rates without
       writing public scores. The check isn't on a schedule today; we run it before trusting a classifier change.
     </p>

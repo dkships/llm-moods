@@ -85,7 +85,7 @@ const Index = () => {
                   },
                   {
                     title: "Classify",
-                    body: "Each post sentiment-labeled by Claude Haiku 4.5 into 12 complaint categories.",
+                    body: "Each post and comment sentiment-labeled by Claude Haiku 4.5 into 12 complaint categories.",
                   },
                   {
                     title: "Score",
