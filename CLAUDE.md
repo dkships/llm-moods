@@ -84,7 +84,7 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 
 | Cron | Schedule (UTC) | PT | Function |
 |---|---|---|---|
-| `scrape-reddit-apify-3x` | `0 4,12,21 * * *` | 21/05/14 | `scrape-reddit-apify` |
+| `scrape-reddit-apify-3x` | `0 4,16 * * *` | 21/09 PT | `scrape-reddit-apify` (now **2×/day** — cost; job name unchanged) |
 | `scrape-hackernews-3x` | `2 4,12,21 * * *` | +2 min | `scrape-hackernews` |
 | `scrape-bluesky-3x` | `4 4,12,21 * * *` | +4 min | `scrape-bluesky` |
 | `scrape-twitter-3x` | `6 4,12,21 * * *` | +6 min | `scrape-twitter` |
