@@ -191,8 +191,10 @@ score = round((effective_positive / total_weight) × 100)`}</code>
     <p>
       The classifier vendor is one of the tracked models. Claude Haiku 4.5 now grades all four models,
       including Claude itself, so pro-Claude bias is the measurement risk. An April 2026 comparison between the
-      Gemini and Claude classifiers found about 92% agreement on sentiment, which suggests vendor identity
-      isn't the main driver of scores, but that isn't a substitute for an ongoing cross-vendor check. The check
+      Gemini and Claude classifiers found about 92% agreement on sentiment, and a June 2026 run on the live
+      Claude Haiku 4.5 classifier put agreement with an independent Gemini grader at 88.9% — which suggests
+      vendor identity isn't the main driver of scores, but neither is a substitute for an ongoing cross-vendor
+      check. The check
       fixture lives at <code>supabase/functions/check-gemini-self-bias</code>. It samples up to 150 recent
       stored posts from the past 21 days that are unclassified, low-confidence, or missing a negative complaint
       category, then reruns them through Gemini as an independent second grader and compares those
