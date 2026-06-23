@@ -183,6 +183,75 @@ export type Database = {
           },
         ]
       }
+      model_rumors: {
+        Row: {
+          benefit_verified: boolean
+          claim_summary: string
+          claim_type: string
+          codename: string | null
+          created_at: string
+          eta_conflicting: boolean
+          eta_date: string | null
+          eta_text: string | null
+          first_seen_at: string | null
+          id: string
+          last_seen_at: string | null
+          mention_count: number
+          model_slug: string
+          platforms: string[]
+          representative_sources: Json
+          rumored_benefit: string | null
+          signals: string | null
+          updated_at: string
+          version_key: string
+          version_label: string | null
+        }
+        Insert: {
+          benefit_verified?: boolean
+          claim_summary?: string
+          claim_type?: string
+          codename?: string | null
+          created_at?: string
+          eta_conflicting?: boolean
+          eta_date?: string | null
+          eta_text?: string | null
+          first_seen_at?: string | null
+          id?: string
+          last_seen_at?: string | null
+          mention_count?: number
+          model_slug: string
+          platforms?: string[]
+          representative_sources?: Json
+          rumored_benefit?: string | null
+          signals?: string | null
+          updated_at?: string
+          version_key: string
+          version_label?: string | null
+        }
+        Update: {
+          benefit_verified?: boolean
+          claim_summary?: string
+          claim_type?: string
+          codename?: string | null
+          created_at?: string
+          eta_conflicting?: boolean
+          eta_date?: string | null
+          eta_text?: string | null
+          first_seen_at?: string | null
+          id?: string
+          last_seen_at?: string | null
+          mention_count?: number
+          model_slug?: string
+          platforms?: string[]
+          representative_sources?: Json
+          rumored_benefit?: string | null
+          signals?: string | null
+          updated_at?: string
+          version_key?: string
+          version_label?: string | null
+        }
+        Relationships: []
+      }
       models: {
         Row: {
           accent_color: string | null
@@ -226,6 +295,8 @@ export type Database = {
           original_language: string | null
           posted_at: string | null
           praise_category: string | null
+          rumor_checked_at: string | null
+          rumor_data: Json | null
           score: number | null
           sentiment: string | null
           source: string
@@ -251,6 +322,8 @@ export type Database = {
           original_language?: string | null
           posted_at?: string | null
           praise_category?: string | null
+          rumor_checked_at?: string | null
+          rumor_data?: Json | null
           score?: number | null
           sentiment?: string | null
           source: string
@@ -276,6 +349,8 @@ export type Database = {
           original_language?: string | null
           posted_at?: string | null
           praise_category?: string | null
+          rumor_checked_at?: string | null
+          rumor_data?: Json | null
           score?: number | null
           sentiment?: string | null
           source?: string
@@ -630,6 +705,27 @@ export type Database = {
           translated_content: string
         }[]
       }
+      get_public_rumors: {
+        Args: never
+        Returns: {
+          benefit_verified: boolean
+          claim_summary: string
+          claim_type: string
+          codename: string
+          eta_conflicting: boolean
+          eta_date: string
+          eta_text: string
+          first_seen_at: string
+          last_seen_at: string
+          mention_count: number
+          model_slug: string
+          platform_count: number
+          representative_sources: Json
+          rumored_benefit: string
+          signals: string
+          version_label: string
+        }[]
+      }
       get_public_score_anomaly_inputs: {
         Args: { lookback_days?: number; recent_days?: number }
         Returns: {
@@ -686,6 +782,18 @@ export type Database = {
           function_name: string
           last_seen: string
           sample_message: string
+        }[]
+      }
+      get_rumor_candidates: {
+        Args: { p_limit?: number }
+        Returns: {
+          content: string
+          id: string
+          posted_at: string
+          score: number
+          source: string
+          source_url: string
+          title: string
         }[]
       }
       get_scraper_monitor_runs: {
