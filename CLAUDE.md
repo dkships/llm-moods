@@ -60,6 +60,7 @@ Functions gated against bare anon (as of PR #38, 2026-05-24): `aggregate-vibes`,
 - `/model/:slug` — Model detail (history chart, complaint/source breakdown, posts, vendor events overlay, recent-incident card, official status card with anomaly correlation, surface-tagged recent posts)
 - `/research` — Research index (long-form articles index)
 - `/research/:slug` — Research article (live embedded charts via `chart-model` markdown sentinel; first article ships with CSV download + Dataset JSON-LD)
+- `/rumors` — Rumors radar: auto-aggregated community chatter about *unreleased* models (version + stage + hedged ETA + rumored benefit + signals), ranked by cross-platform corroboration. DB-driven via `get_public_rumors`; see "Rumors radar" below.
 - `/privacy` — Privacy & data practices + content-removal channel (GitHub issues / LinkedIn; no email on public surfaces)
 - `/admin/scrapers` — Scraper run monitor + score anomalies panel. **Dev-only** (gated on `import.meta.env.DEV`; production bundles physically exclude the chunk).
 - `/og/:slug` — Dev-only OG card preview at fixed 1200×630 for capturing per-article share images.
@@ -71,12 +72,15 @@ Functions gated against bare anon (as of PR #38, 2026-05-24): `aggregate-vibes`,
 | `models` | Tracked LLM models (slug, name, accent_color) |
 | `scraped_posts` | Raw posts with sentiment + complaint classification + translation |
 | `vibes_scores` | Aggregated daily/hourly scores (0-100) |
-| `model_keywords` | Keyword → model matching for scrapers |
+| `model_keywords` | Keyword → model matching for scrapers (incl. upcoming-version + codename rows for the rumors radar) |
 | `scraper_config` | Runtime scraper settings (subreddits, etc.) |
 | `scraper_runs` | Audit log per scraper execution |
 | `error_log` | Debug error tracking |
+| `model_rumors` | Rumors-radar accumulator: one row per (model_slug, version_key), corroboration counts + hedged ETA + signals |
 
-**RPC Functions:** `get_landing_vibes()`, `get_sparkline_scores()`, `get_complaint_breakdown()`, `get_source_breakdown()`, `get_trending_complaints()`
+`scraped_posts` also carries `rumor_checked_at` / `rumor_data` (rumor-extraction state; see "Rumors radar").
+
+**RPC Functions:** `get_landing_vibes()`, `get_sparkline_scores()`, `get_complaint_breakdown()`, `get_source_breakdown()`, `get_trending_complaints()`, `get_public_rumors()` (public read), `get_rumor_candidates()` (service-role only)
 
 ## Cron architecture (May 2026)
 
@@ -94,6 +98,7 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 | `pipeline-watchdog-1h` | `17 * * * *` | hourly at :17 | `pipeline-watchdog` |
 | `cleanup-stuck-scraper-runs` | `*/30 * * * *` | every 30 min | (SQL only — marks runs >30 min as failed) |
 | `cleanup-old-posts-weekly` | `0 8 * * 0` | Sun 01:00 PT | `cleanup-old-posts` |
+| `aggregate-rumors-2x` | `40 4,16 * * *` | ~21:40/09:40 PT | `aggregate-rumors` (rumors radar; ~40 min after the Reddit windows) |
 
 `run-pipeline` and `run-scrapers` are kept in code as manual debug tools but are not scheduled (the merged pipeline blew the 400s edge-function budget — see commit history for the May 8 rebuild and decomposition).
 
@@ -126,11 +131,19 @@ Sentiment is classified by **Claude Haiku 4.5** (`claude-haiku-4-5-20251001`) vi
 
 `reclassify-posts` edge function supports `?mode=multi_model` to find and fix historical multi-model posts with identical sentiment. Run `reaggregate-vibes` after to recalculate scores.
 
-**Reddit scraper** uses the `harshmaur/reddit-scraper` Apify actor (HTML-parsing, residential proxy; config-driven via `scraper_config.actor_id`). One actor run **per subreddit**, fanned out in parallel (`actor_concurrency=8`) so the whole run fits the edge function's hard 150s request limit, across 8 model-specific subreddits (ClaudeAI, ClaudeCode, ChatGPT, OpenAI, ChatGPTPro, GoogleGemini, GeminiAI, grok). **Posts only** — `max_posts_per_sub=10`, `poll_timeout_secs=100`. Comment ingestion is built but **disabled** (`include_comments=false`): the first live run showed harshmaur comment items don't carry the subreddit, so attribution failed and ~302 comments/run dropped for ~$0.76 of wasted spend; re-enable only with a comment→parent-post attribution fix. Cost ~$0.30/run. The old `trudax~reddit-scraper-lite` died with Reddit's `.json` API shutdown (May 2026).
+**Reddit scraper** uses the `harshmaur/reddit-scraper` Apify actor (HTML-parsing, residential proxy; config-driven via `scraper_config.actor_id`). One actor run **per subreddit**, fanned out in parallel (`actor_concurrency=8`) so the whole run fits the edge function's hard 150s request limit, across 8 subreddits (ClaudeAI, ClaudeCode, ChatGPT, OpenAI, GeminiAI, grok, plus the cross-vendor leak hubs r/singularity + r/LocalLLaMA — a net-zero swap in `20260623120000_rumors_radar.sql` from the redundant ChatGPTPro/GoogleGemini, for the rumors radar; the two leak hubs are intentionally NOT in `SUBREDDIT_MODEL_MAP`, so they attribute only via the codename/version `model_keywords`). harshmaur is **pay-per-event** ($0.02 Actor-start fee per run + per-result) — the per-subreddit fan-out pays that start fee 8×/window (~$8/mo); a single run with all `subredditUrls` would save it but needs a live per-sub coverage test (comments are now disabled, which was the original blocker). **Posts only** — `max_posts_per_sub=10`, `poll_timeout_secs=100`. Comment ingestion is built but **disabled** (`include_comments=false`): the first live run showed harshmaur comment items don't carry the subreddit, so attribution failed and ~302 comments/run dropped for ~$0.76 of wasted spend; re-enable only with a comment→parent-post attribution fix. Cost ~$0.30/run. The old `trudax~reddit-scraper-lite` died with Reddit's `.json` API shutdown (May 2026).
 
-**Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input (4 terms, maxItems 50). Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Apify budget: $29/month, used for Reddit and Twitter.
+**Twitter/X scraper** uses `apidojo~tweet-scraper` Apify actor with `searchTerms` array input (4 sentiment terms + 1 combined rumor term added in `20260623120000_rumors_radar.sql`; `max_items` bumped 50→80 so the rumor term doesn't starve sentiment recall). Has a dormant Grok/xAI fallback path (requires `XAI_API_KEY`). Apify budget: $29/month (in-code guard $24/mo + $0.80/day in `_shared/apify-budget.ts`), used for Reddit and Twitter. Both actors are **pay-per-event** — `maxTotalChargeUsd` is the authoritative cost cap (the `maxItems` run-option is largely inert on PPE).
 
 **Tracked models:** Claude, ChatGPT, Gemini, Grok (DeepSeek and Perplexity were removed 2026-03-21).
+
+## Rumors radar (`/rumors`)
+
+Automated board of community chatter about *unreleased* model versions, ranked by cross-platform corroboration (noise), not by author credibility (the scrapers store no author identity). Migration: `20260623120000_rumors_radar.sql`.
+
+- **Intake (additive):** `_shared/rumor-detect.ts` `isLikelyRumorCandidate()` is OR'd into the drop check in `scrape-twitter` + `scrape-reddit-apify` so leak/announcement-shaped posts survive (they still classify `irrelevant`, so vibes scores are unaffected). Codename/next-version `model_keywords` rows let `matchModels` attribute "Fable 5"/"Fennec"/"Orionmist" etc. — **these are ephemeral; refresh each cycle** (the one recurring manual touch). The `RELEASED_SET` in `aggregate-rumors/index.ts` (drives `is_unreleased`) must be refreshed alongside them.
+- **`aggregate-rumors` edge fn (cron `aggregate-rumors-2x`, gated + service-locked):** Phase 1 — `get_rumor_candidates` (distinct-`source_url`, leak-lexicon `~*` gate) → Haiku `record_rumors` forced-tool extraction (**N claims per post**; strict OFF for nullable enums; ~10/batch; anti-hallucination: `version_label` must be a substring of the post; never invents an ETA) → writes `rumor_data` + `rumor_checked_at` on all rows sharing the url (extract once per url). Phase 2 — in-TS accumulator (`_shared/rumor-rollup.ts`) upserts `model_rumors` (mention_count = distinct urls, ≥2-url gate, 21-day decay, sticky delayed/return claim_type). Pure rollup logic is unit-tested in `src/test/rumors.test.ts`.
+- **Frontend:** `useRumors` → `get_public_rumors`; `src/pages/Rumors.tsx` shows ranked cards (version + stage + hedged ETA + rumored benefit (unverified) + signals + "N mentions across …"), quiet "no strong rumors" default. ETAs are framed as unconfirmed community estimates, never forecasts.
 
 ## Frontend patterns added in 2026
 

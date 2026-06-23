@@ -31,6 +31,7 @@ const NavBar = () => {
   const { pathname } = useLocation();
   const showResearchLink = RESEARCH_POSTS.length > 0;
   const isResearchActive = pathname === "/research" || pathname.startsWith("/research/");
+  const isRumorsActive = pathname === "/rumors";
   const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/model/");
 
   const navLinkClass = (active: boolean) =>
@@ -62,6 +63,9 @@ const NavBar = () => {
               Research
             </Link>
           )}
+          <Link to="/rumors" className={navLinkClass(isRumorsActive)}>
+            Rumors
+          </Link>
           <a
             href="https://github.com/dkships/llm-moods"
             target="_blank"

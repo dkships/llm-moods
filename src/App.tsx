@@ -10,6 +10,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ModelDetail = lazy(() => import("./pages/ModelDetail"));
 const ResearchIndex = lazy(() => import("./pages/ResearchIndex"));
 const ResearchPost = lazy(() => import("./pages/ResearchPost"));
+const Rumors = lazy(() => import("./pages/Rumors"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 
 // Admin / generator pages are dev-only — production bundles physically exclude
@@ -64,6 +65,7 @@ const AnimatedRoutes = () => {
         <Route path="/model/:slug" element={<Suspense fallback={<PageFallback />}><ModelDetail /></Suspense>} />
         <Route path="/research" element={<Suspense fallback={<PageFallback />}><ResearchIndex /></Suspense>} />
         <Route path="/research/:slug" element={<Suspense fallback={<PageFallback />}><ResearchPost /></Suspense>} />
+        <Route path="/rumors" element={<Suspense fallback={<PageFallback />}><Rumors /></Suspense>} />
         <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
         {ScraperMonitor && (
           <Route path="/admin/scrapers" element={<Suspense fallback={<PageFallback />}><ScraperMonitor /></Suspense>} />

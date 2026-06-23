@@ -30,6 +30,7 @@ import {
   logZeroDataWarning,
   upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
+import { isLikelyRumorCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-twitter";
 const APIFY_MAX_TOTAL_CHARGE_USD = 0.15;
@@ -216,7 +217,10 @@ async function runApifyPath(
       summary.contentSkipped++;
       continue;
     }
-    if (isLikelyNonExperienceShare(text, "")) {
+    // Rumor candidates (leak/stage/timing chatter about unreleased versions) are
+    // kept even when they read like an announcement — they're the radar's input.
+    // They still get classified `irrelevant` downstream, so vibes scores are unaffected.
+    if (isLikelyNonExperienceShare(text, "") && !isLikelyRumorCandidate(text, "")) {
       summary.contentSkipped++;
       continue;
     }

@@ -180,6 +180,15 @@ function buildRoutes(): RouteMeta[] {
       ogType: "website",
     },
     {
+      path: "/rumors",
+      // Mirrors the useHead call in src/pages/Rumors.tsx.
+      title: "Rumors — LLM Vibes",
+      description:
+        "Aggregated community chatter about unreleased AI models — what's being discussed, when it's expected, and the signals behind it. Unconfirmed estimates, not forecasts.",
+      ogImage: defaultOgImage,
+      ogType: "website",
+    },
+    {
       path: "/privacy",
       // Mirrors the useHead call in src/pages/Privacy.tsx.
       title: "Privacy & data practices — LLM Vibes",

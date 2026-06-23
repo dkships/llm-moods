@@ -25,7 +25,7 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 - Use `product-qa-sweep` for dashboard, public route, scraper monitor, or responsive UI verification.
 
 ## Public App Guardrails
-- Public route inventory is fixed to `/`, `/dashboard`, `/model/:slug`, `/research`, `/research/:slug`, `/privacy`, and `*` (404)
+- Public route inventory is fixed to `/`, `/dashboard`, `/model/:slug`, `/research`, `/research/:slug`, `/rumors`, `/privacy`, and `*` (404)
 - Dev-only routes (gated on `import.meta.env.DEV` so production bundles physically exclude them): `/admin/scrapers` (scraper monitor + anomalies panel), `/og/:slug` (OG card generator)
 - Public complaint taxonomy must flow through `src/shared/public-taxonomy.ts`; do not hardcode labels or aliases in page components
 - Unknown complaint categories must be filtered or shown as `Other` — never expose raw backend taxonomy strings in the UI

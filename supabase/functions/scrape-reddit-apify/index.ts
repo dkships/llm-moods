@@ -29,6 +29,7 @@ import {
   logZeroDataWarning,
   upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
+import { isLikelyRumorCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-reddit-apify";
 const APIFY_ACTOR_TIMEOUT_SECS = 120;
@@ -335,7 +336,10 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
         summary.contentSkipped++;
         continue;
       }
-      if (isLikelyNonExperienceShare(title, bodyText)) {
+      // Keep rumor candidates (leak/stage/timing chatter) that would otherwise be
+      // dropped as announcement-shaped — the rumor radar reads them; the classifier
+      // still marks pure announcements `irrelevant`, so vibes scores are unaffected.
+      if (isLikelyNonExperienceShare(title, bodyText) && !isLikelyRumorCandidate(title, bodyText)) {
         summary.contentSkipped++;
         continue;
       }
@@ -420,7 +424,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
 
       const bodyText = (c.body || "").trim();
       if (bodyText.length < 20) { summary.contentSkipped++; continue; }
-      if (isLikelyNonExperienceShare("", bodyText)) { summary.contentSkipped++; continue; }
+      if (isLikelyNonExperienceShare("", bodyText) && !isLikelyRumorCandidate("", bodyText)) { summary.contentSkipped++; continue; }
 
       const community = c.communityName || c.parsedCommunityName || "";
       const matchedSlugs = matchModels(bodyText, keywords, SUBREDDIT_MODEL_MAP, community);
