@@ -52,6 +52,10 @@ export interface SourceRef {
 // The matching `from:<handle>` Twitter search terms live in scraper_config.
 export const KNOWN_LEAKERS = new Set<string>([
   "synthwavedd",
+  "btibor91",
+  "apples_jimmy",
+  "testingcatalog",
+  "scaling01",
 ]);
 
 const VERIFIED_FOLLOWER_FLOOR = 10000;
