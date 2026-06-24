@@ -3,16 +3,26 @@ import { describe, expect, it } from "vitest";
 import { isLikelyRumorCandidate } from "../../supabase/functions/_shared/rumor-detect";
 import {
   buildContribution,
+  collapseQuoteEchoes,
   groupByCluster,
   isCredibleSource,
   mergeCluster,
   normalizeVersionKey,
   parseRecordRumors,
+  statusIdFromUrl,
   type RawClaim,
   type RumorContribution,
   type RumorRow,
   type SourceRef,
 } from "../../supabase/functions/_shared/rumor-rollup";
+import {
+  canonicalVersionKey,
+  isFamilyConsistentLabel,
+  isNonFrontierLabel,
+  mergeRumorRows,
+  splitCompoundLabel,
+  type MergeableRumor,
+} from "../../supabase/functions/_shared/rumor-canon";
 
 function src(url: string, platform: string, posted_at: string, score = 0, extra: Partial<SourceRef> = {}): SourceRef {
   return { url, platform, posted_at, score, handle: null, snippet: "s", ...extra };
@@ -124,6 +134,34 @@ describe("buildContribution", () => {
     const raw: RawClaim = { is_rumor: true, target_family: "gemini", codename: "Orionmist", is_unreleased: true };
     const c = buildContribution(raw, source, "Orionmist topping the arena");
     expect(c?.versionKey).toBe("orionmist");
+  });
+
+  it("accepts a punctuation-variant label (post 'GPT-5,6' → label 'GPT-5.6')", () => {
+    const raw: RawClaim = { is_rumor: true, target_family: "chatgpt", version_label: "GPT-5.6", is_unreleased: true };
+    const c = buildContribution(raw, source, "GPT-5,6 dropping next week per a leaker");
+    expect(c).not.toBeNull();
+    expect(c!.modelSlug).toBe("chatgpt");
+  });
+
+  it("drops a competitor label mis-attributed to a tracked family", () => {
+    const raw: RawClaim = { is_rumor: true, target_family: "gemini", version_label: "DeepSeek V3", is_unreleased: true };
+    expect(buildContribution(raw, source, "DeepSeek V3 is coming soon")).toBeNull();
+  });
+
+  it("canonicalizes Claude codename aliases to one version key", () => {
+    const mythos = buildContribution(
+      { is_rumor: true, target_family: "claude", codename: "Mythos", is_unreleased: true },
+      source,
+      "Mythos spotted in the API",
+    );
+    const fable = buildContribution(
+      { is_rumor: true, target_family: "claude", codename: "Fable 5", is_unreleased: true },
+      source,
+      "Fable 5 returning soon",
+    );
+    expect(mythos?.versionKey).toBe("fable5");
+    expect(fable?.versionKey).toBe("fable5");
+    expect(mythos?.versionLabel).toBe("Fable 5");
   });
 });
 
@@ -255,5 +293,159 @@ describe("groupByCluster", () => {
     expect(groups.size).toBe(2);
     expect(groups.get("claude:sonnet5")).toHaveLength(2);
     expect(groups.get("gemini:orionmist")).toHaveLength(1);
+  });
+});
+
+describe("statusIdFromUrl / collapseQuoteEchoes", () => {
+  it("extracts the tweet status id from a url", () => {
+    expect(statusIdFromUrl("https://x.com/synthwavedd/status/12345")).toBe("12345");
+    expect(statusIdFromUrl("https://reddit.com/r/x/comments/abc")).toBeNull();
+    expect(statusIdFromUrl(null)).toBeNull();
+  });
+
+  it("drops a quote-tweet echoing another tweet in the same cluster", () => {
+    const original = contrib({
+      source: src("https://x.com/synthwavedd/status/100", "twitter", "2026-06-23", 5, { handle: "synthwavedd" }),
+    });
+    const echo = contrib({
+      source: src("https://x.com/buildwithhassan/status/200", "twitter", "2026-06-23", 1, {
+        handle: "buildwithhassan",
+        quotedStatusId: "100",
+      }),
+    });
+    const out = collapseQuoteEchoes([original, echo]);
+    expect(out).toHaveLength(1);
+    expect(out[0].source.url).toContain("synthwavedd");
+  });
+
+  it("keeps a quote whose original wasn't scraped", () => {
+    const echo = contrib({
+      source: src("https://x.com/buildwithhassan/status/200", "twitter", "2026-06-23", 1, { quotedStatusId: "999" }),
+    });
+    expect(collapseQuoteEchoes([echo])).toHaveLength(1);
+  });
+});
+
+describe("splitCompoundLabel", () => {
+  it("splits compound labels and distributes a trailing version number", () => {
+    expect(splitCompoundLabel("Fable/Mythos 5")).toEqual(["Fable 5", "Mythos 5"]);
+    expect(splitCompoundLabel("Mythos/Fable 5")).toEqual(["Mythos 5", "Fable 5"]);
+    expect(splitCompoundLabel("Sonnet 5 or Opus 5")).toEqual(["Sonnet 5", "Opus 5"]);
+  });
+
+  it("leaves a plain label intact and returns [] for empty", () => {
+    expect(splitCompoundLabel("GPT-5.6")).toEqual(["GPT-5.6"]);
+    expect(splitCompoundLabel(null)).toEqual([]);
+    expect(splitCompoundLabel("")).toEqual([]);
+  });
+});
+
+describe("canonicalVersionKey", () => {
+  it("collapses every Fable/Mythos spelling to one canonical identity", () => {
+    for (const [label, codename] of [
+      [null, "Fable"],
+      [null, "Mythos"],
+      ["Fable 5", null],
+      [null, "Mythos/Fable 5"],
+      [null, "Fable/Mythos 5"],
+    ] as [string | null, string | null][]) {
+      const c = canonicalVersionKey("claude", label, codename);
+      expect(c.key).toBe("fable5");
+      expect(c.label).toBe("Fable 5");
+      expect(c.codename).toBe("Mythos");
+    }
+  });
+
+  it("keeps a distinct real version separate", () => {
+    expect(canonicalVersionKey("claude", "Sonnet 5", null).key).toBe("sonnet5");
+  });
+
+  it("preserves a novel codename via fallback (radar still surfaces new leaks)", () => {
+    const c = canonicalVersionKey("gemini", null, "Fennec");
+    expect(c.key).toBe("fennec");
+    expect(c.codename).toBe("Fennec");
+    expect(c.label).toBeNull();
+  });
+});
+
+describe("isFamilyConsistentLabel / isNonFrontierLabel", () => {
+  it("accepts family-consistent labels and bare versions", () => {
+    expect(isFamilyConsistentLabel("chatgpt", "GPT-5.6")).toBe(true);
+    expect(isFamilyConsistentLabel("claude", "Mythos")).toBe(true);
+    expect(isFamilyConsistentLabel("grok", "5")).toBe(true);
+    expect(isNonFrontierLabel("claude", "Sonnet 5", null)).toBe(false);
+    expect(isNonFrontierLabel("chatgpt", "GPT-5.6", null)).toBe(false);
+  });
+
+  it("keeps codename-only claims open (permissive discovery)", () => {
+    expect(isNonFrontierLabel("claude", null, "Mythos")).toBe(false);
+    expect(isNonFrontierLabel("gemini", null, "Orionmist")).toBe(false);
+  });
+
+  it("drops competitor names and non-family labels", () => {
+    expect(isNonFrontierLabel("gemini", "DeepSeek V3", null)).toBe(true); // competitor
+    expect(isNonFrontierLabel("chatgpt", "Qwen 3", null)).toBe(true); // competitor substring
+    expect(isNonFrontierLabel("claude", "Badoo", null)).toBe(true); // not family-consistent
+  });
+});
+
+describe("mergeRumorRows", () => {
+  function rrow(over: Partial<MergeableRumor> & Record<string, unknown>): MergeableRumor {
+    return {
+      model_slug: "claude",
+      version_label: null,
+      codename: null,
+      claim_type: "other",
+      claim_summary: "summary",
+      mention_count: 1,
+      platform_count: 1,
+      representative_sources: [],
+      last_seen_at: "2026-06-23",
+      ...over,
+    } as MergeableRumor;
+  }
+
+  it("collapses alias-duplicate rows into one card with summed distinct mentions", () => {
+    const out = mergeRumorRows([
+      rrow({ codename: "Fable", mention_count: 1, last_seen_at: "2026-06-22",
+        representative_sources: [{ url: "u1", platform: "twitter" }] }),
+      rrow({ codename: "Mythos", mention_count: 1, last_seen_at: "2026-06-23",
+        representative_sources: [{ url: "u2", platform: "reddit" }] }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].version_label).toBe("Fable 5");
+    expect(out[0].codename).toBe("Mythos");
+    expect(out[0].mention_count).toBe(2); // single-unconfirmed-source tag now clears
+    expect(out[0].platform_count).toBe(2);
+  });
+
+  it("counts a url shared across two alias rows only once (no double-count)", () => {
+    const out = mergeRumorRows([
+      rrow({ codename: "Fable", representative_sources: [{ url: "shared", platform: "twitter" }] }),
+      rrow({ codename: "Mythos", representative_sources: [{ url: "shared", platform: "twitter" }] }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].mention_count).toBe(1);
+  });
+
+  it("applies claim_type precedence and takes display fields from the newest row", () => {
+    const out = mergeRumorRows([
+      rrow({ codename: "Fable", claim_type: "launch", claim_summary: "old", last_seen_at: "2026-06-20",
+        representative_sources: [{ url: "a", platform: "reddit" }] }),
+      rrow({ codename: "Mythos", claim_type: "delayed", claim_summary: "newest", last_seen_at: "2026-06-24",
+        representative_sources: [{ url: "b", platform: "twitter" }] }),
+    ]);
+    expect(out[0].claim_type).toBe("delayed");
+    expect(out[0].claim_summary).toBe("newest");
+  });
+
+  it("filters out non-frontier labels and untracked families", () => {
+    const out = mergeRumorRows([
+      rrow({ version_label: "Sonnet 5", representative_sources: [{ url: "a", platform: "reddit" }] }),
+      rrow({ version_label: "DeepSeek V3" }), // competitor label
+      rrow({ model_slug: "mistral", version_label: "Large 3" }), // untracked family
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].version_label).toBe("Sonnet 5");
   });
 });

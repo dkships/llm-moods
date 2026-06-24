@@ -9,6 +9,7 @@ import {
 } from "../_shared/runtime.ts";
 import {
   buildContribution,
+  collapseQuoteEchoes,
   groupByCluster,
   mergeCluster,
   parseRecordRumors,
@@ -115,7 +116,9 @@ const SYSTEM_PROMPT =
   "If a post is not about an unreleased model, return its index with an empty claims array.\n\n" +
   "Per claim:\n" +
   "- is_rumor: true only if it references an unreleased version/codename.\n" +
-  "- target_family: claude | chatgpt | gemini | grok (use 'unknown' if unclear).\n" +
+  "- target_family: claude (Anthropic) | chatgpt (OpenAI) | gemini (Google) | grok (xAI). " +
+  "Use 'unknown' for ANY model from another maker (DeepSeek, Qwen, Llama, Mistral, Kimi, etc.) " +
+  "or when unclear — never coerce a competitor's model into one of the four.\n" +
   "- version_label: copy the version token VERBATIM from the post (e.g. 'Sonnet 5', 'GPT-5.6'). Null if only a codename.\n" +
   "- codename: arena/internal codename if present (e.g. 'Fennec', 'Orionmist'). Null otherwise.\n" +
   "- is_unreleased: judge against the RELEASED SET above.\n" +
@@ -140,6 +143,7 @@ interface CandidateRow {
   author_handle: string | null;
   author_verified: boolean | null;
   author_followers: number | null;
+  quoted_status_id: string | null;
 }
 
 interface Candidate {
@@ -298,6 +302,7 @@ Deno.serve(async (req) => {
             handle: r.author_handle, // Twitter author; null on platforms without author capture
             verified: r.author_verified,
             followers: r.author_followers,
+            quotedStatusId: r.quoted_status_id, // Twitter quote target; null elsewhere
             snippet: (title || content).slice(0, 280),
             posted_at: r.posted_at,
             score: r.score,
@@ -336,7 +341,10 @@ Deno.serve(async (req) => {
     // Phase 2 — incremental accumulator upsert into model_rumors (one row per cluster).
     const clusters = groupByCluster(contributions);
     let upserts = 0;
-    for (const group of clusters.values()) {
+    for (const rawGroup of clusters.values()) {
+      // Drop quote-tweet echoes so they can't self-corroborate a single leak.
+      const group = collapseQuoteEchoes(rawGroup);
+      if (group.length === 0) continue;
       const modelSlug = group[0].modelSlug;
       const versionKey = group[0].versionKey;
 

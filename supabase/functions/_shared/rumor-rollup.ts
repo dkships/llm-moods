@@ -2,11 +2,16 @@
 // Shared between the `aggregate-rumors` edge function and its vitest unit tests,
 // so this file must NOT import anything Deno-specific.
 //
+// The canonicalization + frontier-filtering it leans on lives in the zero-import
+// sibling `rumor-canon.ts` (also used by the frontend display merge).
+//
 // The accumulator model: `model_rumors` is keyed by (model_slug, version_key) and
 // updated incrementally each run. `mention_count` counts DISTINCT source_url ever
 // seen — and since a post is extracted exactly once (the `rumor_checked_at` gate),
 // a url contributes to exactly one run, so we can safely add this run's distinct
 // new urls without double-counting.
+
+import { canonicalVersionKey, isNonFrontierLabel, squash } from "./rumor-canon.ts";
 
 export type RumorClaimType =
   | "launch"
@@ -45,6 +50,8 @@ export interface SourceRef {
   /** Author credibility signals (Twitter-only; null elsewhere). */
   verified?: boolean | null;
   followers?: number | null;
+  /** Tweet id this post quotes, if any (Twitter-only) — used to drop echoes. */
+  quotedStatusId?: string | null;
 }
 
 // Tracked leaker handles (lowercased, no @). EPHEMERAL — refresh each model cycle
@@ -215,13 +222,22 @@ export function buildContribution(
   const versionLabel = cleanStr(raw.version_label);
   const codename = cleanStr(raw.codename);
 
-  // Anti-hallucination: a stated version token must be a substring of the post.
-  if (versionLabel && !postText.toLowerCase().includes(versionLabel.toLowerCase())) {
+  // Anti-hallucination: a stated version token must appear in the post — compared
+  // punctuation-insensitively so a label of "GPT-5.6" still matches a post that
+  // wrote "GPT-5,6" (the strict substring check used to drop these).
+  const squashedLabel = squash(versionLabel);
+  if (squashedLabel.length >= 2 && !squash(postText).includes(squashedLabel)) {
     return null;
   }
 
-  const versionKey = normalizeVersionKey(versionLabel, codename);
-  if (!versionKey) return null;
+  // Drop competitor / non-family labels (e.g. "DeepSeek V3" mis-attributed to a
+  // tracked family). Codename-only claims stay — discovery is preserved.
+  if (isNonFrontierLabel(family, versionLabel, codename)) return null;
+
+  // Canonicalize so alias spellings (Fable / Mythos / Mythos 5 / "Mythos/Fable 5")
+  // collapse to one (model_slug, version_key) row at write-time.
+  const canon = canonicalVersionKey(family, versionLabel, codename);
+  if (!canon.key) return null;
 
   const claimType = (VALID_CLAIM_TYPES.has(raw.claim_type as RumorClaimType)
     ? (raw.claim_type as RumorClaimType)
@@ -229,9 +245,9 @@ export function buildContribution(
 
   return {
     modelSlug: family,
-    versionKey,
-    versionLabel,
-    codename,
+    versionKey: canon.key,
+    versionLabel: canon.label,
+    codename: canon.codename,
     claimType,
     claimSummary: cleanStr(raw.claim_summary) ?? "Discussed as an upcoming release.",
     rumoredBenefit: cleanStr(raw.rumored_benefit),
@@ -357,4 +373,28 @@ export function groupByCluster(contributions: RumorContribution[]): Map<string, 
     groups.set(key, arr);
   }
   return groups;
+}
+
+/** Pull the numeric status id out of an x.com/twitter.com /status/<id> URL. */
+export function statusIdFromUrl(url: string | null | undefined): string | null {
+  const m = /status\/(\d+)/.exec(url ?? "");
+  return m ? m[1] : null;
+}
+
+/**
+ * Within one cluster, drop a quote-tweet that quotes another tweet already in
+ * the cluster — an echo is not independent corroboration (e.g. "Build with
+ * Hasan" quoting "synthwavedd"). Keeps the quoted original. Quotes whose
+ * original we didn't scrape are kept (we can't know they're echoes).
+ */
+export function collapseQuoteEchoes(group: RumorContribution[]): RumorContribution[] {
+  const ownIds = new Set<string>();
+  for (const c of group) {
+    const id = statusIdFromUrl(c.source.url);
+    if (id) ownIds.add(id);
+  }
+  return group.filter((c) => {
+    const q = c.source.quotedStatusId;
+    return !(q && ownIds.has(q));
+  });
 }

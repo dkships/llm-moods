@@ -61,6 +61,22 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// Pull the quoted tweet's id from an apidojo item, tolerating field-shape drift
+// (the exact key isn't contract-guaranteed — verify against a live dataset item
+// if quote-dedup ever looks off). Drives the rumor radar's echo collapse.
+function extractQuotedStatusId(tweet: any): string | null {
+  const direct = tweet.quotedStatusId ?? tweet.quoted_status_id ?? tweet.quoteId ?? tweet.quoteTweetId;
+  if (direct) return String(direct);
+  const obj = tweet.quoted_tweet ?? tweet.quotedTweet ?? tweet.quote ?? tweet.quotedStatus;
+  if (obj && (obj.id ?? obj.id_str)) return String(obj.id ?? obj.id_str);
+  const qurl = obj?.url ?? tweet.quotedStatusUrl;
+  if (typeof qurl === "string") {
+    const m = qurl.match(/status\/(\d+)/);
+    if (m) return m[1];
+  }
+  return null;
+}
+
 function buildTwitterSummary(backend: "apify" | "grok") {
   return {
     source: SOURCE,
@@ -205,6 +221,7 @@ async function runApifyPath(
     authorHandle: string | null;
     authorVerified: boolean;
     authorFollowers: number | null;
+    quotedStatusId: string | null;
   }[] = [];
   const unmatchedSamples: string[] = [];
 
@@ -277,6 +294,7 @@ async function runApifyPath(
       authorHandle: screenName || null,
       authorVerified,
       authorFollowers,
+      quotedStatusId: extractQuotedStatusId(tweet),
     });
   }
 
@@ -302,6 +320,7 @@ async function runApifyPath(
         author_handle: candidate.authorHandle,
         author_verified: candidate.authorVerified,
         author_followers: candidate.authorFollowers,
+        quoted_status_id: candidate.quotedStatusId,
       });
 
       if (upsertResult.error) {

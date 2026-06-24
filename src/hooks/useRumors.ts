@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { mergeRumorRows } from "../../supabase/functions/_shared/rumor-canon";
 
 // Self-contained source reference stored in `model_rumors.representative_sources`
 // (jsonb), so links survive `cleanup-old-posts` deleting the underlying row.
@@ -64,7 +65,11 @@ export function useRumors() {
     queryFn: async () => {
       const { data, error } = await publicRpc.rpc("get_public_rumors", {});
       if (error) throw error;
-      return data ?? [];
+      // Collapse alias-duplicate rows (Fable/Mythos/…) and drop non-frontier
+      // labels at the display layer — see _shared/rumor-canon.ts. This cleans up
+      // rows already persisted under the old keys; the backend adopts the same
+      // canon at write-time so new rows are clean too.
+      return mergeRumorRows(data ?? []);
     },
   });
 }

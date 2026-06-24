@@ -4,11 +4,27 @@ import PageTransition from "@/components/PageTransition";
 import PageHeader from "@/components/PageHeader";
 import Surface from "@/components/Surface";
 import RumorCard from "@/components/rumors/RumorCard";
+import { RumorCardSkeleton } from "@/components/Skeletons";
 import useHead from "@/hooks/useHead";
 import { useRumors } from "@/hooks/useRumors";
+import { useModelsWithLatestVibes } from "@/hooks/useVibesData";
+
+const MODEL_LABELS: Record<string, string> = {
+  claude: "Claude",
+  chatgpt: "ChatGPT",
+  gemini: "Gemini",
+  grok: "Grok",
+};
+
+// Blended corroboration strength matching the card sort: platform breadth
+// dominates, mention volume breaks ties. Drives the bar length only — the
+// caption always shows real counts.
+const strengthOf = (r: { platform_count: number; mention_count: number }) =>
+  (r.platform_count ?? 0) * 1000 + (r.mention_count ?? 0);
 
 const Rumors = () => {
   const { data: rumors, isLoading } = useRumors();
+  const { data: models } = useModelsWithLatestVibes();
 
   useHead({
     title: "Rumors — LLM Vibes",
@@ -17,6 +33,8 @@ const Rumors = () => {
     url: "/rumors",
   });
 
+  const brand = new Map((models ?? []).map((m) => [m.slug, m]));
+
   // Strongest corroboration first; recency breaks ties.
   const sorted = [...(rumors ?? [])].sort(
     (a, b) =>
@@ -24,6 +42,7 @@ const Rumors = () => {
       b.mention_count - a.mention_count ||
       (b.last_seen_at ?? "").localeCompare(a.last_seen_at ?? ""),
   );
+  const boardMax = Math.max(...sorted.map(strengthOf), 1);
 
   return (
     <PageTransition>
@@ -39,9 +58,14 @@ const Rumors = () => {
 
           <section className="container pb-12">
             {isLoading ? (
-              <p className="text-body text-text-tertiary">Loading…</p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2" role="status" aria-live="polite">
+                <span className="sr-only">Loading rumors…</span>
+                {Array.from({ length: 4 }).map((_, i) => (
+                  <RumorCardSkeleton key={i} />
+                ))}
+              </div>
             ) : sorted.length === 0 ? (
-              <Surface motion="fade">
+              <Surface motion="fade" className="max-w-2xl">
                 <p className="text-body text-text-secondary">No strong rumors right now.</p>
                 <p className="mt-2 text-meta text-text-tertiary">
                   A rumor surfaces here once it's corroborated across posts — or flagged by a tracked
@@ -49,21 +73,28 @@ const Rumors = () => {
                 </p>
               </Surface>
             ) : (
-              <>
+              <div className="animate-fade-in">
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {sorted.map((rumor) => (
-                    <RumorCard
-                      key={`${rumor.model_slug}:${rumor.version_label ?? rumor.codename}`}
-                      rumor={rumor}
-                    />
-                  ))}
+                  {sorted.map((rumor) => {
+                    const m = brand.get(rumor.model_slug);
+                    return (
+                      <RumorCard
+                        key={`${rumor.model_slug}:${rumor.version_label ?? rumor.codename}`}
+                        rumor={rumor}
+                        accent={m?.accent_color ?? "#888"}
+                        modelName={m?.name ?? MODEL_LABELS[rumor.model_slug] ?? rumor.model_slug}
+                        strengthPct={Math.round((strengthOf(rumor) / boardMax) * 100)}
+                      />
+                    );
+                  })}
                 </div>
-                <p className="mt-8 max-w-2xl text-meta text-text-tertiary">
-                  Likelihood reflects how much corroborating chatter we see across platforms, not an
-                  editorial judgment. Dates and benefits are unconfirmed community estimates, not
-                  forecasts.
-                </p>
-              </>
+                <Surface size="compact" className="mt-8 max-w-2xl">
+                  <p className="text-meta text-text-tertiary">
+                    Corroboration reflects how much chatter we see across platforms, not an editorial
+                    judgment. Dates and benefits are unconfirmed community estimates, not forecasts.
+                  </p>
+                </Surface>
+              </div>
             )}
           </section>
         </main>

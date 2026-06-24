@@ -40,6 +40,30 @@ export const DashboardCardSkeleton = () => (
   </div>
 );
 
+export const RumorCardSkeleton = () => (
+  <div className="glass rounded-xl p-6 space-y-4">
+    <div className="flex justify-between">
+      <Shimmer className="h-3.5 w-24" />
+      <Shimmer className="h-3.5 w-28" />
+    </div>
+    <Shimmer className="h-6 w-40" />
+    <div className="space-y-2">
+      <Shimmer className="h-4 w-full" />
+      <Shimmer className="h-4 w-3/4" />
+    </div>
+    <Shimmer className="h-4 w-48" />
+    <div className="space-y-2 border-t border-border pt-4">
+      <div className="flex justify-between">
+        <Shimmer className="h-3 w-28" />
+        <Shimmer className="h-3 w-32" />
+      </div>
+      <Shimmer className="h-1 w-full rounded-full" />
+      <Shimmer className="h-3 w-44" />
+      <Shimmer className="h-3 w-36" />
+    </div>
+  </div>
+);
+
 export const ChatterSkeleton = () => (
   <div className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
     <Shimmer className="h-5 w-20 shrink-0" />
