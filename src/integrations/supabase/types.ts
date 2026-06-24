@@ -301,6 +301,7 @@ export type Database = {
           original_language: string | null
           posted_at: string | null
           praise_category: string | null
+          quoted_status_id: string | null
           rumor_checked_at: string | null
           rumor_data: Json | null
           score: number | null
@@ -331,6 +332,7 @@ export type Database = {
           original_language?: string | null
           posted_at?: string | null
           praise_category?: string | null
+          quoted_status_id?: string | null
           rumor_checked_at?: string | null
           rumor_data?: Json | null
           score?: number | null
@@ -361,6 +363,7 @@ export type Database = {
           original_language?: string | null
           posted_at?: string | null
           praise_category?: string | null
+          quoted_status_id?: string | null
           rumor_checked_at?: string | null
           rumor_data?: Json | null
           score?: number | null
@@ -806,6 +809,7 @@ export type Database = {
           content: string
           id: string
           posted_at: string
+          quoted_status_id: string
           score: number
           source: string
           source_url: string
