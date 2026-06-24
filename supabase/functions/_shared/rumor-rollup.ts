@@ -176,6 +176,11 @@ function firstNonNull(values: (string | null)[]): string | null {
   return null;
 }
 
+function etaKey(v: string | null | undefined): string | null {
+  const q = squash(v);
+  return q.length > 0 ? q : null;
+}
+
 function maxTs(values: (string | null | undefined)[]): string | null {
   let best: string | null = null;
   for (const v of values) if (v && ts(v) >= ts(best)) best = v;
@@ -315,7 +320,7 @@ export function mergeCluster(
   const distinctNewSources = [...bySrc.values()];
 
   const newPlatforms = new Set(contributions.map((c) => c.source.platform));
-  const etaTexts = new Set(contributions.map((c) => c.etaText).filter(Boolean) as string[]);
+  const etaTexts = new Set(contributions.map((c) => etaKey(c.etaText)).filter(Boolean) as string[]);
 
   if (!existing) {
     return {
@@ -341,7 +346,7 @@ export function mergeCluster(
   }
 
   const newestEta = newest.etaText;
-  const etaChanged = Boolean(newestEta && existing.eta_text && newestEta !== existing.eta_text);
+  const etaChanged = Boolean(newestEta && existing.eta_text && etaKey(newestEta) !== etaKey(existing.eta_text));
   const newerThanExisting = ts(newest.source.posted_at) >= ts(existing.last_seen_at);
 
   return {

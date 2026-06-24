@@ -11,7 +11,7 @@ export interface ApifyRunOptions {
 }
 
 function envNumber(name: string, fallback: number): number {
-  const parsed = Number((globalThis as any).Deno?.env.get(name));
+  const parsed = Number((globalThis as { Deno?: { env: { get(name: string): string | undefined } } }).Deno?.env.get(name));
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
 }
 
@@ -27,37 +27,52 @@ function numericFrom(value: unknown): number | null {
   return null;
 }
 
-function findUsageUsd(payload: any): number | null {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function pathValue(payload: unknown, path: string[]): unknown {
+  let current: unknown = payload;
+  for (const key of path) {
+    if (!isRecord(current)) return undefined;
+    current = current[key];
+  }
+  return current;
+}
+
+function findUsageUsd(payload: unknown): number | null {
   const candidates = [
-    payload?.data?.totalUsageCreditsUsdAfterVolumeDiscount,
-    payload?.data?.totalUsageCreditsUsdBeforeVolumeDiscount,
-    payload?.data?.current?.monthlyUsageUsd,
-    payload?.data?.usageTotalUsd,
-    payload?.data?.totalUsd,
-    payload?.data?.totalUsageUsd,
-    payload?.data?.currentUsageUsd,
-    payload?.current?.monthlyUsageUsd,
-    payload?.usageTotalUsd,
-    payload?.totalUsd,
+    ["data", "totalUsageCreditsUsdAfterVolumeDiscount"],
+    ["data", "totalUsageCreditsUsdBeforeVolumeDiscount"],
+    ["data", "current", "monthlyUsageUsd"],
+    ["data", "usageTotalUsd"],
+    ["data", "totalUsd"],
+    ["data", "totalUsageUsd"],
+    ["data", "currentUsageUsd"],
+    ["current", "monthlyUsageUsd"],
+    ["usageTotalUsd"],
+    ["totalUsd"],
   ];
-  for (const candidate of candidates) {
-    const parsed = numericFrom(candidate);
+  for (const path of candidates) {
+    const parsed = numericFrom(pathValue(payload, path));
     if (parsed !== null) return parsed;
   }
   return null;
 }
 
-function findTodayUsageUsd(monthly: any): number | null {
-  const daily = monthly?.data?.dailyServiceUsages;
+function findTodayUsageUsd(monthly: unknown): number | null {
+  const daily = pathValue(monthly, ["data", "dailyServiceUsages"]);
   if (!Array.isArray(daily) || daily.length === 0) return null;
 
   const today = new Date().toISOString().slice(0, 10);
-  const exact = daily.find((entry: any) => typeof entry?.date === "string" && entry.date.slice(0, 10) === today);
+  const exact = daily.find(
+    (entry) => isRecord(entry) && typeof entry.date === "string" && entry.date.slice(0, 10) === today,
+  );
   const latest = exact ?? daily[daily.length - 1];
-  return numericFrom(latest?.totalUsageCreditsUsd);
+  return numericFrom(pathValue(latest, ["totalUsageCreditsUsd"]));
 }
 
-async function fetchJson(url: string): Promise<any | null> {
+async function fetchJson(url: string): Promise<unknown | null> {
   const res = await fetch(url);
   if (!res.ok) return null;
   return await res.json().catch(() => null);
@@ -149,6 +164,22 @@ export function apifyRunUrl(actorId: string, token: string, maxItems: number, op
   return `https://api.apify.com/v2/acts/${actorId}/runs?${params.toString()}`;
 }
 
+export function apifyDatasetItemsUrl(
+  datasetId: string,
+  token: string,
+  options: { limit?: number; clean?: boolean } = {},
+): string {
+  const params = new URLSearchParams({
+    token,
+    format: "json",
+  });
+  if (options.clean !== false) params.set("clean", "true");
+  if (Number.isFinite(options.limit)) {
+    params.set("limit", String(Math.max(1, Math.round(options.limit!))));
+  }
+  return `https://api.apify.com/v2/datasets/${datasetId}/items?${params.toString()}`;
+}
+
 export async function abortApifyRun(token: string, runId: string): Promise<Record<string, unknown> | null> {
   const params = new URLSearchParams({ token });
   const res = await fetch(`https://api.apify.com/v2/actor-runs/${runId}/abort?${params.toString()}`, {
@@ -159,24 +190,27 @@ export async function abortApifyRun(token: string, runId: string): Promise<Recor
   return scrubApifyRun(data?.data);
 }
 
-export function scrubApifyRun(run: any): Record<string, unknown> {
+export function scrubApifyRun(run: unknown): Record<string, unknown> {
+  const stats = pathValue(run, ["stats"]);
+  const pricingInfo = pathValue(run, ["pricingInfo"]);
+  const options = pathValue(run, ["options"]);
   return {
-    id: run?.id ?? null,
-    status: run?.status ?? null,
-    statusMessage: run?.statusMessage ?? null,
-    defaultDatasetId: run?.defaultDatasetId ?? null,
-    usageTotalUsd: run?.usageTotalUsd ?? null,
-    usage: run?.usage ?? null,
-    usageUsd: run?.usageUsd ?? null,
-    stats: run?.stats ? { computeUnits: run.stats.computeUnits, runTimeSecs: run.stats.runTimeSecs } : null,
-    pricingModel: run?.pricingInfo?.pricingModel ?? null,
-    chargedEventCounts: run?.chargedEventCounts ?? null,
-    options: run?.options
+    id: pathValue(run, ["id"]) ?? null,
+    status: pathValue(run, ["status"]) ?? null,
+    statusMessage: pathValue(run, ["statusMessage"]) ?? null,
+    defaultDatasetId: pathValue(run, ["defaultDatasetId"]) ?? null,
+    usageTotalUsd: pathValue(run, ["usageTotalUsd"]) ?? null,
+    usage: pathValue(run, ["usage"]) ?? null,
+    usageUsd: pathValue(run, ["usageUsd"]) ?? null,
+    stats: isRecord(stats) ? { computeUnits: stats.computeUnits, runTimeSecs: stats.runTimeSecs } : null,
+    pricingModel: isRecord(pricingInfo) ? pricingInfo.pricingModel ?? null : null,
+    chargedEventCounts: pathValue(run, ["chargedEventCounts"]) ?? null,
+    options: isRecord(options)
       ? {
-        maxItems: run.options.maxItems ?? null,
-        maxTotalChargeUsd: run.options.maxTotalChargeUsd ?? null,
-        timeoutSecs: run.options.timeoutSecs ?? null,
-        memoryMbytes: run.options.memoryMbytes ?? null,
+        maxItems: options.maxItems ?? null,
+        maxTotalChargeUsd: options.maxTotalChargeUsd ?? null,
+        timeoutSecs: options.timeoutSecs ?? null,
+        memoryMbytes: options.memoryMbytes ?? null,
       }
       : null,
   };

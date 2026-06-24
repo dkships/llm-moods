@@ -128,8 +128,11 @@ const SYSTEM_PROMPT =
   "- claim_summary: one concise sentence on what's claimed.\n" +
   "- rumored_benefit: what it's rumored to improve, if stated (else null). Do not invent benchmark numbers.\n" +
   "- signals: the evidence cited — API slug, codename, app-code/string leak, benchmark leak, staff/exec hint, prediction-market odds (else null).\n" +
-  "- eta_text: the raw timeframe phrase if stated or directly implied (e.g. 'next week', 'mid-July', 'Q3'); NEVER invent one — null if absent.\n" +
-  "- eta_date: a single best-effort ISO date (YYYY-MM-DD) only if clearly resolvable; else null.\n" +
+  "- eta_text: the raw timeframe phrase if stated or directly implied in the same bullet/sentence as this claim " +
+  "(e.g. 'next week', 'mid-July', 'Q3'); NEVER invent one or copy another model's ETA — null if absent.\n" +
+  "- eta_date: ISO date (YYYY-MM-DD) only for an exact calendar day or explicitly stated anchor date " +
+  "(e.g. 'by July 1', 'week of July 30'). For vague windows like 'this week', 'next week', 'soon', " +
+  "'mid-July', or 'Q3', set eta_date to null and preserve the phrase in eta_text.\n" +
   "- confidence: 0..1 that this is a genuine rumor signal (down-weight wishful/speculative posts).";
 
 interface CandidateRow {

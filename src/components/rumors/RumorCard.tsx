@@ -3,6 +3,7 @@ import Surface from "@/components/Surface";
 import Tag from "@/components/Tag";
 import BarList from "@/components/BarList";
 import { formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
+import { formatRumorEta } from "@/lib/rumor-eta";
 import type { PublicRumorRow, RumorClaimType } from "@/hooks/useRumors";
 
 // Display label + warning flag per lifecycle stage. Only `delayed` carries a
@@ -28,9 +29,9 @@ function rumorTitle(r: PublicRumorRow): string {
 
 // Hedged ETA line; null when no source stated a timeframe.
 function etaLabel(r: PublicRumorRow): string | null {
-  const eta = r.eta_text?.trim();
+  const eta = formatRumorEta(r);
   if (!eta) return null;
-  return `Expected ~${eta}${r.eta_conflicting ? " (estimates vary)" : " · unconfirmed"}`;
+  return `${eta}${r.eta_conflicting ? " (estimates vary)" : " · unconfirmed"}`;
 }
 
 function safeUrl(u?: string | null): string | undefined {

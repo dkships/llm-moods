@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { abortApifyRun, apifyRunUrl, checkApifyBudget } from "../_shared/apify-budget.ts";
+import { abortApifyRun, apifyDatasetItemsUrl, apifyRunUrl, checkApifyBudget } from "../_shared/apify-budget.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
@@ -253,7 +253,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
           await abortApifyRun(apifyToken, runId);
           status = "TIMED-OUT";
         }
-        const dRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json`);
+        const dRes = await fetch(apifyDatasetItemsUrl(datasetId, apifyToken, { limit: perRunMaxItems }));
         const data = dRes.ok ? await dRes.json().catch(() => []) : [];
         const runItems = Array.isArray(data) ? data : [];
         const error = (status !== "SUCCEEDED" && runItems.length === 0) ? `r/${sub}: ${status || "no-status"}, 0 items` : undefined;

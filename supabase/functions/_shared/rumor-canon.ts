@@ -40,7 +40,14 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       aliases: ["fable", "mythos", "fable5", "mythos5"],
     },
   ],
-  chatgpt: [],
+  chatgpt: [
+    {
+      key: "bidi",
+      label: "GPT Bidi 1",
+      codename: "Bidi",
+      aliases: ["bidi", "gptbidi", "gptbidi1"],
+    },
+  ],
   gemini: [],
   grok: [],
 };
@@ -99,6 +106,11 @@ function tsNum(v: string | null | undefined): number {
   if (!v) return 0;
   const n = new Date(v).getTime();
   return Number.isFinite(n) ? n : 0;
+}
+
+function etaKey(v: string | null | undefined): string | null {
+  const q = squash(v);
+  return q.length > 0 ? q : null;
 }
 
 /** Lowercase and strip every non-alphanumeric. Matches normalizeVersionKey's core. */
@@ -271,7 +283,19 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
   }
 
   const etaTexts = new Set(
-    group.map((r) => (r as { eta_text?: string | null }).eta_text).filter(Boolean) as string[],
+    group
+      .map((r) => etaKey((r as { eta_text?: string | null }).eta_text))
+      .filter(Boolean) as string[],
+  );
+  const etaDates = new Set(
+    group
+      .map((r) => cleanStr((r as { eta_date?: string | null }).eta_date))
+      .filter(Boolean) as string[],
+  );
+  const etaSource = sorted.find(
+    (r) =>
+      cleanStr((r as { eta_text?: string | null }).eta_text) ||
+      cleanStr((r as { eta_date?: string | null }).eta_date),
   );
 
   const merged = { ...newest } as T;
@@ -286,8 +310,14 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
   // Passthrough fields not in MergeableRumor (present on PublicRumorRow / RumorRow).
   const m = merged as unknown as Record<string, unknown>;
   m.has_credible_source = group.some((r) => (r as { has_credible_source?: boolean }).has_credible_source);
+  if (etaSource) {
+    m.eta_text = cleanStr((etaSource as { eta_text?: string | null }).eta_text);
+    m.eta_date = cleanStr((etaSource as { eta_date?: string | null }).eta_date);
+  }
   m.eta_conflicting =
-    group.some((r) => (r as { eta_conflicting?: boolean }).eta_conflicting) || etaTexts.size > 1;
+    group.some((r) => (r as { eta_conflicting?: boolean }).eta_conflicting) ||
+    etaTexts.size > 1 ||
+    etaDates.size > 1;
   m.first_seen_at =
     group
       .map((r) => (r as { first_seen_at?: string | null }).first_seen_at)

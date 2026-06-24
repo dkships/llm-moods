@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { formatRumorEta } from "../lib/rumor-eta";
 import { isLikelyRumorCandidate } from "../../supabase/functions/_shared/rumor-detect";
 import {
   buildContribution,
@@ -356,6 +357,20 @@ describe("canonicalVersionKey", () => {
     }
   });
 
+  it("collapses every Bidi/GPT Bidi spelling to one canonical identity", () => {
+    for (const [label, codename] of [
+      [null, "Bidi"],
+      [null, "GPT-BIDI"],
+      ["GPT Bidi 1", null],
+      ["Bidi", null],
+    ] as [string | null, string | null][]) {
+      const c = canonicalVersionKey("chatgpt", label, codename);
+      expect(c.key).toBe("bidi");
+      expect(c.label).toBe("GPT Bidi 1");
+      expect(c.codename).toBe("Bidi");
+    }
+  });
+
   it("keeps a distinct real version separate", () => {
     expect(canonicalVersionKey("claude", "Sonnet 5", null).key).toBe("sonnet5");
   });
@@ -419,6 +434,39 @@ describe("mergeRumorRows", () => {
     expect(out[0].platform_count).toBe(2);
   });
 
+  it("collapses Bidi alias rows and preserves the newest stated ETA", () => {
+    const out = mergeRumorRows([
+      rrow({
+        model_slug: "chatgpt",
+        codename: "Bidi",
+        claim_type: "imminent",
+        eta_text: "this week",
+        eta_conflicting: true,
+        mention_count: 2,
+        last_seen_at: "2026-06-23",
+        representative_sources: [
+          { url: "x", platform: "twitter" },
+          { url: "r", platform: "reddit" },
+        ],
+      }),
+      rrow({
+        model_slug: "chatgpt",
+        codename: "GPT Bidi 1",
+        claim_type: "in_testing",
+        mention_count: 1,
+        last_seen_at: "2026-06-24",
+        representative_sources: [{ url: "t", platform: "twitter" }],
+      }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].version_label).toBe("GPT Bidi 1");
+    expect(out[0].codename).toBe("Bidi");
+    expect(out[0].claim_type).toBe("imminent");
+    expect((out[0] as { eta_text?: string | null }).eta_text).toBe("this week");
+    expect((out[0] as { eta_conflicting?: boolean }).eta_conflicting).toBe(true);
+    expect(out[0].mention_count).toBe(3);
+  });
+
   it("counts a url shared across two alias rows only once (no double-count)", () => {
     const out = mergeRumorRows([
       rrow({ codename: "Fable", representative_sources: [{ url: "shared", platform: "twitter" }] }),
@@ -447,5 +495,39 @@ describe("mergeRumorRows", () => {
     ]);
     expect(out).toHaveLength(1);
     expect(out[0].version_label).toBe("Sonnet 5");
+  });
+});
+
+describe("formatRumorEta", () => {
+  it("turns relative week phrases into absolute week windows", () => {
+    expect(formatRumorEta({ eta_text: "next week", last_seen_at: "2026-06-24T03:00:00Z" })).toBe(
+      "Week of Jun 29, 2026",
+    );
+    expect(formatRumorEta({ eta_text: "as early as next week", last_seen_at: "2026-06-24T03:00:00Z" })).toBe(
+      "As early as the week of Jun 29, 2026",
+    );
+    expect(formatRumorEta({ eta_text: "this week", last_seen_at: "2026-06-24T03:00:00Z" })).toBe(
+      "Week of Jun 22, 2026",
+    );
+  });
+
+  it("keeps broad calendar windows broad", () => {
+    expect(formatRumorEta({ eta_text: "mid-July", last_seen_at: "2026-06-24T03:00:00Z" })).toBe(
+      "Mid-July 2026",
+    );
+    expect(formatRumorEta({ eta_text: "into July", last_seen_at: "2026-06-24T03:00:00Z" })).toBe(
+      "July 2026",
+    );
+    expect(formatRumorEta({ eta_text: "Q3", last_seen_at: "2026-06-24T03:00:00Z" })).toBe("Q3 2026");
+  });
+
+  it("uses exact dates only when the source gives an exact anchor", () => {
+    expect(formatRumorEta({ eta_text: "by July 1", last_seen_at: "2026-06-24T03:00:00Z" })).toBe(
+      "By Jul 1, 2026",
+    );
+    expect(formatRumorEta({ eta_text: "week of July 30", last_seen_at: "2026-06-24T03:00:00Z" })).toBe(
+      "Week of Jul 30, 2026",
+    );
+    expect(formatRumorEta({ eta_date: "2026-07-01" })).toBe("Jul 1, 2026");
   });
 });

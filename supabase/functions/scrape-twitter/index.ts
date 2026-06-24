@@ -1,5 +1,11 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { abortApifyRun, apifyRunUrl, checkApifyBudget, scrubApifyRun } from "../_shared/apify-budget.ts";
+import {
+  abortApifyRun,
+  apifyDatasetItemsUrl,
+  apifyRunUrl,
+  checkApifyBudget,
+  scrubApifyRun,
+} from "../_shared/apify-budget.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
@@ -197,7 +203,7 @@ async function runApifyPath(
     };
   }
 
-  const datasetRes = await fetch(`https://api.apify.com/v2/datasets/${datasetId}/items?token=${apifyToken}&format=json`);
+  const datasetRes = await fetch(apifyDatasetItemsUrl(datasetId, apifyToken, { limit: apifyInput.maxItems }));
   if (!datasetRes.ok) throw new Error("Failed to fetch Apify dataset");
 
   const rawItems = await datasetRes.json();
