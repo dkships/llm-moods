@@ -194,6 +194,7 @@ export type Database = {
           eta_date: string | null
           eta_text: string | null
           first_seen_at: string | null
+          has_credible_source: boolean
           id: string
           last_seen_at: string | null
           mention_count: number
@@ -216,6 +217,7 @@ export type Database = {
           eta_date?: string | null
           eta_text?: string | null
           first_seen_at?: string | null
+          has_credible_source?: boolean
           id?: string
           last_seen_at?: string | null
           mention_count?: number
@@ -238,6 +240,7 @@ export type Database = {
           eta_date?: string | null
           eta_text?: string | null
           first_seen_at?: string | null
+          has_credible_source?: boolean
           id?: string
           last_seen_at?: string | null
           mention_count?: number
@@ -278,6 +281,9 @@ export type Database = {
       }
       scraped_posts: {
         Row: {
+          author_followers: number | null
+          author_handle: string | null
+          author_verified: boolean | null
           classification_attempts: number
           classification_status: string
           classified_at: string | null
@@ -305,6 +311,9 @@ export type Database = {
           translated_content: string | null
         }
         Insert: {
+          author_followers?: number | null
+          author_handle?: string | null
+          author_verified?: boolean | null
           classification_attempts?: number
           classification_status?: string
           classified_at?: string | null
@@ -332,6 +341,9 @@ export type Database = {
           translated_content?: string | null
         }
         Update: {
+          author_followers?: number | null
+          author_handle?: string | null
+          author_verified?: boolean | null
           classification_attempts?: number
           classification_status?: string
           classified_at?: string | null
@@ -716,6 +728,7 @@ export type Database = {
           eta_date: string
           eta_text: string
           first_seen_at: string
+          has_credible_source: boolean
           last_seen_at: string
           mention_count: number
           model_slug: string
@@ -787,6 +800,9 @@ export type Database = {
       get_rumor_candidates: {
         Args: { p_limit?: number }
         Returns: {
+          author_followers: number
+          author_handle: string
+          author_verified: boolean
           content: string
           id: string
           posted_at: string
