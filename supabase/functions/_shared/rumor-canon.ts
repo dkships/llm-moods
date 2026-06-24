@@ -4,9 +4,9 @@
 // frontend (display-time, via `useRumors`). Pure logic — unit-tested in
 // `src/test/rumors.test.ts`.
 //
-// EPHEMERAL DATA: `FAMILY_ALIASES` and `COMPETITOR_DENY` are refreshed each
-// model cycle alongside RELEASED_SET (aggregate-rumors), KNOWN_LEAKERS
-// (rumor-rollup), and the codename `model_keywords` rows. A stale alias map
+// EPHEMERAL DATA: `FAMILY_ALIASES`, `COMPETITOR_DENY`, and
+// `TRACKED_LEAKER_HANDLES` are refreshed each model cycle alongside RELEASED_SET
+// (aggregate-rumors) and the codename `model_keywords` rows. A stale alias map
 // silently stops merging next cycle's codenames — keep them in lockstep.
 
 export type TrackedFamily = "claude" | "chatgpt" | "gemini" | "grok";
@@ -17,6 +17,150 @@ export const TRACKED_FAMILIES: ReadonlySet<string> = new Set([
   "gemini",
   "grok",
 ]);
+
+export type SourceQuality =
+  | "tracked_leaker"
+  | "artifact_leak"
+  | "prediction_market"
+  | "press_echo"
+  | "official"
+  | "unknown";
+
+interface SourceQualityInput {
+  url?: string | null;
+  platform?: string | null;
+  handle?: string | null;
+  quotedStatusId?: string | null;
+  source_quality?: string | null;
+}
+
+// Tracked leaker handles (lowercased, no @). Mirrors scraper_config X search
+// terms and the old KNOWN_LEAKERS export in rumor-rollup.ts.
+export const TRACKED_LEAKER_HANDLES: ReadonlySet<string> = new Set([
+  "synthwavedd",
+  "btibor91",
+  "apples_jimmy",
+  "testingcatalog",
+  "scaling01",
+]);
+
+const VALID_SOURCE_QUALITIES: ReadonlySet<string> = new Set([
+  "tracked_leaker",
+  "artifact_leak",
+  "prediction_market",
+  "press_echo",
+  "official",
+  "unknown",
+]);
+
+const OFFICIAL_DOMAINS = [
+  "openai.com",
+  "anthropic.com",
+  "google.com",
+  "google.dev",
+  "googleblog.com",
+  "deepmind.google",
+  "x.ai",
+];
+
+const PREDICTION_MARKET_DOMAINS = [
+  "polymarket.com",
+  "kalshi.com",
+  "manifold.markets",
+];
+
+const ARTIFACT_LEAK_DOMAINS = [
+  "testingcatalog.com",
+  "github.com",
+  "huggingface.co",
+  "lmarena.ai",
+];
+
+const PRESS_ECHO_DOMAINS = [
+  "androidauthority.com",
+  "digg.com",
+  "theverge.com",
+  "techcrunch.com",
+  "venturebeat.com",
+  "windowscentral.com",
+  "tomsguide.com",
+  "9to5google.com",
+  "neowin.net",
+];
+
+const SOURCE_QUALITY_LABELS: Record<SourceQuality, string> = {
+  tracked_leaker: "tracked leaker",
+  artifact_leak: "artifact leak",
+  prediction_market: "prediction market signal",
+  press_echo: "press echo",
+  official: "official status check",
+  unknown: "community signal",
+};
+
+const SOURCE_QUALITY_RANK: Record<SourceQuality, number> = {
+  official: 5,
+  tracked_leaker: 4,
+  artifact_leak: 3,
+  prediction_market: 2,
+  press_echo: 1,
+  unknown: 0,
+};
+
+export function normalizeSourceHandle(handle: string | null | undefined): string {
+  return (handle ?? "").trim().replace(/^@/, "").toLowerCase();
+}
+
+function normalizeSourceQuality(value: string | null | undefined): SourceQuality | null {
+  const q = (value ?? "").trim().toLowerCase();
+  return VALID_SOURCE_QUALITIES.has(q) ? (q as SourceQuality) : null;
+}
+
+function hostnameFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    return new URL(url).hostname.toLowerCase().replace(/^www\./, "");
+  } catch {
+    return null;
+  }
+}
+
+function hostMatches(host: string | null, domains: string[]): boolean {
+  if (!host) return false;
+  return domains.some((domain) => host === domain || host.endsWith(`.${domain}`));
+}
+
+export function inferSourceQuality(source: SourceQualityInput): SourceQuality {
+  const explicit = normalizeSourceQuality(source.source_quality);
+  if (explicit && explicit !== "unknown") return explicit;
+
+  const handle = normalizeSourceHandle(source.handle);
+  if (TRACKED_LEAKER_HANDLES.has(handle)) return "tracked_leaker";
+
+  const platform = (source.platform ?? "").toLowerCase();
+  const host = hostnameFromUrl(source.url);
+  if (hostMatches(host, OFFICIAL_DOMAINS) || platform === "official") return "official";
+  if (hostMatches(host, ARTIFACT_LEAK_DOMAINS) || platform === "github") return "artifact_leak";
+  if (hostMatches(host, PREDICTION_MARKET_DOMAINS) || platform === "prediction_market") {
+    return "prediction_market";
+  }
+  if (source.quotedStatusId || hostMatches(host, PRESS_ECHO_DOMAINS) || platform === "press") {
+    return "press_echo";
+  }
+
+  return explicit ?? "unknown";
+}
+
+export function sourceQualityRank(source: SourceQuality | SourceQualityInput | null | undefined): number {
+  if (!source) return 0;
+  const quality = typeof source === "string" ? normalizeSourceQuality(source) ?? "unknown" : inferSourceQuality(source);
+  return SOURCE_QUALITY_RANK[quality];
+}
+
+export function sourceQualityLabel(source: SourceQuality | SourceQualityInput | null | undefined): string {
+  if (!source) return SOURCE_QUALITY_LABELS.unknown;
+  const quality = typeof source === "string" ? normalizeSourceQuality(source) ?? "unknown" : inferSourceQuality(source);
+  return SOURCE_QUALITY_LABELS[quality];
+}
 
 /** A canonical upcoming-version identity and the spellings that map to it. */
 interface AliasEntry {
@@ -219,6 +363,11 @@ export function isNonFrontierLabel(
 // states that win over an older launch/in_testing.
 const CLAIM_TYPE_PRECEDENCE = ["delayed", "return", "imminent", "in_testing", "launch", "other"];
 
+function claimTypeRank(type: string | null | undefined): number {
+  const index = CLAIM_TYPE_PRECEDENCE.indexOf(type ?? "other");
+  return index >= 0 ? CLAIM_TYPE_PRECEDENCE.length - index : 0;
+}
+
 /** Minimal source shape the merge needs; richer fields pass through untouched. */
 interface MergeSource {
   url?: string | null;
@@ -226,6 +375,8 @@ interface MergeSource {
   handle?: string | null;
   verified?: boolean | null;
   score?: number | null;
+  quotedStatusId?: string | null;
+  source_quality?: SourceQuality | null;
 }
 
 /** Minimal row shape both PublicRumorRow and the backend RumorRow satisfy. */
@@ -241,21 +392,53 @@ export interface MergeableRumor {
   last_seen_at: string | null;
 }
 
+function sourceSortRank(source: MergeSource | null | undefined): number {
+  if (!source) return 0;
+  const quality = inferSourceQuality(source);
+  const qualityRank = sourceQualityRank(quality) * 10;
+  const accountRank =
+    quality === "tracked_leaker"
+      ? 0
+      : source.verified === true
+        ? 8
+        : source.handle
+          ? 4
+          : 0;
+  return Math.max(qualityRank, accountRank);
+}
+
+function withSourceQuality<T extends MergeSource>(source: T): T {
+  return { ...source, source_quality: inferSourceQuality(source) } as T;
+}
+
+function compareMergeRows<T extends MergeableRumor>(a: T, b: T): number {
+  const claimDelta = claimTypeRank(b.claim_type) - claimTypeRank(a.claim_type);
+  if (claimDelta !== 0) return claimDelta;
+  const sourceDelta =
+    sourceSortRank((b.representative_sources ?? [])[0]) -
+    sourceSortRank((a.representative_sources ?? [])[0]);
+  if (sourceDelta !== 0) return sourceDelta;
+  return tsNum(b.last_seen_at) - tsNum(a.last_seen_at);
+}
+
 function mergeGroup<T extends MergeableRumor>(group: T[]): T {
-  const sorted = [...group].sort((a, b) => tsNum(b.last_seen_at) - tsNum(a.last_seen_at));
-  const newest = sorted[0];
-  const canon = canonicalVersionKey(newest.model_slug, newest.version_label, newest.codename);
+  const sortedByTime = [...group].sort((a, b) => tsNum(b.last_seen_at) - tsNum(a.last_seen_at));
+  const newest = sortedByTime[0];
+  const sortedByLead = [...group].sort(compareMergeRows);
+  const lead = sortedByLead[0];
+  const canon = canonicalVersionKey(lead.model_slug, lead.version_label, lead.codename);
 
   // Union representative sources by url (keeps the full original objects), then
   // surface credible / handled sources first so the card's lead stays sensible.
   const byUrl = new Map<string, MergeSource>();
   for (const r of group) {
     for (const s of r.representative_sources ?? []) {
-      if (s && s.url) byUrl.set(s.url, s);
+      if (s && s.url) byUrl.set(s.url, withSourceQuality(s));
     }
   }
   const reps = [...byUrl.values()].sort(
     (a, b) =>
+      sourceSortRank(b) - sourceSortRank(a) ||
       Number(Boolean(b.verified)) - Number(Boolean(a.verified)) ||
       Number(Boolean(b.handle)) - Number(Boolean(a.handle)) ||
       (b.score ?? 0) - (a.score ?? 0),
@@ -273,15 +456,6 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
   const repPlatforms = new Set(reps.map((s) => s.platform).filter(Boolean));
   const platformCount = Math.max(...group.map((r) => r.platform_count ?? 0), repPlatforms.size);
 
-  const types = group.map((r) => r.claim_type);
-  let claimType = "other";
-  for (const t of CLAIM_TYPE_PRECEDENCE) {
-    if (types.includes(t)) {
-      claimType = t;
-      break;
-    }
-  }
-
   const etaTexts = new Set(
     group
       .map((r) => etaKey((r as { eta_text?: string | null }).eta_text))
@@ -292,16 +466,17 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
       .map((r) => cleanStr((r as { eta_date?: string | null }).eta_date))
       .filter(Boolean) as string[],
   );
-  const etaSource = sorted.find(
+  const etaSource = sortedByLead.find(
     (r) =>
-      cleanStr((r as { eta_text?: string | null }).eta_text) ||
-      cleanStr((r as { eta_date?: string | null }).eta_date),
+      r.claim_type === lead.claim_type &&
+      (cleanStr((r as { eta_text?: string | null }).eta_text) ||
+        cleanStr((r as { eta_date?: string | null }).eta_date)),
   );
 
-  const merged = { ...newest } as T;
+  const merged = { ...lead } as T;
   merged.version_label = canon.label ?? newest.version_label;
   merged.codename = canon.codename ?? newest.codename;
-  merged.claim_type = claimType;
+  merged.claim_type = lead.claim_type;
   merged.mention_count = mentionCount;
   merged.platform_count = platformCount;
   merged.representative_sources = reps as T["representative_sources"];
@@ -310,10 +485,8 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
   // Passthrough fields not in MergeableRumor (present on PublicRumorRow / RumorRow).
   const m = merged as unknown as Record<string, unknown>;
   m.has_credible_source = group.some((r) => (r as { has_credible_source?: boolean }).has_credible_source);
-  if (etaSource) {
-    m.eta_text = cleanStr((etaSource as { eta_text?: string | null }).eta_text);
-    m.eta_date = cleanStr((etaSource as { eta_date?: string | null }).eta_date);
-  }
+  m.eta_text = etaSource ? cleanStr((etaSource as { eta_text?: string | null }).eta_text) : null;
+  m.eta_date = etaSource ? cleanStr((etaSource as { eta_date?: string | null }).eta_date) : null;
   m.eta_conflicting =
     group.some((r) => (r as { eta_conflicting?: boolean }).eta_conflicting) ||
     etaTexts.size > 1 ||

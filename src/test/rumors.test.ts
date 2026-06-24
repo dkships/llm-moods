@@ -18,9 +18,11 @@ import {
 } from "../../supabase/functions/_shared/rumor-rollup";
 import {
   canonicalVersionKey,
+  inferSourceQuality,
   isFamilyConsistentLabel,
   isNonFrontierLabel,
   mergeRumorRows,
+  sourceQualityLabel,
   splitCompoundLabel,
   type MergeableRumor,
 } from "../../supabase/functions/_shared/rumor-canon";
@@ -164,6 +166,40 @@ describe("buildContribution", () => {
     expect(fable?.versionKey).toBe("fable5");
     expect(mythos?.versionLabel).toBe("Fable 5");
   });
+
+  it("drops status-only Fable/Mythos news but keeps return or timing claims", () => {
+    const statusOnly = buildContribution(
+      {
+        is_rumor: true,
+        target_family: "claude",
+        codename: "Mythos",
+        is_unreleased: true,
+        claim_type: "other",
+        claim_summary: "Anthropic published a public Mythos model page.",
+        confidence: 0.7,
+      },
+      source,
+      "Anthropic published a public Mythos model page with general status details.",
+    );
+    expect(statusOnly).toBeNull();
+
+    const returning = buildContribution(
+      {
+        is_rumor: true,
+        target_family: "claude",
+        codename: "Mythos",
+        is_unreleased: true,
+        claim_type: "return",
+        claim_summary: "Mythos is rumored to return in mid-July.",
+        eta_text: "mid-July",
+        confidence: 0.8,
+      },
+      source,
+      "Mythos is rumored to return in mid-July.",
+    );
+    expect(returning?.versionKey).toBe("fable5");
+    expect(returning?.claimType).toBe("return");
+  });
 });
 
 describe("parseRecordRumors", () => {
@@ -243,6 +279,53 @@ describe("mergeCluster", () => {
     expect(row.last_seen_at).toBe("2026-06-23");
   });
 
+  it("lets a newer tracked-leaker delay supersede an older launch ETA", () => {
+    const existing: RumorRow = {
+      model_slug: "chatgpt",
+      version_key: "gpt56",
+      version_label: "GPT-5.6",
+      codename: null,
+      claim_type: "launch",
+      claim_summary: "GPT-5.6 was expected next week.",
+      rumored_benefit: null,
+      benefit_verified: false,
+      signals: null,
+      eta_text: "next week",
+      eta_date: null,
+      eta_conflicting: false,
+      mention_count: 2,
+      platforms: ["reddit", "twitter"],
+      representative_sources: [src("old-url", "reddit", "2026-06-22", 20)],
+      has_credible_source: false,
+      first_seen_at: "2026-06-21",
+      last_seen_at: "2026-06-22",
+    };
+    const row = mergeCluster(
+      existing,
+      [
+        contrib({
+          modelSlug: "chatgpt",
+          versionKey: "gpt56",
+          versionLabel: "GPT-5.6",
+          claimType: "delayed",
+          claimSummary: "GPT-5.6 is delayed to mid-July.",
+          etaText: "mid-July",
+          source: src("https://x.com/synthwavedd/status/56", "twitter", "2026-06-23", 7, {
+            handle: "synthwavedd",
+          }),
+        }),
+      ],
+      4,
+    );
+
+    expect(row.claim_type).toBe("delayed");
+    expect(row.claim_summary).toBe("GPT-5.6 is delayed to mid-July.");
+    expect(row.eta_text).toBe("mid-July");
+    expect(row.eta_conflicting).toBe(true);
+    expect(row.representative_sources[0].handle).toBe("synthwavedd");
+    expect(row.representative_sources[0].source_quality).toBe("tracked_leaker");
+  });
+
   it("caps representative_sources to the top N by score", () => {
     const many = [10, 40, 20, 5, 30].map((s, i) => contrib({ source: src(`u${i}`, "reddit", "2026-06-22", s) }));
     const row = mergeCluster(null, many, 2);
@@ -271,6 +354,7 @@ describe("credibility", () => {
       4,
     );
     expect(row.representative_sources[0].url).toBe("x-url"); // leaker leads despite lower score
+    expect(row.representative_sources[0].source_quality).toBe("tracked_leaker");
     expect(row.has_credible_source).toBe(true);
   });
 
@@ -281,6 +365,25 @@ describe("credibility", () => {
 
     const weak = mergeCluster(null, [contrib({ source: src("b", "bluesky", "2026-06-22", 1) })], 4);
     expect(weak.has_credible_source).toBe(false);
+  });
+});
+
+describe("source quality", () => {
+  it("classifies tracked leakers, official pages, prediction markets, artifacts, and echoes", () => {
+    expect(inferSourceQuality({ url: "https://x.com/SynthWaveDD/status/1", platform: "twitter", handle: "@SynthWaveDD" })).toBe(
+      "tracked_leaker",
+    );
+    expect(inferSourceQuality({ url: "https://platform.openai.com/docs/models", platform: "web" })).toBe("official");
+    expect(inferSourceQuality({ url: "https://polymarket.com/event/gpt-5-6", platform: "web" })).toBe(
+      "prediction_market",
+    );
+    expect(inferSourceQuality({ url: "https://www.testingcatalog.com/openai-app-string-leak/", platform: "web" })).toBe(
+      "artifact_leak",
+    );
+    expect(inferSourceQuality({ url: "https://x.com/someone/status/2", platform: "twitter", quotedStatusId: "1" })).toBe(
+      "press_echo",
+    );
+    expect(sourceQualityLabel("prediction_market")).toBe("prediction market signal");
   });
 });
 
@@ -476,7 +579,7 @@ describe("mergeRumorRows", () => {
     expect(out[0].mention_count).toBe(1);
   });
 
-  it("applies claim_type precedence and takes display fields from the newest row", () => {
+  it("applies claim_type precedence and takes display fields from the strongest row", () => {
     const out = mergeRumorRows([
       rrow({ codename: "Fable", claim_type: "launch", claim_summary: "old", last_seen_at: "2026-06-20",
         representative_sources: [{ url: "a", platform: "reddit" }] }),
@@ -485,6 +588,39 @@ describe("mergeRumorRows", () => {
     ]);
     expect(out[0].claim_type).toBe("delayed");
     expect(out[0].claim_summary).toBe("newest");
+  });
+
+  it("replaces stale GPT-5.6 ETA text with a tracked-leaker delay during display merge", () => {
+    const out = mergeRumorRows([
+      rrow({
+        model_slug: "chatgpt",
+        version_label: "GPT-5.6",
+        claim_type: "launch",
+        claim_summary: "GPT-5.6 was expected next week.",
+        eta_text: "next week",
+        mention_count: 2,
+        last_seen_at: "2026-06-22",
+        representative_sources: [{ url: "r", platform: "reddit" }],
+      }),
+      rrow({
+        model_slug: "chatgpt",
+        version_label: "GPT 5.6",
+        claim_type: "delayed",
+        claim_summary: "GPT-5.6 is delayed to mid-July.",
+        eta_text: "mid-July",
+        mention_count: 1,
+        has_credible_source: true,
+        last_seen_at: "2026-06-23",
+        representative_sources: [{ url: "x", platform: "twitter", handle: "synthwavedd" }],
+      }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].claim_type).toBe("delayed");
+    expect(out[0].claim_summary).toBe("GPT-5.6 is delayed to mid-July.");
+    expect((out[0] as { eta_text?: string | null }).eta_text).toBe("mid-July");
+    expect((out[0] as { representative_sources?: Array<{ source_quality?: string | null }> }).representative_sources?.[0].source_quality).toBe(
+      "tracked_leaker",
+    );
   });
 
   it("filters out non-frontier labels and untracked families", () => {

@@ -116,6 +116,7 @@ const SYSTEM_PROMPT =
   "If a post is not about an unreleased model, return its index with an empty claims array.\n\n" +
   "Per claim:\n" +
   "- is_rumor: true only if it references an unreleased version/codename.\n" +
+  "- Fable/Mythos public news or official availability pages are NOT rumors unless the post claims return, suspension, access change, or timing.\n" +
   "- target_family: claude (Anthropic) | chatgpt (OpenAI) | gemini (Google) | grok (xAI). " +
   "Use 'unknown' for ANY model from another maker (DeepSeek, Qwen, Llama, Mistral, Kimi, etc.) " +
   "or when unclear — never coerce a competitor's model into one of the four.\n" +

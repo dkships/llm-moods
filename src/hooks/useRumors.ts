@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { mergeRumorRows } from "../../supabase/functions/_shared/rumor-canon";
+import { mergeRumorRows, type SourceQuality } from "../../supabase/functions/_shared/rumor-canon";
 
 // Self-contained source reference stored in `model_rumors.representative_sources`
 // (jsonb), so links survive `cleanup-old-posts` deleting the underlying row.
@@ -13,6 +13,8 @@ export interface RumorSourceRef {
   score?: number | null;
   verified?: boolean | null;
   followers?: number | null;
+  quotedStatusId?: string | null;
+  source_quality?: SourceQuality | null;
 }
 
 export type RumorClaimType =

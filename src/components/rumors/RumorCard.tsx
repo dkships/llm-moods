@@ -4,7 +4,8 @@ import Tag from "@/components/Tag";
 import BarList from "@/components/BarList";
 import { formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
 import { formatRumorEta } from "@/lib/rumor-eta";
-import type { PublicRumorRow, RumorClaimType } from "@/hooks/useRumors";
+import type { PublicRumorRow, RumorClaimType, RumorSourceRef } from "@/hooks/useRumors";
+import { inferSourceQuality, sourceQualityLabel } from "../../../supabase/functions/_shared/rumor-canon";
 
 // Display label + warning flag per lifecycle stage. Only `delayed` carries a
 // warning tint; every other stage is a quiet mono-cap eyebrow — this is a rumor
@@ -44,6 +45,11 @@ function safeUrl(u?: string | null): string | undefined {
   }
 }
 
+function sourceContextLabel(source: RumorSourceRef): string | null {
+  const quality = inferSourceQuality(source);
+  return quality === "unknown" ? null : sourceQualityLabel(quality);
+}
+
 interface RumorCardProps {
   rumor: PublicRumorRow;
   /** Per-model brand color (the one allowed accent use — dot + meter fill). */
@@ -59,12 +65,14 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
   const eta = etaLabel(rumor);
   const isSingleSource = rumor.mention_count < 2;
   const sources = (rumor.representative_sources ?? []).slice(0, 3);
+  const leadContext = sources.map(sourceContextLabel).find(Boolean);
 
   const platforms = Array.from(
     new Set((rumor.representative_sources ?? []).map((s) => formatSourceDisplay(s.platform).label)),
   );
   const platformCount = Math.max(rumor.platform_count ?? 0, platforms.length);
   const corroboration =
+    (leadContext ? `${leadContext} · ` : "") +
     `${platformCount} platform${platformCount === 1 ? "" : "s"} · ` +
     `${rumor.mention_count} mention${rumor.mention_count === 1 ? "" : "s"}`;
 
@@ -122,10 +130,13 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
           <ul className="mt-3 space-y-1.5">
             {sources.map((s) => {
               const href = safeUrl(s.url);
-              const meta =
-                formatSourceDisplay(s.platform).label +
-                (s.handle ? ` · @${s.handle}${s.verified ? " ✓" : ""}` : "") +
-                (s.posted_at ? ` · ${formatTimeAgo(s.posted_at)}` : "");
+              const context = sourceContextLabel(s);
+              const meta = [
+                context,
+                formatSourceDisplay(s.platform).label,
+                s.handle ? `@${s.handle}${s.verified ? " ✓" : ""}` : null,
+                s.posted_at ? formatTimeAgo(s.posted_at) : null,
+              ].filter(Boolean).join(" · ");
               const inner = (
                 <>
                   <span className="truncate">{meta}</span>

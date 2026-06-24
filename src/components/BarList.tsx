@@ -23,9 +23,9 @@ const BarList = ({ items, max, accent, ramp = false }: BarListProps) => {
         const opacity = ramp ? RAMP[Math.min(i, RAMP.length - 1)] : 0.85;
         return (
           <li key={row.label}>
-            <div className="mb-1 flex items-baseline justify-between text-meta">
+            <div className="mb-1 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1 text-meta">
               <span className="text-text-tertiary">{row.label}</span>
-              <span className="text-foreground">{row.secondary ?? `${pct}%`}</span>
+              <span className="ml-auto text-right text-foreground">{row.secondary ?? `${pct}%`}</span>
             </div>
             <div className="h-1 w-full overflow-hidden rounded-full bg-border/60">
               <div

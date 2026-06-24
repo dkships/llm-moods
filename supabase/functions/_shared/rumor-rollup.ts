@@ -11,7 +11,15 @@
 // a url contributes to exactly one run, so we can safely add this run's distinct
 // new urls without double-counting.
 
-import { canonicalVersionKey, isNonFrontierLabel, squash } from "./rumor-canon.ts";
+import {
+  TRACKED_LEAKER_HANDLES,
+  canonicalVersionKey,
+  inferSourceQuality,
+  isNonFrontierLabel,
+  sourceQualityRank,
+  type SourceQuality,
+  squash,
+} from "./rumor-canon.ts";
 
 export type RumorClaimType =
   | "launch"
@@ -52,25 +60,17 @@ export interface SourceRef {
   followers?: number | null;
   /** Tweet id this post quotes, if any (Twitter-only) — used to drop echoes. */
   quotedStatusId?: string | null;
+  /** Display/source-quality context inferred from handle, domain, or source type. */
+  source_quality?: SourceQuality | null;
 }
 
 // Tracked leaker handles (lowercased, no @). EPHEMERAL — refresh each model cycle
 // alongside the codename `model_keywords` and the RELEASED_SET in aggregate-rumors.
 // The matching `from:<handle>` Twitter search terms live in scraper_config.
-export const KNOWN_LEAKERS = new Set<string>([
-  "synthwavedd",
-  "btibor91",
-  "apples_jimmy",
-  "testingcatalog",
-  "scaling01",
-]);
+export const KNOWN_LEAKERS = TRACKED_LEAKER_HANDLES;
 
 const VERIFIED_FOLLOWER_FLOOR = 10000;
 const HIGH_ENGAGEMENT_FLOOR = 250;
-
-function normalizeHandle(handle: string | null | undefined): string {
-  return (handle ?? "").trim().replace(/^@/, "").toLowerCase();
-}
 
 /**
  * A source is "credible" if it's a tracked leaker, a verified account, has a
@@ -79,8 +79,11 @@ function normalizeHandle(handle: string | null | undefined): string {
  * single-source gate and which source leads the card.
  */
 export function isCredibleSource(s: SourceRef): boolean {
+  const quality = inferSourceQuality(s);
   return (
-    KNOWN_LEAKERS.has(normalizeHandle(s.handle)) ||
+    quality === "official" ||
+    quality === "tracked_leaker" ||
+    quality === "artifact_leak" ||
     s.verified === true ||
     (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR ||
     (s.score ?? 0) >= HIGH_ENGAGEMENT_FLOOR
@@ -90,10 +93,10 @@ export function isCredibleSource(s: SourceRef): boolean {
 // Higher rank = more authoritative; used to order representative_sources so a
 // tracked-leaker / verified tweet leads even when a Reddit post has more upvotes.
 function credibilityRank(s: SourceRef): number {
-  if (KNOWN_LEAKERS.has(normalizeHandle(s.handle))) return 3;
-  if (s.verified === true || (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR) return 2;
-  if ((s.score ?? 0) >= HIGH_ENGAGEMENT_FLOOR) return 1;
-  return 0;
+  const qualityRank = sourceQualityRank(s) * 10;
+  const accountRank = s.verified === true || (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR ? 15 : 0;
+  const engagementRank = (s.score ?? 0) >= HIGH_ENGAGEMENT_FLOOR ? 10 : 0;
+  return Math.max(qualityRank, accountRank, engagementRank);
 }
 
 /** A validated claim attached to its source, ready to roll up. */
@@ -207,6 +210,20 @@ function clampConfidence(c: unknown): number {
   return Math.max(0, Math.min(1, n));
 }
 
+function withSourceQuality<T extends SourceRef>(source: T): T {
+  return { ...source, source_quality: inferSourceQuality(source) } as T;
+}
+
+function hasFableMythosAccessOrTimingSignal(raw: RawClaim, claimType: RumorClaimType, postText: string): boolean {
+  if (claimType === "return" || claimType === "delayed" || claimType === "imminent" || claimType === "in_testing") {
+    return true;
+  }
+  if (cleanStr(raw.eta_text) || cleanStr(raw.eta_date)) return true;
+
+  const evidence = `${raw.claim_summary ?? ""} ${raw.signals ?? ""} ${postText}`.toLowerCase();
+  return /\b(return(?:ed|ing)?|re-?add(?:ed|ing)?|restor(?:ed|ing)?|reinstat(?:ed|ing)?|suspend(?:ed|ing)?|paused?|unavailable|available|access|eap|early access|api|canary|spotted|release date|timing|delayed|pushed back|slipped|postponed|next week|this week|mid[-\s]+july|july|q[1-4])\b/i.test(evidence);
+}
+
 /**
  * Validate one raw claim against its source post; returns null if it should be
  * dropped. Drops: non-rumors, released versions, unknown/invalid family, claims
@@ -248,6 +265,13 @@ export function buildContribution(
     ? (raw.claim_type as RumorClaimType)
     : "other");
 
+  // Fable/Mythos has public-status/news chatter in the wild. Keep claims about
+  // return, suspension, access/API changes, or timing; drop status-only mentions
+  // so they don't become a fresh unreleased-model rumor.
+  if (family === "claude" && canon.key === "fable5" && !hasFableMythosAccessOrTimingSignal(raw, claimType, postText)) {
+    return null;
+  }
+
   return {
     modelSlug: family,
     versionKey: canon.key,
@@ -260,7 +284,7 @@ export function buildContribution(
     etaText: cleanStr(raw.eta_text),
     etaDate: cleanStr(raw.eta_date),
     confidence: clampConfidence(raw.confidence),
-    source,
+    source: withSourceQuality(source),
   };
 }
 
@@ -281,28 +305,98 @@ export function parseRecordRumors(input: unknown, batchLength: number): RawClaim
   return out;
 }
 
-function pickClaimType(types: RumorClaimType[]): RumorClaimType {
-  for (const t of CLAIM_TYPE_PRECEDENCE) if (types.includes(t)) return t;
-  return "other";
-}
-
 function mergeSources(
   existing: SourceRef[],
   incoming: SourceRef[],
   maxSources: number,
 ): SourceRef[] {
   const byUrl = new Map<string, SourceRef>();
-  for (const s of [...existing, ...incoming]) if (s?.url) byUrl.set(s.url, s);
+  for (const s of [...existing, ...incoming]) if (s?.url) byUrl.set(s.url, withSourceQuality(s));
   return [...byUrl.values()]
     .sort((a, b) => credibilityRank(b) - credibilityRank(a) || (b.score ?? 0) - (a.score ?? 0))
     .slice(0, maxSources);
 }
 
+interface LeadClaim {
+  claimType: RumorClaimType;
+  claimSummary: string;
+  rumoredBenefit: string | null;
+  signals: string | null;
+  etaText: string | null;
+  etaDate: string | null;
+  confidence: number;
+  source: SourceRef | null;
+}
+
+function claimTypeRank(type: RumorClaimType): number {
+  const index = CLAIM_TYPE_PRECEDENCE.indexOf(type);
+  return index >= 0 ? CLAIM_TYPE_PRECEDENCE.length - index : 0;
+}
+
+function compareLeadClaims(a: LeadClaim, b: LeadClaim): number {
+  const claimDelta = claimTypeRank(b.claimType) - claimTypeRank(a.claimType);
+  if (claimDelta !== 0) return claimDelta;
+  const sourceDelta = credibilityRank(b.source ?? emptySource()) - credibilityRank(a.source ?? emptySource());
+  if (sourceDelta !== 0) return sourceDelta;
+  const timeDelta = ts(b.source?.posted_at) - ts(a.source?.posted_at);
+  if (timeDelta !== 0) return timeDelta;
+  return b.confidence - a.confidence;
+}
+
+function emptySource(): SourceRef {
+  return { url: "", platform: "unknown", source_quality: "unknown" };
+}
+
+function leadFromContribution(c: RumorContribution): LeadClaim {
+  return {
+    claimType: c.claimType,
+    claimSummary: c.claimSummary,
+    rumoredBenefit: c.rumoredBenefit,
+    signals: c.signals,
+    etaText: c.etaText,
+    etaDate: c.etaDate,
+    confidence: c.confidence,
+    source: c.source,
+  };
+}
+
+function leadFromExisting(existing: RumorRow): LeadClaim {
+  const source = existing.representative_sources[0] ?? emptySource();
+  return {
+    claimType: existing.claim_type,
+    claimSummary: existing.claim_summary,
+    rumoredBenefit: existing.rumored_benefit,
+    signals: existing.signals,
+    etaText: existing.eta_text,
+    etaDate: existing.eta_date,
+    confidence: existing.has_credible_source ? 1 : 0,
+    source: { ...source, posted_at: existing.last_seen_at ?? source.posted_at },
+  };
+}
+
+function sortedLeadClaims(existing: RumorRow | null, contributions: RumorContribution[]): LeadClaim[] {
+  const claims = contributions.map(leadFromContribution);
+  if (existing) claims.push(leadFromExisting(existing));
+  return claims.sort(compareLeadClaims);
+}
+
+function etaForLead(lead: LeadClaim, claims: LeadClaim[]): { etaText: string | null; etaDate: string | null } {
+  const etaSource = claims.find(
+    (claim) =>
+      claim.claimType === lead.claimType &&
+      (cleanStr(claim.etaText) || cleanStr(claim.etaDate)),
+  );
+  return {
+    etaText: etaSource ? cleanStr(etaSource.etaText) : null,
+    etaDate: etaSource ? cleanStr(etaSource.etaDate) : null,
+  };
+}
+
 /**
  * Merge this run's contributions for ONE cluster (model_slug, version_key) into
- * the existing accumulator row (or null for a fresh cluster). The newest
- * contribution by `posted_at` drives the human-readable "current state" fields;
- * `claim_type` uses precedence so delayed/return stay sticky.
+ * the existing accumulator row (or null for a fresh cluster). The strongest
+ * lifecycle claim drives the human-readable current-state fields; delayed/return
+ * win over launch/in_testing, and ETA only comes from that winning lifecycle.
  */
 export function mergeCluster(
   existing: RumorRow | null,
@@ -313,14 +407,28 @@ export function mergeCluster(
     (a, b) => ts(b.source.posted_at) - ts(a.source.posted_at),
   );
   const newest = sorted[0];
+  const leadClaims = sortedLeadClaims(existing, contributions);
+  const lead = leadClaims[0];
+  const leadEta = etaForLead(lead, leadClaims);
 
   // Distinct sources this run, by url.
   const bySrc = new Map<string, SourceRef>();
-  for (const c of contributions) if (!bySrc.has(c.source.url)) bySrc.set(c.source.url, c.source);
+  for (const c of contributions) if (!bySrc.has(c.source.url)) bySrc.set(c.source.url, withSourceQuality(c.source));
   const distinctNewSources = [...bySrc.values()];
 
   const newPlatforms = new Set(contributions.map((c) => c.source.platform));
-  const etaTexts = new Set(contributions.map((c) => etaKey(c.etaText)).filter(Boolean) as string[]);
+  const etaTexts = new Set(
+    [
+      existing?.eta_text ?? null,
+      ...contributions.map((c) => c.etaText),
+    ].map((eta) => etaKey(eta)).filter(Boolean) as string[],
+  );
+  const etaDates = new Set(
+    [
+      existing?.eta_date ?? null,
+      ...contributions.map((c) => cleanStr(c.etaDate)),
+    ].filter(Boolean) as string[],
+  );
 
   if (!existing) {
     return {
@@ -328,14 +436,14 @@ export function mergeCluster(
       version_key: newest.versionKey,
       version_label: newest.versionLabel,
       codename: newest.codename,
-      claim_type: pickClaimType(contributions.map((c) => c.claimType)),
-      claim_summary: newest.claimSummary,
-      rumored_benefit: firstNonNull(sorted.map((c) => c.rumoredBenefit)),
+      claim_type: lead.claimType,
+      claim_summary: lead.claimSummary,
+      rumored_benefit: lead.rumoredBenefit ?? firstNonNull(sorted.map((c) => c.rumoredBenefit)),
       benefit_verified: false,
-      signals: firstNonNull(sorted.map((c) => c.signals)),
-      eta_text: newest.etaText ?? firstNonNull(sorted.map((c) => c.etaText)),
-      eta_date: newest.etaDate ?? firstNonNull(sorted.map((c) => c.etaDate)),
-      eta_conflicting: etaTexts.size > 1,
+      signals: lead.signals ?? firstNonNull(sorted.map((c) => c.signals)),
+      eta_text: leadEta.etaText,
+      eta_date: leadEta.etaDate,
+      eta_conflicting: etaTexts.size > 1 || etaDates.size > 1,
       mention_count: distinctNewSources.length,
       platforms: [...newPlatforms],
       representative_sources: mergeSources([], distinctNewSources, maxSources),
@@ -345,21 +453,17 @@ export function mergeCluster(
     };
   }
 
-  const newestEta = newest.etaText;
-  const etaChanged = Boolean(newestEta && existing.eta_text && etaKey(newestEta) !== etaKey(existing.eta_text));
-  const newerThanExisting = ts(newest.source.posted_at) >= ts(existing.last_seen_at);
-
   return {
     ...existing,
     version_label: existing.version_label ?? newest.versionLabel,
     codename: existing.codename ?? newest.codename,
-    claim_type: pickClaimType([existing.claim_type, ...contributions.map((c) => c.claimType)]),
-    claim_summary: newerThanExisting ? newest.claimSummary : existing.claim_summary,
-    rumored_benefit: existing.rumored_benefit ?? firstNonNull(sorted.map((c) => c.rumoredBenefit)),
-    signals: existing.signals ?? firstNonNull(sorted.map((c) => c.signals)),
-    eta_text: newerThanExisting && newestEta ? newestEta : existing.eta_text,
-    eta_date: newerThanExisting && newest.etaDate ? newest.etaDate : existing.eta_date,
-    eta_conflicting: existing.eta_conflicting || etaChanged || etaTexts.size > 1,
+    claim_type: lead.claimType,
+    claim_summary: lead.claimSummary,
+    rumored_benefit: lead.rumoredBenefit ?? existing.rumored_benefit ?? firstNonNull(sorted.map((c) => c.rumoredBenefit)),
+    signals: lead.signals ?? existing.signals ?? firstNonNull(sorted.map((c) => c.signals)),
+    eta_text: leadEta.etaText,
+    eta_date: leadEta.etaDate,
+    eta_conflicting: existing.eta_conflicting || etaTexts.size > 1 || etaDates.size > 1,
     mention_count: existing.mention_count + distinctNewSources.length,
     platforms: [...new Set([...existing.platforms, ...newPlatforms])],
     representative_sources: mergeSources(existing.representative_sources, distinctNewSources, maxSources),
