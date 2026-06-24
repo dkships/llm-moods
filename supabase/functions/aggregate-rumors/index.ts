@@ -137,6 +137,9 @@ interface CandidateRow {
   content: string | null;
   posted_at: string | null;
   score: number | null;
+  author_handle: string | null;
+  author_verified: boolean | null;
+  author_followers: number | null;
 }
 
 interface Candidate {
@@ -292,7 +295,9 @@ Deno.serve(async (req) => {
           source: {
             url: r.source_url!,
             platform: r.source,
-            handle: null, // scrapers don't persist author identity
+            handle: r.author_handle, // Twitter author; null on platforms without author capture
+            verified: r.author_verified,
+            followers: r.author_followers,
             snippet: (title || content).slice(0, 280),
             posted_at: r.posted_at,
             score: r.score,

@@ -42,6 +42,47 @@ export interface SourceRef {
   snippet?: string | null;
   posted_at?: string | null;
   score?: number | null;
+  /** Author credibility signals (Twitter-only; null elsewhere). */
+  verified?: boolean | null;
+  followers?: number | null;
+}
+
+// Tracked leaker handles (lowercased, no @). EPHEMERAL — refresh each model cycle
+// alongside the codename `model_keywords` and the RELEASED_SET in aggregate-rumors.
+// The matching `from:<handle>` Twitter search terms live in scraper_config.
+export const KNOWN_LEAKERS = new Set<string>([
+  "synthwavedd",
+]);
+
+const VERIFIED_FOLLOWER_FLOOR = 10000;
+const HIGH_ENGAGEMENT_FLOOR = 250;
+
+function normalizeHandle(handle: string | null | undefined): string {
+  return (handle ?? "").trim().replace(/^@/, "").toLowerCase();
+}
+
+/**
+ * A source is "credible" if it's a tracked leaker, a verified account, has a
+ * large following, OR cleared a high engagement bar (the proxy for platforms
+ * with no author data, e.g. a heavily-upvoted Reddit post). Drives both the
+ * single-source gate and which source leads the card.
+ */
+export function isCredibleSource(s: SourceRef): boolean {
+  return (
+    KNOWN_LEAKERS.has(normalizeHandle(s.handle)) ||
+    s.verified === true ||
+    (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR ||
+    (s.score ?? 0) >= HIGH_ENGAGEMENT_FLOOR
+  );
+}
+
+// Higher rank = more authoritative; used to order representative_sources so a
+// tracked-leaker / verified tweet leads even when a Reddit post has more upvotes.
+function credibilityRank(s: SourceRef): number {
+  if (KNOWN_LEAKERS.has(normalizeHandle(s.handle))) return 3;
+  if (s.verified === true || (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR) return 2;
+  if ((s.score ?? 0) >= HIGH_ENGAGEMENT_FLOOR) return 1;
+  return 0;
 }
 
 /** A validated claim attached to its source, ready to roll up. */
@@ -77,6 +118,7 @@ export interface RumorRow {
   mention_count: number;
   platforms: string[];
   representative_sources: SourceRef[];
+  has_credible_source: boolean;
   first_seen_at: string | null;
   last_seen_at: string | null;
 }
@@ -227,7 +269,7 @@ function mergeSources(
   const byUrl = new Map<string, SourceRef>();
   for (const s of [...existing, ...incoming]) if (s?.url) byUrl.set(s.url, s);
   return [...byUrl.values()]
-    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .sort((a, b) => credibilityRank(b) - credibilityRank(a) || (b.score ?? 0) - (a.score ?? 0))
     .slice(0, maxSources);
 }
 
@@ -272,6 +314,7 @@ export function mergeCluster(
       mention_count: distinctNewSources.length,
       platforms: [...newPlatforms],
       representative_sources: mergeSources([], distinctNewSources, maxSources),
+      has_credible_source: contributions.some((c) => isCredibleSource(c.source)),
       first_seen_at: minTs(contributions.map((c) => c.source.posted_at)),
       last_seen_at: maxTs(contributions.map((c) => c.source.posted_at)),
     };
@@ -295,6 +338,7 @@ export function mergeCluster(
     mention_count: existing.mention_count + distinctNewSources.length,
     platforms: [...new Set([...existing.platforms, ...newPlatforms])],
     representative_sources: mergeSources(existing.representative_sources, distinctNewSources, maxSources),
+    has_credible_source: existing.has_credible_source || contributions.some((c) => isCredibleSource(c.source)),
     last_seen_at: maxTs([existing.last_seen_at, ...contributions.map((c) => c.source.posted_at)]),
   };
 }

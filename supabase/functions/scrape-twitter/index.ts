@@ -202,6 +202,9 @@ async function runApifyPath(
     title: string;
     createdAt: string;
     engagementScore: number;
+    authorHandle: string | null;
+    authorVerified: boolean;
+    authorFollowers: number | null;
   }[] = [];
   const unmatchedSamples: string[] = [];
 
@@ -233,6 +236,15 @@ async function runApifyPath(
     summary.filtered_candidates++;
 
     const screenName = tweet.username || tweet.user?.screen_name || tweet.screen_name || tweet.author?.userName || "";
+    // apidojo returns an author object with verified + follower signals; capture
+    // them so credible leaker tweets can outrank raw Reddit upvote-volume.
+    const tweetAuthor = tweet.author || tweet.user || {};
+    const authorVerified = Boolean(
+      tweet.isVerified || tweet.verified || tweetAuthor.isVerified || tweetAuthor.isBlueVerified || tweetAuthor.verified,
+    );
+    const authorFollowers = Number(
+      tweetAuthor.followers ?? tweetAuthor.followersCount ?? tweetAuthor.followers_count ?? 0,
+    ) || null;
     const sourceUrl = tweet.url || (screenName && tweet.id
       ? `https://x.com/${screenName}/status/${tweet.id}`
       : "");
@@ -262,6 +274,9 @@ async function runApifyPath(
       title,
       createdAt: createdAt.toISOString(),
       engagementScore: (tweet.favorite_count || tweet.likeCount || 0) + (tweet.retweet_count || tweet.retweetCount || 0),
+      authorHandle: screenName || null,
+      authorVerified,
+      authorFollowers,
     });
   }
 
@@ -284,6 +299,9 @@ async function runApifyPath(
         content_type: "title_only",
         score: candidate.engagementScore,
         posted_at: candidate.createdAt,
+        author_handle: candidate.authorHandle,
+        author_verified: candidate.authorVerified,
+        author_followers: candidate.authorFollowers,
       });
 
       if (upsertResult.error) {

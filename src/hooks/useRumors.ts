@@ -10,6 +10,8 @@ export interface RumorSourceRef {
   snippet?: string | null;
   posted_at?: string | null;
   score?: number | null;
+  verified?: boolean | null;
+  followers?: number | null;
 }
 
 export type RumorClaimType =
@@ -34,6 +36,7 @@ export interface PublicRumorRow {
   eta_conflicting: boolean;
   mention_count: number;
   platform_count: number;
+  has_credible_source: boolean;
   representative_sources: RumorSourceRef[] | null;
   first_seen_at: string | null;
   last_seen_at: string | null;

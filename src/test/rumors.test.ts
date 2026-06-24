@@ -4,6 +4,7 @@ import { isLikelyRumorCandidate } from "../../supabase/functions/_shared/rumor-d
 import {
   buildContribution,
   groupByCluster,
+  isCredibleSource,
   mergeCluster,
   normalizeVersionKey,
   parseRecordRumors,
@@ -13,8 +14,8 @@ import {
   type SourceRef,
 } from "../../supabase/functions/_shared/rumor-rollup";
 
-function src(url: string, platform: string, posted_at: string, score = 0): SourceRef {
-  return { url, platform, posted_at, score, handle: null, snippet: "s" };
+function src(url: string, platform: string, posted_at: string, score = 0, extra: Partial<SourceRef> = {}): SourceRef {
+  return { url, platform, posted_at, score, handle: null, snippet: "s", ...extra };
 }
 
 function contrib(over: Partial<RumorContribution> & { source: SourceRef }): RumorContribution {
@@ -185,6 +186,7 @@ describe("mergeCluster", () => {
       mention_count: 2,
       platforms: ["reddit"],
       representative_sources: [],
+      has_credible_source: false,
       first_seen_at: "2026-06-20",
       last_seen_at: "2026-06-22",
     };
@@ -207,6 +209,39 @@ describe("mergeCluster", () => {
     const row = mergeCluster(null, many, 2);
     expect(row.representative_sources).toHaveLength(2);
     expect(row.representative_sources.map((r) => r.score)).toEqual([40, 30]);
+  });
+});
+
+describe("credibility", () => {
+  it("flags tracked leakers, verified, high-follower, and high-engagement sources", () => {
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "synthwavedd" }))).toBe(true);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "@SynthWaveDD" }))).toBe(true); // normalized
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true }))).toBe(true);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { followers: 50000 }))).toBe(true);
+    expect(isCredibleSource(src("u", "reddit", "2026-06-22", 500))).toBe(true); // high upvotes
+    expect(isCredibleSource(src("u", "bluesky", "2026-06-22", 2))).toBe(false);
+  });
+
+  it("orders a tracked-leaker source ahead of a higher-upvote Reddit post", () => {
+    const row = mergeCluster(
+      null,
+      [
+        contrib({ source: src("reddit-url", "reddit", "2026-06-20", 900) }),
+        contrib({ source: src("x-url", "twitter", "2026-06-21", 4, { handle: "synthwavedd", verified: true }) }),
+      ],
+      4,
+    );
+    expect(row.representative_sources[0].url).toBe("x-url"); // leaker leads despite lower score
+    expect(row.has_credible_source).toBe(true);
+  });
+
+  it("marks a single credible source so it can pass the gate, but not a lone low-signal post", () => {
+    const credible = mergeCluster(null, [contrib({ source: src("x", "twitter", "2026-06-22", 1, { handle: "synthwavedd" }) })], 4);
+    expect(credible.mention_count).toBe(1);
+    expect(credible.has_credible_source).toBe(true);
+
+    const weak = mergeCluster(null, [contrib({ source: src("b", "bluesky", "2026-06-22", 1) })], 4);
+    expect(weak.has_credible_source).toBe(false);
   });
 });
 
