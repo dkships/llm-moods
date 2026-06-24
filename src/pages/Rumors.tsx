@@ -52,7 +52,7 @@ const Rumors = () => {
           <section className="container pt-10 pb-8 animate-fade-in">
             <PageHeader
               title="Rumors"
-              description="What the community is saying about unreleased Claude, ChatGPT, Gemini, and Grok models — the next version, its stage, and when it's rumored to land."
+              description="What the community is saying about unreleased Claude, ChatGPT, Gemini, and Grok models — the next version, its stage, and when it's rumored to land. Unconfirmed community estimates, not forecasts."
             />
           </section>
 
@@ -73,27 +73,19 @@ const Rumors = () => {
                 </p>
               </Surface>
             ) : (
-              <div className="animate-fade-in">
-                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                  {sorted.map((rumor) => {
-                    const m = brand.get(rumor.model_slug);
-                    return (
-                      <RumorCard
-                        key={`${rumor.model_slug}:${rumor.version_label ?? rumor.codename}`}
-                        rumor={rumor}
-                        accent={m?.accent_color ?? "#888"}
-                        modelName={m?.name ?? MODEL_LABELS[rumor.model_slug] ?? rumor.model_slug}
-                        strengthPct={Math.round((strengthOf(rumor) / boardMax) * 100)}
-                      />
-                    );
-                  })}
-                </div>
-                <Surface size="compact" className="mt-8 max-w-2xl">
-                  <p className="text-meta text-text-tertiary">
-                    Corroboration reflects how much chatter we see across platforms, not an editorial
-                    judgment. Dates and benefits are unconfirmed community estimates, not forecasts.
-                  </p>
-                </Surface>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 animate-fade-in">
+                {sorted.map((rumor) => {
+                  const m = brand.get(rumor.model_slug);
+                  return (
+                    <RumorCard
+                      key={`${rumor.model_slug}:${rumor.version_label ?? rumor.codename}`}
+                      rumor={rumor}
+                      accent={m?.accent_color ?? "#888"}
+                      modelName={m?.name ?? MODEL_LABELS[rumor.model_slug] ?? rumor.model_slug}
+                      strengthPct={Math.round((strengthOf(rumor) / boardMax) * 100)}
+                    />
+                  );
+                })}
               </div>
             )}
           </section>
