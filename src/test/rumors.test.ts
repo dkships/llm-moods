@@ -10,6 +10,8 @@ import {
   mergeCluster,
   normalizeVersionKey,
   parseRecordRumors,
+  recoverDeterministicClaims,
+  referencedStatusIdFromText,
   statusIdFromUrl,
   type RawClaim,
   type RumorContribution,
@@ -335,12 +337,13 @@ describe("mergeCluster", () => {
 });
 
 describe("credibility", () => {
-  it("flags tracked leakers, verified, high-follower, and high-engagement sources", () => {
+  it("flags tracked leakers, verified high-follower accounts, artifacts, and high-engagement sources", () => {
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "synthwavedd" }))).toBe(true);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "@SynthWaveDD" }))).toBe(true); // normalized
-    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true }))).toBe(true);
-    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { followers: 50000 }))).toBe(true);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true }))).toBe(false);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true, followers: 50000 }))).toBe(true);
     expect(isCredibleSource(src("u", "reddit", "2026-06-22", 500))).toBe(true); // high upvotes
+    expect(isCredibleSource(src("https://www.testingcatalog.com/openai-app-string-leak/", "web", "2026-06-22", 0))).toBe(true);
     expect(isCredibleSource(src("u", "bluesky", "2026-06-22", 2))).toBe(false);
   });
 
@@ -387,6 +390,37 @@ describe("source quality", () => {
   });
 });
 
+describe("deterministic rumor recovery", () => {
+  it("recovers obvious GPT-5.6 delay and Gemini 3.5 Pro claims from a tracked source", () => {
+    const source = src("https://x.com/synthwavedd/status/2069432791184650426", "twitter", "2026-06-24", 4, {
+      handle: "synthwavedd",
+    });
+    const text = [
+      "June delays:",
+      "GPT-5.6 delayed to mid-July.",
+      "3.5 Pro is in testing with limited access.",
+    ].join("\n");
+
+    const claims = recoverDeterministicClaims(source, text);
+    expect(claims).toHaveLength(2);
+
+    const contributions = claims
+      .map((raw) => buildContribution(raw, source, text))
+      .filter(Boolean) as RumorContribution[];
+    expect(contributions.map((c) => `${c.modelSlug}:${c.versionKey}:${c.claimType}`)).toEqual([
+      "chatgpt:gpt56:delayed",
+      "gemini:gemini35pro:in_testing",
+    ]);
+    expect(contributions[0].etaText).toBe("mid-July");
+    expect(contributions[1].versionLabel).toBe("Gemini 3.5 Pro");
+  });
+
+  it("does not recover from low-signal uncorroborated posts", () => {
+    const weakSource = src("u", "bluesky", "2026-06-24", 1);
+    expect(recoverDeterministicClaims(weakSource, "GPT-5.6 delayed to mid-July. 3.5 Pro in testing.")).toEqual([]);
+  });
+});
+
 describe("groupByCluster", () => {
   it("groups contributions by (model_slug, version_key)", () => {
     const groups = groupByCluster([
@@ -407,6 +441,12 @@ describe("statusIdFromUrl / collapseQuoteEchoes", () => {
     expect(statusIdFromUrl(null)).toBeNull();
   });
 
+  it("extracts a referenced X status id from repost text", () => {
+    expect(referencedStatusIdFromText("mirror of https://x.com/synthwavedd/status/12345")).toBe("12345");
+    expect(referencedStatusIdFromText("self https://x.com/synthwavedd/status/12345", "https://x.com/me/status/12345")).toBeNull();
+    expect(referencedStatusIdFromText("nothing here")).toBeNull();
+  });
+
   it("drops a quote-tweet echoing another tweet in the same cluster", () => {
     const original = contrib({
       source: src("https://x.com/synthwavedd/status/100", "twitter", "2026-06-23", 5, { handle: "synthwavedd" }),
@@ -420,6 +460,20 @@ describe("statusIdFromUrl / collapseQuoteEchoes", () => {
     const out = collapseQuoteEchoes([original, echo]);
     expect(out).toHaveLength(1);
     expect(out[0].source.url).toContain("synthwavedd");
+  });
+
+  it("drops a cross-platform repost that links the original X status", () => {
+    const original = contrib({
+      source: src("https://x.com/synthwavedd/status/100", "twitter", "2026-06-23", 5, { handle: "synthwavedd" }),
+    });
+    const linkedEcho = contrib({
+      source: src("https://www.reddit.com/r/singularity/comments/abc", "reddit", "2026-06-23", 200, {
+        quotedStatusId: referencedStatusIdFromText("original: https://x.com/synthwavedd/status/100"),
+      }),
+    });
+    const out = collapseQuoteEchoes([original, linkedEcho]);
+    expect(out).toHaveLength(1);
+    expect(out[0].source.platform).toBe("twitter");
   });
 
   it("keeps a quote whose original wasn't scraped", () => {
@@ -471,6 +525,15 @@ describe("canonicalVersionKey", () => {
       expect(c.key).toBe("bidi");
       expect(c.label).toBe("GPT Bidi 1");
       expect(c.codename).toBe("Bidi");
+    }
+  });
+
+  it("collapses Gemini 3.5 Pro spelling variants to one canonical identity", () => {
+    for (const label of ["3.5 Pro", "Gemini 3.5 Pro", "Gemini-3.5-Pro"]) {
+      const c = canonicalVersionKey("gemini", label, null);
+      expect(c.key).toBe("gemini35pro");
+      expect(c.label).toBe("Gemini 3.5 Pro");
+      expect(c.codename).toBeNull();
     }
   });
 
@@ -568,6 +631,27 @@ describe("mergeRumorRows", () => {
     expect((out[0] as { eta_text?: string | null }).eta_text).toBe("this week");
     expect((out[0] as { eta_conflicting?: boolean }).eta_conflicting).toBe(true);
     expect(out[0].mention_count).toBe(3);
+  });
+
+  it("collapses Gemini 3.5 Pro display rows into one canonical card", () => {
+    const out = mergeRumorRows([
+      rrow({
+        model_slug: "gemini",
+        version_label: "3.5 Pro",
+        mention_count: 1,
+        representative_sources: [{ url: "a", platform: "twitter" }],
+      }),
+      rrow({
+        model_slug: "gemini",
+        version_label: "Gemini 3.5 Pro",
+        mention_count: 1,
+        representative_sources: [{ url: "b", platform: "reddit" }],
+      }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].version_label).toBe("Gemini 3.5 Pro");
+    expect(out[0].mention_count).toBe(2);
+    expect(out[0].platform_count).toBe(2);
   });
 
   it("counts a url shared across two alias rows only once (no double-count)", () => {

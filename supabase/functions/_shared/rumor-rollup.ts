@@ -73,19 +73,22 @@ const VERIFIED_FOLLOWER_FLOOR = 10000;
 const HIGH_ENGAGEMENT_FLOOR = 250;
 
 /**
- * A source is "credible" if it's a tracked leaker, a verified account, has a
- * large following, OR cleared a high engagement bar (the proxy for platforms
- * with no author data, e.g. a heavily-upvoted Reddit post). Drives both the
- * single-source gate and which source leads the card.
+ * A source is "credible" if it's a tracked leaker, official/artifact evidence,
+ * an established verified account, or cleared a high engagement bar (the proxy
+ * for platforms with no author data, e.g. a heavily-upvoted Reddit post). A
+ * paid/verified checkmark alone is not enough.
  */
+function hasCredibleAccount(s: SourceRef): boolean {
+  return s.verified === true && (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR;
+}
+
 export function isCredibleSource(s: SourceRef): boolean {
   const quality = inferSourceQuality(s);
   return (
     quality === "official" ||
     quality === "tracked_leaker" ||
     quality === "artifact_leak" ||
-    s.verified === true ||
-    (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR ||
+    hasCredibleAccount(s) ||
     (s.score ?? 0) >= HIGH_ENGAGEMENT_FLOOR
   );
 }
@@ -94,7 +97,7 @@ export function isCredibleSource(s: SourceRef): boolean {
 // tracked-leaker / verified tweet leads even when a Reddit post has more upvotes.
 function credibilityRank(s: SourceRef): number {
   const qualityRank = sourceQualityRank(s) * 10;
-  const accountRank = s.verified === true || (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR ? 15 : 0;
+  const accountRank = hasCredibleAccount(s) ? 15 : 0;
   const engagementRank = (s.score ?? 0) >= HIGH_ENGAGEMENT_FLOOR ? 10 : 0;
   return Math.max(qualityRank, accountRank, engagementRank);
 }
@@ -305,6 +308,132 @@ export function parseRecordRumors(input: unknown, batchLength: number): RawClaim
   return out;
 }
 
+const GPT56_RE = /\bgpt[-\s]?5[.,]\s*6\b/i;
+const GEMINI_35_PRO_RE = /\b(?:gemini\s*)?3[.,]\s*5\s*pro\b/i;
+const DELAY_RE = /\b(?:delays?|delayed|pushed back|slipped|postponed|stalled|no longer|give us until)\b/i;
+const TESTING_RE = /\b(?:in testing|early access|\bEAP\b|canary|spotted|api|arena|model[-\s]?(?:string|id)|codename)\b/i;
+const IMMINENT_RE = /\b(?:imminent|next week|this week|any day now|coming soon|dropping|drops? (?:next|this)|rolling out|rolls? out|scheduled)\b/i;
+
+function backstopEligible(source: SourceRef): boolean {
+  return isCredibleSource(source);
+}
+
+function compactWhitespace(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function windowAround(text: string, match: RegExpExecArray | null, radius = 180): string {
+  if (!match) return text.slice(0, radius * 2);
+  const start = Math.max(0, match.index - radius);
+  const end = Math.min(text.length, match.index + match[0].length + radius);
+  return text.slice(start, end);
+}
+
+function claimScope(text: string, match: RegExpExecArray | null): string {
+  if (!match) return windowAround(text, match);
+  const left = Math.max(
+    text.lastIndexOf("\n", match.index - 1),
+    text.lastIndexOf(". ", match.index - 1),
+    text.lastIndexOf("; ", match.index - 1),
+  );
+  const rightCandidates = [
+    text.indexOf("\n", match.index + match[0].length),
+    text.indexOf(".", match.index + match[0].length),
+    text.indexOf("; ", match.index + match[0].length),
+  ].filter((idx) => idx >= 0);
+  const right = rightCandidates.length > 0 ? Math.min(...rightCandidates) : -1;
+  if (right > left && right - left <= 360) {
+    return text.slice(left + 1, right + 1);
+  }
+  return windowAround(text, match);
+}
+
+function etaFromText(text: string): string | null {
+  if (/\bmid[-\s]?july\b/i.test(text)) return "mid-July";
+  if (/\bnext week\b/i.test(text)) return "next week";
+  if (/\bthis week\b/i.test(text)) return "this week";
+  if (/\binto july\b/i.test(text)) return "into July";
+  if (/\bjuly\b/i.test(text)) return "July";
+  return null;
+}
+
+function geminiClaimType(text: string): RumorClaimType | null {
+  if (DELAY_RE.test(text)) return "delayed";
+  if (TESTING_RE.test(text)) return "in_testing";
+  if (IMMINENT_RE.test(text)) return "imminent";
+  if (/\b(?:rumou?red?|leaked?|incoming|release date)\b/i.test(text)) return "launch";
+  return null;
+}
+
+/**
+ * Deterministic recovery for high-quality multi-claim posts where the extractor
+ * can miss one obvious bullet. Kept intentionally narrow: current backstops only
+ * cover the observed GPT-5.6 delay and Gemini 3.5 Pro variant.
+ */
+export function recoverDeterministicClaims(source: SourceRef, postText: string): RawClaim[] {
+  if (!backstopEligible(source)) return [];
+  const text = (postText ?? "").trim();
+  if (!compactWhitespace(text)) return [];
+
+  const claims: RawClaim[] = [];
+
+  const gptMatch = GPT56_RE.exec(text);
+  if (gptMatch) {
+    const gptWindow = claimScope(text, gptMatch);
+    const eta = etaFromText(gptWindow) ?? etaFromText(text);
+    if (DELAY_RE.test(gptWindow) || DELAY_RE.test(text)) {
+      claims.push({
+        is_rumor: true,
+        target_family: "chatgpt",
+        version_label: "GPT-5.6",
+        codename: null,
+        is_unreleased: true,
+        claim_type: "delayed",
+        claim_summary: eta ? `GPT-5.6 is delayed to ${eta}.` : "GPT-5.6 is delayed.",
+        rumored_benefit: null,
+        signals: "Tracked source delay claim",
+        eta_text: eta,
+        eta_date: null,
+        confidence: 0.85,
+      });
+    }
+  }
+
+  const geminiMatch = GEMINI_35_PRO_RE.exec(text);
+  if (geminiMatch) {
+    const geminiWindow = claimScope(text, geminiMatch);
+    const claimType = geminiClaimType(geminiWindow);
+    if (claimType) {
+      const eta = etaFromText(geminiWindow) ?? etaFromText(text);
+      const matchedLabel = compactWhitespace(geminiMatch[0]);
+      const versionLabel = /^gemini/i.test(matchedLabel) ? "Gemini 3.5 Pro" : "3.5 Pro";
+      claims.push({
+        is_rumor: true,
+        target_family: "gemini",
+        version_label: versionLabel,
+        codename: null,
+        is_unreleased: true,
+        claim_type: claimType,
+        claim_summary:
+          claimType === "delayed"
+            ? (eta ? `Gemini 3.5 Pro is delayed to ${eta}.` : "Gemini 3.5 Pro is delayed.")
+            : claimType === "in_testing"
+              ? "Gemini 3.5 Pro is being discussed as in testing."
+              : claimType === "imminent"
+                ? "Gemini 3.5 Pro is being discussed as imminent."
+                : "Gemini 3.5 Pro is being discussed as an upcoming release.",
+        rumored_benefit: null,
+        signals: "Tracked source multi-claim post",
+        eta_text: eta,
+        eta_date: null,
+        confidence: 0.75,
+      });
+    }
+  }
+
+  return claims;
+}
+
 function mergeSources(
   existing: SourceRef[],
   incoming: SourceRef[],
@@ -488,6 +617,23 @@ export function groupByCluster(contributions: RumorContribution[]): Map<string, 
 export function statusIdFromUrl(url: string | null | undefined): string | null {
   const m = /status\/(\d+)/.exec(url ?? "");
   return m ? m[1] : null;
+}
+
+const REFERENCED_X_STATUS_RE =
+  /https?:\/\/(?:www\.)?(?:x\.com|twitter\.com)\/(?:(?:i\/web\/status)|(?:[^/\s?#]+\/status))\/(\d+)/gi;
+
+/** Pull the first referenced X/Twitter status id out of repost text. */
+export function referencedStatusIdFromText(
+  text: string | null | undefined,
+  ownUrl?: string | null,
+): string | null {
+  const ownId = statusIdFromUrl(ownUrl);
+  const body = text ?? "";
+  for (const match of body.matchAll(REFERENCED_X_STATUS_RE)) {
+    const id = match[1];
+    if (id && id !== ownId) return id;
+  }
+  return null;
 }
 
 /**

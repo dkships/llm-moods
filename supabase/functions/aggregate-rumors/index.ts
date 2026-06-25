@@ -13,6 +13,8 @@ import {
   groupByCluster,
   mergeCluster,
   parseRecordRumors,
+  recoverDeterministicClaims,
+  referencedStatusIdFromText,
   type RawClaim,
   type RumorContribution,
   type RumorRow,
@@ -297,16 +299,18 @@ Deno.serve(async (req) => {
       .map((r: CandidateRow) => {
         const title = r.title ?? "";
         const content = r.content ?? "";
+        const postText = `${title} ${content}`.trim().slice(0, 2000);
+        const quotedStatusId = r.quoted_status_id ?? referencedStatusIdFromText(postText, r.source_url);
         return {
           row: r,
-          postText: `${title} ${content}`.trim().slice(0, 2000),
+          postText,
           source: {
             url: r.source_url!,
             platform: r.source,
             handle: r.author_handle, // Twitter author; null on platforms without author capture
             verified: r.author_verified,
             followers: r.author_followers,
-            quotedStatusId: r.quoted_status_id, // Twitter quote target; null elsewhere
+            quotedStatusId,
             snippet: (title || content).slice(0, 280),
             posted_at: r.posted_at,
             score: r.score,
@@ -324,20 +328,27 @@ Deno.serve(async (req) => {
       for (let i = 0; i < candidates.length; i++) {
         const cand = candidates[i];
         const claims = claimsByCandidate[i] ?? [];
+        const recoveredClaims = recoverDeterministicClaims(cand.source, cand.postText);
+        const auditClaims = [...claims, ...recoveredClaims];
 
         // Mark every row sharing this source_url as checked (the scraper inserts
         // one row per matched model), storing the raw claims for audit.
         const { error: updErr } = await supabase
           .from("scraped_posts")
-          .update({ rumor_checked_at: nowIso, rumor_data: claims })
+          .update({ rumor_checked_at: nowIso, rumor_data: auditClaims })
           .eq("source_url", cand.row.source_url)
           .is("rumor_checked_at", null);
         if (updErr) await logError(`mark checked failed (${cand.row.source_url}): ${updErr.message}`, "mark-checked");
         else checkedPosts++;
 
-        for (const raw of claims) {
+        const seenContributionKeys = new Set<string>();
+        for (const raw of auditClaims) {
           const contribution = buildContribution(raw as RawClaim, cand.source, cand.postText);
-          if (contribution) contributions.push(contribution);
+          if (!contribution) continue;
+          const contributionKey = `${contribution.modelSlug}:${contribution.versionKey}:${contribution.source.url}`;
+          if (seenContributionKeys.has(contributionKey)) continue;
+          seenContributionKeys.add(contributionKey);
+          contributions.push(contribution);
         }
       }
     }

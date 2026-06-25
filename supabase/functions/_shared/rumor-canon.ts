@@ -192,7 +192,14 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       aliases: ["bidi", "gptbidi", "gptbidi1"],
     },
   ],
-  gemini: [],
+  gemini: [
+    {
+      key: "gemini35pro",
+      label: "Gemini 3.5 Pro",
+      codename: null,
+      aliases: ["35pro", "gemini35pro"],
+    },
+  ],
   grok: [],
 };
 
@@ -374,6 +381,7 @@ interface MergeSource {
   platform?: string | null;
   handle?: string | null;
   verified?: boolean | null;
+  followers?: number | null;
   score?: number | null;
   quotedStatusId?: string | null;
   source_quality?: SourceQuality | null;
@@ -399,7 +407,7 @@ function sourceSortRank(source: MergeSource | null | undefined): number {
   const accountRank =
     quality === "tracked_leaker"
       ? 0
-      : source.verified === true
+      : source.verified === true && (source.followers ?? 0) >= 10000
         ? 8
         : source.handle
           ? 4
