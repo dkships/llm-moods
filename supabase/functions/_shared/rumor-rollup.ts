@@ -311,8 +311,10 @@ export function parseRecordRumors(input: unknown, batchLength: number): RawClaim
 const GPT56_RE = /\bgpt[-\s]?5[.,]\s*6\b/i;
 const GEMINI_35_PRO_RE = /\b(?:gemini\s*)?3[.,]\s*5\s*pro\b/i;
 const DELAY_RE = /\b(?:delays?|delayed|pushed back|slipped|postponed|stalled|no longer|give us until)\b/i;
-const TESTING_RE = /\b(?:in testing|early access|\bEAP\b|canary|spotted|api|arena|model[-\s]?(?:string|id)|codename)\b/i;
-const IMMINENT_RE = /\b(?:imminent|next week|this week|any day now|coming soon|dropping|drops? (?:next|this)|rolling out|rolls? out|scheduled)\b/i;
+const TESTING_RE = /\b(?:in testing|early access|\bEAP\b|enterprise partners?|partner testing|testing ahead of|canary|spotted|api|arena|model[-\s]?(?:string|id)|codename)\b/i;
+const IMMINENT_RE = /\b(?:imminent|eta|next week|this week|any day now|coming soon|dropping|drops? (?:next|this)|rolling out|rolls? out|scheduled|wider launch)\b/i;
+const PARTNER_TESTING_RE =
+  /\b(?:launch(?:ed)? for .{0,80}testing|enterprise partners? for testing|testing ahead of (?:the )?(?:wider|public|general) launch)\b/i;
 
 function backstopEligible(source: SourceRef): boolean {
   return isCredibleSource(source);
@@ -349,6 +351,7 @@ function claimScope(text: string, match: RegExpExecArray | null): string {
 }
 
 function etaFromText(text: string): string | null {
+  if (/\b(?:the\s+)?(?:2nd|second)\s+week\s+of\s+july\b/i.test(text)) return "2nd week of July";
   if (/\bmid[-\s]?july\b/i.test(text)) return "mid-July";
   if (/\bnext week\b/i.test(text)) return "next week";
   if (/\bthis week\b/i.test(text)) return "this week";
@@ -380,8 +383,8 @@ export function recoverDeterministicClaims(source: SourceRef, postText: string):
   const gptMatch = GPT56_RE.exec(text);
   if (gptMatch) {
     const gptWindow = claimScope(text, gptMatch);
-    const eta = etaFromText(gptWindow) ?? etaFromText(text);
     if (DELAY_RE.test(gptWindow) || DELAY_RE.test(text)) {
+      const eta = etaFromText(gptWindow) ?? etaFromText(text);
       claims.push({
         is_rumor: true,
         target_family: "chatgpt",
@@ -392,6 +395,22 @@ export function recoverDeterministicClaims(source: SourceRef, postText: string):
         claim_summary: eta ? `GPT-5.6 is delayed to ${eta}.` : "GPT-5.6 is delayed.",
         rumored_benefit: null,
         signals: "Tracked source delay claim",
+        eta_text: eta,
+        eta_date: null,
+        confidence: 0.85,
+      });
+    } else if (PARTNER_TESTING_RE.test(text)) {
+      const eta = etaFromText(text);
+      claims.push({
+        is_rumor: true,
+        target_family: "chatgpt",
+        version_label: "GPT-5.6",
+        codename: null,
+        is_unreleased: true,
+        claim_type: "in_testing",
+        claim_summary: "GPT-5.6 is in enterprise partner testing ahead of wider launch.",
+        rumored_benefit: null,
+        signals: "Tracked source enterprise partner testing claim",
         eta_text: eta,
         eta_date: null,
         confidence: 0.85,

@@ -59,6 +59,8 @@ describe("isLikelyRumorCandidate", () => {
       "Gemini 4 scheduled next week",
       "Fable 5 is returning soon",
       "model string for opus 5 leaked",
+      "Exclusive GPT-5.6 scoop: ETA for wider launch is the 2nd week of July",
+      "GPT-5.6 launched for OpenAI enterprise partners for testing ahead of the wider launch",
       "EAP access just opened",
       "that output is looking sus",
     ]) {
@@ -76,6 +78,7 @@ describe("isLikelyRumorCandidate", () => {
     expect(isLikelyRumorCandidate("versus the other model", "")).toBe(false); // not "sus"
     expect(isLikelyRumorCandidate("the census numbers", "")).toBe(false); // not "sus"
     expect(isLikelyRumorCandidate("this plan is cheap", "")).toBe(false); // not "EAP"
+    expect(isLikelyRumorCandidate("metadata export shipped", "")).toBe(false); // not "ETA"
   });
 
   it("checks title and body together", () => {
@@ -418,6 +421,27 @@ describe("deterministic rumor recovery", () => {
   it("does not recover from low-signal uncorroborated posts", () => {
     const weakSource = src("u", "bluesky", "2026-06-24", 1);
     expect(recoverDeterministicClaims(weakSource, "GPT-5.6 delayed to mid-July. 3.5 Pro in testing.")).toEqual([]);
+  });
+
+  it("recovers GPT-5.6 enterprise partner testing with a wider-launch ETA from a tracked source", () => {
+    const source = src("https://x.com/synthwavedd/status/207123", "twitter", "2026-06-25", 1300, {
+      handle: "synthwavedd",
+    });
+    const text = [
+      "Exclusive GPT-5.6 scoop:",
+      "- Today 5.6 launched for OpenAI enterprise partners for testing ahead of the wider launch",
+      "- ETA for wider launch is the 2nd week of July",
+      "- There will be NO pricing changes",
+    ].join("\n");
+
+    const claims = recoverDeterministicClaims(source, text);
+    expect(claims).toHaveLength(1);
+
+    const contribution = buildContribution(claims[0], source, text);
+    expect(contribution?.modelSlug).toBe("chatgpt");
+    expect(contribution?.versionKey).toBe("gpt56");
+    expect(contribution?.claimType).toBe("in_testing");
+    expect(contribution?.etaText).toBe("2nd week of July");
   });
 });
 

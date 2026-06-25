@@ -125,14 +125,14 @@ const SYSTEM_PROMPT =
   "- version_label: copy the version token VERBATIM from the post (e.g. 'Sonnet 5', 'GPT-5.6'). Null if only a codename.\n" +
   "- codename: arena/internal codename if present (e.g. 'Fennec', 'Orionmist'). Null otherwise.\n" +
   "- is_unreleased: judge against the RELEASED SET above.\n" +
-  "- claim_type: in_testing (EAP / spotted in API / canary / arena), imminent (next week / any day), " +
+  "- claim_type: in_testing (EAP / enterprise partner testing / spotted in API / canary / arena), imminent (next week / any day), " +
   "delayed (pushed back / slipped / no longer this month), return (re-added / brought back / restored), " +
   "launch (a new version is coming), or other.\n" +
   "- claim_summary: one concise sentence on what's claimed.\n" +
   "- rumored_benefit: what it's rumored to improve, if stated (else null). Do not invent benchmark numbers.\n" +
   "- signals: the evidence cited — API slug, codename, app-code/string leak, benchmark leak, staff/exec hint, prediction-market odds (else null).\n" +
   "- eta_text: the raw timeframe phrase if stated or directly implied in the same bullet/sentence as this claim " +
-  "(e.g. 'next week', 'mid-July', 'Q3'); NEVER invent one or copy another model's ETA — null if absent.\n" +
+  "(e.g. 'next week', '2nd week of July', 'mid-July', 'Q3'); NEVER invent one or copy another model's ETA — null if absent.\n" +
   "- eta_date: ISO date (YYYY-MM-DD) only for an exact calendar day or explicitly stated anchor date " +
   "(e.g. 'by July 1', 'week of July 30'). For vague windows like 'this week', 'next week', 'soon', " +
   "'mid-July', or 'Q3', set eta_date to null and preserve the phrase in eta_text.\n" +
