@@ -20,6 +20,7 @@ export const TRACKED_FAMILIES: ReadonlySet<string> = new Set([
 
 export type SourceQuality =
   | "tracked_leaker"
+  | "press_scoop"
   | "artifact_leak"
   | "prediction_market"
   | "press_echo"
@@ -44,8 +45,16 @@ export const TRACKED_LEAKER_HANDLES: ReadonlySet<string> = new Set([
   "scaling01",
 ]);
 
+const PRESS_SCOOP_HANDLES: ReadonlySet<string> = new Set([
+  "axios",
+  "semafor",
+  "theinformation",
+  "fortunemagazine",
+]);
+
 const VALID_SOURCE_QUALITIES: ReadonlySet<string> = new Set([
   "tracked_leaker",
+  "press_scoop",
   "artifact_leak",
   "prediction_market",
   "press_echo",
@@ -76,6 +85,13 @@ const ARTIFACT_LEAK_DOMAINS = [
   "lmarena.ai",
 ];
 
+const PRESS_SCOOP_DOMAINS = [
+  "axios.com",
+  "semafor.com",
+  "theinformation.com",
+  "fortune.com",
+];
+
 const PRESS_ECHO_DOMAINS = [
   "androidauthority.com",
   "digg.com",
@@ -90,6 +106,7 @@ const PRESS_ECHO_DOMAINS = [
 
 const SOURCE_QUALITY_LABELS: Record<SourceQuality, string> = {
   tracked_leaker: "tracked leaker",
+  press_scoop: "reported scoop",
   artifact_leak: "artifact leak",
   prediction_market: "prediction market signal",
   press_echo: "press echo",
@@ -100,6 +117,7 @@ const SOURCE_QUALITY_LABELS: Record<SourceQuality, string> = {
 const SOURCE_QUALITY_RANK: Record<SourceQuality, number> = {
   official: 5,
   tracked_leaker: 4,
+  press_scoop: 3,
   artifact_leak: 3,
   prediction_market: 2,
   press_echo: 1,
@@ -135,10 +153,12 @@ export function inferSourceQuality(source: SourceQualityInput): SourceQuality {
 
   const handle = normalizeSourceHandle(source.handle);
   if (TRACKED_LEAKER_HANDLES.has(handle)) return "tracked_leaker";
+  if (PRESS_SCOOP_HANDLES.has(handle)) return "press_scoop";
 
   const platform = (source.platform ?? "").toLowerCase();
   const host = hostnameFromUrl(source.url);
   if (hostMatches(host, OFFICIAL_DOMAINS) || platform === "official") return "official";
+  if (hostMatches(host, PRESS_SCOOP_DOMAINS)) return "press_scoop";
   if (hostMatches(host, ARTIFACT_LEAK_DOMAINS) || platform === "github") return "artifact_leak";
   if (hostMatches(host, PREDICTION_MARKET_DOMAINS) || platform === "prediction_market") {
     return "prediction_market";

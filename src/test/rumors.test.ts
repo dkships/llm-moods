@@ -340,9 +340,11 @@ describe("mergeCluster", () => {
 });
 
 describe("credibility", () => {
-  it("flags tracked leakers, verified high-follower accounts, artifacts, and high-engagement sources", () => {
+  it("flags tracked leakers, press scoops, verified high-follower accounts, artifacts, and high-engagement sources", () => {
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "synthwavedd" }))).toBe(true);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "@SynthWaveDD" }))).toBe(true); // normalized
+    expect(isCredibleSource(src("https://x.com/axios/status/1", "twitter", "2026-06-22", 0, { handle: "@axios" }))).toBe(true);
+    expect(isCredibleSource(src("https://x.com/someone/status/2", "twitter", "2026-06-22", 0, { quotedStatusId: "1" }))).toBe(false);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true }))).toBe(false);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true, followers: 50000 }))).toBe(true);
     expect(isCredibleSource(src("u", "reddit", "2026-06-22", 500))).toBe(true); // high upvotes
@@ -364,10 +366,32 @@ describe("credibility", () => {
     expect(row.has_credible_source).toBe(true);
   });
 
+  it("orders tracked leakers ahead of press scoops, and press scoops ahead of unknown posts", () => {
+    const row = mergeCluster(
+      null,
+      [
+        contrib({ source: src("reddit-url", "reddit", "2026-06-20", 900) }),
+        contrib({ source: src("axios-url", "twitter", "2026-06-21", 2, { handle: "axios" }) }),
+        contrib({ source: src("x-url", "twitter", "2026-06-22", 1, { handle: "synthwavedd" }) }),
+      ],
+      4,
+    );
+    expect(row.representative_sources.map((s) => s.url)).toEqual(["x-url", "axios-url", "reddit-url"]);
+    expect(row.representative_sources.map((s) => s.source_quality)).toEqual([
+      "tracked_leaker",
+      "press_scoop",
+      "unknown",
+    ]);
+  });
+
   it("marks a single credible source so it can pass the gate, but not a lone low-signal post", () => {
     const credible = mergeCluster(null, [contrib({ source: src("x", "twitter", "2026-06-22", 1, { handle: "synthwavedd" }) })], 4);
     expect(credible.mention_count).toBe(1);
     expect(credible.has_credible_source).toBe(true);
+
+    const scoop = mergeCluster(null, [contrib({ source: src("https://www.axios.com/fable-5", "web", "2026-06-22", 0) })], 4);
+    expect(scoop.mention_count).toBe(1);
+    expect(scoop.has_credible_source).toBe(true);
 
     const weak = mergeCluster(null, [contrib({ source: src("b", "bluesky", "2026-06-22", 1) })], 4);
     expect(weak.has_credible_source).toBe(false);
@@ -386,10 +410,17 @@ describe("source quality", () => {
     expect(inferSourceQuality({ url: "https://www.testingcatalog.com/openai-app-string-leak/", platform: "web" })).toBe(
       "artifact_leak",
     );
+    expect(inferSourceQuality({ url: "https://x.com/axios/status/1", platform: "twitter", handle: "@axios" })).toBe(
+      "press_scoop",
+    );
+    expect(inferSourceQuality({ url: "https://www.axios.com/2026/06/27/fable-5", platform: "web" })).toBe(
+      "press_scoop",
+    );
     expect(inferSourceQuality({ url: "https://x.com/someone/status/2", platform: "twitter", quotedStatusId: "1" })).toBe(
       "press_echo",
     );
     expect(sourceQualityLabel("prediction_market")).toBe("prediction market signal");
+    expect(sourceQualityLabel("press_scoop")).toBe("reported scoop");
   });
 });
 

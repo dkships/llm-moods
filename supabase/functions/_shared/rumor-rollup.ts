@@ -73,10 +73,10 @@ const VERIFIED_FOLLOWER_FLOOR = 10000;
 const HIGH_ENGAGEMENT_FLOOR = 250;
 
 /**
- * A source is "credible" if it's a tracked leaker, official/artifact evidence,
- * an established verified account, or cleared a high engagement bar (the proxy
- * for platforms with no author data, e.g. a heavily-upvoted Reddit post). A
- * paid/verified checkmark alone is not enough.
+ * A source is "credible" if it's a tracked leaker, curated press scoop,
+ * official/artifact evidence, an established verified account, or cleared a
+ * high engagement bar (the proxy for platforms with no author data, e.g. a
+ * heavily-upvoted Reddit post). A paid/verified checkmark alone is not enough.
  */
 function hasCredibleAccount(s: SourceRef): boolean {
   return s.verified === true && (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR;
@@ -87,6 +87,7 @@ export function isCredibleSource(s: SourceRef): boolean {
   return (
     quality === "official" ||
     quality === "tracked_leaker" ||
+    quality === "press_scoop" ||
     quality === "artifact_leak" ||
     hasCredibleAccount(s) ||
     (s.score ?? 0) >= HIGH_ENGAGEMENT_FLOOR

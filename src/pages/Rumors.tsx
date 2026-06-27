@@ -69,7 +69,7 @@ const Rumors = () => {
                 <p className="text-body text-text-secondary">No strong rumors right now.</p>
                 <p className="mt-2 text-meta text-text-tertiary">
                   A rumor surfaces here once it's corroborated across posts — or flagged by a tracked
-                  leaker. Check back around model-launch season.
+                  source. Check back around model-launch season.
                 </p>
               </Surface>
             ) : (
