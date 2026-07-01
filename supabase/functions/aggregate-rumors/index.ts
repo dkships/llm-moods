@@ -20,7 +20,7 @@ import {
   type RumorRow,
   type SourceRef,
 } from "../_shared/rumor-rollup.ts";
-import { canonicalVersionKey } from "../_shared/rumor-canon.ts";
+import { canonicalVersionKey, isReleasedVersion } from "../_shared/rumor-canon.ts";
 import { deriveReleasedTokens } from "../_shared/released-models.ts";
 import { isCredibleReleaseSource, isReleaseAnnouncement } from "../_shared/release-detect.ts";
 
@@ -450,20 +450,41 @@ Deno.serve(async (req) => {
       else upserts++;
     }
 
-    // Retire launched versions: flip is_released on any rumor row whose version_key
-    // matches a token detected this run (API or social). Bounded to the token list
-    // and idempotent. The RPC + frontend then hide these rows.
+    // Retire launched versions. Match on CANONICAL identity (not raw version_key)
+    // so legacy compound-key rows are caught too — e.g. a row stored under
+    // "mythosfable5" whose label "Mythos/Fable 5" canonicalizes to fable5. A row
+    // is released if its canonical key (or raw key) is a token detected this run
+    // (API/social) OR its label/codename is in the static FAMILY_ALIASES released
+    // set (isReleasedVersion — the same check the frontend display uses). The
+    // model_rumors accumulator is small (frontier-only, 21-day decay), so scanning
+    // the open rows each run is cheap.
     let releasedFlagged = 0;
     const releasedList = [...releasedTokens];
-    if (releasedList.length > 0) {
-      const { data: flagged, error: relErr } = await supabase
-        .from("model_rumors")
-        .update({ is_released: true, updated_at: new Date().toISOString() })
-        .in("version_key", releasedList)
-        .eq("is_released", false)
-        .select("version_key");
-      if (relErr) await logError(`release-flag update failed: ${relErr.message}`, "release-flag");
-      else releasedFlagged = flagged?.length ?? 0;
+    const dynamicTokens = new Set(releasedList);
+    const { data: openRows, error: fetchErr } = await supabase
+      .from("model_rumors")
+      .select("id, model_slug, version_key, version_label, codename")
+      .eq("is_released", false);
+    if (fetchErr) {
+      await logError(`release-flag fetch failed: ${fetchErr.message}`, "release-flag");
+    } else {
+      const toFlag: string[] = [];
+      for (const r of openRows ?? []) {
+        const canon = canonicalVersionKey(r.model_slug, r.version_label, r.codename);
+        const byDynamic =
+          (canon.key != null && dynamicTokens.has(canon.key)) || dynamicTokens.has(r.version_key);
+        if (byDynamic || isReleasedVersion(r.model_slug, r.version_label, r.codename)) {
+          toFlag.push(r.id);
+        }
+      }
+      if (toFlag.length > 0) {
+        const { error: relErr } = await supabase
+          .from("model_rumors")
+          .update({ is_released: true, updated_at: new Date().toISOString() })
+          .in("id", toFlag);
+        if (relErr) await logError(`release-flag update failed: ${relErr.message}`, "release-flag");
+        else releasedFlagged = toFlag.length;
+      }
     }
 
     const summary = {
