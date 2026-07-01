@@ -20,6 +20,9 @@ import {
   type RumorRow,
   type SourceRef,
 } from "../_shared/rumor-rollup.ts";
+import { canonicalVersionKey } from "../_shared/rumor-canon.ts";
+import { deriveReleasedTokens } from "../_shared/released-models.ts";
+import { isCredibleReleaseSource, isReleaseAnnouncement } from "../_shared/release-detect.ts";
 
 const SOURCE = "aggregate-rumors";
 const LOCK_KEY = "rumor-aggregate";
@@ -252,6 +255,38 @@ async function extractAll(
   return out.flat();
 }
 
+// Released-model auto-detection (API layer). Best-effort — a failed fetch never
+// breaks the rumor run; it just skips that family's auto-retire this cycle.
+async function fetchAnthropicModelIds(apiKey: string): Promise<string[]> {
+  try {
+    const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
+      headers: { "x-api-key": apiKey, "anthropic-version": ANTHROPIC_VERSION },
+    });
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (Array.isArray(data?.data) ? data.data : [])
+      .map((m: { id?: unknown }) => (typeof m?.id === "string" ? m.id : null))
+      .filter((x: string | null): x is string => x !== null);
+  } catch {
+    return [];
+  }
+}
+
+async function fetchGeminiModelIds(apiKey: string): Promise<string[]> {
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${apiKey}`,
+    );
+    if (!res.ok) return [];
+    const data = await res.json();
+    return (Array.isArray(data?.models) ? data.models : [])
+      .map((m: { name?: unknown }) => (typeof m?.name === "string" ? m.name : null))
+      .filter((x: string | null): x is string => x !== null);
+  } catch {
+    return [];
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -323,6 +358,17 @@ Deno.serve(async (req) => {
     const contributions: RumorContribution[] = [];
     let checkedPosts = 0;
 
+    // Released-model auto-detection. API layer (authoritative for Claude + Gemini):
+    // the Models APIs only list shipped ids, so a match can't be a false positive.
+    const releasedTokens = new Set<string>();
+    const geminiKey = Deno.env.get("GEMINI_API_KEY");
+    const [anthropicIds, geminiIds] = await Promise.all([
+      fetchAnthropicModelIds(apiKey),
+      geminiKey ? fetchGeminiModelIds(geminiKey) : Promise.resolve([]),
+    ]);
+    for (const token of deriveReleasedTokens(anthropicIds, geminiIds)) releasedTokens.add(token);
+    const apiTokenCount = releasedTokens.size;
+
     if (candidates.length > 0) {
       const claimsByCandidate = await extractAll(candidates, apiKey, rumorModel(), logError);
       const nowIso = new Date().toISOString();
@@ -332,6 +378,24 @@ Deno.serve(async (req) => {
         const claims = claimsByCandidate[i] ?? [];
         const recoveredClaims = recoverDeterministicClaims(cand.source, cand.postText);
         const auditClaims = [...claims, ...recoveredClaims];
+
+        // Social layer: a GA announcement from a credible source retires whatever
+        // version(s) it names — the backstop for ChatGPT/Grok (no Models API key)
+        // and codename launches. Conservative gate; a limited/EAP release doesn't
+        // count (isReleaseAnnouncement excludes it) so it stays on the board.
+        if (
+          isReleaseAnnouncement(cand.row.title, cand.row.content) &&
+          isCredibleReleaseSource(cand.source)
+        ) {
+          for (const raw of auditClaims) {
+            const { key } = canonicalVersionKey(
+              (raw as RawClaim).target_family,
+              (raw as RawClaim).version_label,
+              (raw as RawClaim).codename,
+            );
+            if (key) releasedTokens.add(key);
+          }
+        }
 
         // Mark every row sharing this source_url as checked (the scraper inserts
         // one row per matched model), storing the raw claims for audit.
@@ -386,12 +450,31 @@ Deno.serve(async (req) => {
       else upserts++;
     }
 
+    // Retire launched versions: flip is_released on any rumor row whose version_key
+    // matches a token detected this run (API or social). Bounded to the token list
+    // and idempotent. The RPC + frontend then hide these rows.
+    let releasedFlagged = 0;
+    const releasedList = [...releasedTokens];
+    if (releasedList.length > 0) {
+      const { data: flagged, error: relErr } = await supabase
+        .from("model_rumors")
+        .update({ is_released: true, updated_at: new Date().toISOString() })
+        .in("version_key", releasedList)
+        .eq("is_released", false)
+        .select("version_key");
+      if (relErr) await logError(`release-flag update failed: ${relErr.message}`, "release-flag");
+      else releasedFlagged = flagged?.length ?? 0;
+    }
+
     const summary = {
       status: "complete",
       candidates: candidates.length,
       checked_posts: checkedPosts,
       contributions: contributions.length,
       clusters_upserted: upserts,
+      released_tokens: releasedList.length,
+      released_from_api: apiTokenCount,
+      released_rows_flagged: releasedFlagged,
     };
     await supabase.from("error_log").insert({
       function_name: SOURCE,

@@ -29,6 +29,8 @@ import {
   splitCompoundLabel,
   type MergeableRumor,
 } from "../../supabase/functions/_shared/rumor-canon";
+import { deriveReleasedTokens, modelIdToTokens } from "../../supabase/functions/_shared/released-models";
+import { isCredibleReleaseSource, isReleaseAnnouncement } from "../../supabase/functions/_shared/release-detect";
 
 function src(url: string, platform: string, posted_at: string, score = 0, extra: Partial<SourceRef> = {}): SourceRef {
   return { url, platform, posted_at, score, handle: null, snippet: "s", ...extra };
@@ -622,6 +624,52 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("chatgpt", "GPT-5.6", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
     expect(isReleasedVersion("chatgpt", null, "Bidi")).toBe(false);
+  });
+});
+
+describe("modelIdToTokens / deriveReleasedTokens (API auto-detect)", () => {
+  it("maps Anthropic ids to full + family-stripped tokens, stripping dated snapshots", () => {
+    expect(modelIdToTokens("claude-sonnet-5")).toEqual(expect.arrayContaining(["claudesonnet5", "sonnet5"]));
+    expect(modelIdToTokens("claude-fable-5")).toEqual(expect.arrayContaining(["fable5"]));
+    expect(modelIdToTokens("claude-haiku-4-5-20251001")).toEqual(expect.arrayContaining(["haiku45"]));
+  });
+
+  it("maps Gemini ids (models/ prefix) to matching tokens", () => {
+    expect(modelIdToTokens("models/gemini-3-pro")).toEqual(expect.arrayContaining(["gemini3pro", "3pro"]));
+  });
+
+  it("derived tokens match the rumor version_keys they should retire", () => {
+    const anthropic = new Set(deriveReleasedTokens(["claude-sonnet-5"], []));
+    expect(anthropic.has(canonicalVersionKey("claude", "Sonnet 5", null).key!)).toBe(true);
+    const gemini = new Set(deriveReleasedTokens([], ["models/gemini-3-pro"]));
+    expect(gemini.has(canonicalVersionKey("gemini", "Gemini 3 Pro", null).key!)).toBe(true);
+    // An unreleased rumor's key is NOT in the shipped-token set.
+    expect(anthropic.has(canonicalVersionKey("claude", "Opus 5", null).key!)).toBe(false);
+  });
+});
+
+describe("release-detect (social auto-detect)", () => {
+  const officialTweet = { url: "https://x.com/OpenAI/status/1", platform: "twitter", handle: "OpenAI" };
+  const randomTweet = { url: "https://x.com/someguy/status/2", platform: "twitter", handle: "someguy" };
+
+  it("flags a generally-available announcement", () => {
+    expect(isReleaseAnnouncement("GPT-5.6 is now available to everyone", "")).toBe(true);
+    expect(isReleaseAnnouncement("Grok 5 released today", "you can use it now")).toBe(true);
+    expect(isReleaseAnnouncement("Gemini 3 Pro is now live", null)).toBe(true);
+  });
+
+  it("does not flag hype, future tense, or a limited/EAP release", () => {
+    expect(isReleaseAnnouncement("GPT-5.6 is basically out", "")).toBe(false);
+    expect(isReleaseAnnouncement("Sonnet 5 will launch next week", "")).toBe(false);
+    expect(isReleaseAnnouncement("GPT-5.6 now available for enterprise partners", "for testing")).toBe(false);
+    expect(isReleaseAnnouncement("Opus 5 rumored to drop soon", "")).toBe(false);
+  });
+
+  it("trusts official handles, vendor domains, and press scoops; not random accounts", () => {
+    expect(isCredibleReleaseSource(officialTweet)).toBe(true);
+    expect(isCredibleReleaseSource({ url: "https://openai.com/index/gpt-5-6", platform: "web" })).toBe(true);
+    expect(isCredibleReleaseSource({ url: "https://x.com/axios/status/3", platform: "twitter", handle: "axios" })).toBe(true);
+    expect(isCredibleReleaseSource(randomTweet)).toBe(false);
   });
 });
 
