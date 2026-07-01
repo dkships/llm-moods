@@ -196,6 +196,7 @@ export type Database = {
           first_seen_at: string | null
           has_credible_source: boolean
           id: string
+          is_released: boolean
           last_seen_at: string | null
           mention_count: number
           model_slug: string
@@ -219,6 +220,7 @@ export type Database = {
           first_seen_at?: string | null
           has_credible_source?: boolean
           id?: string
+          is_released?: boolean
           last_seen_at?: string | null
           mention_count?: number
           model_slug: string
@@ -242,6 +244,7 @@ export type Database = {
           first_seen_at?: string | null
           has_credible_source?: boolean
           id?: string
+          is_released?: boolean
           last_seen_at?: string | null
           mention_count?: number
           model_slug?: string
