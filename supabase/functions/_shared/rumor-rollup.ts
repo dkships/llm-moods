@@ -16,6 +16,7 @@ import {
   canonicalVersionKey,
   inferSourceQuality,
   isNonFrontierLabel,
+  isReleasedVersion,
   sourceQualityRank,
   type SourceQuality,
   squash,
@@ -218,16 +219,6 @@ function withSourceQuality<T extends SourceRef>(source: T): T {
   return { ...source, source_quality: inferSourceQuality(source) } as T;
 }
 
-function hasFableMythosAccessOrTimingSignal(raw: RawClaim, claimType: RumorClaimType, postText: string): boolean {
-  if (claimType === "return" || claimType === "delayed" || claimType === "imminent" || claimType === "in_testing") {
-    return true;
-  }
-  if (cleanStr(raw.eta_text) || cleanStr(raw.eta_date)) return true;
-
-  const evidence = `${raw.claim_summary ?? ""} ${raw.signals ?? ""} ${postText}`.toLowerCase();
-  return /\b(return(?:ed|ing)?|re-?add(?:ed|ing)?|restor(?:ed|ing)?|reinstat(?:ed|ing)?|suspend(?:ed|ing)?|paused?|unavailable|available|access|eap|early access|api|canary|spotted|release date|timing|delayed|pushed back|slipped|postponed|next week|this week|mid[-\s]+july|july|q[1-4])\b/i.test(evidence);
-}
-
 /**
  * Validate one raw claim against its source post; returns null if it should be
  * dropped. Drops: non-rumors, released versions, unknown/invalid family, claims
@@ -265,16 +256,14 @@ export function buildContribution(
   const canon = canonicalVersionKey(family, versionLabel, codename);
   if (!canon.key) return null;
 
+  // Drop versions that have now shipped — the radar tracks unreleased models only.
+  // Deterministic (doesn't trust the LLM's is_unreleased), and it also retires any
+  // row already persisted before the version launched via the display/RPC filters.
+  if (isReleasedVersion(family, canon.label, canon.codename)) return null;
+
   const claimType = (VALID_CLAIM_TYPES.has(raw.claim_type as RumorClaimType)
     ? (raw.claim_type as RumorClaimType)
     : "other");
-
-  // Fable/Mythos has public-status/news chatter in the wild. Keep claims about
-  // return, suspension, access/API changes, or timing; drop status-only mentions
-  // so they don't become a fresh unreleased-model rumor.
-  if (family === "claude" && canon.key === "fable5" && !hasFableMythosAccessOrTimingSignal(raw, claimType, postText)) {
-    return null;
-  }
 
   return {
     modelSlug: family,

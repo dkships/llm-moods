@@ -39,9 +39,11 @@ const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529]);
 
 // Current released flagships — drives the model's `is_unreleased` judgment.
 // EPHEMERAL: refresh this alongside the codename `model_keywords` rows each cycle
-// (see the residual-risk note in the plan / CLAUDE.md).
+// (see the residual-risk note in the plan / CLAUDE.md). Deterministic backstop:
+// launched versions are also dropped by `isReleasedVersion` (rumor-canon.ts), so
+// keep this list and the `released` FAMILY_ALIASES flags in step.
 const RELEASED_SET =
-  "Claude: Opus 4.8, Sonnet 4.6, Haiku 4.5 (Fable 5 / Mythos 5 currently suspended). " +
+  "Claude: Opus 4.8, Sonnet 5, Sonnet 4.6, Haiku 4.5, Fable 5 / Mythos 5. " +
   "ChatGPT/OpenAI: GPT-5.4 and earlier. Gemini: 3 Pro, 3 Flash, 3.5 Flash. Grok: 4 and earlier. " +
   "Anything newer/higher than these, or an unrecognized codename, is UNRELEASED.";
 

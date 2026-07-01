@@ -188,6 +188,7 @@ interface AliasEntry {
   label: string | null; // canonical human label
   codename: string | null; // canonical codename
   aliases: string[]; // squashed spellings that resolve here
+  released?: boolean; // true once shipped → retired from the radar (see isReleasedVersion)
 }
 
 // Known upcoming versions whose codenames/labels are aliases of one model. The
@@ -195,6 +196,8 @@ interface AliasEntry {
 // Mythos 5, and the compound "Mythos/Fable 5" — all one model. Add new entries
 // (e.g. Gemini's "Orionmist") as they leak; leave a family empty when its
 // versions are plain version numbers that `canonicalVersionKey` handles already.
+// Set `released: true` once a version ships — `isReleasedVersion` derives its
+// retire-list from these, so flipping the flag drops it from the radar.
 const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
   claude: [
     {
@@ -202,6 +205,16 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       label: "Fable 5",
       codename: "Mythos",
       aliases: ["fable", "mythos", "fable5", "mythos5"],
+      released: true,
+    },
+    {
+      key: "sonnet5",
+      label: "Sonnet 5",
+      codename: null,
+      // "sonic5" is a common mis-spelling of the shipped Sonnet 5; fold it in so
+      // it canonically collapses here rather than surfacing as a stray card.
+      aliases: ["sonnet5", "sonic5"],
+      released: true,
     },
   ],
   chatgpt: [
@@ -340,6 +353,46 @@ export function canonicalVersionKey(
     label: cleanStr(label),
     codename: cleanStr(codename),
   };
+}
+
+// Squashed family stems stripped from a leading label word so a family-prefixed
+// spelling ("Claude Sonnet 5") matches the same released token as "Sonnet 5".
+const FAMILY_STEMS = ["claude", "chatgpt", "gpt", "gemini", "grok"];
+
+// Canonical keys + every alias spelling of the FAMILY_ALIASES entries flagged
+// `released`. Derived once, so flipping one `released` boolean retires a model
+// across every consumer. Default-false: a novel unreleased leak can't be denied.
+const RELEASED_TOKENS: ReadonlySet<string> = new Set(
+  Object.values(FAMILY_ALIASES)
+    .flat()
+    .filter((e) => e.released)
+    .flatMap((e) => [e.key, ...e.aliases]),
+);
+
+/**
+ * Has this version already shipped? The radar tracks UNRELEASED models only, so a
+ * launched version is retired from both the write path (`buildContribution`) and
+ * the display merge (`mergeRumorRows`). Family-agnostic like the competitor deny:
+ * a launched version is out regardless of which family it's tagged to.
+ */
+export function isReleasedVersion(
+  family: string | null | undefined,
+  label: string | null | undefined,
+  codename: string | null | undefined,
+): boolean {
+  const { key } = canonicalVersionKey(family, label, codename);
+  if (key && RELEASED_TOKENS.has(key)) return true;
+  // Family-prefixed spellings ("Claude Sonnet 5") fall past the alias map; strip
+  // a leading family stem and re-test the squashed remainder.
+  for (const raw of [label, codename]) {
+    const q = squash(raw);
+    if (!q) continue;
+    if (RELEASED_TOKENS.has(q)) return true;
+    for (const stem of FAMILY_STEMS) {
+      if (q.startsWith(stem) && RELEASED_TOKENS.has(q.slice(stem.length))) return true;
+    }
+  }
+  return false;
 }
 
 function hitsDeny(s: string | null | undefined): boolean {
@@ -540,6 +593,7 @@ export function mergeRumorRows<T extends MergeableRumor>(rows: T[]): T[] {
     const slug = (r.model_slug ?? "").toLowerCase();
     if (!TRACKED_FAMILIES.has(slug)) continue;
     if (isNonFrontierLabel(slug, r.version_label, r.codename)) continue;
+    if (isReleasedVersion(slug, r.version_label, r.codename)) continue;
     const { key } = canonicalVersionKey(slug, r.version_label, r.codename);
     const groupKey = `${slug}:${key ?? squash(r.version_label || r.codename || "")}`;
     const arr = groups.get(groupKey) ?? [];

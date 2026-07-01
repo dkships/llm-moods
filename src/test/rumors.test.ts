@@ -23,6 +23,7 @@ import {
   inferSourceQuality,
   isFamilyConsistentLabel,
   isNonFrontierLabel,
+  isReleasedVersion,
   mergeRumorRows,
   sourceQualityLabel,
   splitCompoundLabel,
@@ -108,24 +109,26 @@ describe("buildContribution", () => {
     const raw: RawClaim = {
       is_rumor: true,
       target_family: "claude",
-      version_label: "Sonnet 5",
+      version_label: "Opus 5",
       is_unreleased: true,
       claim_type: "in_testing",
       claim_summary: "Available to select enterprise customers under EAP.",
       confidence: 0.7,
     };
-    const c = buildContribution(raw, source, "Claude Sonnet 5 is in early access for enterprise");
+    const c = buildContribution(raw, source, "Claude Opus 5 is in early access for enterprise");
     expect(c).not.toBeNull();
     expect(c!.modelSlug).toBe("claude");
-    expect(c!.versionKey).toBe("sonnet5");
+    expect(c!.versionKey).toBe("opus5");
     expect(c!.claimType).toBe("in_testing");
   });
 
   it("drops non-rumors, released versions, and unknown family", () => {
-    const base: RawClaim = { is_rumor: true, target_family: "claude", version_label: "Sonnet 5", is_unreleased: true };
-    expect(buildContribution({ ...base, is_rumor: false }, source, "Sonnet 5")).toBeNull();
-    expect(buildContribution({ ...base, is_unreleased: false }, source, "Sonnet 5")).toBeNull();
-    expect(buildContribution({ ...base, target_family: "unknown" }, source, "Sonnet 5")).toBeNull();
+    const base: RawClaim = { is_rumor: true, target_family: "claude", version_label: "Opus 5", is_unreleased: true };
+    expect(buildContribution({ ...base, is_rumor: false }, source, "Opus 5")).toBeNull();
+    expect(buildContribution({ ...base, is_unreleased: false }, source, "Opus 5")).toBeNull();
+    expect(buildContribution({ ...base, target_family: "unknown" }, source, "Opus 5")).toBeNull();
+    // A version that has now shipped is dropped even when the model judged it unreleased.
+    expect(buildContribution({ ...base, version_label: "Sonnet 5" }, source, "Sonnet 5 rumor")).toBeNull();
   });
 
   it("drops a claim with no version or codename", () => {
@@ -134,7 +137,7 @@ describe("buildContribution", () => {
   });
 
   it("anti-hallucination: drops a version_label not present in the post text", () => {
-    const raw: RawClaim = { is_rumor: true, target_family: "claude", version_label: "Sonnet 5", is_unreleased: true };
+    const raw: RawClaim = { is_rumor: true, target_family: "claude", version_label: "Opus 5", is_unreleased: true };
     expect(buildContribution(raw, source, "just talking about claude in general")).toBeNull();
   });
 
@@ -156,54 +159,32 @@ describe("buildContribution", () => {
     expect(buildContribution(raw, source, "DeepSeek V3 is coming soon")).toBeNull();
   });
 
-  it("canonicalizes Claude codename aliases to one version key", () => {
-    const mythos = buildContribution(
-      { is_rumor: true, target_family: "claude", codename: "Mythos", is_unreleased: true },
+  it("canonicalizes codename aliases to one version key", () => {
+    const bidi = buildContribution(
+      { is_rumor: true, target_family: "chatgpt", codename: "Bidi", is_unreleased: true },
       source,
-      "Mythos spotted in the API",
+      "Bidi spotted in the API",
     );
-    const fable = buildContribution(
-      { is_rumor: true, target_family: "claude", codename: "Fable 5", is_unreleased: true },
+    const gptBidi = buildContribution(
+      { is_rumor: true, target_family: "chatgpt", version_label: "GPT Bidi 1", is_unreleased: true },
       source,
-      "Fable 5 returning soon",
+      "GPT Bidi 1 launching soon",
     );
-    expect(mythos?.versionKey).toBe("fable5");
-    expect(fable?.versionKey).toBe("fable5");
-    expect(mythos?.versionLabel).toBe("Fable 5");
+    expect(bidi?.versionKey).toBe("bidi");
+    expect(gptBidi?.versionKey).toBe("bidi");
+    expect(bidi?.versionLabel).toBe("GPT Bidi 1");
   });
 
-  it("drops status-only Fable/Mythos news but keeps return or timing claims", () => {
-    const statusOnly = buildContribution(
-      {
-        is_rumor: true,
-        target_family: "claude",
-        codename: "Mythos",
-        is_unreleased: true,
-        claim_type: "other",
-        claim_summary: "Anthropic published a public Mythos model page.",
-        confidence: 0.7,
-      },
-      source,
-      "Anthropic published a public Mythos model page with general status details.",
-    );
-    expect(statusOnly).toBeNull();
-
-    const returning = buildContribution(
-      {
-        is_rumor: true,
-        target_family: "claude",
-        codename: "Mythos",
-        is_unreleased: true,
-        claim_type: "return",
-        claim_summary: "Mythos is rumored to return in mid-July.",
-        eta_text: "mid-July",
-        confidence: 0.8,
-      },
-      source,
-      "Mythos is rumored to return in mid-July.",
-    );
-    expect(returning?.versionKey).toBe("fable5");
-    expect(returning?.claimType).toBe("return");
+  it("drops a launched version even when the model marks it unreleased", () => {
+    const launched: RawClaim[] = [
+      { is_rumor: true, target_family: "claude", codename: "Mythos", is_unreleased: true, claim_type: "return", eta_text: "mid-July" },
+      { is_rumor: true, target_family: "claude", version_label: "Fable 5", is_unreleased: true, claim_type: "launch" },
+      { is_rumor: true, target_family: "claude", version_label: "Sonnet 5", is_unreleased: true, claim_type: "launch" },
+    ];
+    for (const raw of launched) {
+      const text = `${raw.version_label ?? raw.codename} details in the post`;
+      expect(buildContribution(raw, source, text)).toBeNull();
+    }
   });
 });
 
@@ -625,6 +606,25 @@ describe("isFamilyConsistentLabel / isNonFrontierLabel", () => {
   });
 });
 
+describe("isReleasedVersion", () => {
+  it("flags launched versions across every spelling", () => {
+    expect(isReleasedVersion("claude", "Fable 5", null)).toBe(true);
+    expect(isReleasedVersion("claude", null, "Mythos")).toBe(true);
+    expect(isReleasedVersion("claude", "Mythos/Fable 5", null)).toBe(true);
+    expect(isReleasedVersion("claude", "Sonnet 5", null)).toBe(true);
+    expect(isReleasedVersion("claude", "Sonic 5", null)).toBe(true); // common mis-spelling
+    expect(isReleasedVersion("claude", "Claude Sonnet 5", null)).toBe(true); // family-prefixed
+    expect(isReleasedVersion("grok", "Fable 5", null)).toBe(true); // family-agnostic
+  });
+
+  it("keeps unreleased versions (no false positives)", () => {
+    expect(isReleasedVersion("claude", "Opus 5", null)).toBe(false);
+    expect(isReleasedVersion("chatgpt", "GPT-5.6", null)).toBe(false);
+    expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
+    expect(isReleasedVersion("chatgpt", null, "Bidi")).toBe(false);
+  });
+});
+
 describe("mergeRumorRows", () => {
   function rrow(over: Partial<MergeableRumor> & Record<string, unknown>): MergeableRumor {
     return {
@@ -643,14 +643,14 @@ describe("mergeRumorRows", () => {
 
   it("collapses alias-duplicate rows into one card with summed distinct mentions", () => {
     const out = mergeRumorRows([
-      rrow({ codename: "Fable", mention_count: 1, last_seen_at: "2026-06-22",
+      rrow({ model_slug: "chatgpt", codename: "Bidi", mention_count: 1, last_seen_at: "2026-06-22",
         representative_sources: [{ url: "u1", platform: "twitter" }] }),
-      rrow({ codename: "Mythos", mention_count: 1, last_seen_at: "2026-06-23",
+      rrow({ model_slug: "chatgpt", version_label: "GPT Bidi 1", mention_count: 1, last_seen_at: "2026-06-23",
         representative_sources: [{ url: "u2", platform: "reddit" }] }),
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("Fable 5");
-    expect(out[0].codename).toBe("Mythos");
+    expect(out[0].version_label).toBe("GPT Bidi 1");
+    expect(out[0].codename).toBe("Bidi");
     expect(out[0].mention_count).toBe(2); // single-unconfirmed-source tag now clears
     expect(out[0].platform_count).toBe(2);
   });
@@ -711,8 +711,8 @@ describe("mergeRumorRows", () => {
 
   it("counts a url shared across two alias rows only once (no double-count)", () => {
     const out = mergeRumorRows([
-      rrow({ codename: "Fable", representative_sources: [{ url: "shared", platform: "twitter" }] }),
-      rrow({ codename: "Mythos", representative_sources: [{ url: "shared", platform: "twitter" }] }),
+      rrow({ model_slug: "chatgpt", codename: "Bidi", representative_sources: [{ url: "shared", platform: "twitter" }] }),
+      rrow({ model_slug: "chatgpt", version_label: "GPT Bidi 1", representative_sources: [{ url: "shared", platform: "twitter" }] }),
     ]);
     expect(out).toHaveLength(1);
     expect(out[0].mention_count).toBe(1);
@@ -720,9 +720,9 @@ describe("mergeRumorRows", () => {
 
   it("applies claim_type precedence and takes display fields from the strongest row", () => {
     const out = mergeRumorRows([
-      rrow({ codename: "Fable", claim_type: "launch", claim_summary: "old", last_seen_at: "2026-06-20",
+      rrow({ model_slug: "chatgpt", codename: "Bidi", claim_type: "launch", claim_summary: "old", last_seen_at: "2026-06-20",
         representative_sources: [{ url: "a", platform: "reddit" }] }),
-      rrow({ codename: "Mythos", claim_type: "delayed", claim_summary: "newest", last_seen_at: "2026-06-24",
+      rrow({ model_slug: "chatgpt", version_label: "GPT Bidi 1", claim_type: "delayed", claim_summary: "newest", last_seen_at: "2026-06-24",
         representative_sources: [{ url: "b", platform: "twitter" }] }),
     ]);
     expect(out[0].claim_type).toBe("delayed");
@@ -764,12 +764,23 @@ describe("mergeRumorRows", () => {
 
   it("filters out non-frontier labels and untracked families", () => {
     const out = mergeRumorRows([
-      rrow({ version_label: "Sonnet 5", representative_sources: [{ url: "a", platform: "reddit" }] }),
+      rrow({ version_label: "Opus 5", representative_sources: [{ url: "a", platform: "reddit" }] }),
       rrow({ version_label: "DeepSeek V3" }), // competitor label
       rrow({ model_slug: "mistral", version_label: "Large 3" }), // untracked family
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("Sonnet 5");
+    expect(out[0].version_label).toBe("Opus 5");
+  });
+
+  it("drops rows for versions that have launched", () => {
+    const out = mergeRumorRows([
+      rrow({ version_label: "Opus 5", representative_sources: [{ url: "a", platform: "reddit" }] }),
+      rrow({ codename: "Mythos" }), // Fable 5 shipped
+      rrow({ version_label: "Sonnet 5" }), // shipped
+      rrow({ version_label: "Claude Sonnet 5" }), // shipped, family-prefixed spelling
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].version_label).toBe("Opus 5");
   });
 });
 
