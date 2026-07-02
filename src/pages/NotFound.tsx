@@ -11,6 +11,7 @@ const NotFound = () => {
     title: "Page Not Found — LLM Vibes",
     description:
       "The page you're looking for doesn't exist. Browse the live AI sentiment dashboard or the latest LLM Vibes research.",
+    noindex: true,
   });
 
   return (
@@ -31,11 +32,11 @@ const NotFound = () => {
             </Button>
             <p className="mt-6 text-meta text-text-tertiary">
               Or jump to the{" "}
-              <Link to="/dashboard" className="text-foreground underline underline-offset-2 hover:text-primary">
+              <Link to="/dashboard" className="text-foreground underline underline-offset-2">
                 dashboard
               </Link>{" "}
               or{" "}
-              <Link to="/research" className="text-foreground underline underline-offset-2 hover:text-primary">
+              <Link to="/research" className="text-foreground underline underline-offset-2">
                 latest research
               </Link>
               .

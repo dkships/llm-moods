@@ -17,16 +17,36 @@ const formatDate = (iso: string) =>
     timeZone: "UTC",
   });
 
+// Static data → module-level so the JSON-LD object identity is stable and
+// useHead's effect doesn't re-run every render.
+const SORTED_POSTS = [...RESEARCH_POSTS].sort((a, b) =>
+  new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
+);
+
+// Mirrored in the /research RouteMeta in scripts/prerender-routes.ts — both
+// sides are required (prerender for crawlers, this for post-hydration).
+const RESEARCH_INDEX_JSON_LD = {
+  "@context": "https://schema.org",
+  "@type": "ItemList",
+  name: "LLM Vibes Research",
+  itemListElement: SORTED_POSTS.map((post, i) => ({
+    "@type": "ListItem",
+    position: i + 1,
+    url: `https://llmvibes.ai/research/${post.slug}`,
+    name: post.title,
+  })),
+};
+
 const ResearchIndex = () => {
-  const posts = [...RESEARCH_POSTS].sort((a, b) =>
-    new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
-  );
+  const posts = SORTED_POSTS;
 
   useHead({
     title: "Research — LLM Vibes",
     description:
       "Independent analysis of AI model quality and incidents from the LLM Vibes data set.",
     url: "/research",
+    jsonLd: RESEARCH_INDEX_JSON_LD,
+    noindex: posts.length === 0,
   });
 
   if (posts.length === 0) {

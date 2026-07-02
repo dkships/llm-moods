@@ -2,6 +2,9 @@ import { Component, type ErrorInfo, type ReactNode } from "react";
 
 interface ErrorBoundaryProps {
   children: ReactNode;
+  /** Compact fallback for section-level boundaries (charts); the default
+   * full-page card is meant for the router root only. */
+  fallback?: ReactNode;
 }
 
 interface ErrorBoundaryState {
@@ -45,6 +48,9 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
 
   render() {
     if (this.state.hasError) {
+      if (this.props.fallback !== undefined) {
+        return this.props.fallback;
+      }
       return (
         <div className="min-h-screen bg-background flex items-center justify-center">
           <div className="max-w-md rounded-lg border border-border bg-secondary/30 px-8 py-10 text-center">

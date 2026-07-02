@@ -23,7 +23,7 @@ const strengthOf = (r: { platform_count: number; mention_count: number }) =>
   (r.platform_count ?? 0) * 1000 + (r.mention_count ?? 0);
 
 const Rumors = () => {
-  const { data: rumors, isLoading } = useRumors();
+  const { data: rumors, isLoading, isError } = useRumors();
   const { data: models } = useModelsWithLatestVibes();
 
   useHead({
@@ -64,6 +64,12 @@ const Rumors = () => {
                   <RumorCardSkeleton key={i} />
                 ))}
               </div>
+            ) : isError ? (
+              <Surface motion="fade" className="max-w-2xl">
+                <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
+                  Couldn't load rumors right now. Refresh to try again.
+                </p>
+              </Surface>
             ) : sorted.length === 0 ? (
               <Surface motion="fade" className="max-w-2xl">
                 <p className="text-body text-text-secondary">No strong rumors right now.</p>

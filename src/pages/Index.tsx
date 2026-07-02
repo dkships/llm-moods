@@ -51,6 +51,9 @@ const Index = () => {
                   </Link>
                 </Button>
               </div>
+              <p className="mt-8 text-mono-cap text-text-tertiary">
+                Independent · 100% automated · open source · {PLATFORM_COUNT} platforms, no user votes
+              </p>
             </div>
           </section>
 
@@ -61,7 +64,7 @@ const Index = () => {
                 {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
               </div>
             ) : isError ? (
-              <p className="py-8 text-center text-sm text-text-tertiary" role="status" aria-live="polite">
+              <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
                 Failed to load data
               </p>
             ) : (
@@ -105,6 +108,15 @@ const Index = () => {
                   </li>
                 ))}
               </ol>
+              <p className="mt-8 text-meta text-text-tertiary">
+                <Link
+                  to="/research/how-llm-vibes-classifies-sentiment"
+                  className="inline-flex items-center gap-1 rounded-md text-text-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                >
+                  Read the full methodology
+                  <ArrowRight className="h-3.5 w-3.5" />
+                </Link>
+              </p>
             </div>
           </section>
         </main>

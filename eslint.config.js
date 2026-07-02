@@ -23,4 +23,13 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
     },
   },
+  {
+    // Deno edge functions: third-party API payloads are legitimately untyped,
+    // and empty catch is the established swallow-and-continue pattern there.
+    files: ["supabase/functions/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "no-empty": ["error", { allowEmptyCatch: true }],
+    },
+  },
 );

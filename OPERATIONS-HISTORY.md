@@ -4,6 +4,39 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-07-01 — quality audit (Fable 5) + fixes
+
+Three-lens audit (frontend/UX, backend/pipeline, public-facing/SEO) with adversarial
+verification. Shipped in one batch:
+
+- **Deleted `apify-actor-probe`** from the repo, along with the `.lovable/plan.md`
+  standing instruction to deploy it. June bake-off helper, ungated with
+  caller-controlled `maxTotalChargeUsd`/`maxItems` (no upper clamp) — an anonymous
+  Apify-credit spender if deployed. Verified NOT live at audit time (functions
+  gateway returns NOT_FOUND vs 400 for deployed functions), so the fix removes the
+  deployable recipe rather than a live hole.
+- **Fixed the watchdog scraper-staleness arm**: it had matched short source names
+  against `scrape-*` slug run rows since its first commit (2026-05-10), inserting 5
+  spurious critical rows hourly (~120/day) while real staleness was invisible. Now
+  per-source slug thresholds (14h reddit / 11h others) + a 30h no-success arm over a
+  72h runs window. Expected observable: the hourly "Scraper 'X' has not run in >12h"
+  error_log noise stops after redeploy.
+- **Privacy page** now carries the retention policy (~90 days for posts, with the
+  three documented carve-outs: aggregate scores, rumor source refs, article quotes)
+  and a removal channel (GitHub issues / LinkedIn) — the prerendered meta had promised
+  both since May without the page delivering either.
+- Rumors/TrendingComplaints error states (outages no longer masquerade as empty
+  states), `Promise.all` on the landing RPC pair, chart `role="img"` labels +
+  section-level ErrorBoundaries, sitemap lastmod, ItemList JSON-LD on /research,
+  404 noindex + canonical suppression (useHead extension), RSS author email removed,
+  dead code removed (`classification-queue.ts`, `triggerAggregateVibes`, `fadeUp`,
+  `getKnownSurfacesForModel`, duplicate `getPacificDateLabel`, duplicate safe-URL
+  helpers), drain fallback defaults aligned to prod (200/20), origin-side 5-min cache
+  on `fetch-vendor-status`, eslint edge-function override + GitHub Actions CI.
+- Deferred consciously: scheduler-gate spoofability (documented as accepted risk in
+  `AGENT-REFERENCE.md`), chatter cursor tie-skip (needs a migration), reclassify-posts
+  broken `find_multi_model_misclassified` branch (fix at next redeploy of that fn).
+
 ## 2026-05-16 — methodology + scoring + scraper + historical-numbers audit
 
 Full end-to-end audit. Read-only snapshot pulled 16,496 posts (Feb 15 – May 16) and all

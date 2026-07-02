@@ -31,6 +31,14 @@ interface HeadConfig {
    * document head. Cleared automatically on routes that don't pass one.
    */
   jsonLd?: Record<string, unknown>;
+  /**
+   * Mark the route as not-found: emits <meta name="robots" content="noindex">
+   * and removes the canonical link (a 404 must not canonicalize to the
+   * homepage). Both effects are reset unconditionally on every useHead call —
+   * every production route calls useHead, so SPA navigation away from a 404
+   * restores the robots-free head and re-creates the canonical.
+   */
+  noindex?: boolean;
 }
 
 const BASE_URL = "https://llmvibes.ai";
@@ -64,9 +72,38 @@ function setOrRemovePropertyMeta(property: string, content: string | undefined) 
   el.content = content;
 }
 
-function setLinkHref(selector: string, href: string) {
-  const el = document.querySelector<HTMLLinkElement>(selector);
-  if (el) el.href = href;
+/** Like setOrRemovePropertyMeta, but for name-based metas (robots). */
+function setOrRemoveNamedMeta(name: string, content: string | undefined) {
+  let el = document.querySelector<HTMLMetaElement>(`meta[name="${name}"]`);
+  if (content === undefined) {
+    if (el) el.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement("meta");
+    el.setAttribute("name", name);
+    document.head.appendChild(el);
+  }
+  el.content = content;
+}
+
+/**
+ * Set (creating if needed) or remove the canonical link. Must create-if-missing:
+ * a mutate-only setter would leave canonicals dead for the rest of the SPA
+ * session after a 404 removed the element.
+ */
+function setOrRemoveCanonical(href: string | undefined) {
+  let el = document.querySelector<HTMLLinkElement>('link[rel="canonical"]');
+  if (href === undefined) {
+    if (el) el.remove();
+    return;
+  }
+  if (!el) {
+    el = document.createElement("link");
+    el.setAttribute("rel", "canonical");
+    document.head.appendChild(el);
+  }
+  el.href = href;
 }
 
 function setJsonLd(data: Record<string, unknown> | undefined) {
@@ -92,7 +129,7 @@ function resolveOgImage(image?: string): string {
   return `${BASE_URL}${image.startsWith("/") ? image : `/${image}`}`;
 }
 
-const useHead = ({ title, description, url, ogImage, ogType, article, jsonLd }: HeadConfig) => {
+const useHead = ({ title, description, url, ogImage, ogType, article, jsonLd, noindex }: HeadConfig) => {
   useEffect(() => {
     const desc = description ?? DEFAULT_DESCRIPTION;
     const fullUrl = url ? `${BASE_URL}${url}` : BASE_URL;
@@ -114,9 +151,12 @@ const useHead = ({ title, description, url, ogImage, ogType, article, jsonLd }: 
     setOrRemovePropertyMeta("article:modified_time", article?.modifiedTime);
     setOrRemovePropertyMeta("article:author", article?.author);
 
-    setLinkHref('link[rel="canonical"]', fullUrl);
+    // Both calls run unconditionally so a prior 404's head state can never
+    // leak onto a real route (or vice versa) across SPA navigations.
+    setOrRemoveNamedMeta("robots", noindex ? "noindex" : undefined);
+    setOrRemoveCanonical(noindex ? undefined : fullUrl);
     setJsonLd(jsonLd);
-  }, [title, description, url, ogImage, ogType, article, jsonLd]);
+  }, [title, description, url, ogImage, ogType, article, jsonLd, noindex]);
 };
 
 export default useHead;

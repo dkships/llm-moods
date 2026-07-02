@@ -56,17 +56,3 @@ export function detectProductSurface(modelSlug: string, text: string): DetectedS
   }
   return null;
 }
-
-export function getKnownSurfacesForModel(modelSlug: string): DetectedSurface[] {
-  const patterns = SURFACE_PATTERNS[modelSlug];
-  if (!patterns) return [];
-  const seen = new Set<string>();
-  const out: DetectedSurface[] = [];
-  for (const p of patterns) {
-    const key = `${p.surface}:${p.label}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    out.push({ surface: p.surface, label: p.label });
-  }
-  return out;
-}

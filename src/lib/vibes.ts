@@ -46,24 +46,16 @@ export const LIMITED_SAMPLE_THRESHOLD = 5;
 
 export function formatTimeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime();
+  // Malformed timestamps render "NaNm ago" and future ones go negative —
+  // both have shown up in scraped posted_at values.
+  if (Number.isNaN(diff)) return "";
+  if (diff < 0) return "just now";
   const mins = Math.floor(diff / 60000);
   if (mins < 60) return `${mins}m ago`;
   const hours = Math.floor(mins / 60);
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
-}
-
-export function getPacificDateLabel(date: Date): string {
-  const parts = new Intl.DateTimeFormat("en-US", {
-    timeZone: "America/Los_Angeles",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(date);
-
-  const lookup = (type: "year" | "month" | "day") => parts.find((part) => part.type === type)?.value ?? "00";
-  return `${lookup("year")}-${lookup("month")}-${lookup("day")}`;
 }
 
 export function formatSourceDisplay(source: string): { emoji: string; label: string } {
@@ -104,12 +96,3 @@ export function decodeHTMLEntities(text: string): string {
   result = result.replace(/&#x([0-9a-fA-F]+);/g, (_, h) => String.fromCharCode(parseInt(h, 16)));
   return result;
 }
-
-export const fadeUp = {
-  hidden: { opacity: 0, y: 20 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.08, duration: 0.45, ease: [0, 0, 0.2, 1] as const },
-  }),
-};

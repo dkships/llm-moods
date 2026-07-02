@@ -2,6 +2,7 @@ import { memo } from "react";
 import Surface from "@/components/Surface";
 import Tag from "@/components/Tag";
 import { formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
+import { getSafeExternalUrl } from "@/lib/safe-url";
 
 interface ChatterPostProps {
   post: {
@@ -19,16 +20,6 @@ interface ChatterPostProps {
   extraMeta?: string | null;
   /** Hide the model attribution (e.g. on a single-model page where it's implicit). */
   hideModel?: boolean;
-}
-
-function getSafeExternalUrl(sourceUrl?: string | null): string | undefined {
-  if (!sourceUrl) return undefined;
-  try {
-    const url = new URL(sourceUrl);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 const ChatterPost = memo(({ post, extraMeta, hideModel = false }: ChatterPostProps) => {

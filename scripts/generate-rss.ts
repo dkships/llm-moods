@@ -41,7 +41,6 @@ function renderItem(post: ResearchPost): string {
     `      <link>${link}</link>`,
     `      <guid isPermaLink="true">${link}</guid>`,
     `      <description>${escapeXml(post.summary)}</description>`,
-    `      <author>noreply@llmvibes.ai (${escapeXml(post.author)})</author>`,
     `      <pubDate>${pubDate(post.publishedAt)}</pubDate>`,
     ...post.tags.map((tag) => `      <category>${escapeXml(tag)}</category>`),
     "    </item>",
@@ -52,7 +51,13 @@ function buildFeed(posts: ResearchPost[]): string {
   const sorted = [...posts].sort(
     (a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime(),
   );
-  const lastBuild = sorted[0] ? pubDate(sorted[0].publishedAt) : new Date().toUTCString();
+  // Newest change across the feed, counting article updates — not just the
+  // newest publish date. Per-item pubDate stays publishedAt (stable guids).
+  const newestChange = sorted
+    .map((p) => p.updatedAt ?? p.publishedAt)
+    .sort()
+    .at(-1);
+  const lastBuild = newestChange ? pubDate(newestChange) : new Date().toUTCString();
   const items = sorted.map(renderItem).join("\n");
 
   return [

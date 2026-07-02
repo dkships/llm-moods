@@ -256,6 +256,24 @@ function isVendor(value: string): value is Vendor {
   return (SUPPORTED_VENDORS as string[]).includes(value);
 }
 
+// The function is unauthenticated (frontend calls it directly), so without an
+// origin-side cache any caller could make it hammer the vendor status feeds.
+// Best-effort per warm isolate; the Cache-Control header below only throttles
+// browsers/CDN, not this origin.
+const ORIGIN_CACHE_TTL_MS = 5 * 60 * 1000;
+const originCache = new Map<Vendor, { result: VendorStatusResponse; expiresAt: number }>();
+
+async function fetchVendorStatusCached(vendor: Vendor): Promise<VendorStatusResponse> {
+  const hit = originCache.get(vendor);
+  if (hit && hit.expiresAt > Date.now()) return hit.result;
+  const result = await fetchVendorStatus(vendor);
+  // Don't cache failures — the next call should retry the upstream.
+  if (!result.error) {
+    originCache.set(vendor, { result, expiresAt: Date.now() + ORIGIN_CACHE_TTL_MS });
+  }
+  return result;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -285,7 +303,7 @@ Deno.serve(async (req) => {
     );
   }
 
-  const result = await fetchVendorStatus(vendor);
+  const result = await fetchVendorStatusCached(vendor);
   const responseBody = { ...result, publicUrl: VENDOR_PUBLIC_URL[vendor] };
 
   return new Response(JSON.stringify(responseBody), {

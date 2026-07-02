@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import NavBar from "@/components/NavBar";
@@ -53,7 +53,10 @@ const Dashboard = () => {
     prefetch(slug, id);
   }, [prefetch]);
 
-  const latestScoreUpdate = (models || []).reduce<string | null>((oldest, model) => {
+  // Deliberately the OLDEST ingest time across models (commit 0d3e339): a
+  // stalled scraper must keep the "Updated" label honest instead of being
+  // masked by the healthiest model.
+  const oldestModelIngestAt = (models || []).reduce<string | null>((oldest, model) => {
     if (!model.lastUpdated) return oldest;
     if (!oldest) return model.lastUpdated;
     return new Date(model.lastUpdated).getTime() < new Date(oldest).getTime() ? model.lastUpdated : oldest;
@@ -66,6 +69,33 @@ const Dashboard = () => {
     if (!newest) return model.scoreComputedAt;
     return new Date(model.scoreComputedAt).getTime() > new Date(newest).getTime() ? model.scoreComputedAt : newest;
   }, null);
+
+  // Dedupe multi-model fanout: the same scraped post is stored once per
+  // matched model, so the feed otherwise shows the exact same text twice in a
+  // row. Collapse to one row and collect the matched model names into the meta
+  // line. Memoized: the infinite-scroll list grows and this runs over all of it.
+  const dedupedChatter = useMemo(() => {
+    const rows = (chatterData?.pages ?? []).flatMap((p) => p);
+    const seen = new Map<string, { post: typeof rows[number]; models: string[] }>();
+    for (const post of rows) {
+      const key =
+        post.source_url ||
+        `${post.source}::${(post.translated_content || post.content || post.title || "").slice(0, 200)}`;
+      const existing = seen.get(key);
+      const modelName = post.models?.name ?? null;
+      if (existing) {
+        if (modelName && !existing.models.includes(modelName)) {
+          existing.models.push(modelName);
+        }
+      } else {
+        seen.set(key, {
+          post,
+          models: modelName ? [modelName] : [],
+        });
+      }
+    }
+    return Array.from(seen.values());
+  }, [chatterData]);
 
   return (
     <PageTransition>
@@ -83,8 +113,8 @@ const Dashboard = () => {
                 role="status"
                 aria-live="polite"
               >
-                {latestScoreUpdate
-                  ? `Updated ${formatTimeAgo(latestScoreUpdate)} · ${today}`
+                {oldestModelIngestAt
+                  ? `Updated ${formatTimeAgo(oldestModelIngestAt)} · ${today}`
                   : today}
               </p>
             </div>
@@ -97,7 +127,7 @@ const Dashboard = () => {
                 {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
               </div>
             ) : modelsError ? (
-              <p className="py-8 text-center text-sm text-text-tertiary" role="status" aria-live="polite">
+              <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
                 Failed to load data
               </p>
             ) : (
@@ -131,53 +161,28 @@ const Dashboard = () => {
             />
 
             {chatterError ? (
-              <p className="py-8 text-center text-sm text-text-tertiary" role="status" aria-live="polite">
+              <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
                 Failed to load data
               </p>
             ) : !chatterVisible || chatterLoading ? (
               <div className="space-y-3" role="status" aria-live="polite">
                 {Array.from({ length: 6 }).map((_, i) => <ChatterSkeleton key={i} />)}
               </div>
-            ) : (chatterData?.pages ?? []).flatMap((page) => page).length === 0 ? (
-              <p className="py-8 text-center text-sm text-text-tertiary">
+            ) : dedupedChatter.length === 0 ? (
+              <p className="py-8 text-center text-body text-text-tertiary">
                 No posts in the last 7 days.
               </p>
             ) : (
               <div className="space-y-3">
-                {(() => {
-                  // Dedupe multi-model fanout: the same scraped post is stored
-                  // once per matched model, so the feed otherwise shows the
-                  // exact same text twice in a row. Collapse to one row and
-                  // collect the matched model names into the meta line.
-                  const rows = (chatterData?.pages ?? []).flatMap((p) => p);
-                  const seen = new Map<string, { post: typeof rows[number]; models: string[] }>();
-                  for (const post of rows) {
-                    const key =
-                      post.source_url ||
-                      `${post.source}::${(post.translated_content || post.content || post.title || "").slice(0, 200)}`;
-                    const existing = seen.get(key);
-                    const modelName = post.models?.name ?? null;
-                    if (existing) {
-                      if (modelName && !existing.models.includes(modelName)) {
-                        existing.models.push(modelName);
-                      }
-                    } else {
-                      seen.set(key, {
-                        post,
-                        models: modelName ? [modelName] : [],
-                      });
-                    }
-                  }
-                  return Array.from(seen.values()).map(({ post, models }) => (
-                    <ChatterPost
-                      key={post.id}
-                      post={{
-                        ...post,
-                        models: models.length > 0 ? { name: models.join(", ") } : post.models,
-                      }}
-                    />
-                  ));
-                })()}
+                {dedupedChatter.map(({ post, models }) => (
+                  <ChatterPost
+                    key={post.id}
+                    post={{
+                      ...post,
+                      models: models.length > 0 ? { name: models.join(", ") } : post.models,
+                    }}
+                  />
+                ))}
               </div>
             )}
 

@@ -25,7 +25,7 @@ function lookupPart(parts: Intl.DateTimeFormatPart[], type: Intl.DateTimeFormatP
   return Number(value);
 }
 
-function getPacificDateLabel(date: Date): string {
+export function getPacificDateLabel(date: Date): string {
   const parts = getPartsFormatter(PACIFIC_TIMEZONE).formatToParts(date);
   const y = lookupPart(parts, "year");
   const m = lookupPart(parts, "month");

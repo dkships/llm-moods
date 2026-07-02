@@ -16,15 +16,24 @@ const SOURCE = "pipeline-watchdog";
 const QUEUE_BACKLOG_WARN = 500;
 const QUEUE_OLDEST_WARN_MIN = 60;
 const AGGREGATION_LAG_WARN_MIN = 90;
-const SCRAPER_STALE_HOURS = 12;
 const RECENT_FAILED_WARN = 20;
-const SCRAPER_SOURCES = [
-  "reddit",
-  "hackernews",
-  "bluesky",
-  "twitter",
-  "mastodon",
-];
+// scraper_runs.source holds the function slug (see createRunRecord callers),
+// not a short name. Thresholds are per-source: reddit runs 2×/day (0 4,16 UTC,
+// max happy-path age ~11h17m at the :17 check), the rest 3×/day (max gap ~8h15m).
+const SCRAPER_STALE_HOURS_BY_SOURCE: Record<string, number> = {
+  "scrape-reddit-apify": 14,
+  "scrape-hackernews": 11,
+  "scrape-bluesky": 11,
+  "scrape-twitter": 11,
+  "scrape-mastodon": 11,
+};
+// A scraper that runs on schedule but fails/skips every run never trips the
+// started_at check, so also alert when the last success/partial is older than
+// this (2+ fully missed reddit windows; single failures can't spam).
+const SCRAPER_NO_SUCCESS_HOURS = 30;
+// Runs-query lookback must comfortably exceed the 30h success window or a
+// success row ages out while today's run is still in flight (false alert).
+const RUNS_LOOKBACK_HOURS = 72;
 
 interface Alert { level: "warn" | "error"; message: string; context: Record<string, unknown>; }
 
@@ -95,8 +104,8 @@ Deno.serve(async (req) => {
       });
     }
 
-    // 2. Scraper staleness — most recent run per source
-    const sinceIso = new Date(now - SCRAPER_STALE_HOURS * 60 * 60 * 1000 * 2).toISOString();
+    // 2. Scraper staleness — most recent run + most recent healthy run per source
+    const sinceIso = new Date(now - RUNS_LOOKBACK_HOURS * 60 * 60 * 1000).toISOString();
     const { data: runs, error: runsErr } = await supabase
       .from("scraper_runs")
       .select("source, started_at, status")
@@ -106,17 +115,33 @@ Deno.serve(async (req) => {
     if (runsErr) throw new Error(`scraper_runs: ${runsErr.message}`);
 
     const lastBySource = new Map<string, { started_at: string; status: string }>();
+    const lastHealthyBySource = new Map<string, { started_at: string; status: string }>();
     for (const row of runs ?? []) {
       if (!lastBySource.has(row.source)) lastBySource.set(row.source, row);
+      if (!lastHealthyBySource.has(row.source) && (row.status === "success" || row.status === "partial")) {
+        lastHealthyBySource.set(row.source, row);
+      }
     }
-    for (const source of SCRAPER_SOURCES) {
+    for (const [source, staleHours] of Object.entries(SCRAPER_STALE_HOURS_BY_SOURCE)) {
       const last = lastBySource.get(source);
       const ageHours = last ? Math.round((now - new Date(last.started_at).getTime()) / 3_600_000) : Infinity;
-      if (ageHours >= SCRAPER_STALE_HOURS) {
+      if (ageHours >= staleHours) {
         alerts.push({
           level: "warn",
-          message: `Scraper '${source}' has not run in ${ageHours === Infinity ? `>${SCRAPER_STALE_HOURS}` : ageHours}h`,
+          message: `Scraper '${source}' has not run in ${ageHours === Infinity ? `>${staleHours}` : ageHours}h`,
           context: { source, last_run: last?.started_at ?? null, last_status: last?.status ?? null },
+        });
+        continue; // no-success alert would be redundant noise on top
+      }
+      const healthy = lastHealthyBySource.get(source);
+      const healthyAgeHours = healthy
+        ? Math.round((now - new Date(healthy.started_at).getTime()) / 3_600_000)
+        : Infinity;
+      if (healthyAgeHours >= SCRAPER_NO_SUCCESS_HOURS) {
+        alerts.push({
+          level: "error",
+          message: `Scraper '${source}' is running but has had no success/partial run in ${healthyAgeHours === Infinity ? `>${RUNS_LOOKBACK_HOURS}` : healthyAgeHours}h`,
+          context: { source, last_run: last?.started_at ?? null, last_status: last?.status ?? null, last_healthy_run: healthy?.started_at ?? null },
         });
       }
     }
@@ -144,11 +169,14 @@ Deno.serve(async (req) => {
       alerts: alerts.length,
       queue: { queued, retrying, failed, recent_failed_24h: recentFailed ?? 0, oldest_age_min: oldestAgeMin },
       aggregation_lag_min: lagMin === Infinity ? null : lagMin,
-      scrapers_checked: SCRAPER_SOURCES.length,
+      scrapers_checked: Object.keys(SCRAPER_STALE_HOURS_BY_SOURCE).length,
     };
 
     if (alerts.length > 0) {
       for (const a of alerts) {
+        // Alert `level` (warn/error) is flattened to severity=critical so
+        // get_critical_alerts surfaces everything; the level survives in the
+        // message prefix. Post-fix, staleness alerts are rare and genuine.
         await supabase.from("error_log").insert({
           function_name: SOURCE,
           severity: "critical",

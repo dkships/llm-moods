@@ -1,4 +1,5 @@
 import { lazy, Suspense } from "react";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import Surface from "@/components/Surface";
 import { useModelDetail, useVibesHistory } from "@/hooks/useVibesData";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
@@ -60,8 +61,18 @@ const EmbeddedModelChart = ({ modelSlug, daysBack, startDate, endDate, caption }
 
   if (isError) {
     return (
-      <Surface className="my-6 text-center text-sm text-text-tertiary">
+      <Surface className="my-6 text-center text-body text-text-tertiary">
         Failed to load chart data.
+      </Surface>
+    );
+  }
+
+  // A pinned window that predates data collection resolves successfully with an
+  // all-null grid; without this branch the article shows a silent empty axis box.
+  if (!isLoading && chartData.every((d) => d.score == null)) {
+    return (
+      <Surface className="my-6 text-center text-body text-text-tertiary">
+        No score data for this window.
       </Surface>
     );
   }
@@ -83,9 +94,17 @@ const EmbeddedModelChart = ({ modelSlug, daysBack, startDate, endDate, caption }
         {isLoading ? (
           <div className="h-full animate-pulse rounded bg-secondary/40" aria-hidden="true" />
         ) : (
-          <Suspense fallback={<div className="h-full animate-pulse rounded bg-secondary/40" aria-hidden="true" />}>
-            <LazyVibesChart chartData={chartData} accent={accent} timeRange="30d" events={chartEvents} />
-          </Suspense>
+          <ErrorBoundary
+            fallback={
+              <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
+                Chart failed to render.
+              </p>
+            }
+          >
+            <Suspense fallback={<div className="h-full animate-pulse rounded bg-secondary/40" aria-hidden="true" />}>
+              <LazyVibesChart chartData={chartData} accent={accent} timeRange="30d" events={chartEvents} />
+            </Suspense>
+          </ErrorBoundary>
         )}
       </div>
       {chartEvents.length > 0 && (

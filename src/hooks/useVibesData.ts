@@ -191,10 +191,16 @@ export function useModelsWithLatestVibes() {
     refetchIntervalInBackground: false,
     staleTime: QUERY_STALE_TIME,
     queryFn: async () => {
-      const { data: landing, error: lErr } = await supabase.rpc("get_landing_vibes");
+      // Independent RPCs; supabase-js resolves with {data,error} (never rejects),
+      // so Promise.all can't short-circuit — check both errors after.
+      const [
+        { data: landing, error: lErr },
+        { data: sparkRows, error: sErr },
+      ] = await Promise.all([
+        supabase.rpc("get_landing_vibes"),
+        publicRpc.rpc("get_public_vibes_sparkline", { days_back: 10 }),
+      ]);
       if (lErr) throw lErr;
-
-      const { data: sparkRows, error: sErr } = await publicRpc.rpc("get_public_vibes_sparkline", { days_back: 10 });
       if (sErr) throw sErr;
 
       const sparkByModel = new Map<

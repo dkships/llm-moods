@@ -159,10 +159,23 @@ const renderCarryForwardDot = (accent: string) => (props: CarryForwardDotProps) 
   );
 };
 
+function buildAriaLabel(chartData: VibesChartDatum[], timeRange: string): string {
+  const scored = chartData.filter((d) => typeof d.score === "number");
+  if (scored.length === 0) return "Sentiment score chart: no score data for this period.";
+  const latest = scored[scored.length - 1];
+  const first = scored[0];
+  const delta = Math.round((latest.score as number) - (first.score as number));
+  const trend = delta > 0 ? `up ${delta} points` : delta < 0 ? `down ${Math.abs(delta)} points` : "flat";
+  return `Sentiment score chart, ${timeRange} range: latest score ${latest.score} at ${latest.day}, ${trend} across the visible period.`;
+}
+
 const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesChartProps) => {
   const [yMin, yMax] = computeYDomain(chartData);
   const showMidlineRef = yMin <= 50 && yMax >= 50;
   return (
+  // h-full w-full is load-bearing: consumers size the chart via wrapper divs,
+  // and ResponsiveContainer's height:100% resolves to 0 in an unsized parent.
+  <div role="img" aria-label={buildAriaLabel(chartData, timeRange)} className="h-full w-full">
   <ResponsiveContainer width="100%" height="100%">
     <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 0, left: 0 }}>
       <XAxis
@@ -226,6 +239,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
       />
     </LineChart>
   </ResponsiveContainer>
+  </div>
   );
 });
 VibesChart.displayName = "VibesChart";

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { getPacificDateLabel } from "@/lib/vibes";
+import { getPacificDateLabel } from "@/lib/pacific-day";
 import { getEventColor, getEventsForModel } from "@/data/vendor-events";
 import type { ChartEventMarker } from "@/components/VibesChart";
 

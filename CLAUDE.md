@@ -40,7 +40,7 @@ One-shot invocations of gated functions go through a temporary helper edge funct
 | State | TanStack React Query 5.83 |
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Edge Functions | 15 Deno functions (5 active scrapers + utilities) |
+| Edge Functions | 16 Deno functions (5 active scrapers + utilities) |
 | Sentiment AI | Claude Haiku 4.5 via Anthropic Messages API; provider pluggable via `CLASSIFIER_MODEL`, Gemini fallback |
 
 ## Key Routes

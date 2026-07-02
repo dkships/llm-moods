@@ -3,6 +3,7 @@ import Surface from "@/components/Surface";
 import Tag from "@/components/Tag";
 import BarList from "@/components/BarList";
 import { formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
+import { getSafeExternalUrl } from "@/lib/safe-url";
 import { formatRumorEta } from "@/lib/rumor-eta";
 import type { PublicRumorRow, RumorClaimType, RumorSourceRef } from "@/hooks/useRumors";
 import { inferSourceQuality, sourceQualityLabel } from "../../../supabase/functions/_shared/rumor-canon";
@@ -33,16 +34,6 @@ function etaLabel(r: PublicRumorRow): string | null {
   const eta = formatRumorEta(r);
   if (!eta) return null;
   return `${eta}${r.eta_conflicting ? " (estimates vary)" : " · unconfirmed"}`;
-}
-
-function safeUrl(u?: string | null): string | undefined {
-  if (!u) return undefined;
-  try {
-    const url = new URL(u);
-    return url.protocol === "https:" || url.protocol === "http:" ? url.toString() : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 function sourceContextLabel(source: RumorSourceRef): string | null {
@@ -129,7 +120,7 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
         {sources.length > 0 && (
           <ul className="mt-3 space-y-1.5">
             {sources.map((s) => {
-              const href = safeUrl(s.url);
+              const href = getSafeExternalUrl(s.url);
               const context = sourceContextLabel(s);
               const meta = [
                 context,

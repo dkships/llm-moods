@@ -84,7 +84,9 @@ const ResearchPostPage = () => {
   }, [post]);
 
   useHead({
-    title: post ? `${post.title} — LLM Vibes` : "Research — LLM Vibes",
+    // This effect runs AFTER the nested <NotFound/>'s (child effects fire
+    // first), so the bad-slug case must carry the 404 head state itself.
+    title: post ? `${post.title} — LLM Vibes` : "Page Not Found — LLM Vibes",
     description: post?.metaDescription ?? post?.summary,
     url: post ? `/research/${post.slug}` : undefined,
     ogImage: post?.ogImage,
@@ -97,6 +99,7 @@ const ResearchPostPage = () => {
         }
       : undefined,
     jsonLd,
+    noindex: !post || !Body,
   });
 
   if (!post || !Body) {
@@ -154,6 +157,11 @@ const ResearchPostPage = () => {
               </div>
 
               <ShareLinks url={`https://llmvibes.ai/research/${post.slug}`} title={post.title} />
+
+              <p className="mt-6 text-meta text-text-tertiary">
+                Cite this analysis: {post.author}, &ldquo;{post.title},&rdquo; LLM Vibes,{" "}
+                {formatDate(post.publishedAt)}. llmvibes.ai/research/{post.slug}
+              </p>
             </div>
           </article>
         </main>

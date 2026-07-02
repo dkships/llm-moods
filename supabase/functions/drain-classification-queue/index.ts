@@ -12,8 +12,11 @@ import { claimServiceLock, releaseServiceLock } from "../_shared/score-refresh.t
 import { corsHeaders, logToErrorLog } from "../_shared/utils.ts";
 
 const SOURCE = "drain-classification-queue";
-const DEFAULT_LIMIT = 100;
-const DEFAULT_BATCH_SIZE = 40;
+// Fallbacks for invocations that omit limit/batch_size. Match the pg_cron
+// production body (limit=200, batch_size=20); batch_size stays at 20 to
+// respect the batch-JSON-size cap decision (see AGENT-REFERENCE.md).
+const DEFAULT_LIMIT = 200;
+const DEFAULT_BATCH_SIZE = 20;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });

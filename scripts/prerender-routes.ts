@@ -154,9 +154,10 @@ function buildRoutes(): RouteMeta[] {
 
   const models: RouteMeta[] = Object.entries(MODEL_NAMES).map(([slug, name]) => ({
     path: `/model/${slug}`,
-    // Mirrors the useHead call in src/pages/ModelDetail.tsx.
+    // Mirrors the useHead call in src/pages/ModelDetail.tsx — the description
+    // string must stay byte-identical there (no automated parity guard).
     title: `${name} Vibes — LLM Vibes`,
-    description: `Latest community sentiment and complaint trends for ${name}.`,
+    description: `Daily 0-100 community sentiment score for ${name}: trend history, complaint breakdown, and incident timeline from Reddit, Hacker News, X, Bluesky, and Mastodon.`,
     ogImage: defaultOgImage,
     ogType: "website",
     jsonLd: buildModelJsonLd(slug, name),
@@ -173,11 +174,24 @@ function buildRoutes(): RouteMeta[] {
     },
     {
       path: "/research",
-      // Mirrors the useHead call in src/pages/ResearchIndex.tsx.
+      // Mirrors the useHead call in src/pages/ResearchIndex.tsx (incl. the ItemList JSON-LD).
       title: "Research — LLM Vibes",
       description: "Independent analysis of AI model quality and incidents from the LLM Vibes data set.",
       ogImage: defaultOgImage,
       ogType: "website",
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "ItemList",
+        name: "LLM Vibes Research",
+        itemListElement: [...RESEARCH_POSTS]
+          .sort((a, b) => new Date(b.publishedAt).getTime() - new Date(a.publishedAt).getTime())
+          .map((post, i) => ({
+            "@type": "ListItem",
+            position: i + 1,
+            url: `${BASE_URL}/research/${post.slug}`,
+            name: post.title,
+          })),
+      },
     },
     {
       path: "/rumors",

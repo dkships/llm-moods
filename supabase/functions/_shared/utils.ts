@@ -4,8 +4,6 @@ export const corsHeaders = {
     "authorization, x-client-info, apikey, content-type, x-run-pipeline-trigger-secret, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
 };
 
-declare const Deno: { env: { get(name: string): string | undefined } };
-
 const CHATGPT_EXPLICIT_PATTERNS = [
   /\bchat\s?gpt\b/i,
   /\bgpt[-\s]?4o\b/i,
@@ -63,13 +61,13 @@ export function matchModels(text: string, keywords: KeywordEntry[], communitySlu
   const highKws = keywords.filter(k => k.tier === "high").sort((a, b) => b.keyword.length - a.keyword.length);
   for (const k of highKws) {
     if (matched.includes(k.model_slug)) continue;
-    const regex = new RegExp(`\\b${k.keyword.replace(/[-\.]/g, "[-\\s.]?")}\\b`, "i");
+    const regex = new RegExp(`\\b${k.keyword.replace(/[-.]/g, "[-\\s.]?")}\\b`, "i");
     if (regex.test(lower)) matched.push(k.model_slug);
   }
   const ambigKws = keywords.filter(k => k.tier === "ambiguous");
   for (const k of ambigKws) {
     if (matched.includes(k.model_slug)) continue;
-    const regex = new RegExp(`\\b${k.keyword.replace(/[-\.]/g, "[-\\s.]?")}\\b`, "i");
+    const regex = new RegExp(`\\b${k.keyword.replace(/[-.]/g, "[-\\s.]?")}\\b`, "i");
     if (!regex.test(lower)) continue;
     if (shouldSkipAmbiguousMatch(lower, k)) continue;
     if (!k.context_words) { matched.push(k.model_slug); continue; }
@@ -204,40 +202,6 @@ export async function logZeroDataWarning(
     `Zero/low data: posts_found=${postsFound} (threshold=${threshold})`,
     "zero_data_warning",
   );
-}
-
-export async function triggerAggregateVibes(supabase: any, source: string, payload: Record<string, unknown> = {}) {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL");
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) return;
-
-  try {
-    const res = await fetch(`${supabaseUrl}/functions/v1/aggregate-vibes`, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${serviceRoleKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ source, ...payload }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text().catch(() => "no body");
-      await logToErrorLog(
-        supabase,
-        source,
-        `aggregate-vibes trigger failed HTTP ${res.status}: ${text.slice(0, 300)}`,
-        "aggregate-trigger",
-      );
-    }
-  } catch (error) {
-    await logToErrorLog(
-      supabase,
-      source,
-      `aggregate-vibes trigger exception: ${error instanceof Error ? error.message : String(error)}`,
-      "aggregate-trigger",
-    );
-  }
 }
 
 export async function upsertScrapedPost(

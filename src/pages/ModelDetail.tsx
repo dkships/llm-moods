@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, lazy, Suspense } from "react";
 import NavBar from "@/components/NavBar";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import NotFound from "@/pages/NotFound";
 import PageTransition from "@/components/PageTransition";
 import Surface from "@/components/Surface";
@@ -14,6 +15,7 @@ import Footer from "@/components/Footer";
 import {
   useModelDetail, useVibesHistory, useComplaintBreakdown,
   useSourceBreakdown, useModelPosts, useModelsWithLatestVibes,
+  usePrefetchModelDetail,
 } from "@/hooks/useVibesData";
 import { getResearchPostsForModel } from "@/data/research-posts";
 import { detectProductSurface } from "@/lib/product-surface";
@@ -39,6 +41,8 @@ const ModelDetail = () => {
   const { data: fetchedModel, isLoading: modelLoading, isError: modelError } = useModelDetail(slug);
   const { data: allModels, isError: landingError } = useModelsWithLatestVibes();
   const enriched = allModels?.find((m) => m.slug === slug);
+  const prefetch = usePrefetchModelDetail();
+  const siblingModels = (allModels ?? []).filter((m) => m.slug !== slug);
 
   // Synthesize a model from the dashboard cache while useModelDetail is in flight.
   // This eliminates the full-page skeleton stutter on Dashboard → ModelDetail
@@ -115,10 +119,14 @@ const ModelDetail = () => {
 
   useHead({
     title: model ? `${model.name} Vibes — LLM Vibes` : "Loading — LLM Vibes",
+    // Must stay byte-identical to the models block in scripts/prerender-routes.ts.
     description: model
-      ? `Latest community sentiment and complaint trends for ${model.name}.`
+      ? `Daily 0-100 community sentiment score for ${model.name}: trend history, complaint breakdown, and incident timeline from Reddit, Hacker News, X, Bluesky, and Mastodon.`
       : undefined,
     url: slug ? `/model/${slug}` : undefined,
+    // Belt-and-braces for bad slugs: the nested <NotFound/> usually carries
+    // this, but only because its child effect happens to run last.
+    noindex: !modelLoading && !model,
     jsonLd: model && slug
       ? {
           "@context": "https://schema.org",
@@ -273,6 +281,23 @@ const ModelDetail = () => {
                 <div className="h-4 w-52 rounded bg-secondary/60" />
               </div>
             )}
+            {siblingModels.length > 0 && (
+              <p className="mt-5 text-meta text-text-tertiary">
+                Also tracking:{" "}
+                {siblingModels.map((m, i) => (
+                  <span key={m.slug}>
+                    <Link
+                      to={`/model/${m.slug}`}
+                      onMouseEnter={() => prefetch(m.slug, m.id)}
+                      className="rounded-md text-text-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    >
+                      {m.name}
+                    </Link>
+                    {i < siblingModels.length - 1 && " · "}
+                  </span>
+                ))}
+              </p>
+            )}
           </section>
 
           {/* Recent incident analysis — only when a research post references this model */}
@@ -324,9 +349,17 @@ const ModelDetail = () => {
                     <>
                       <SectionHeader title="Vibes over time" />
                       <div className="h-64">
-                        <Suspense fallback={<div className="h-64 animate-pulse rounded bg-secondary/40" />}>
-                          <LazyVibesChart chartData={chartData} accent={accent} timeRange={timeRange} events={chartEvents} />
-                        </Suspense>
+                        <ErrorBoundary
+                          fallback={
+                            <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
+                              Chart failed to render.
+                            </p>
+                          }
+                        >
+                          <Suspense fallback={<div className="h-64 animate-pulse rounded bg-secondary/40" />}>
+                            <LazyVibesChart chartData={chartData} accent={accent} timeRange={timeRange} events={chartEvents} />
+                          </Suspense>
+                        </ErrorBoundary>
                       </div>
                       <div className="mt-4 flex gap-2" role="group" aria-label="Chart time range">
                         {TIME_RANGES.map((r) => (

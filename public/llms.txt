@@ -13,6 +13,8 @@ LLM Vibes is 100% automated — there are no user-submitted reports or votes. Se
 - [Gemini](https://llmvibes.ai/model/gemini): Community sentiment history, complaint breakdown, and incidents for Gemini.
 - [Grok](https://llmvibes.ai/model/grok): Community sentiment history, complaint breakdown, and incidents for Grok.
 - [Research](https://llmvibes.ai/research): Independent long-form analysis of AI model quality and incidents.
+- [Rumors](https://llmvibes.ai/rumors): Aggregated community chatter about unreleased AI models, ranked by cross-platform corroboration. Unconfirmed estimates, not forecasts.
+- [Privacy & data practices](https://llmvibes.ai/privacy): What LLM Vibes collects, how long it keeps it, and how to request removal of a quoted post.
 
 ## Research
 

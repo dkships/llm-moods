@@ -53,7 +53,7 @@ function changeToneClass(pct: number): string {
 }
 
 const TrendingComplaints = () => {
-  const { data, isLoading } = useTrendingComplaints();
+  const { data, isLoading, isError } = useTrendingComplaints();
 
   if (isLoading) {
     return (
@@ -62,6 +62,17 @@ const TrendingComplaints = () => {
         <div className="space-y-3">
           {[1, 2, 3].map((i) => <div key={i} className="h-8 rounded bg-secondary/40" />)}
         </div>
+      </Surface>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Surface motion="fade">
+        <SectionHeader title="Trending complaints" />
+        <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
+          Couldn't load complaint trends.
+        </p>
       </Surface>
     );
   }
