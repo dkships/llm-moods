@@ -260,6 +260,9 @@ function isVendor(value: string): value is Vendor {
 // origin-side cache any caller could make it hammer the vendor status feeds.
 // Best-effort per warm isolate; the Cache-Control header below only throttles
 // browsers/CDN, not this origin.
+// Bump CODE_VERSION on changes to this file — Lovable deploys can silently
+// ship stale code, and the response field is the only external deploy check.
+const CODE_VERSION = "2026-07-02.1";
 const ORIGIN_CACHE_TTL_MS = 5 * 60 * 1000;
 const originCache = new Map<Vendor, { result: VendorStatusResponse; expiresAt: number }>();
 
@@ -304,7 +307,7 @@ Deno.serve(async (req) => {
   }
 
   const result = await fetchVendorStatusCached(vendor);
-  const responseBody = { ...result, publicUrl: VENDOR_PUBLIC_URL[vendor] };
+  const responseBody = { ...result, publicUrl: VENDOR_PUBLIC_URL[vendor], codeVersion: CODE_VERSION };
 
   return new Response(JSON.stringify(responseBody), {
     status: 200,
