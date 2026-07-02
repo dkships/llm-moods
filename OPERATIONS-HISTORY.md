@@ -33,6 +33,18 @@ verification. Shipped in one batch:
   `getKnownSurfacesForModel`, duplicate `getPacificDateLabel`, duplicate safe-URL
   helpers), drain fallback defaults aligned to prod (200/20), origin-side 5-min cache
   on `fetch-vendor-status`, eslint edge-function override + GitHub Actions CI.
+- **Post-deploy measurement:** the `fetch-vendor-status` in-memory cache never hits in
+  production — verified via a `codeVersion` response marker (added specifically because
+  Lovable deploys can't otherwise be distinguished from stale code) plus rapid-burst
+  probes: the Supabase edge runtime did not reuse isolate module state across requests
+  even on a pinned TCP connection. The cache stays in (harmless, and correct if the
+  runtime ever changes) but provides no throttling; a real throttle would need shared
+  state, which contradicts the function's no-DB/no-service-role design. Accepted.
+- Watchdog fix verified live by direct scheduler-body invocation: 5 scrapers checked,
+  zero staleness alerts; it immediately surfaced a real pre-existing signal instead:
+  50 posts in failed classification state (at the >=50 alert threshold). Open
+  follow-up: run `reclassify-posts?mode=reset_failed&error_pattern=transient`
+  (dry_run=1 first) via the temporary-helper route to recover them.
 - Deferred consciously: scheduler-gate spoofability (documented as accepted risk in
   `AGENT-REFERENCE.md`), chatter cursor tie-skip (needs a migration), reclassify-posts
   broken `find_multi_model_misclassified` branch (fix at next redeploy of that fn).
