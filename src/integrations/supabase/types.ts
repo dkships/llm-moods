@@ -851,14 +851,6 @@ export type Database = {
           source: string
         }[]
       }
-      get_sparkline_scores: {
-        Args: never
-        Returns: {
-          model_id: string
-          period_start: string
-          score: number
-        }[]
-      }
       get_trending_complaints: {
         Args: never
         Returns: {
