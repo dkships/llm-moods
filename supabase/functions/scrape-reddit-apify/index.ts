@@ -189,9 +189,10 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     // (fallback to defaults). Reddit killed its public .json API (403 since
     // May 2026), so the old trudax-lite actor returns almost nothing; the
     // configurable HTML-parsing actor below (harshmaur by default, residential
-    // proxy) is the bake-off winner. One run PER subreddit — harshmaur exhausts
-    // a single run on the first subreddit when comments are on — fanned out with
-    // bounded concurrency so the whole window still fits the function budget.
+    // proxy) is the bake-off winner. Default is one run PER subreddit — harshmaur
+    // exhausts a single run on the first subreddit when comments are on — fanned
+    // out with bounded concurrency so the window fits the function budget. With
+    // comments off, `single_run_mode` collapses the window to one run (see below).
     const startUrls = getConfigValues(config, "start_url");
     const subreddits = Array.from(new Set(
       (startUrls.length > 0 ? startUrls : DEFAULT_START_URLS)
@@ -209,18 +210,22 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     const pollTimeoutSecs = Math.min(getConfigNumber(config, "poll_timeout_secs", APIFY_POLL_TIMEOUT_SECS), 170);
     const concurrency = Math.min(getConfigNumber(config, "actor_concurrency", 4), 8);
 
-    const runForSubreddit = async (sub: string): Promise<{ items: any[]; status: string; usageUsd: number; error?: string }> => {
+    const runForSubreddits = async (subs: string[]): Promise<{ items: any[]; status: string; usageUsd: number; error?: string }> => {
+      const label = subs.length === 1 ? `r/${subs[0]}` : `${subs.length} subreddits`;
+      const runMaxItems = Math.max(perRunMaxItems, maxPostsPerSub * subs.length);
       try {
         const input = {
-          subredditUrls: [`r/${sub}`],
+          subredditUrls: subs.map((s) => `r/${s}`),
           searchSort: "new",
-          maxPostsCount: maxPostsPerSub,
+          // maxPostsCount is a TOTAL cap across all subredditUrls (per the
+          // actor's input schema), so scale it by the subreddit count.
+          maxPostsCount: maxPostsPerSub * subs.length,
           crawlCommentsPerPost: includeComments,
           maxCommentsPerPost,
           fastMode: true,
           proxy: { useApifyProxy: true, apifyProxyGroups: ["RESIDENTIAL"] },
         };
-        const startRes = await fetch(apifyRunUrl(actorId, apifyToken, perRunMaxItems, {
+        const startRes = await fetch(apifyRunUrl(actorId, apifyToken, runMaxItems, {
           timeoutSecs: actorTimeoutSecs,
           maxTotalChargeUsd: perRunChargeUsd,
         }), {
@@ -230,12 +235,12 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
         });
         if (!startRes.ok) {
           const t = await startRes.text().catch(() => "");
-          return { items: [], status: `start_${startRes.status}`, usageUsd: 0, error: `r/${sub} start HTTP ${startRes.status}: ${t.slice(0, 160)}` };
+          return { items: [], status: `start_${startRes.status}`, usageUsd: 0, error: `${label} start HTTP ${startRes.status}: ${t.slice(0, 160)}` };
         }
         const runData = await startRes.json();
         const runId = runData?.data?.id;
         const datasetId = runData?.data?.defaultDatasetId;
-        if (!runId || !datasetId) return { items: [], status: "no_run", usageUsd: 0, error: `r/${sub} missing runId` };
+        if (!runId || !datasetId) return { items: [], status: "no_run", usageUsd: 0, error: `${label} missing runId` };
 
         let status = "";
         let usageUsd = 0;
@@ -253,29 +258,46 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
           await abortApifyRun(apifyToken, runId);
           status = "TIMED-OUT";
         }
-        const dRes = await fetch(apifyDatasetItemsUrl(datasetId, apifyToken, { limit: perRunMaxItems }));
+        const dRes = await fetch(apifyDatasetItemsUrl(datasetId, apifyToken, { limit: runMaxItems }));
         const data = dRes.ok ? await dRes.json().catch(() => []) : [];
         const runItems = Array.isArray(data) ? data : [];
-        const error = (status !== "SUCCEEDED" && runItems.length === 0) ? `r/${sub}: ${status || "no-status"}, 0 items` : undefined;
+        const error = (status !== "SUCCEEDED" && runItems.length === 0) ? `${label}: ${status || "no-status"}, 0 items` : undefined;
         return { items: runItems, status, usageUsd, error };
       } catch (e) {
-        return { items: [], status: "error", usageUsd: 0, error: `r/${sub}: ${e instanceof Error ? e.message : String(e)}` };
+        return { items: [], status: "error", usageUsd: 0, error: `${label}: ${e instanceof Error ? e.message : String(e)}` };
       }
     };
 
-    const runResults = await mapWithConcurrency(subreddits, concurrency, runForSubreddit);
+    // Single-run mode: all subreddits in one actor run — pays one $0.02
+    // actor-start fee per window instead of eight (~$6/mo). Off by default;
+    // enabled via the `single_run_mode` config row once a validation run
+    // confirms even per-sub coverage (maxPostsCount is a TOTAL cap, so a
+    // sequential crawl could starve later-listed subs). A request-body
+    // `single_run: true` override allows validating without touching config.
+    const singleRunMode = body.single_run === true || getConfigBoolean(config, "single_run_mode", false);
+    const runResults = singleRunMode
+      ? [await runForSubreddits(subreddits)]
+      : await mapWithConcurrency(subreddits, concurrency, (sub) => runForSubreddits([sub]));
     const items: any[] = [];
     const runErrors: string[] = [];
     const perSubStatus: Record<string, string> = {};
     let totalUsageUsd = 0;
-    for (let i = 0; i < subreddits.length; i++) {
-      const r = runResults[i];
+    if (singleRunMode) {
+      const r = runResults[0];
       if (r.items.length) items.push(...r.items);
-      totalUsageUsd += r.usageUsd || 0;
-      perSubStatus[subreddits[i]] = r.status;
+      totalUsageUsd = r.usageUsd || 0;
+      for (const sub of subreddits) perSubStatus[sub] = r.status;
       if (r.error) runErrors.push(r.error);
+    } else {
+      for (let i = 0; i < subreddits.length; i++) {
+        const r = runResults[i];
+        if (r.items.length) items.push(...r.items);
+        totalUsageUsd += r.usageUsd || 0;
+        perSubStatus[subreddits[i]] = r.status;
+        if (r.error) runErrors.push(r.error);
+      }
     }
-    const apifyUsageSummary = { actor: actorId, subreddits: subreddits.length, per_subreddit_status: perSubStatus, total_usage_usd: Number(totalUsageUsd.toFixed(4)) };
+    const apifyUsageSummary = { actor: actorId, mode: singleRunMode ? "single_run" : "fan_out", subreddits: subreddits.length, per_subreddit_status: perSubStatus, total_usage_usd: Number(totalUsageUsd.toFixed(4)) };
     apifyRunMetadata = apifyUsageSummary;
 
     const posts = items.filter((item: any) => item.dataType === "post");

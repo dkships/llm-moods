@@ -16,13 +16,14 @@ import { internalOnlyResponse, isInternalServiceRequest, readJsonBody } from "..
 const SOURCE = "check-gemini-self-bias";
 const DEFAULT_ORACLE = "gemini-2.5-pro";
 // Default candidate set is the Gemini→Claude migration comparison: the incumbent
-// Flash baseline head-to-head against the three Claude tiers. Override via the
-// `candidates` body param for other evaluations (e.g. the free-Gemini canary).
+// Flash baseline head-to-head against the production Haiku tier and Sonnet.
+// Opus was dropped from the defaults (2026-07-06) so a bare invocation can't
+// silently bill 300 posts at Opus rates — pass it via the `candidates` body
+// param when an Opus comparison is actually wanted.
 const DEFAULT_CANDIDATES = [
   "gemini-2.5-flash",
   "claude-haiku-4-5-20251001",
   "claude-sonnet-4-6",
-  "claude-opus-4-8",
 ];
 const DEFAULT_SAMPLE_SIZE = 300;
 const MAX_SAMPLE_SIZE = 500;

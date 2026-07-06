@@ -4,6 +4,41 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-07-06 — Apify cost optimization (Fable 5, adversarially reviewed)
+
+Demand was ~$30/mo against the $24/mo + $0.80/day fail-closed guards ($15 spent
+mid-cycle), so late-day runs were being budget-skipped nondeterministically. Root
+causes and fixes, all verified against actor pages + official Apify/Anthropic docs:
+
+- **Twitter search terms consolidated 8 → 5** (`20260706120000`). apidojo bills a
+  50-tweet minimum per query — 8 queries put the floor at $0.16/run, above the
+  $0.15 `maxTotalChargeUsd` cap — and the actor documents a 5-batched-query max,
+  so terms 6–8 were undocumented behavior (possibly silently unexecuted). New
+  floor ~$0.10/run (~$4.5/mo saved at 3×/day). Cadence deliberately kept at
+  3×/day: post-consolidation the 3rd run costs ~$2/mo and it's the 14:00 PT
+  peak-US window (an earlier draft cut it — reversed as an over-cut on review).
+- **Reddit `single_run_mode`** implemented behind a config flag (default off):
+  one harshmaur run for all 8 subs saves 7×$0.02 start fees/window (~$6/mo).
+  Enable only after the validation run passes (per-sub coverage via
+  `communityName`, runtime <120s, ~$0.18–0.20 usage) — `maxPostsCount` is a
+  TOTAL cap, so first-sub starvation is the documented risk; fan-out remains
+  the fallback.
+- **`check-gemini-self-bias` `DEFAULT_CANDIDATES` dropped Opus** — bare manual
+  invocation could bill 300 posts × Opus with no spend cap.
+- **Evaluated and rejected**: Anthropic Batch API (50% off ~$8/mo classifier,
+  but two-phase drain rework + watchdog conflict at its 60-min backlog alert);
+  prompt caching (inert on Haiku 4.5 — 4,096-token min cacheable prefix vs
+  ~1,460-token instruction block); classify batch-size 20→40 (~$0.65/mo);
+  `-filter:links`/date filters on Twitter queries (~$0 — the 50/query floor
+  dominates billing while delivery sits under it); actor swaps (candidates
+  logged in the plan; bake-off cost + preserve-working-scrapers).
+- **Guards left at $0.80/day + $24/mo by design** — post-plan demand ~$0.66/day
+  turns them into true backstops with same-day-retry headroom.
+- Baseline audit numbers (per-run `apify_usage`, budget-skip counts, per-model
+  Twitter recall baseline): _pending — recorded here after the Lovable SQL run_.
+- Open follow-up: bump Twitter `max_items` 80→~150 IF `chargedEventCounts`
+  shows floor billing (billed = 50×queries regardless of delivery) — free recall.
+
 ## 2026-07-01 — quality audit (Fable 5) + fixes
 
 Three-lens audit (frontend/UX, backend/pipeline, public-facing/SEO) with adversarial
