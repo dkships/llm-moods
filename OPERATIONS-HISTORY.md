@@ -34,10 +34,18 @@ causes and fixes, all verified against actor pages + official Apify/Anthropic do
   logged in the plan; bake-off cost + preserve-working-scrapers).
 - **Guards left at $0.80/day + $24/mo by design** — post-plan demand ~$0.66/day
   turns them into true backstops with same-day-retry headroom.
-- Baseline audit numbers (per-run `apify_usage`, budget-skip counts, per-model
-  Twitter recall baseline): _pending — recorded here after the Lovable SQL run_.
-- Open follow-up: bump Twitter `max_items` 80→~150 IF `chargedEventCounts`
-  shows floor billing (billed = 50×queries regardless of delivery) — free recall.
+- Baseline audit (Lovable SQL, 14 days to 2026-07-06): Reddit $0.19–0.30/window
+  (healthy; one ChatGPT sub-run FAILED 07-05). Twitter **80 charged items at
+  ~$0.032/run** — apidojo bills DELIVERED items, not the 50/query minimum, which
+  **refutes the floor-billing hypothesis**: Twitter was ~$2.9/mo (not the
+  estimated ~$13.5/mo), the 8→5 consolidation is primarily the batch-cap
+  data-quality fix rather than a dollar saving, and the `max_items` 80→150 bump
+  is REJECTED (billing tracks delivery, so it would roughly double Twitter cost).
+  Budget-skip count: **0 rows in 14 days** — the "guard already skipping runs"
+  hypothesis was wrong for this window; real demand was ~$0.60/day (Reddit
+  start-fees dominate). Per-model Twitter recall baseline for the week-1 watch:
+  claude 712, grok 621, chatgpt 402, gemini 70 (gemini is the starvation
+  canary in the merged query).
 
 ## 2026-07-01 — quality audit (Fable 5) + fixes
 
