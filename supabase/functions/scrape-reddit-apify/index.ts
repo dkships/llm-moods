@@ -297,7 +297,15 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
         if (r.error) runErrors.push(r.error);
       }
     }
-    const apifyUsageSummary = { actor: actorId, mode: singleRunMode ? "single_run" : "fan_out", subreddits: subreddits.length, per_subreddit_status: perSubStatus, total_usage_usd: Number(totalUsageUsd.toFixed(4)) };
+    // Fetched-item counts per subreddit — the coverage signal for single_run_mode
+    // (inserted-row counts can't prove coverage because dedup discards items the
+    // fan-out already ingested).
+    const perSubItems: Record<string, number> = {};
+    for (const item of items) {
+      const community = String(item?.communityName ?? item?.parsedCommunityName ?? "unknown").replace(/^r\//i, "");
+      perSubItems[community] = (perSubItems[community] ?? 0) + 1;
+    }
+    const apifyUsageSummary = { actor: actorId, mode: singleRunMode ? "single_run" : "fan_out", subreddits: subreddits.length, per_subreddit_status: perSubStatus, per_subreddit_items: perSubItems, total_usage_usd: Number(totalUsageUsd.toFixed(4)) };
     apifyRunMetadata = apifyUsageSummary;
 
     const posts = items.filter((item: any) => item.dataType === "post");
