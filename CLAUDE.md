@@ -70,7 +70,7 @@ One-shot invocations of gated functions go through a temporary helper edge funct
 
 `scraped_posts` also carries `rumor_checked_at` / `rumor_data` (rumor-extraction state; see "Rumors radar").
 
-**RPC Functions:** `get_landing_vibes()`, `get_sparkline_scores()`, `get_complaint_breakdown()`, `get_source_breakdown()`, `get_trending_complaints()`, `get_public_rumors()` (public read), `get_rumor_candidates()` (service-role only)
+**RPC Functions:** `get_landing_vibes()`, `get_complaint_breakdown()`, `get_source_breakdown()`, `get_trending_complaints()`, `get_public_rumors()` (public read), `get_rumor_candidates()` (service-role only)
 
 ## Cron architecture (May 2026)
 
