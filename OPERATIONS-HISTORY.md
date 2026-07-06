@@ -18,11 +18,19 @@ causes and fixes, all verified against actor pages + official Apify/Anthropic do
   3×/day: post-consolidation the 3rd run costs ~$2/mo and it's the 14:00 PT
   peak-US window (an earlier draft cut it — reversed as an over-cut on review).
 - **Reddit `single_run_mode`** implemented behind a config flag (default off):
-  one harshmaur run for all 8 subs saves 7×$0.02 start fees/window (~$6/mo).
-  Enable only after the validation run passes (per-sub coverage via
-  `communityName`, runtime <120s, ~$0.18–0.20 usage) — `maxPostsCount` is a
-  TOTAL cap, so first-sub starvation is the documented risk; fan-out remains
-  the fallback.
+  one harshmaur run for all 8 subs would save 7×$0.02 start fees/window (~$8/mo).
+  **Validation run 2026-07-06: NO-GO.** All 80 fetched items came from
+  r/ClaudeAI (`per_subreddit_items: {ClaudeAI: 80}`, all 8 subs "SUCCEEDED",
+  $0.164, ~56s) — the actor exhausts the total `maxPostsCount` cap on the
+  first-listed subreddit even with comments off. Flag stays off permanently for
+  this actor; code kept as telemetry + ready path for a per-URL-cap actor.
+  Side effect: the validation ingested 83 genuinely-new r/ClaudeAI rows (one-time
+  extra Claude Reddit volume in that day's sample; real in-window posts, left in).
+- **Live budget guards are looser than the docs said**: env overrides
+  `APIFY_MONTHLY_SPEND_LIMIT_USD=28` / `APIFY_DAILY_SPEND_LIMIT_USD=2` (seen in
+  the run's `apifyBudget` block), not the in-code $24/$0.80 defaults — which is
+  why no runs were ever budget-skipped. Post-plan demand ~$0.60/day ≈ $18/mo
+  against the $28 guard and $29 plan; usage at validation time $15.73.
 - **`check-gemini-self-bias` `DEFAULT_CANDIDATES` dropped Opus** — bare manual
   invocation could bill 300 posts × Opus with no spend cap.
 - **Evaluated and rejected**: Anthropic Batch API (50% off ~$8/mo classifier,
