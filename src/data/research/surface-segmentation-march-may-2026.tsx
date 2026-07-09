@@ -161,7 +161,7 @@ const SurfaceSegmentationBody = () => (
     </p>
     <p>
       Second, for Gemini and Grok, almost no posts name a surface at all. The detector matched 126 Gemini
-      posts (5.6%) and 10 Grok posts (0.5%) across the whole window — every one in a cell too thin to chart. We don't think that's because Gemini and Grok users only use one surface.
+      posts (5.6%) and 10 Grok posts (0.5%) across the whole window, every one in a cell too thin to chart. We don't think that's because Gemini and Grok users only use one surface.
       We think it's a mix of two things: the detector has blind spots (no patterns for "Gemini Code Assist,"
       "Google AI Studio" matches but its users may call it something else), and the social conversation about
       those two vendors runs at the brand level rather than the surface level. Either way, we can't
@@ -332,7 +332,7 @@ const SurfaceSegmentationBody = () => (
           [1]
         </a>
       </sup>{" "}
-      May 7 was a near-blackout day during a cron architecture rebuild — only one (model, surface) cell
+      May 7 was a near-blackout day during a cron architecture rebuild: only one (model, surface) cell
       cleared the five-post floor that day, so the rest were skipped. It shows up as a single
       day's gap in the chart, not as a sustained shift.
     </p>

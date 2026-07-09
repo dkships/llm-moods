@@ -172,7 +172,7 @@ const ClaudeApril2026Body = () => (
       dropped 23, ChatGPT dropped 49, Gemini dropped 38, Grok dropped 14. By that read, ChatGPT looked far
       worse than Claude. The signal that singled Claude out is the <em>post-fix recovery shape</em>. Between
       April 11 and April 15, ChatGPT moved back toward its baseline (32 → 46), Gemini drifted slightly down
-      (38 → 36), and Claude fell another 12 points to 36 — then kept going. (Grok also slid on much thinner
+      (38 → 36), and Claude fell another 12 points to 36, then kept going. (Grok also slid on much thinner
       post volume; Claude's drop is the only one with high-volume support.) That post-fix divergence is the
       strongest evidence we have that the underlying issue was Claude-specific rather than the press cycle
       hitting every model.
@@ -183,7 +183,7 @@ const ClaudeApril2026Body = () => (
       Three things, in order of how much they undercut the dashboard.
     </p>
     <p>
-      The April 11–15 trough (single-day low of 29, window average 36 — the lowest sustained stretch on
+      The April 11–15 trough (single-day low of 29, window average 36, the lowest sustained stretch on
       Claude's chart through April 24) landed{" "}
       <em>after</em> Anthropic fixed the cache bug on April 10 and <em>before</em> the verbosity-prompt bug
       on April 16. That window is press-cycle echo, not silent-bug detection. The Register published on April
@@ -195,8 +195,8 @@ const ClaudeApril2026Body = () => (
       The February 19 – March 7 volume gap is on us. The scraper orchestrator was committed in early March
       but ran on manual triggers only; the hourly cron schedule landed April 22. After a May 2026
       reclassification pass that recovered previously-failed posts, the gap is smaller than our April
-      retrospective reported, but the "Feb 15–18 baseline" still stands on only four days of meaningful data
-      — not a robust statistical floor. The operational miss was less expensive than we feared, and worth
+      retrospective reported, but the "Feb 15–18 baseline" still stands on only four days of meaningful data,
+      not a solid statistical floor. The operational miss was less expensive than we feared, and worth
       naming anyway because shipping a leading-indicator with manual-trigger scrapers is the kind of mistake
       that doesn't show up until you need the indicator.
     </p>
@@ -222,10 +222,10 @@ const ClaudeApril2026Body = () => (
       shipped.
     </p>
     <p>
-      For a frontier-model team, the value of an outside signal isn't trusting the score. It's having one.
-      Internal evals measure what the model can do on curated tasks. A noisy public-grumble dataset measures
+      For a frontier-model team, an outside signal is valuable because it exists, not because the score is
+      right. Internal evals measure what the model can do on curated tasks. A noisy public-grumble dataset measures
       what users feel when those tasks meet their workflows. The two answer different questions, but if they
-      diverge for a week, the divergence itself is the bug report — and the retro doesn't have to wait 28
+      diverge for a week, the divergence itself is the bug report, and the retro doesn't have to wait 28
       days.
     </p>
     <p>

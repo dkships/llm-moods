@@ -20,7 +20,7 @@ const CrossModelDeltasBody = () => (
       How a model's score recovers after a known fix tells you more than the depth of the original drop. In
       the <a href="/research/claude-april-2026">March–April 2026 Claude incident</a>, ChatGPT drifted back
       toward its baseline once Anthropic's fix shipped. Gemini stayed roughly flat. Claude kept falling, the
-      deepest of the four. That post-fix divergence is what singled Claude out as actually broken — not its
+      deepest of the four. That post-fix divergence is what singled Claude out as actually broken, not its
       bug-window delta, and definitely not its absolute score in any single day.
     </p>
     <p>
@@ -44,7 +44,7 @@ const CrossModelDeltasBody = () => (
     <EmbeddedModelChart modelSlug="grok" startDate="2026-02-10" endDate="2026-04-25" />
 
     <p>
-      Each chart shows the model's own daily score, February 10 through April 25, 2026 — the publication
+      Each chart shows the model's own daily score, February 10 through April 25, 2026, the publication
       window. The Claude chart is shaded with the three Anthropic-confirmed bug windows. The other three are
       not shaded because their vendors have not published comparable postmortems for the same period.
     </p>
@@ -130,8 +130,8 @@ const CrossModelDeltasBody = () => (
     <p>
       Press-cycle echo. When a story goes mainstream (VentureBeat, Fortune, Hacker News, The Register), the wave
       of "X is broken" posts arrives <em>after</em> the fix. Our scrapers pick up that echo for every model
-      visible in the news cycle. The interesting question isn't who showed up in the press wave. It's who{" "}
-      <em>kept</em> sliding through it. A model whose post-fix score recovers toward baseline (ChatGPT, Gemini)
+      visible in the news cycle. The interesting question is who{" "}
+      <em>kept</em> sliding through the wave, not who showed up in it. A model whose post-fix score recovers toward baseline (ChatGPT, Gemini)
       is a model where the press-cycle posts are stale complaints. A model whose post-fix score keeps falling
       (Claude) is a model where the underlying complaints are still arriving.
     </p>
@@ -172,7 +172,7 @@ const CrossModelDeltasBody = () => (
       <li>
         After a known regression and fix, watch the recovery column, not the trough. If three models trend
         upward and one stays flat or falls, the flat one is the model whose underlying issue isn't actually
-        resolved — regardless of which had the deepest absolute drop or the largest bug-window delta.
+        resolved, regardless of which had the deepest absolute drop or the largest bug-window delta.
       </li>
       <li>
         Treat a single ≥2σ daily deviation as a watch flag, not a verdict. The anomaly detector
@@ -186,8 +186,8 @@ const CrossModelDeltasBody = () => (
     <p>
       When the next Claude, GPT, Gemini, or Grok regression happens (and it will), the early signal will not
       be a single model's drop and probably won't even be its delta from baseline. Industry-wide news cycles
-      pull every visible model down at the same time. The signal that one model is actually still degraded —
-      and not just absorbing a press wave — is post-recovery divergence: most models climb back; one doesn't.
+      pull every visible model down at the same time. The signal that one model is actually still degraded
+      (not just absorbing a press wave) is post-recovery divergence: most models climb back; one doesn't.
     </p>
     <p>
       That comparison currently requires eyeballing four charts side by side. The next iteration of LLM Vibes

@@ -119,7 +119,7 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     summary:
       "Comparing absolute scores or even bug-window deltas across LLM Vibes models can mislead you. What actually caught Claude's March 2026 regression was the post-fix recovery shape: ChatGPT recovered, Gemini stayed flat, Claude kept sliding.",
     metaDescription:
-      "Why cross-model score deltas mislead — and how the post-fix recovery shape, not the absolute drop, caught Claude's March 2026 regression.",
+      "Why cross-model score deltas mislead, and how the post-fix recovery shape, not the absolute drop, caught Claude's March 2026 regression.",
     author: "David Kelly",
     tags: ["cross-model", "case-study", "claude", "chatgpt", "gemini", "grok"],
     ogImage: "/research/cross-model-deltas-march-april-2026/og.png",

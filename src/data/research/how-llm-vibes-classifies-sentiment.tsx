@@ -46,13 +46,13 @@ const HowLlmVibesClassifiesSentimentBody = () => (
       Each scraper has its own Supabase <code>pg_cron</code> row, firing three times a day at the same
       Pacific-time windows (05:00, 14:00, 21:00) and staggered by a couple of minutes so they never contend.
       Classification is decoupled: scrapers insert posts as <code>pending</code>, a separate cron drains the
-      classification queue every two minutes, and a third refreshes aggregate scores every 30 minutes. No
-      orchestrator, no shared failure domain — a Reddit timeout can't take Mastodon down with it.
+      classification queue every two minutes, and a third refreshes aggregate scores every 30 minutes. There's no
+      orchestrator and no shared failure domain: a Reddit timeout can't take Mastodon down with it.
     </p>
     <p>
       It didn't start that way. The original design ran a single orchestrator function
       (<code>run-scrapers</code>), committed in early March 2026 on manual triggers, with an hourly cron
-      schedule landing April 22 — that gap is documented in{" "}
+      schedule landing April 22; that gap is documented in{" "}
       <ExternalLink href="https://github.com/dkships/llm-moods/blob/main/docs/llm-vibes-retrospective-april-2026.md">
         our retrospective
       </ExternalLink>
@@ -123,7 +123,7 @@ content_multiplier = 0.6 if title-only else 1.0`}</code>
       Each source (<code>reddit</code>, <code>bluesky</code>, <code>twitter</code>, etc.) is then capped at no
       more than 50% of total weight. If Bluesky alone produces enough volume to dominate a day's score, the
       cap rescales it down. This is the deliberate trade-off: less reactive to local Bluesky or Reddit
-      subculture shifts, more robust to a single platform's sudden moderation policy change. We picked the
+      subculture shifts, less exposed to a single platform's sudden moderation policy change. We picked the
       second.
     </p>
     <p>After capping, the per-day score is:</p>
@@ -179,7 +179,7 @@ score = round((effective_positive / total_weight) × 100)`}</code>
       from the Lovable AI gateway to the Google Gemini API on March 20, an upgrade through 2.5 Flash-Lite and
       3.1 Flash-Lite Preview in the following days, a move to 2.5 Flash on April 25, and a switch to Anthropic's
       Claude Haiku 4.5 on June 1. Each transition
-      produced a visible step-change in the positive / negative / neutral mix — most dramatically a one-week,
+      produced a visible step-change in the positive / negative / neutral mix. The most dramatic was a one-week,
       roughly 25-percentage-point drop in neutral share across all four tracked models the week of the API
       switch. Numbers cited in the{" "}
       <a href="/research/claude-april-2026">Claude April 2026</a> and{" "}
@@ -192,7 +192,7 @@ score = round((effective_positive / total_weight) × 100)`}</code>
       The classifier vendor is one of the tracked models. Claude Haiku 4.5 now grades all four models,
       including Claude itself, so pro-Claude bias is the measurement risk. An April 2026 comparison between the
       Gemini and Claude classifiers found about 92% agreement on sentiment, and a June 2026 run on the live
-      Claude Haiku 4.5 classifier put agreement with an independent Gemini grader at 88.9% — which suggests
+      Claude Haiku 4.5 classifier put agreement with an independent Gemini grader at 88.9%, which suggests
       vendor identity isn't the main driver of scores, but neither is a substitute for an ongoing cross-vendor
       check. The check
       fixture lives at <code>supabase/functions/check-gemini-self-bias</code>. It samples up to 150 recent
@@ -204,7 +204,7 @@ score = round((effective_positive / total_weight) × 100)`}</code>
     <p>
       Volume gaps are part of the record. The Feb 19 – Mar 7, 2026 gap (no scheduled cron, manual triggers only)
       means our pre-bug baseline for the{" "}
-      <a href="/research/claude-april-2026">Claude April 2026 incident</a> is four days, not a robust statistical
+      <a href="/research/claude-april-2026">Claude April 2026 incident</a> is four days, not a solid statistical
       floor.
     </p>
     <p>
