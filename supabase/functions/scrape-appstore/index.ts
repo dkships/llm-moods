@@ -43,6 +43,15 @@ const APP_IDS: Record<string, string> = {
 // 15/app × 3 runs/day ≈ 45/app/day ceiling keeps the source supplementary.
 const DEFAULT_MAX_REVIEWS_PER_APP = 15;
 
+// Apple's review RSS is served from inconsistent CDN caches: back-to-back
+// fetches of the same feed can differ by WEEKS in their "newest" entry
+// (verified live 2026-07-10: one snapshot's newest was 26h old, the next 26
+// days). A 24h recency cutoff ingests zero on stale cache hits, so the window
+// is 7 days and the source_url dedupe (stable per-review IDs) absorbs the
+// overlap across runs. posted_at keeps the review's own timestamp, so scoring
+// buckets each review into its real day regardless of when it was ingested.
+const REVIEW_MAX_AGE_MS = 7 * 24 * 3600000;
+
 interface ReviewEntry {
   id?: { label?: string };
   title?: { label?: string };
@@ -139,7 +148,7 @@ export async function handleScrapeAppstore(req: Request): Promise<Response> {
       .limit(10000);
     const existingUrls = new Set((existing || []).map((entry: { source_url: string | null }) => entry.source_url).filter(Boolean));
 
-    const cutoff = new Date(Date.now() - 24 * 3600000);
+    const cutoff = new Date(Date.now() - REVIEW_MAX_AGE_MS);
     const summary = {
       source: SOURCE,
       posts_found: 0,
