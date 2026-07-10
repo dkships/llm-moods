@@ -351,7 +351,15 @@ export function computeScore(posts: ScoreInputPost[]): ScoreResult {
 
     const contentMult = post.content_type === "title_only" ? 0.6 : 1.0;
     const confidence = Math.max(0, Math.min(1, rawConfidence)) * contentMult;
-    const engagement = (post.score && post.score > 0) ? Math.log(post.score + 1) : 1.0;
+    // Engagement multiplier: floored at 1 so it is monotonic (raw ln(score+1)
+    // made a 1-like post weigh LESS than a 0-like post), and capped at
+    // ln(1001) ≈ 6.9 so one viral post can't supply most of a day's weight —
+    // engagement scales differ wildly by platform (20k-like tweets vs 0-2-like
+    // Mastodon posts) and the source-share cap only bounds whole sources.
+    const engagement = Math.min(
+      Math.max(1.0, Math.log((post.score && post.score > 0 ? post.score : 0) + 1)),
+      Math.log(1001),
+    );
     const weight = confidence * engagement;
     const source = post.source || "unknown";
 
@@ -403,7 +411,12 @@ export function computeScore(posts: ScoreInputPost[]): ScoreResult {
   }
 
   const totalWeight = positiveWeight + negativeWeight + neutralWeight;
-  const effectivePositive = positiveWeight + (neutralWeight * 0.3);
+  // Neutral counts as 0.5 positive so a neutral post is score-neutral,
+  // consistent with the empty-day baseline of 50. The previous 0.3 made
+  // neutral read as 70% negative: an all-neutral day scored 30, dragging
+  // scores down exactly on launch/news days when factual comparison posts
+  // spike — the largest structural bias the 2026-07 accuracy audit found.
+  const effectivePositive = positiveWeight + (neutralWeight * 0.5);
   const score = totalWeight > 0 ? Math.round((effectivePositive / totalWeight) * 100) : 50;
 
   let topComplaint: string | null = null;

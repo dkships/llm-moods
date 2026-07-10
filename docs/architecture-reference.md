@@ -57,6 +57,7 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 | `scrape-bluesky-3x` | `4 4,12,21 * * *` | +4 min | `scrape-bluesky` |
 | `scrape-twitter-3x` | `6 4,12,21 * * *` | +6 min | `scrape-twitter` |
 | `scrape-mastodon-3x` | `8 4,12,21 * * *` | +8 min | `scrape-mastodon` |
+| `scrape-appstore-3x` | `10 4,12,21 * * *` | +10 min | `scrape-appstore` (Apple review RSS, free/keyless; added 2026-07-10) |
 | `drain-classification-queue-2min` | `*/2 * * * *` | every 2 min | `drain-classification-queue` (body: `limit=200`, `batch_size=20` → 10 classifier calls/pass) |
 | `aggregate-vibes-q30` | `20,50 * * * *` | every 30 min, offset | `aggregate-vibes` (refreshes last 7 days; `queued_posts` heals as drain catches up, `failed_posts` only via `reclassify-posts?mode=reset_failed`) |
 | `pipeline-watchdog-1h` | `17 * * * *` | hourly at :17 | `pipeline-watchdog` |
@@ -68,7 +69,7 @@ Drain capacity: every 2 min at `limit=200`, `batch_size=20` ≈ 6,000 posts/hr. 
 
 ## Scrapers (Edge Functions)
 
-Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances). Lemmy was dropped in Phase 12 (yielded 0.4 posts/run for 18 wasted Gemini calls; mostly Reddit cross-posts). Each scraper runs on its own pg_cron row at the three Pacific-time windows (05:00, 14:00, 21:00 PT), staggered by minute. Scrapers insert posts as `classification_status='pending'`; classification is drained by the separate `drain-classification-queue` cron, and `aggregate-vibes` runs independently to refresh scores.
+Reddit (Apify), Hacker News (Algolia API — stories + comments since 2026-07-10), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances; hashtag timelines only — unauthenticated phrase search was dead and removed 2026-07-10), App Store reviews (Apple RSS, free/keyless, added 2026-07-10). Lemmy was dropped in Phase 12 (yielded 0.4 posts/run for 18 wasted Gemini calls; mostly Reddit cross-posts). Each scraper runs on its own pg_cron row at the three Pacific-time windows (05:00, 14:00, 21:00 PT), staggered by minute. Scrapers insert posts as `classification_status='pending'`; classification is drained by the separate `drain-classification-queue` cron, and `aggregate-vibes` runs independently to refresh scores.
 
 **Tracked models:** Claude, ChatGPT, Gemini, Grok (DeepSeek and Perplexity were removed 2026-03-21).
 

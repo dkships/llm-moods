@@ -101,9 +101,24 @@ function hasValidSentiment(post: ScoreInputPost): boolean {
 
 const PARTIAL_COVERAGE_QUEUE_THRESHOLD = 5;
 const PARTIAL_COVERAGE_MIN_RATIO = 0.85;
+// Terminal classification failures are excluded from classification_coverage
+// (so the ratio heals after reset_failed), but they are still silent sample
+// loss — and a biased one: batch truncation/parse errors correlate with long
+// and non-English posts. Past this share of the collected sample, the day can
+// no longer honestly claim "measured".
+const FAILED_SHARE_DEMOTION_THRESHOLD = 0.15;
 
-function basisForResult(result: ScoreResult, queuedPosts = 0, classificationCoverage = 1, minPosts = DEFAULT_MIN_POSTS): ScoreBasisStatus {
-  if (queuedPosts > PARTIAL_COVERAGE_QUEUE_THRESHOLD || classificationCoverage < PARTIAL_COVERAGE_MIN_RATIO) return "partial_coverage";
+function failedShareFor(classifiedPosts: number, queuedPosts: number, failedPosts: number): number {
+  const total = classifiedPosts + queuedPosts + failedPosts;
+  return total > 0 ? failedPosts / total : 0;
+}
+
+function basisForResult(result: ScoreResult, queuedPosts = 0, classificationCoverage = 1, minPosts = DEFAULT_MIN_POSTS, failedShare = 0): ScoreBasisStatus {
+  if (
+    queuedPosts > PARTIAL_COVERAGE_QUEUE_THRESHOLD
+    || classificationCoverage < PARTIAL_COVERAGE_MIN_RATIO
+    || failedShare > FAILED_SHARE_DEMOTION_THRESHOLD
+  ) return "partial_coverage";
   if (result.eligible_posts < minPosts) return "thin_sample";
   return "measured";
 }
@@ -338,7 +353,8 @@ export async function refreshScores(
         // Coverage excludes failed so the ratio heals when reclassify-posts?mode=reset_failed
         // moves failed rows back through pending → classified.
         const classificationCoverage = coverageFor(classifiedPosts.length, classifiedPosts.length + queuedPosts);
-        const basis = basisForResult(result, queuedPosts, classificationCoverage, minPosts);
+        const failedShare = failedShareFor(classifiedPosts.length, queuedPosts, failedPosts);
+        const basis = basisForResult(result, queuedPosts, classificationCoverage, minPosts, failedShare);
         const scoreConfidence = confidenceForResult(result, basis, classificationCoverage, minPosts);
         const measurementPeriodStart = window.periodStart;
         const score = applyScoreSmoothing(result.score, previousScore, result.eligible_posts, minPosts);
@@ -419,7 +435,8 @@ export async function refreshScores(
       const result = computeScore(asScoreInput(classifiedPosts));
       if (result.eligible_posts === 0) continue;
       const classificationCoverage = coverageFor(classifiedPosts.length, classifiedPosts.length + queuedPosts);
-      const basis = basisForResult(result, queuedPosts, classificationCoverage, minPosts);
+      const failedShare = failedShareFor(classifiedPosts.length, queuedPosts, failedPosts);
+      const basis = basisForResult(result, queuedPosts, classificationCoverage, minPosts, failedShare);
       rows.push({
         model_id: modelId,
         period: "hourly",

@@ -156,7 +156,7 @@ If the post IS in English, set "language" to null and "english_translation" to n
 STEP 2 — SENTIMENT
 - "positive": Praising quality, impressed by output, favorably comparing to alternatives, expressing satisfaction
 - "negative": Complaining about quality, frustrated with output, unfavorably comparing, expressing disappointment
-- "neutral": Genuinely mixed or purely factual comparison with no opinion. This should be RARE — most relevant posts express clear sentiment. When ambiguous, lean toward the expressed emotion.
+- "neutral": Genuinely mixed or purely factual comparison with no opinion. Use it when that is truly the case — do not force polarity onto ambiguous posts; reflect genuine ambiguity as confidence 0.5-0.6 instead.
 
 IMPORTANT: If the post describes switching away from, leaving, or replacing this model, that is NEGATIVE sentiment — even if the overall tone is positive. "I'm happily moving to X, done with Y" is negative for Y. Conversely, if someone is switching TO this model, that is POSITIVE for it.
 
@@ -210,7 +210,7 @@ LANGUAGE: If a post is NOT in English, detect the language (ISO 639-1 code) and 
 SENTIMENT (if relevant):
 - "positive": praising, impressed, satisfied
 - "negative": complaining, frustrated, disappointed
-- "neutral": genuinely mixed or purely factual (should be RARE)
+- "neutral": genuinely mixed or purely factual. Use it when that is truly the case — do not force polarity onto ambiguous posts; reflect genuine ambiguity as confidence 0.5-0.6 instead.
 
 IMPORTANT: If the post describes switching away from, leaving, or replacing the model being discussed, that is NEGATIVE sentiment — even if the overall tone is positive. "I'm happily moving to X, done with Y" is negative for Y. Conversely, if someone is switching TO the model, that is POSITIVE.
 
@@ -230,6 +230,13 @@ Return ONLY a JSON object with one result per post in the same order:
 Posts to classify:
 `;
 
+// Classifier input cap (chars). Was 600, which cut long Reddit self-posts whose
+// sentiment-bearing verdict lands at the end ("...so I cancelled my sub"); ingest
+// stores up to 2000 chars of content (scrape-reddit-apify) so 2000 matches what
+// the pipeline already keeps. Cost impact is input-tokens only (~$1-2/mo at
+// Haiku 4.5 $1/MTok; output is fixed-shape JSON and unchanged).
+const CLASSIFY_INPUT_MAX_CHARS = 2000;
+
 const BATCH_CLASSIFY_TARGETED_PROMPT = `You are classifying social media posts about AI language models. Each post has a TARGET MODEL indicated in brackets. You must classify the sentiment SPECIFICALLY TOWARD that target model.
 
 IMPORTANT: A post may mention multiple AI models. Focus ONLY on what it says about the TARGET model. For example:
@@ -242,16 +249,20 @@ CONTRAST PATTERNS — read carefully, the surface tone often misleads:
 - "Claude nailed the reasoning, but ChatGPT excels at prose" → [TARGET: Claude] = POSITIVE (nailed reasoning), [TARGET: ChatGPT] = POSITIVE (excels at prose). Both can be positive.
 - "Moving from ChatGPT to Claude because of hallucinations" → [TARGET: ChatGPT] = NEGATIVE (the reason for leaving is the target's flaw), [TARGET: Claude] = POSITIVE (chosen as replacement)
 - "Gemini 3 outperforms Claude on benchmarks but Claude still wins on long context" → [TARGET: Gemini] = POSITIVE (outperforms), [TARGET: Claude] = POSITIVE (wins on long context). Comparative wins both ways.
-- "X is faster than Y but less accurate" → [TARGET: X] = MIXED but lean POSITIVE if speed is the post's emphasis; [TARGET: Y] = the inverse. When two attributes trade off, pick the one the author seems to weight more.
+- "X is faster than Y but less accurate" → when two attributes trade off, pick the sentiment for the attribute the author seems to weight more; if the trade-off is genuinely balanced, use "neutral". Only ever output "positive", "negative", or "neutral" — no other sentiment values exist.
 
-CRITICAL: The overall TONE of a sentence may differ from sentiment toward the TARGET model. Always ask: is the author expressing satisfaction or frustration with the TARGET specifically? Switching away from / leaving / replacing the target = NEGATIVE. Switching to / adopting / praising the target = POSITIVE.
+CRITICAL: The overall TONE of a sentence may differ from sentiment toward the TARGET model. Always ask: is the author expressing satisfaction or frustration with the TARGET specifically? Switching away from / leaving / replacing the target = NEGATIVE, even if the overall tone is positive ("I'm happily moving to X, done with TARGET" is negative for TARGET). Switching to / adopting / praising the target = POSITIVE.
 
 DISAMBIGUATION RULE: When a sentence says "X is [adjective] which Y is not as good at", the [adjective] applies to BOTH X and Y — Y is just less proficient at being [adjective]. If [adjective] is negative ("misleading", "overreaching"), both targets are NEGATIVE. If [adjective] is positive ("careful", "thoughtful"), both are POSITIVE (with Y less so).
 
 For EACH post, determine:
 
 RELEVANCE: Is this post expressing a PERSONAL opinion about the TARGET model's quality, behavior, or usefulness based on direct or reported experience? If the target model is only mentioned in passing with no opinion about it, mark as not relevant.
+- RELEVANT: direct experience, quality complaints/praise, model comparisons, switching decisions, user-reported quality trends
+  Examples: "Claude keeps refusing my coding requests", "GPT just hallucinated my bibliography", "has anyone noticed Gemini getting worse?", "I switched from ChatGPT to Claude"
+- IMPLICIT TARGET: if the post context says it was posted in the TARGET model's dedicated community (e.g. "(posted in r/ClaudeAI)") or is an App Store review of the TARGET model's app, the author may refer to the target implicitly — "it just deleted my whole repo" in r/ClaudeAI is a RELEVANT experience post about Claude even though no model is named. For app reviews, judge only opinions about the MODEL's output/behavior; app-shell complaints (login, crashes, billing, UI) stay NOT RELEVANT.
 - NOT RELEVANT (return relevant:false, sentiment:null even when a model name appears and the tone seems positive/negative):
+  - Pure availability/status posts with no judgment of output quality: "is X down?", outage reports, login failures, 5xx/API errors, app crashes, billing/subscription gripes about the app or plan. (Complaints that the model's OUTPUT quality degraded remain relevant negative — api_reliability.)
   - News / research / novelty reporting, incl. benchmark stunts: "ChatGPT loses at chess to an Atari 2600", "ChatGPT and DeepSeek play chess against Stockfish", "study finds ChatGPT acts as a cognitive crutch"
   - Product / feature announcements or changelogs: "ChatGPT rebuilt Scheduled Tasks into its own page, rolling out to paid plans", "Gemini now available on…", anything framed as "introducing / rolling out / now available"
   - Societal / policy / behavioral commentary: "why schools should (not) allow LLMs", "people are becoming dependent on AI", "in 10 years will anyone know how to code?"
@@ -264,15 +275,15 @@ LANGUAGE: If a post is NOT in English, detect the language (ISO 639-1 code) and 
 SENTIMENT (if relevant, toward the TARGET model only):
 - "positive": praising, impressed, satisfied with the target model
 - "negative": complaining, frustrated, disappointed with the target model
-- "neutral": genuinely mixed or purely factual about the target model (should be RARE)
+- "neutral": genuinely mixed or purely factual about the target model. Use it when that is truly the case — do not force polarity onto ambiguous posts; reflect genuine ambiguity as confidence 0.5-0.6 instead.
 
-IMPORTANT: Watch for sarcasm and irony. Classify based on TRUE intent, not surface tone.
+IMPORTANT: Watch for sarcasm and irony. Classify based on TRUE intent, not surface tone. Example: "At least ChatGPT would be sycophants who read books" is NEGATIVE toward ChatGPT (calling the model sycophantic), not positive.
 
 CATEGORY (if relevant):
 If negative: lazy_responses, hallucinations, refusals, coding_quality, speed, general_drop, pricing_value, censorship, context_window, api_reliability, multimodal_quality, reasoning
 If positive: output_quality, coding_quality, speed, reasoning, creativity, value, reliability, context_handling, multimodal_quality, general_improvement
 
-Category guidance: hallucinations = model generated false info. censorship = model refused due to safety filters. general_drop = quality declined. lazy_responses = low-effort text (NOT image/video artifacts — use multimodal_quality).
+Category guidance: hallucinations = model generated factually incorrect info (NOT someone using the model to generate content). censorship = model refused due to safety filters (NOT copyright concerns about AI content). general_drop = quality declined vs before (NOT societal concerns about AI dependency). lazy_responses = low-effort text (NOT image/video artifacts — use multimodal_quality).
 
 CONFIDENCE: 0.0-1.0 (0.9+ = explicit target model name + clear sentiment from direct experience, 0.7-0.8 = clear but indirect, below 0.5 = weak)
 
@@ -1008,7 +1019,7 @@ export async function classifyPost(
   const startedAt = performance.now();
   try {
     const singleTokens = options.maxTokensOverride && options.maxTokensOverride > 0 ? options.maxTokensOverride : 700;
-    const res = await callClassifier(CLASSIFY_PROMPT, text.slice(0, 600), apiKey, singleTokens, "single", logError, options);
+    const res = await callClassifier(CLASSIFY_PROMPT, text.slice(0, CLASSIFY_INPUT_MAX_CHARS), apiKey, singleTokens, "single", logError, options);
     if (!(res instanceof Response)) {
       if (logError) await logError(`AI gateway ${res.status}: ${res.error}`, "classify-error");
       return res;
@@ -1067,6 +1078,16 @@ async function batchClassifyWithPrompt(
   if (!Array.isArray(parsedResults)) {
     return Array.from({ length: batchLength }, () => makeSkippedResult("parse_error", "missing_results_array"));
   }
+  // MORE results than posts means the model miscounted the batch (e.g. framing
+  // tokens inside a post) — positional alignment is untrusted for the whole
+  // batch, so every row gets a retryable parse_error instead of shifted labels.
+  // A SHORT array (output truncation) keeps its trustworthy prefix below.
+  if (parsedResults.length > batchLength) {
+    if (logError) {
+      await logError(`Batch returned ${parsedResults.length} results for ${batchLength} posts — alignment untrusted`, "batch-classify-parse");
+    }
+    return Array.from({ length: batchLength }, () => makeSkippedResult("parse_error", "result_count_mismatch"));
+  }
   const results: ClassifyResult[] = [];
   for (let j = 0; j < batchLength; j++) {
     // A short results array means the model truncated or dropped trailing posts.
@@ -1090,6 +1111,19 @@ function fillRemainingFromStop(stopResult: ClassifyResult, count: number): Class
 interface BatchDescriptor {
   numbered: string;
   length: number;
+}
+
+// Post text is interpolated raw into the numbered plain-text batch format, so a
+// post that itself contains a quote-and-marker sequence like `" Post 2 [TARGET:`
+// can make the model count N+1 posts and shift every later result by one row —
+// wrong sentiment AND wrong model, written as terminal `classified`. Neutralize
+// the framing tokens before interpolation. Occurs organically (people quote the
+// dashboard's own format, tweets containing "Post 2:" patterns), not just adversarially.
+function sanitizeBatchText(text: string): string {
+  return text
+    .replace(/"/g, "'")
+    .replace(/\[\s*TARGET\s*:/gi, "(TARGET:")
+    .replace(/\b(Post)\s+(\d+)\s*:/gi, "$1 $2 -");
 }
 
 // Anthropic has no quota gate and Tier 1 Haiku (50 RPM / 100k OTPM) dwarfs our
@@ -1192,7 +1226,7 @@ export async function classifyBatch(
   const descriptors: BatchDescriptor[] = [];
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
-    const numbered = batch.map((t, j) => `Post ${j + 1}: "${t.slice(0, 600)}"`).join("\n\n");
+    const numbered = batch.map((t, j) => `Post ${j + 1}: "${sanitizeBatchText(t.slice(0, CLASSIFY_INPUT_MAX_CHARS))}"`).join("\n\n");
     descriptors.push({ numbered, length: batch.length });
   }
   return runBatches(BATCH_CLASSIFY_PROMPT, descriptors, texts.length, apiKey, logError, options);
@@ -1210,7 +1244,7 @@ export async function classifyBatchTargeted(
   const descriptors: BatchDescriptor[] = [];
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
-    const numbered = batch.map((item, j) => `Post ${j + 1} [TARGET: ${item.targetModel}]: "${item.text.slice(0, 600)}"`).join("\n\n");
+    const numbered = batch.map((item, j) => `Post ${j + 1} [TARGET: ${item.targetModel}]: "${sanitizeBatchText(item.text.slice(0, CLASSIFY_INPUT_MAX_CHARS))}"`).join("\n\n");
     descriptors.push({ numbered, length: batch.length });
   }
   return runBatches(BATCH_CLASSIFY_TARGETED_PROMPT, descriptors, items.length, apiKey, logError, options);

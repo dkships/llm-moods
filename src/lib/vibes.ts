@@ -30,6 +30,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   discourse: "Discourse",
   github: "GitHub",
   twitter: "𝕏",
+  appstore: "App Store",
 };
 
 export function getVibeStatus(score: number) {
@@ -71,6 +72,7 @@ export function formatSourceDisplay(source: string): { emoji: string; label: str
   if (source === "discourse") return { emoji: "💬", label: "Discourse" };
   if (source === "github") return { emoji: "🐙", label: "GitHub" };
   if (source === "twitter") return { emoji: "⚪", label: "𝕏" };
+  if (source === "appstore") return { emoji: "🍎", label: "App Store" };
   return { emoji: "⚪", label: source };
 }
 

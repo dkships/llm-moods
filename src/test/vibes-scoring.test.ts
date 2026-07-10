@@ -222,3 +222,40 @@ describe("vibes scoring helpers", () => {
     expect(applyScoreSmoothing(100, 50, 10, 5)).toBe(85);
   });
 });
+
+describe("2026-07 accuracy-audit scoring fixes", () => {
+  const post = (overrides: Record<string, unknown>) => ({
+    sentiment: "positive",
+    complaint_category: null,
+    confidence: 0.9,
+    score: 0,
+    content_type: "full_content",
+    source: "reddit",
+    ...overrides,
+  });
+
+  it("scores an all-neutral day at the 50 no-signal baseline", () => {
+    const result = computeScore([post({ sentiment: "neutral" }), post({ sentiment: "neutral" })]);
+    expect(result.score).toBe(50);
+  });
+
+  it("keeps engagement weighting monotonic: a 1-like post never weighs less than a 0-like post", () => {
+    const result = computeScore([
+      post({ sentiment: "positive", score: 1 }),
+      post({ sentiment: "negative", score: 0 }),
+    ]);
+    expect(result.score).toBeGreaterThanOrEqual(50);
+  });
+
+  it("caps a single viral post's engagement multiplier at the 1000-engagement ceiling", () => {
+    const viral = computeScore([
+      post({ sentiment: "negative", score: 1_000_000 }),
+      post({ sentiment: "positive", score: 0 }),
+    ]);
+    const atCap = computeScore([
+      post({ sentiment: "negative", score: 1000 }),
+      post({ sentiment: "positive", score: 0 }),
+    ]);
+    expect(viral.score).toBe(atCap.score);
+  });
+});
