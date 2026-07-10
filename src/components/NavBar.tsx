@@ -35,7 +35,7 @@ const NavBar = () => {
   const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/model/");
 
   const navLinkClass = (active: boolean) =>
-    `rounded-md px-2 py-1 text-mono-cap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+    `inline-flex min-h-11 items-center rounded-md px-1.5 text-mono-cap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:px-2 sm:py-1 ${
       active ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-foreground"
     }`;
 
@@ -44,17 +44,19 @@ const NavBar = () => {
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
-      <div className="container flex h-16 items-center justify-between">
+      <div className="container flex h-14 items-center justify-between gap-2 sm:h-16">
         <Link
           to="/"
-          className="inline-flex items-center gap-2 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          aria-label="LLM Vibes home"
+          className="inline-flex min-w-0 items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:gap-2"
         >
           <SvgMark />
           <span className="whitespace-nowrap text-section text-foreground">
-            LLM <span className="text-primary">Vibes</span>
+            <span className="hidden min-[360px]:inline">LLM </span>
+            <span className="text-primary">Vibes</span>
           </span>
         </Link>
-        <div className="flex items-center gap-3 sm:gap-5">
+        <div className="flex flex-none items-center gap-0.5 sm:gap-3 lg:gap-5">
           <Link to="/dashboard" className={navLinkClass(isDashboardActive)}>
             Dashboard
           </Link>
@@ -71,7 +73,7 @@ const NavBar = () => {
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub repository"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-md text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="hidden h-11 w-11 items-center justify-center rounded-md text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline-flex"
           >
             <GitHubIcon className="h-5 w-5" />
           </a>
