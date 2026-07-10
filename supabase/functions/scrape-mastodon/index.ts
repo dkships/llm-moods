@@ -32,12 +32,16 @@ const MAIN_INSTANCE = "mastodon.social";
 // hashtag asymmetry was suppressing real Gemini complaints.
 const MAIN_HASHTAGS = ["chatgpt", "claudeai", "grok", "llm", "geminiai", "geminipro"];
 const TECH_INSTANCES = ["mastodon.online", "techhub.social", "sigmoid.social", "hachyderm.io"];
-const TECH_HASHTAGS = ["llm", "chatgpt"];
-// Neutral brand/product terms only — negative-skew queries ("GPT dumber",
-// "Gemini bad", "AI getting worse") were removed to stop oversampling negativity
-// into the headline score (see Reddit overhaul for low-volume-model coverage).
-const SEARCH_QUERIES = ["Claude AI", "ChatGPT", "Gemini Pro", "Grok 4"];
-const SEARCH_INSTANCE = "mastodon.social";
+// Per-model hashtags on the tech instances too — previously only llm/chatgpt,
+// which under-sampled Claude/Gemini/Grok on exactly the most tech-literate
+// instances (mastodon rows ran chatgpt 394 vs gemini 74 / grok 33).
+// matchModels re-attributes cross-model mentions, so tag overlap is harmless.
+const TECH_HASHTAGS = ["llm", "chatgpt", "claudeai", "geminiai", "grok"];
+// NOTE: the old /api/v2/search phrase-query pass was removed 2026-07-10 — full-text
+// status search requires an authenticated token; unauthenticated requests return
+// HTTP 200 with {"statuses":[]}, so the loop contributed zero posts on every run
+// while looking healthy. Re-adding it requires a (free) Mastodon app token stored
+// as an edge-function secret; the request budget went to the extra hashtags above.
 const ASTROLOGY_TERMS = [
   "horoscope",
   "zodiac",
@@ -202,25 +206,6 @@ export async function handleScrapeMastodon(req: Request): Promise<Response> {
         } catch (error) {
           summary.errors.push(`${instance}/#${hashtag}: ${error instanceof Error ? error.message : String(error)}`);
         }
-      }
-    }
-
-    for (const query of SEARCH_QUERIES) {
-      await delay(1000);
-      try {
-        const url = `https://${SEARCH_INSTANCE}/api/v2/search?q=${encodeURIComponent(query)}&type=statuses&limit=20`;
-        const res = await fetchWithTimeout(url);
-        if (!res.ok) {
-          summary.errors.push(`search "${query}": HTTP ${res.status}`);
-          continue;
-        }
-        const result = await res.json();
-        const statuses: Status[] = result.statuses || [];
-        for (const status of statuses) {
-          if (status.url && !allStatuses.has(status.url)) allStatuses.set(status.url, status);
-        }
-      } catch (error) {
-        summary.errors.push(`search "${query}": ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 

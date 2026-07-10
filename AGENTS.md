@@ -7,7 +7,7 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 - React 18 + TypeScript + Vite (SWC) + shadcn/ui + Tailwind + Recharts
 - Supabase (PostgreSQL + Edge Functions)
 - Sentiment: Claude Haiku 4.5 (`claude-haiku-4-5-20251001`) via Anthropic Messages API (batch classification). Provider pluggable via `CLASSIFIER_MODEL` (claude-* → Anthropic, else Gemini); free-tier Gemini kept as fallback
-- Scrapers (5 active): Reddit (Apify), HN, Bluesky, Twitter/X (Apify), Mastodon
+- Scrapers (6 active): Reddit (Apify), HN (stories + comments), Bluesky, Twitter/X (Apify), Mastodon, App Store reviews
 
 ## Scope And Boundaries
 - Lovable-generated app synced bi-directionally with GitHub on `main`

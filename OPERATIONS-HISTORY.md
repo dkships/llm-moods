@@ -4,6 +4,44 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-07-10 — Sentiment-accuracy audit (Fable 5, 30-agent fan-out + blind re-judge)
+
+Full-pipeline accuracy audit: 8 parallel code audits (classifier, scoring, each
+scraper, keywords, live health, free sources) plus a blind regression — 120 live
+classified posts re-judged blind by independent judges with every disagreement
+adjudicated. Headline results:
+
+- **Blind eval: 56/120 raw agreement, but 57 of the 64 disagreements were
+  relevance leaks** (news digests, ads, passing mentions classified as sentiment),
+  43 of them from Bluesky. Sentiment DIRECTION on genuinely relevant posts was
+  ~89% accurate. Only 5 genuine sentiment flips survived adjudication.
+- **Root cause of the Bluesky leak concentration: production was running
+  pre-June-20 code.** Live `posts_found` ran 285–291/run — the old 12-term
+  negative-fishing query list (12×25=300 cap) — while the repo's post-cf65318
+  code caps at 125 (5 neutral terms × 25). The June 20 de-bias commit was never
+  redeployed; shared-module changes (relevance prefilters, prompt tightening)
+  likely also stale in every function not redeployed since. Fix: full redeploy
+  + verify `posts_found ≤ 125` on the next Bluesky run.
+- **Shipped same-day** (commit on `main`): classifier input cap 600→2000 chars,
+  targeted-prompt drift re-sync + outage rule + implicit-target rule + neutral
+  calibration, batch framing-token sanitization + `result_count_mismatch` guard,
+  subreddit context prefix for reddit rows, neutral scored as 0.5 (was 0.3 —
+  an all-neutral day scored 30), engagement weight floored at 1 and capped at
+  ln(1001), failed-share >15% demotes a day to `partial_coverage`, HN comments
+  + Ask-HN bodies ingestion, dead Mastodon phrase-search removed + per-model
+  tech-instance hashtags, new free `scrape-appstore` source, Twitter
+  `max_items` 80→250 (floor-billed tweets already paid for), keyword rows for
+  shipped sub-model names, Reddit r/OpenAI→r/Bard net-zero swap.
+- **Explicitly NOT changed** (documented decisions): smoothing EWMA (stability
+  over responsiveness — revisit if launch events look muted), hourly raw scores,
+  Reddit comment ingestion (still config-off; attribution fix exists in code via
+  subreddit context but cost ~2.8× — revisit deliberately), Reddit budget guard
+  still checks flat $0.35 planned (making it honest would over-block; flagged
+  only), Discourse forums scraper (verified viable — community.openai.com,
+  forum.cursor.com, discuss.ai.google.dev all serve anonymous search.json; the
+  old scrape-discourse died on a DNS-dead forum list, not the approach — good
+  next source if more volume is wanted).
+
 ## 2026-07-06 — Apify cost optimization (Fable 5, adversarially reviewed)
 
 Demand was ~$30/mo against the $24/mo + $0.80/day fail-closed guards ($15 spent

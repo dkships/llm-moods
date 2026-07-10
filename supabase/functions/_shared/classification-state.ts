@@ -90,10 +90,20 @@ function clippedText(value: string | null | undefined, maxLength: number): strin
   return (value ?? "").replace(/\s+/g, " ").trim().slice(0, maxLength);
 }
 
+// Subreddit context for reddit rows: dedicated-community posts often refer to
+// the model implicitly ("it just deleted my repo" in r/ClaudeAI) and were being
+// classified irrelevant because the model saw no mention of the target. The
+// prefix (not suffix — the classifier truncates long text from the end) pairs
+// with the IMPLICIT TARGET rule in BATCH_CLASSIFY_TARGETED_PROMPT.
+const REDDIT_SUBREDDIT_FROM_URL = /reddit\.com\/r\/([^/?#]+)/i;
+
 export function modelMentionText(row: PendingModelMentionRow): string {
   const title = clippedText(row.title, 500);
   const content = clippedText(row.content, 3500);
-  return `${title} ${content}`.replace(/\s+/g, " ").trim();
+  const base = `${title} ${content}`.replace(/\s+/g, " ").trim();
+  if (!base) return base;
+  const subreddit = row.source_url?.match(REDDIT_SUBREDDIT_FROM_URL)?.[1];
+  return subreddit ? `(posted in r/${subreddit}) ${base}` : base;
 }
 
 export function targetModelLabel(row: PendingModelMentionRow): string {

@@ -38,6 +38,26 @@ const STORY_SEARCH_TERMS = [
   "OpenAI",
 ];
 
+// Comments are where HN model-experience sentiment actually lives (story titles
+// skew news/announcement and mostly classify irrelevant). Same free Algolia
+// endpoint, tags=comment. Attribution stays precise because matchModels runs on
+// the comment text itself — a comment must name the model to be ingested.
+// The cap bounds classification cost (~60 comments × 3 runs/day ≈ $1-2/mo Haiku).
+const MAX_COMMENTS_PER_RUN = 60;
+const MIN_COMMENT_CHARS = 40;
+
+function stripHtmlTags(html: string): string {
+  return html
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&quot;/g, '"')
+    .replace(/&#x27;|&#39;/g, "'")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -114,10 +134,12 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
       contentSkipped: 0,
       errors: [] as string[],
       stories: 0,
+      comments: 0,
     };
 
     const storyCandidates: {
       text: string;
+      body: string;
       matchedSlugs: string[];
       sourceUrl: string;
       title: string;
@@ -147,11 +169,14 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
             summary.contentSkipped++;
             continue;
           }
-          if (!meetsMinLength(hit.title, "")) {
+          // Ask HN / Tell HN self-post bodies are the most experience-dense HN
+          // stories ("Ask HN: has Claude gotten worse?") — previously discarded.
+          const storyText = stripHtmlTags(hit.story_text || "");
+          if (!meetsMinLength(hit.title, storyText)) {
             summary.contentSkipped++;
             continue;
           }
-          if (isLikelyNonExperienceShare(hit.title, hit.url || "")) {
+          if (isLikelyNonExperienceShare(hit.title, storyText || hit.url || "")) {
             summary.contentSkipped++;
             continue;
           }
@@ -162,7 +187,7 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
             continue;
           }
 
-          const matchedSlugs = matchModels(`${hit.title} ${hit.url || ""}`, keywords);
+          const matchedSlugs = matchModels(`${hit.title} ${storyText} ${hit.url || ""}`, keywords);
           if (matchedSlugs.length === 0) continue;
           summary.filtered_candidates++;
 
@@ -181,6 +206,7 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
 
           storyCandidates.push({
             text: hit.title,
+            body: storyText,
             matchedSlugs,
             sourceUrl,
             title: hit.title,
@@ -207,8 +233,8 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
           source: "hackernews",
           source_url: candidate.sourceUrl,
           title: candidate.title.slice(0, 500),
-          content: candidate.title.slice(0, 2000),
-          content_type: "title_only",
+          content: (candidate.body || candidate.title).slice(0, 2000),
+          content_type: candidate.body ? "title_and_body" : "title_only",
           score: candidate.score,
           posted_at: candidate.postedAt,
         });
@@ -229,6 +255,105 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
       }
     }
 
+    // Comment pass: same free Algolia endpoint, tags=comment. Comment text must
+    // itself name a model to match (no community shortcut), so attribution is
+    // safe without parent-story context; the classifier's targeted prompt and
+    // DEFAULT-TO-NOT-RELEVANT rule filter tangential mentions.
+    const commentCandidates: {
+      body: string;
+      matchedSlugs: string[];
+      sourceUrl: string;
+      score: number;
+      postedAt: string;
+    }[] = [];
+
+    for (const term of STORY_SEARCH_TERMS) {
+      if (commentCandidates.length >= MAX_COMMENTS_PER_RUN) break;
+      try {
+        const url = `${ALGOLIA_BASE}?query=${encodeURIComponent(term)}&tags=comment&numericFilters=created_at_i>${oneDayAgo}&hitsPerPage=50`;
+        const res = await fetch(url);
+        if (!res.ok) {
+          summary.errors.push(`Comment ${term}: ${res.status}`);
+          await delay(1000);
+          continue;
+        }
+
+        const data = await res.json();
+        const hits = data.hits || [];
+        summary.comments += hits.length;
+        summary.posts_found += hits.length;
+
+        for (const hit of hits) {
+          if (commentCandidates.length >= MAX_COMMENTS_PER_RUN) break;
+          if (!hit.created_at || !hit.comment_text) continue;
+
+          const bodyText = stripHtmlTags(hit.comment_text);
+          if (bodyText.length < MIN_COMMENT_CHARS) {
+            summary.contentSkipped++;
+            continue;
+          }
+          if (isLikelyNonExperienceShare("", bodyText)) {
+            summary.contentSkipped++;
+            continue;
+          }
+
+          const sourceUrl = `https://news.ycombinator.com/item?id=${hit.objectID}`;
+          if (existingUrls.has(sourceUrl) || candidateUrls.has(sourceUrl)) {
+            summary.dedupSkipped++;
+            continue;
+          }
+
+          const matchedSlugs = matchModels(bodyText, keywords);
+          if (matchedSlugs.length === 0) continue;
+          summary.filtered_candidates++;
+
+          commentCandidates.push({
+            body: bodyText,
+            matchedSlugs,
+            sourceUrl,
+            score: hit.points || 0,
+            postedAt: hit.created_at,
+          });
+          candidateUrls.add(sourceUrl);
+        }
+      } catch (error) {
+        summary.errors.push(`Comment ${term}: ${error instanceof Error ? error.message : "unknown"}`);
+      }
+
+      await delay(500);
+    }
+
+    for (const candidate of commentCandidates) {
+      for (const slug of candidate.matchedSlugs) {
+        const modelId = modelMap[slug];
+        if (!modelId) continue;
+
+        const upsertResult = await upsertPendingScrapedPost(supabase, {
+          model_id: modelId,
+          source: "hackernews",
+          source_url: candidate.sourceUrl,
+          title: null,
+          content: candidate.body.slice(0, 2000),
+          content_type: "comment",
+          score: candidate.score,
+          posted_at: candidate.postedAt,
+        });
+
+        if (upsertResult.error) {
+          summary.errors.push(upsertResult.error);
+          continue;
+        }
+
+        if (upsertResult.inserted) {
+          summary.net_new_rows++;
+          summary.classificationQueued++;
+          existingUrls.add(candidate.sourceUrl);
+        } else {
+          summary.duplicate_conflicts++;
+        }
+      }
+    }
+
     const derived = deriveRunMetrics(summary);
     await updateRunRecord(supabase, runRecord!.id, {
       status: derived.status,
@@ -240,6 +365,7 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
       errors: derived.errors,
       metadata: {
         stories: summary.stories,
+        comments: summary.comments,
         irrelevant: summary.irrelevant,
         classifier_errors: summary.classifierErrors,
         classifier_request_errors: summary.classifierRequestErrors,

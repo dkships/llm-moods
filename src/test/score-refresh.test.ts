@@ -117,3 +117,48 @@ describe("score refresh pipeline", () => {
     expect(upserts[0].classification_coverage).toBe(0.5);
   });
 });
+
+describe("terminal classification failure demotion", () => {
+  const model: ModelRow = { id: "model-1", name: "Claude", slug: "claude" };
+
+  const classified = (hour: number) => ({
+    model_id: model.id,
+    sentiment: "positive",
+    complaint_category: null,
+    confidence: 0.95,
+    score: 1,
+    content_type: "full_content",
+    source: "reddit",
+    posted_at: `2026-05-08T1${hour}:00:00.000Z`,
+    created_at: `2026-05-08T1${hour}:01:00.000Z`,
+    classification_status: "classified",
+  });
+
+  it("demotes a day with heavy terminal failure to partial_coverage even though coverage reads 1.0", async () => {
+    const upserts: Record<string, unknown>[] = [];
+    const failed = {
+      ...classified(5),
+      sentiment: null,
+      confidence: null,
+      classification_status: "failed",
+    };
+    const supabase = createRefreshClient({
+      posts: [classified(0), classified(1), classified(2), classified(3), classified(4), failed, failed],
+      upserts,
+    });
+
+    const summary = await refreshScores(supabase, [model], {
+      daysBack: 0,
+      includeHourly: false,
+      now: new Date("2026-05-08T16:00:00.000Z"),
+    });
+
+    expect(summary.daily_rows).toBe(1);
+    expect(upserts[0]).toMatchObject({
+      score_basis_status: "partial_coverage",
+      failed_posts: 2,
+      classification_coverage: 1,
+    });
+    expect(upserts[0].score_confidence).not.toBe("high");
+  });
+});
