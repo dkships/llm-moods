@@ -75,9 +75,9 @@ const HIGH_ENGAGEMENT_FLOOR = 250;
 
 /**
  * A source is "credible" if it's a tracked leaker, curated press scoop,
- * official/artifact evidence, an established verified account, or cleared a
- * high engagement bar (the proxy for platforms with no author data, e.g. a
- * heavily-upvoted Reddit post). A paid/verified checkmark alone is not enough.
+ * official/artifact evidence, or an established verified account. Engagement
+ * still affects representative-source ordering, but popularity alone cannot
+ * make a single-source rumor public. A paid/verified checkmark alone is not enough.
  */
 function hasCredibleAccount(s: SourceRef): boolean {
   return s.verified === true && (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR;
@@ -90,8 +90,7 @@ export function isCredibleSource(s: SourceRef): boolean {
     quality === "tracked_leaker" ||
     quality === "press_scoop" ||
     quality === "artifact_leak" ||
-    hasCredibleAccount(s) ||
-    (s.score ?? 0) >= HIGH_ENGAGEMENT_FLOOR
+    hasCredibleAccount(s)
   );
 }
 

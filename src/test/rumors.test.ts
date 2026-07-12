@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import { formatRumorEta } from "../lib/rumor-eta";
-import { isLikelyRumorCandidate } from "../../supabase/functions/_shared/rumor-detect";
+import {
+  isLikelyRumorCandidate,
+  isRumorOrReleaseCandidate,
+} from "../../supabase/functions/_shared/rumor-detect";
 import {
   buildContribution,
   collapseQuoteEchoes,
@@ -70,6 +73,12 @@ describe("isLikelyRumorCandidate", () => {
       "Gemini 4 scheduled next week",
       "Fable 5 is returning soon",
       "model string for opus 5 leaked",
+      "GPT-6 appeared behind a feature flag in the model selector",
+      "Claude Opus 5 entered internal testing",
+      "Gemini 4 is in a private preview",
+      "Grok 5 is being red-teamed before launch",
+      "A new checkpoint was spotted under the Honeycomb codename",
+      "The team is preparing to launch Fable 5.1",
       "Exclusive GPT-5.6 scoop: ETA for wider launch is the 2nd week of July",
       "GPT-5.6 launched for OpenAI enterprise partners for testing ahead of the wider launch",
       "EAP access just opened",
@@ -95,6 +104,12 @@ describe("isLikelyRumorCandidate", () => {
   it("checks title and body together", () => {
     expect(isLikelyRumorCandidate("Claude update", "rumored to drop next week")).toBe(true);
     expect(isLikelyRumorCandidate(null, null)).toBe(false);
+  });
+
+  it("keeps both unreleased rumors and GA posts for the radar pipeline", () => {
+    expect(isRumorOrReleaseCandidate("GPT-6 entered a limited preview", "")).toBe(true);
+    expect(isRumorOrReleaseCandidate("GPT-5.6 is now available to everyone", "")).toBe(true);
+    expect(isRumorOrReleaseCandidate("I use ChatGPT every day", "")).toBe(false);
   });
 });
 
@@ -344,14 +359,19 @@ describe("mergeCluster", () => {
 });
 
 describe("credibility", () => {
-  it("flags tracked leakers, press scoops, verified high-follower accounts, artifacts, and high-engagement sources", () => {
+  it("flags vetted sources but does not treat engagement alone as credibility", () => {
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "synthwavedd" }))).toBe(true);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "@SynthWaveDD" }))).toBe(true); // normalized
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "@M1Astra" }))).toBe(true);
     expect(isCredibleSource(src("https://x.com/axios/status/1", "twitter", "2026-06-22", 0, { handle: "@axios" }))).toBe(true);
+    expect(isCredibleSource(src("https://x.com/alexeheath/status/1", "twitter", "2026-06-22", 0, { handle: "@alexeheath" }))).toBe(true);
+    expect(isCredibleSource(src("https://x.com/OpenAI/status/1", "twitter", "2026-06-22", 0, { handle: "@OpenAI" }))).toBe(true);
     expect(isCredibleSource(src("https://x.com/someone/status/2", "twitter", "2026-06-22", 0, { quotedStatusId: "1" }))).toBe(false);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true }))).toBe(false);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true, followers: 50000 }))).toBe(true);
-    expect(isCredibleSource(src("u", "reddit", "2026-06-22", 500))).toBe(true); // high upvotes
+    expect(isCredibleSource(src("u", "reddit", "2026-06-22", 500))).toBe(false);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 1000, { handle: "bedros_p" }))).toBe(false);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 1000, { handle: "nima_owji" }))).toBe(false);
     expect(isCredibleSource(src("https://www.testingcatalog.com/openai-app-string-leak/", "web", "2026-06-22", 0))).toBe(true);
     expect(isCredibleSource(src("u", "bluesky", "2026-06-22", 2))).toBe(false);
   });
@@ -416,6 +436,9 @@ describe("source quality", () => {
     );
     expect(inferSourceQuality({ url: "https://x.com/axios/status/1", platform: "twitter", handle: "@axios" })).toBe(
       "press_scoop",
+    );
+    expect(inferSourceQuality({ url: "https://x.com/OpenAI/status/1", platform: "twitter", handle: "@OpenAI" })).toBe(
+      "official",
     );
     expect(inferSourceQuality({ url: "https://www.axios.com/2026/06/27/fable-5", platform: "web" })).toBe(
       "press_scoop",

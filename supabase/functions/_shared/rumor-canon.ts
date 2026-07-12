@@ -43,6 +43,7 @@ export const TRACKED_LEAKER_HANDLES: ReadonlySet<string> = new Set([
   "apples_jimmy",
   "testingcatalog",
   "scaling01",
+  "m1astra",
 ]);
 
 const PRESS_SCOOP_HANDLES: ReadonlySet<string> = new Set([
@@ -50,6 +51,23 @@ const PRESS_SCOOP_HANDLES: ReadonlySet<string> = new Set([
   "semafor",
   "theinformation",
   "fortunemagazine",
+  "alexeheath",
+]);
+
+// Company accounts are authoritative for previews and release status. Keep
+// celebrity/executive accounts in release-detect only when their posts need to
+// retire a launch; this smaller set stays precise enough for rumor cards too.
+export const OFFICIAL_VENDOR_HANDLES: ReadonlySet<string> = new Set([
+  "openai",
+  "openaidevs",
+  "anthropicai",
+  "anthropic",
+  "claudeai",
+  "googledeepmind",
+  "googleai",
+  "geminiapp",
+  "xai",
+  "grok",
 ]);
 
 const VALID_SOURCE_QUALITIES: ReadonlySet<string> = new Set([
@@ -154,6 +172,7 @@ export function inferSourceQuality(source: SourceQualityInput): SourceQuality {
   const handle = normalizeSourceHandle(source.handle);
   if (TRACKED_LEAKER_HANDLES.has(handle)) return "tracked_leaker";
   if (PRESS_SCOOP_HANDLES.has(handle)) return "press_scoop";
+  if (OFFICIAL_VENDOR_HANDLES.has(handle)) return "official";
 
   const platform = (source.platform ?? "").toLowerCase();
   const host = hostnameFromUrl(source.url);

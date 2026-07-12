@@ -1,3 +1,5 @@
+import { isReleaseAnnouncement } from "./release-detect.ts";
+
 // Leak / rumor / launch-timing lexicon for the upcoming-model rumors radar.
 //
 // Two consumers, both gated so this only ever runs against posts ALREADY
@@ -5,8 +7,8 @@
 // rows), so the lexicon doesn't need to re-assert the model — it only has to
 // recognize "this is leak / stage / timing / return chatter about an unreleased
 // version":
-//   1. scrape-twitter / scrape-reddit-apify — a post that `isLikelyNonExperienceShare`
-//      would normally DROP (announcement/news/promo-shaped) is KEPT when it also
+//   1. Every social scraper — a post that `isLikelyNonExperienceShare` would
+//      normally DROP (announcement/news/promo-shaped) is KEPT when it also
 //      matches here, so formally-worded leaks survive into `scraped_posts`.
 //   2. aggregate-rumors — the SQL candidate pre-filter selects only posts whose
 //      title/content match this lexicon before the (paid) Haiku extraction pass.
@@ -31,19 +33,28 @@ export const RUMOR_LEXICON: readonly string[] = [
   "cloaked",
   "codename",
   "arena",
+  "checkpoint",
+  "feature[- ]?flag",
+  "model selector",
+  "config(?:uration)?[- ]?string",
   // stage / timing
   "incoming",
   "in testing",
+  "internal(?:ly)? test(?:ed|ing)",
   "early access",
+  "private (?:beta|preview)",
+  "limited (?:access|preview)",
   "\\bEAP\\b",
   "\\bETA\\b",
   "canary",
+  "red[- ]?team(?:ed|ing)?",
   "imminent",
   "dropping",
   "drops? (?:next|this)",
   "rolling out",
   "rolls? out",
   "release date",
+  "prepar(?:ing|ations?) (?:to|for) launch",
   "wider launch",
   "testing ahead of (?:the )?(?:wider|public|general) launch",
   "enterprise partners? for testing",
@@ -92,4 +103,12 @@ export function isLikelyRumorCandidate(
   const text = `${title ?? ""} ${body ?? ""}`;
   if (!text.trim()) return false;
   return RUMOR_REGEX.test(text);
+}
+
+/** Keep formal rumors and GA-shaped announcements out of the sentiment-only news filter. */
+export function isRumorOrReleaseCandidate(
+  title?: string | null,
+  body?: string | null,
+): boolean {
+  return isLikelyRumorCandidate(title, body) || isReleaseAnnouncement(title, body);
 }

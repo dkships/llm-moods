@@ -36,8 +36,7 @@ import {
   logZeroDataWarning,
   upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
-import { isLikelyRumorCandidate } from "../_shared/rumor-detect.ts";
-import { isReleaseAnnouncement } from "../_shared/release-detect.ts";
+import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-twitter";
 const APIFY_MAX_TOTAL_CHARGE_USD = 0.15;
@@ -249,8 +248,7 @@ async function runApifyPath(
     // downstream, so vibes scores are unaffected.
     if (
       isLikelyNonExperienceShare(text, "") &&
-      !isLikelyRumorCandidate(text, "") &&
-      !isReleaseAnnouncement(text, "")
+      !isRumorOrReleaseCandidate(text, "")
     ) {
       summary.contentSkipped++;
       continue;

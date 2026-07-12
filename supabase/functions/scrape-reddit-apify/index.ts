@@ -29,8 +29,7 @@ import {
   logZeroDataWarning,
   upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
-import { isLikelyRumorCandidate } from "../_shared/rumor-detect.ts";
-import { isReleaseAnnouncement } from "../_shared/release-detect.ts";
+import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-reddit-apify";
 const APIFY_ACTOR_TIMEOUT_SECS = 120;
@@ -371,8 +370,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       // dropped as news. Both remain `irrelevant` to sentiment scoring.
       if (
         isLikelyNonExperienceShare(title, bodyText) &&
-        !isLikelyRumorCandidate(title, bodyText) &&
-        !isReleaseAnnouncement(title, bodyText)
+        !isRumorOrReleaseCandidate(title, bodyText)
       ) {
         summary.contentSkipped++;
         continue;
@@ -460,8 +458,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       if (bodyText.length < 20) { summary.contentSkipped++; continue; }
       if (
         isLikelyNonExperienceShare("", bodyText) &&
-        !isLikelyRumorCandidate("", bodyText) &&
-        !isReleaseAnnouncement("", bodyText)
+        !isRumorOrReleaseCandidate("", bodyText)
       ) { summary.contentSkipped++; continue; }
 
       const community = c.communityName || c.parsedCommunityName || "";

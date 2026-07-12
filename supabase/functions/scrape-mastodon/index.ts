@@ -23,6 +23,7 @@ import {
   logZeroDataWarning,
   upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
+import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-mastodon";
 const MAIN_INSTANCE = "mastodon.social";
@@ -232,7 +233,10 @@ export async function handleScrapeMastodon(req: Request): Promise<Response> {
         summary.contentSkipped++;
         continue;
       }
-      if (isLikelyNonExperienceShare("", content)) {
+      if (
+        isLikelyNonExperienceShare("", content) &&
+        !isRumorOrReleaseCandidate("", content)
+      ) {
         summary.contentSkipped++;
         continue;
       }

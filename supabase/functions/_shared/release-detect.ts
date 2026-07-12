@@ -9,7 +9,12 @@
 // hype or future tense; (2) a credible source. A LIMITED/EAP release is NOT GA —
 // a model in early access is still rumor-worthy, so it stays on the board.
 
-import { inferSourceQuality, normalizeSourceHandle, type SourceQuality } from "./rumor-canon.ts";
+import {
+  OFFICIAL_VENDOR_HANDLES,
+  inferSourceQuality,
+  normalizeSourceHandle,
+  type SourceQuality,
+} from "./rumor-canon.ts";
 
 // GA phrasing. Narrow on purpose: present-tense general availability only.
 const GA_RE = new RegExp(
@@ -51,10 +56,10 @@ export function isReleaseAnnouncement(
 // Official vendor handles (lowercased, no @). A launch tweet from one of these,
 // paired with GA phrasing, is about as authoritative a signal as exists.
 const OFFICIAL_HANDLES: ReadonlySet<string> = new Set([
-  "openai", "openaidevs", "sama",
-  "xai", "grok", "elonmusk",
-  "googledeepmind", "googleai", "google", "geminiapp",
-  "anthropicai", "anthropic", "claudeai",
+  ...OFFICIAL_VENDOR_HANDLES,
+  "sama",
+  "elonmusk",
+  "google",
 ]);
 
 /** Official vendor domain/handle, or a reported press scoop — trusted enough to retire a model. */

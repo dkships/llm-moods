@@ -23,19 +23,21 @@ import {
   logZeroDataWarning,
   upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
+import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-bluesky";
-// Neutral brand terms only. The previous negative-skew queries ("Gemini sucks",
-// "Grok worse", etc.) had no positive counterpart, so they oversampled negative
-// posts and biased the headline score downward. Low-volume models (Gemini/Grok)
-// get their organic volume back from dedicated subreddits in the Reddit overhaul,
-// not by fishing for complaints here.
+// Neutral brand terms plus the current unreleased generation names. The previous
+// negative-skew queries ("Gemini sucks", "Grok worse", etc.) had no positive
+// counterpart, so they oversampled negative posts and biased the headline score.
 const SEARCH_TERMS = [
   "Claude AI",
   "ChatGPT",
-  "GPT-5",
+  "Opus 5",
+  "GPT-6",
   "Gemini AI",
+  "Gemini 3.5 Pro",
   "Grok AI",
+  "Grok 5",
 ];
 
 async function fetchWithTimeout(
@@ -194,7 +196,10 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
             summary.contentSkipped++;
             continue;
           }
-          if (isLikelyNonExperienceShare(text, "")) {
+          if (
+            isLikelyNonExperienceShare(text, "") &&
+            !isRumorOrReleaseCandidate(text, "")
+          ) {
             summary.contentSkipped++;
             continue;
           }

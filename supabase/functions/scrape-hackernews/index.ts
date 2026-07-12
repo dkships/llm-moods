@@ -23,6 +23,7 @@ import {
   logZeroDataWarning,
   upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
+import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-hackernews";
 const ALGOLIA_BASE = "https://hn.algolia.com/api/v1/search_by_date";
@@ -176,7 +177,10 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
             summary.contentSkipped++;
             continue;
           }
-          if (isLikelyNonExperienceShare(hit.title, storyText || hit.url || "")) {
+          if (
+            isLikelyNonExperienceShare(hit.title, storyText || hit.url || "") &&
+            !isRumorOrReleaseCandidate(hit.title, storyText || hit.url || "")
+          ) {
             summary.contentSkipped++;
             continue;
           }
@@ -292,7 +296,10 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
             summary.contentSkipped++;
             continue;
           }
-          if (isLikelyNonExperienceShare("", bodyText)) {
+          if (
+            isLikelyNonExperienceShare("", bodyText) &&
+            !isRumorOrReleaseCandidate("", bodyText)
+          ) {
             summary.contentSkipped++;
             continue;
           }
