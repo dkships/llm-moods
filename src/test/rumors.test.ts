@@ -164,6 +164,20 @@ describe("buildContribution", () => {
     expect(c!.modelSlug).toBe("chatgpt");
   });
 
+  it("writes a numbered ChatGPT codename claim to the generation identity", () => {
+    const raw: RawClaim = {
+      is_rumor: true,
+      target_family: "chatgpt",
+      version_label: "GPT-6 Sol",
+      codename: "Sol",
+      is_unreleased: true,
+    };
+    const c = buildContribution(raw, source, "GPT-6 Sol was spotted in testing");
+    expect(c?.versionKey).toBe("gpt6");
+    expect(c?.versionLabel).toBe("GPT-6");
+    expect(c?.codename).toBe("Sol");
+  });
+
   it("drops a competitor label mis-attributed to a tracked family", () => {
     const raw: RawClaim = { is_rumor: true, target_family: "gemini", version_label: "DeepSeek V3", is_unreleased: true };
     expect(buildContribution(raw, source, "DeepSeek V3 is coming soon")).toBeNull();
@@ -576,6 +590,25 @@ describe("canonicalVersionKey", () => {
     }
   });
 
+  it("collapses numbered ChatGPT generation/codename spellings without merging product variants", () => {
+    for (const [label, codename] of [
+      ["GPT-6", null],
+      ["ChatGPT 6", null],
+      ["6", null],
+      ["GPT-6 Sol", "Sol"],
+      ["GPT-6 Sol", "Sol, Terra, Luna"],
+    ] as [string, string | null][]) {
+      const c = canonicalVersionKey("chatgpt", label, codename);
+      expect(c.key).toBe("gpt6");
+      expect(c.label).toBe("GPT-6");
+    }
+
+    expect(canonicalVersionKey("chatgpt", "GPT-6 Mini", null).key).toBe("gpt6mini");
+    expect(canonicalVersionKey("gemini", "Gemini 4 Pro", null).key).not.toBe(
+      canonicalVersionKey("gemini", "Gemini 4 Flash", null).key,
+    );
+  });
+
   it("keeps a distinct real version separate", () => {
     expect(canonicalVersionKey("claude", "Sonnet 5", null).key).toBe("sonnet5");
   });
@@ -776,6 +809,30 @@ describe("mergeRumorRows", () => {
     expect(out[0].version_label).toBe("Gemini 3.5 Pro");
     expect(out[0].codename).toBeNull();
     expect(out[0].mention_count).toBe(2); // single-unconfirmed-source tag now clears
+    expect(out[0].platform_count).toBe(2);
+  });
+
+  it("collapses a numbered ChatGPT generation and repeated-codename row into one card", () => {
+    const out = mergeRumorRows([
+      rrow({
+        model_slug: "chatgpt",
+        version_label: "GPT-6",
+        codename: "Sol, Terra, Luna",
+        representative_sources: [{ url: "x", platform: "twitter" }],
+      }),
+      rrow({
+        model_slug: "chatgpt",
+        version_label: "GPT-6 Sol",
+        codename: "Sol",
+        last_seen_at: "2026-06-24",
+        representative_sources: [{ url: "b", platform: "bluesky" }],
+      }),
+    ]);
+
+    expect(out).toHaveLength(1);
+    expect(out[0].version_label).toBe("GPT-6");
+    expect(out[0].codename).toBe("Sol, Terra, Luna");
+    expect(out[0].mention_count).toBe(2);
     expect(out[0].platform_count).toBe(2);
   });
 

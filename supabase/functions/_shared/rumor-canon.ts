@@ -424,9 +424,48 @@ export function splitCompoundLabel(label: string | null | undefined): string[] {
 /**
  * Resolve a (family, label, codename) to a canonical version identity. Splits
  * compound labels/codenames and matches each component against the family's
- * alias map; the first hit wins. Falls back to the squashed label/codename
- * (preserving novel codenames) so the radar still surfaces never-seen leaks.
+ * alias map; the first hit wins. Numbered ChatGPT generations also collapse a
+ * repeated codename suffix ("GPT-6 Sol" + codename "Sol") into the generation
+ * key. Falls back to the squashed label/codename (preserving novel codenames)
+ * so the radar still surfaces never-seen leaks.
  */
+function canonicalChatGptGeneration(
+  label: string | null | undefined,
+  codename: string | null | undefined,
+): { key: string; label: string; codename: string | null } | null {
+  const rawLabel = cleanStr(label);
+  if (!rawLabel) return null;
+
+  // Accept "GPT-6", "ChatGPT 6", and a family-scoped bare "6". A suffix is
+  // folded into the generation only when the extractor also identified it as a
+  // codename. This catches the observed "GPT-5.6 Sol" / codename "Sol" split
+  // without conflating real product variants such as GPT-6 Mini.
+  const match = rawLabel.match(
+    /^(?:(?:chatgpt|gpt)[\s-]*)?(?:v\s*)?(\d+(?:[.,]\d+)*)(.*)$/i,
+  );
+  if (!match) return null;
+
+  const rawSuffix = cleanStr(
+    (match[2] ?? "").replace(/^[\s\-\u2013\u2014:·/|,()]+/, ""),
+  );
+  const cleanCodename = cleanStr(codename);
+  if (rawSuffix) {
+    if (!cleanCodename) return null;
+    const suffixParts = splitCompoundLabel(rawSuffix).map(squash).filter(Boolean);
+    const codenameParts = new Set(splitCompoundLabel(cleanCodename).map(squash).filter(Boolean));
+    if (suffixParts.length === 0 || suffixParts.some((part) => !codenameParts.has(part))) {
+      return null;
+    }
+  }
+
+  const version = match[1].replace(/,/g, ".");
+  return {
+    key: `gpt${version.replace(/[^0-9]/g, "")}`,
+    label: `GPT-${version}`,
+    codename: cleanCodename,
+  };
+}
+
 export function canonicalVersionKey(
   family: string | null | undefined,
   label: string | null | undefined,
@@ -443,6 +482,10 @@ export function canonicalVersionKey(
         return { key: e.key, label: e.label, codename: e.codename };
       }
     }
+  }
+  if (fam === "chatgpt") {
+    const generation = canonicalChatGptGeneration(label, codename);
+    if (generation) return generation;
   }
   const fallback = squash(label || codename || "");
   return {
@@ -642,6 +685,24 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
   const lead = sortedByLead[0];
   const canon = canonicalVersionKey(lead.model_slug, lead.version_label, lead.codename);
 
+  // Preserve every distinct codename attached to the now-single model card.
+  // Legacy duplicate rows can contain a broad list on one row ("Sol, Terra,
+  // Luna") and one repeated codename on another; unioning keeps the richer
+  // display without repeating values.
+  const codenameByKey = new Map<string, string>();
+  for (const r of sortedByLead) {
+    const canonicalCodename = canonicalVersionKey(
+      r.model_slug,
+      r.version_label,
+      r.codename,
+    ).codename ?? cleanStr(r.codename);
+    for (const part of splitCompoundLabel(canonicalCodename)) {
+      const key = squash(part);
+      if (key && !codenameByKey.has(key)) codenameByKey.set(key, part);
+    }
+  }
+  const mergedCodename = codenameByKey.size > 0 ? [...codenameByKey.values()].join(", ") : null;
+
   // Union representative sources by url (keeps the full original objects), then
   // surface credible / handled sources first so the card's lead stays sensible.
   const byUrl = new Map<string, MergeSource>();
@@ -689,7 +750,7 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
 
   const merged = { ...lead } as T;
   merged.version_label = canon.label ?? newest.version_label;
-  merged.codename = canon.codename ?? newest.codename;
+  merged.codename = mergedCodename ?? canon.codename ?? newest.codename;
   merged.claim_type = lead.claim_type;
   merged.mention_count = mentionCount;
   merged.platform_count = platformCount;

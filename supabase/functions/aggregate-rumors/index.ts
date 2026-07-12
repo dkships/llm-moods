@@ -129,6 +129,7 @@ const SYSTEM_PROMPT =
   "Use 'unknown' for ANY model from another maker (DeepSeek, Qwen, Llama, Mistral, Kimi, etc.) " +
   "or when unclear — never coerce a competitor's model into one of the four.\n" +
   "- version_label: copy the version token VERBATIM from the post (e.g. 'Sonnet 5', 'GPT-5.6'). Null if only a codename.\n" +
+  "  For a numbered OpenAI generation followed by a codename (e.g. 'GPT-6 Sol'), use version_label 'GPT-6' and codename 'Sol'; never include the codename in both fields.\n" +
   "- codename: arena/internal codename if present (e.g. 'Fennec', 'Orionmist'). Null otherwise.\n" +
   "- is_unreleased: judge against the RELEASED SET above.\n" +
   "- claim_type: in_testing (EAP / enterprise partner testing / spotted in API / canary / arena), imminent (next week / any day), " +
