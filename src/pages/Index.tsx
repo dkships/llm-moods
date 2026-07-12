@@ -2,7 +2,6 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import CreatorNote from "@/components/CreatorNote";
 import ModelCard from "@/components/ModelCard";
 import SectionHeader from "@/components/SectionHeader";
 import useHead from "@/hooks/useHead";
@@ -118,7 +117,6 @@ const Index = () => {
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </p>
-              <CreatorNote />
             </div>
       </section>
     </>

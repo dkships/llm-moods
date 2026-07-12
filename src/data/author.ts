@@ -18,5 +18,3 @@ export const AUTHOR_NAME = "David Kelly";
 export const AUTHOR_SAMEAS: readonly string[] = BIO_LINKS.map((l) => l.href);
 export const AUTHOR_PORTFOLIO_URL = "https://dmkthinks.org";
 export const AUTHOR_LINKEDIN_URL = "https://www.linkedin.com/in/thedmkelly/";
-export const AUTHOR_CREATOR_NOTE =
-  "LLM Vibes is built independently by David Kelly, a product and growth contractor who advises AppSumo Originals on product, growth, and AI tooling.";
