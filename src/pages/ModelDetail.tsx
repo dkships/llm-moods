@@ -2,16 +2,13 @@ import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, lazy, Suspense } from "react";
-import NavBar from "@/components/NavBar";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import NotFound from "@/pages/NotFound";
-import PageTransition from "@/components/PageTransition";
 import Surface from "@/components/Surface";
 import SectionHeader from "@/components/SectionHeader";
 import FilterChip from "@/components/FilterChip";
 import ChatterPost from "@/components/ChatterPost";
 import useHead from "@/hooks/useHead";
-import Footer from "@/components/Footer";
 import {
   useModelDetail, useVibesHistory, useComplaintBreakdown,
   useSourceBreakdown, useModelPosts, useModelsWithLatestVibes,
@@ -39,7 +36,7 @@ const ModelDetail = () => {
   const [surfaceFilter, setSurfaceFilter] = useState<string>("all");
 
   const { data: fetchedModel, isLoading: modelLoading, isError: modelError } = useModelDetail(slug);
-  const { data: allModels, isError: landingError } = useModelsWithLatestVibes();
+  const { data: allModels, isLoading: landingLoading, isError: landingError } = useModelsWithLatestVibes();
   const enriched = allModels?.find((m) => m.slug === slug);
   const prefetch = usePrefetchModelDetail();
   const siblingModels = (allModels ?? []).filter((m) => m.slug !== slug);
@@ -146,42 +143,30 @@ const ModelDetail = () => {
   const dailyChart = useDailyChartData(vibesHistory, timeRange === "7d" ? 7 : 30);
   const dailyEvents = useChartEvents(slug ?? "", dailyChart.dateLabels);
 
-  if (!model && modelLoading) {
+  if ((!model && (modelLoading || landingLoading)) || (model && !enriched && landingLoading)) {
     return (
-      <PageTransition>
-        <div className="min-h-screen bg-background">
-          <NavBar />
-          <main id="main-content" tabIndex={-1} className="scroll-mt-24">
-            <section className="container pt-10 pb-8">
+            <section className="container min-h-[calc(100svh-3.5rem)] pb-8 pt-10 sm:min-h-[calc(100svh-4rem)] sm:pt-12">
               <div className="animate-pulse space-y-4" role="status" aria-live="polite">
+                <span className="sr-only">Loading model data</span>
                 <div className="h-4 w-32 bg-secondary/60 rounded" />
                 <div className="h-10 w-48 bg-secondary/60 rounded" />
                 <div className="h-16 w-32 bg-secondary/60 rounded" />
               </div>
             </section>
-          </main>
-        </div>
-      </PageTransition>
     );
   }
 
   if (!model && modelError) {
     return (
-      <PageTransition>
-        <div className="min-h-screen bg-background flex flex-col">
-          <NavBar />
-          <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center scroll-mt-24">
+          <section className="container flex min-h-[calc(100svh-14rem)] items-center justify-center py-16">
             <div className="text-center">
-              <p className="text-page text-foreground mb-4">Failed to load model data</p>
+              <h1 className="mb-4 text-page text-foreground">Failed to load model data</h1>
               <p className="text-body text-text-secondary mb-8">Check your connection and reload the page.</p>
               <Button asChild variant="outline" className="font-mono text-sm">
                 <Link to="/dashboard">Back to Dashboard</Link>
               </Button>
             </div>
-          </main>
-          <Footer />
-        </div>
-      </PageTransition>
+          </section>
     );
   }
 
@@ -235,15 +220,12 @@ const ModelDetail = () => {
     : "FLAT FROM YESTERDAY";
 
   return (
-    <PageTransition>
-      <div className="min-h-screen bg-background">
-        <NavBar />
-        <main id="main-content" tabIndex={-1} className="scroll-mt-24">
+    <>
           {/* Model Header */}
-          <section className="container pt-10 pb-8 animate-fade-in">
+          <section className="container pb-8 pt-10 sm:pt-12">
             <Link
               to="/dashboard"
-              className="mb-5 inline-flex items-center gap-1.5 rounded-md text-meta text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="mb-5 inline-flex min-h-11 items-center gap-1.5 rounded-md text-meta text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               Dashboard
@@ -282,21 +264,21 @@ const ModelDetail = () => {
               </div>
             )}
             {siblingModels.length > 0 && (
-              <p className="mt-5 text-meta text-text-tertiary">
-                Also tracking:{" "}
+              <div className="mt-4 flex flex-wrap items-center gap-x-3 text-meta text-text-tertiary">
+                <span>Also tracking:</span>
                 {siblingModels.map((m, i) => (
-                  <span key={m.slug}>
+                  <span key={m.slug} className="inline-flex items-center gap-3">
                     <Link
                       to={`/model/${m.slug}`}
                       onMouseEnter={() => prefetch(m.slug, m.id)}
-                      className="rounded-md text-text-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      className="inline-flex min-h-11 items-center rounded-md text-text-secondary underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       {m.name}
                     </Link>
-                    {i < siblingModels.length - 1 && " · "}
+                    {i < siblingModels.length - 1 && <span aria-hidden="true">·</span>}
                   </span>
                 ))}
-              </p>
+              </div>
             )}
           </section>
 
@@ -309,14 +291,13 @@ const ModelDetail = () => {
               <section className="container pb-6">
                 <Link
                   to={`/research/${featured.slug}`}
-                  className="group block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                  aria-label={`Read research analysis: ${featured.title}`}
+                  className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   <Surface
                     as="article"
                     size="compact"
-                    motion="fade"
-                    className="flex items-center gap-4 transition-colors group-hover:bg-surface-hover sm:gap-5"
+                    elevation="lift"
+                    className="flex items-center gap-4 sm:gap-5"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="text-mono-cap text-text-tertiary">
@@ -326,7 +307,7 @@ const ModelDetail = () => {
                         {featured.title}
                       </p>
                     </div>
-                    <ArrowRight className="h-4 w-4 shrink-0 text-text-tertiary transition-all group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden="true" />
+                    <ArrowRight className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />
                   </Surface>
                 </Link>
               </section>
@@ -338,7 +319,7 @@ const ModelDetail = () => {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Left Column — Chart + Official Status stacked */}
               <div className="lg:col-span-2 space-y-6">
-                <Surface motion="fade">
+                <Surface>
                   {historyError ? (
                     <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
                       Failed to load data
@@ -375,9 +356,9 @@ const ModelDetail = () => {
                       {chartEvents.length > 0 && (
                         <div className="mt-4 border-t border-border/40 pt-3">
                           <p className="mb-2 text-meta text-text-tertiary">Known events on this chart</p>
-                          <ul className="space-y-1">
+                          <ul className="space-y-2">
                             {chartEvents.map((evt, i) => (
-                              <li key={`legend-${i}`} className="flex items-center gap-2 text-meta">
+                              <li key={`legend-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta">
                                 <span
                                   className="inline-block h-2 w-3 shrink-0 rounded-sm"
                                   style={{ background: evt.color, opacity: 0.7 }}
@@ -402,7 +383,7 @@ const ModelDetail = () => {
               {/* Right Column — Negative-by-surface (conditional) + Complaints + Sources */}
               <div className="space-y-6">
                 {hasMeaningfulSurfaceRows && (
-                  <Surface motion="fade">
+                  <Surface>
                     <SectionHeader title="Negative posts by surface" />
                     <BarList
                       ramp
@@ -413,7 +394,7 @@ const ModelDetail = () => {
                   </Surface>
                 )}
 
-                <Surface motion="fade">
+                <Surface>
                   <SectionHeader title="Complaint breakdown" meta="Last 30 days" />
                   {complaintsError ? (
                     <p className="text-body text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
@@ -430,7 +411,7 @@ const ModelDetail = () => {
                   )}
                 </Surface>
 
-                <Surface motion="fade">
+                <Surface>
                   <SectionHeader title="Sources" meta="Share of posts over the last 30 days" />
                   {sourcesError ? (
                     <p className="text-body text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
@@ -510,10 +491,7 @@ const ModelDetail = () => {
               </div>
             )}
           </section>
-        </main>
-        <Footer />
-      </div>
-    </PageTransition>
+    </>
   );
 };
 

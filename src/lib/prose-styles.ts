@@ -15,7 +15,7 @@ export const PROSE_CLASS_NAME = [
   // paragraphs — bumped for reading rhythm
   "prose-p:text-text-secondary prose-p:text-[17px] prose-p:leading-[1.7]",
   // inline links
-  "prose-a:text-primary prose-a:no-underline hover:prose-a:underline",
+  "prose-a:text-primary prose-a:underline prose-a:decoration-primary/50 prose-a:underline-offset-4 hover:prose-a:decoration-primary",
   "prose-strong:text-foreground",
   // inline code
   "prose-code:text-primary prose-code:before:content-none prose-code:after:content-none",

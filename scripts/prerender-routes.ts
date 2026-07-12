@@ -207,7 +207,7 @@ function buildRoutes(): RouteMeta[] {
       // Mirrors the useHead call in src/pages/Privacy.tsx.
       title: "Privacy & data practices — LLM Vibes",
       description:
-        "What LLM Vibes collects, how long it keeps it, and how to request removal of a quoted post. No accounts, no cookies, no analytics.",
+        "What LLM Vibes collects, how long it keeps public posts, Lovable-hosted project analytics, and how to request removal of a quoted post.",
       ogImage: defaultOgImage,
       ogType: "website",
     },

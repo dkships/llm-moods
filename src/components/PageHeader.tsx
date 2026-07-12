@@ -26,7 +26,7 @@ const PageHeader = ({
       </div>
     )}
     {description && (
-      <p className="mt-2 text-body text-text-secondary">{description}</p>
+      <p className="mt-2 max-w-3xl text-body text-text-secondary">{description}</p>
     )}
   </div>
 );

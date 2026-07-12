@@ -47,8 +47,8 @@ const NavBar = () => {
       <div className="container flex h-14 items-center justify-between gap-2 sm:h-16">
         <Link
           to="/"
-          aria-label="LLM Vibes home"
-          className="inline-flex min-w-0 items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:gap-2"
+          aria-label="LLM Vibes"
+          className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:gap-2"
         >
           <SvgMark />
           <span className="whitespace-nowrap text-section text-foreground">

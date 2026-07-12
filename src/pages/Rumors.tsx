@@ -1,6 +1,3 @@
-import NavBar from "@/components/NavBar";
-import Footer from "@/components/Footer";
-import PageTransition from "@/components/PageTransition";
 import PageHeader from "@/components/PageHeader";
 import Surface from "@/components/Surface";
 import RumorCard from "@/components/rumors/RumorCard";
@@ -40,11 +37,8 @@ const Rumors = () => {
   const boardMax = Math.max(...sorted.map(rumorStrengthScore), 1);
 
   return (
-    <PageTransition>
-      <div className="min-h-screen bg-background">
-        <NavBar />
-        <main id="main-content" tabIndex={-1} className="scroll-mt-24">
-          <section className="container pt-10 pb-8 animate-fade-in">
+    <>
+          <section className="container pb-8 pt-10 sm:pt-12">
             <PageHeader
               title="Rumors"
               description="What the community is saying about unreleased Claude, ChatGPT, Gemini, and Grok models — the next version, its stage, and when it's rumored to land. Unconfirmed community estimates, not forecasts."
@@ -60,13 +54,13 @@ const Rumors = () => {
                 ))}
               </div>
             ) : isError ? (
-              <Surface motion="fade" className="max-w-2xl">
+              <Surface className="max-w-2xl">
                 <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
                   Couldn't load rumors right now. Refresh to try again.
                 </p>
               </Surface>
             ) : sorted.length === 0 ? (
-              <Surface motion="fade" className="max-w-2xl">
+              <Surface className="max-w-2xl">
                 <p className="text-body text-text-secondary">No strong rumors right now.</p>
                 <p className="mt-2 text-meta text-text-tertiary">
                   A rumor surfaces here once it's independently corroborated or backed by a vetted
@@ -74,7 +68,7 @@ const Rumors = () => {
                 </p>
               </Surface>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 animate-fade-in">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {sorted.map((rumor) => {
                   const m = brand.get(rumor.model_slug);
                   return (
@@ -90,10 +84,7 @@ const Rumors = () => {
               </div>
             )}
           </section>
-        </main>
-        <Footer />
-      </div>
-    </PageTransition>
+    </>
   );
 };
 

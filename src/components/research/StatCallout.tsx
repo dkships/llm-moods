@@ -10,7 +10,7 @@ interface StatCalloutProps {
 }
 
 const StatCallout = ({ stats }: StatCalloutProps) => (
-  <Surface motion="fade" className="my-6">
+  <Surface className="my-6">
     <dl className="grid grid-cols-1 gap-6 sm:grid-cols-2">
       {stats.map((stat) => (
         <div key={stat.label}>

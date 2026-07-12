@@ -35,7 +35,7 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
       onMouseEnter={() => onHover?.(m.slug, m.id)}
       className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
     >
-      <Surface size="bare" motion="fade" elevation="lift" className="relative overflow-hidden h-full">
+      <Surface size="bare" elevation="lift" className="relative h-full min-h-56 overflow-hidden sm:min-h-64">
         {/* Sentiment cue: 3px top bar on >=sm (grid layouts), 2px left rail on mobile
             stacks so four cards don't read as a barcode of stacked color bars. */}
         <div
@@ -43,7 +43,7 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
           style={{ background: vibe.color }}
           aria-hidden="true"
         />
-        <div className="p-6">
+        <div className="px-5 py-4 sm:p-6">
           <p className="text-mono-cap text-text-tertiary">{vibe.label}</p>
           <div className="mt-1 flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
@@ -56,14 +56,14 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
           </div>
 
           {showSparkline && m.sparkline.length > 1 && (
-            <div className="mt-4 h-12" aria-hidden="true">
+            <div className="mt-3 h-10 sm:mt-4 sm:h-12" aria-hidden="true">
               <Suspense fallback={<div className="h-12 animate-pulse rounded bg-secondary/40" />}>
                 <LazySparkline data={m.sparkline} accent="hsl(var(--foreground) / 0.7)" />
               </Suspense>
             </div>
           )}
 
-          <p className="mt-3 text-mono-cap">
+          <p className="mt-2.5 text-mono-cap sm:mt-3">
             <span className="text-text-secondary">{trendCaption}</span>
             <span className="text-text-tertiary"> · {postsCaption}</span>
             {m.scoreBasisStatus === "thin_sample" && (
@@ -77,7 +77,7 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
           </p>
 
           {m.topComplaint && (
-            <div className="mt-4 flex items-baseline gap-2 border-t border-border pt-3">
+            <div className="mt-3 flex items-baseline gap-2 border-t border-border pt-3 sm:mt-4">
               <span className="shrink-0 text-mono-cap text-text-tertiary">Mostly</span>
               <span className="truncate text-body font-medium text-foreground">
                 {formatComplaintLabel(m.topComplaint)}

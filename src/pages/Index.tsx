@@ -2,12 +2,10 @@ import { ArrowRight } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import NavBar from "@/components/NavBar";
-import PageTransition from "@/components/PageTransition";
+import CreatorNote from "@/components/CreatorNote";
 import ModelCard from "@/components/ModelCard";
 import SectionHeader from "@/components/SectionHeader";
 import useHead from "@/hooks/useHead";
-import Footer from "@/components/Footer";
 import { useModelsWithLatestVibes, usePrefetchModelDetail } from "@/hooks/useVibesData";
 import { CardSkeleton } from "@/components/Skeletons";
 
@@ -27,24 +25,21 @@ const Index = () => {
   }, [prefetch]);
 
   return (
-    <PageTransition>
-      <div className="min-h-screen bg-background">
-        <NavBar />
-        <main id="main-content" tabIndex={-1} className="scroll-mt-24">
-          {/* Hero */}
-          <section className="container pt-14 sm:pt-24 pb-12 relative overflow-hidden">
-            <div className="absolute -top-32 right-[-12%] w-[620px] h-[620px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.14)_0%,_transparent_62%)] blur-[2px] pointer-events-none" aria-hidden="true" />
-            <div className="absolute top-40 left-[-8%] w-[360px] h-[360px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.06)_0%,_transparent_70%)] pointer-events-none" aria-hidden="true" />
-            <div className="max-w-3xl relative animate-fade-in">
+    <>
+      {/* Hero */}
+      <section className="container relative flex min-h-[calc(100svh-3.5rem)] items-center overflow-hidden py-16 sm:block sm:min-h-0 sm:pb-24 sm:pt-24 lg:pt-28">
+            <div className="pointer-events-none absolute -right-[32%] -top-48 h-[620px] w-[620px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.13)_0%,_hsl(var(--glow)/0.035)_36%,_transparent_68%)] sm:-right-[12%]" aria-hidden="true" />
+            <div className="pointer-events-none absolute -left-[28%] top-44 h-[360px] w-[360px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.055)_0%,_transparent_70%)] sm:-left-[8%]" aria-hidden="true" />
+            <div className="relative max-w-3xl">
               <h1 className="text-hero text-foreground">
                 Is your AI having<br />
                 a <span className="text-primary glow-text">bad day</span>?
               </h1>
-              <p className="mt-6 text-body text-text-secondary max-w-xl">
+              <p className="mt-6 max-w-xl text-body text-text-secondary">
                 A daily read on community sentiment, across social media.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-4">
-                <Button asChild size="lg" variant="outline" className="font-mono text-sm gap-2 group border-primary/40 text-foreground transition-all hover:bg-primary/10 hover:text-foreground hover:border-primary/60">
+                <Button asChild size="lg" variant="outline" className="group gap-2 border-primary/40 font-mono text-sm text-foreground transition-colors hover:border-primary/60 hover:bg-primary/10 hover:text-foreground">
                   <Link to="/dashboard">
                     Check the Vibes
                     <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-1" />
@@ -55,10 +50,15 @@ const Index = () => {
                 Independent · 100% automated · open source
               </p>
             </div>
-          </section>
+      </section>
 
-          {/* Live Vibes Preview */}
-          <section className="container pb-24">
+      {/* Live Vibes Preview */}
+      <section className="border-y border-border/80 bg-card/20">
+        <div className="container py-10 sm:py-12">
+            <div className="mb-5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+              <h2 className="text-section text-foreground">Live model scores</h2>
+              <span className="text-mono-cap text-text-tertiary">Updated throughout the day</span>
+            </div>
             {isLoading ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="status" aria-live="polite">
                 {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
@@ -68,17 +68,18 @@ const Index = () => {
                 Failed to load data
               </p>
             ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4 animate-fade-in">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {(models || []).map((m) => (
                   <ModelCard key={m.id} m={m} showSparkline onHover={handleHover} />
                 ))}
               </div>
             )}
-          </section>
+        </div>
+      </section>
 
-          {/* How it works */}
-          <section className="border-t border-border">
-            <div className="container py-12 sm:py-16">
+      {/* How it works */}
+      <section>
+            <div className="container py-14 sm:py-20">
               <SectionHeader title="How it works" className="mb-8 sm:mb-10" />
               <ol className="grid grid-cols-1 gap-8 sm:gap-10 md:grid-cols-3">
                 {[
@@ -111,19 +112,16 @@ const Index = () => {
               <p className="mt-8 text-meta text-text-tertiary">
                 <Link
                   to="/research/how-llm-vibes-classifies-sentiment"
-                  className="inline-flex items-center gap-1 rounded-md text-text-secondary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                  className="inline-flex min-h-11 items-center gap-1 rounded-md text-text-secondary underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   Read the full methodology
                   <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               </p>
+              <CreatorNote />
             </div>
-          </section>
-        </main>
-
-        <Footer />
-      </div>
-    </PageTransition>
+      </section>
+    </>
   );
 };
 

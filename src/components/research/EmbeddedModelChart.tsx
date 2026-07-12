@@ -1,4 +1,4 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Surface from "@/components/Surface";
 import { useModelDetail, useVibesHistory } from "@/hooks/useVibesData";
@@ -39,7 +39,7 @@ function daysBetweenInclusive(startLabel: string, endLabel: string): number {
  * Pass startDate + endDate to pin the window to a specific historical period.
  * Otherwise the chart shows the trailing `daysBack` days from today.
  */
-const EmbeddedModelChart = ({ modelSlug, daysBack, startDate, endDate, caption }: EmbeddedModelChartProps) => {
+const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, caption }: EmbeddedModelChartProps) => {
   const isPinned = Boolean(startDate && endDate);
   const days = isPinned ? daysBetweenInclusive(startDate!, endDate!) : (daysBack ?? 30);
   const sinceISO = isPinned ? getUtcInstantForPacificMidnight(startDate!).toISOString() : undefined;
@@ -86,7 +86,7 @@ const EmbeddedModelChart = ({ modelSlug, daysBack, startDate, endDate, caption }
   return (
     <Surface className="my-6">
       <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-mono-cap text-text-tertiary">
+        <h3 className="text-mono-cap leading-relaxed text-text-tertiary">
           {headerLabel}
         </h3>
       </div>
@@ -110,7 +110,7 @@ const EmbeddedModelChart = ({ modelSlug, daysBack, startDate, endDate, caption }
       {chartEvents.length > 0 && (
         <ul className="mt-3 space-y-1 border-t border-border/40 pt-3">
           {chartEvents.map((evt, i) => (
-            <li key={`evt-${i}`} className="flex items-center gap-2 text-xs">
+            <li key={`evt-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta">
               <span
                 className="inline-block h-2 w-3 shrink-0 rounded-sm"
                 style={{ background: evt.color, opacity: 0.7 }}
@@ -126,6 +126,43 @@ const EmbeddedModelChart = ({ modelSlug, daysBack, startDate, endDate, caption }
         </ul>
       )}
     </Surface>
+  );
+};
+
+const EmbeddedModelChart = (props: EmbeddedModelChartProps) => {
+  const placeholderRef = useRef<HTMLDivElement>(null);
+  const [shouldMount, setShouldMount] = useState(false);
+
+  useEffect(() => {
+    const element = placeholderRef.current;
+    if (!element) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setShouldMount(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setShouldMount(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "500px 0px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  if (shouldMount) return <EmbeddedModelChartContent {...props} />;
+
+  return (
+    <div ref={placeholderRef} className="my-6" role="status">
+      <Surface className="flex min-h-[17rem] items-center justify-center sm:min-h-[19rem]">
+        <div className="h-40 w-full animate-pulse rounded-lg bg-secondary/30" aria-hidden="true" />
+        <span className="sr-only">Chart loads when it nears the viewport.</span>
+      </Surface>
+    </div>
   );
 };
 

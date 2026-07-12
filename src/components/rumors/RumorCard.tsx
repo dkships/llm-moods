@@ -70,7 +70,7 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
     `${rumor.mention_count} independent source${rumor.mention_count === 1 ? "" : "s"}`;
 
   return (
-    <Surface as="article" motion="fade" className="h-full">
+    <Surface as="article" className="h-full">
       {/* Identity — who */}
       <div className="flex items-center justify-between gap-3">
         <span className="flex min-w-0 items-center gap-2">
@@ -112,6 +112,7 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
         <BarList
           accent={accent}
           max={100}
+          secondaryLayout="stacked-mobile"
           items={[{ label: "Corroboration", value: strengthPct, secondary: corroboration }]}
         />
         {isSingleSource && (
@@ -146,7 +147,7 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group flex items-center justify-between gap-3 rounded-md text-meta text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      className="group flex min-h-11 items-center justify-between gap-3 rounded-md text-meta text-text-tertiary underline decoration-border underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       {inner}
                     </a>

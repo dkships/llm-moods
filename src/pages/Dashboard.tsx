@@ -1,19 +1,16 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import NavBar from "@/components/NavBar";
-import PageTransition from "@/components/PageTransition";
 import SectionHeader from "@/components/SectionHeader";
+import Surface from "@/components/Surface";
 import ModelCard from "@/components/ModelCard";
 import ChatterPost from "@/components/ChatterPost";
 import useHead from "@/hooks/useHead";
-import Footer from "@/components/Footer";
 import {
   useModelsWithLatestVibes,
   useRecentChatter,
   usePrefetchModelDetail,
 } from "@/hooks/useVibesData";
-import StalenessBanner from "@/components/StalenessBanner";
 import { formatTimeAgo } from "@/lib/vibes";
 import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
@@ -62,14 +59,6 @@ const Dashboard = () => {
     return new Date(model.lastUpdated).getTime() < new Date(oldest).getTime() ? model.lastUpdated : oldest;
   }, null);
 
-  // Newest score_computed_at across all models. Drives the staleness banner —
-  // if no model has been refreshed in 3+ hours, the pipeline is likely paused.
-  const mostRecentScoreAt = (models || []).reduce<string | null>((newest, model) => {
-    if (!model.scoreComputedAt) return newest;
-    if (!newest) return model.scoreComputedAt;
-    return new Date(model.scoreComputedAt).getTime() > new Date(newest).getTime() ? model.scoreComputedAt : newest;
-  }, null);
-
   // Dedupe multi-model fanout: the same scraped post is stored once per
   // matched model, so the feed otherwise shows the exact same text twice in a
   // row. Collapse to one row and collect the matched model names into the meta
@@ -98,14 +87,9 @@ const Dashboard = () => {
   }, [chatterData]);
 
   return (
-    <PageTransition>
-      <div className="min-h-screen bg-background">
-        <NavBar />
-        <main id="main-content" tabIndex={-1} className="scroll-mt-24">
-          <StalenessBanner mostRecentScoreAt={mostRecentScoreAt} />
-
+    <>
           {/* Page Header */}
-          <section className="container pt-10 pb-8">
+          <section className="container pb-8 pt-10 sm:pt-12">
             <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
               <h1 className="text-page text-foreground">Current vibes</h1>
               <p
@@ -127,11 +111,12 @@ const Dashboard = () => {
                 {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
               </div>
             ) : modelsError ? (
-              <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
-                Failed to load data
-              </p>
+              <Surface className="text-center" role="status" aria-live="polite">
+                <p className="text-section text-foreground">Model scores are unavailable</p>
+                <p className="mt-2 text-body text-text-tertiary">Refresh the page to try again.</p>
+              </Surface>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4 animate-fade-in">
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 {(models || []).map((m) => (
                   <ModelCard key={m.id} m={m} showSparkline onHover={handleHover} />
                 ))}
@@ -161,17 +146,18 @@ const Dashboard = () => {
             />
 
             {chatterError ? (
-              <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
-                Failed to load data
-              </p>
+              <Surface className="text-center" role="status" aria-live="polite">
+                <p className="text-section text-foreground">Community chatter is unavailable</p>
+                <p className="mt-2 text-body text-text-tertiary">Refresh the page to try again.</p>
+              </Surface>
             ) : !chatterVisible || chatterLoading ? (
               <div className="space-y-3" role="status" aria-live="polite">
                 {Array.from({ length: 6 }).map((_, i) => <ChatterSkeleton key={i} />)}
               </div>
             ) : dedupedChatter.length === 0 ? (
-              <p className="py-8 text-center text-body text-text-tertiary">
-                No posts in the last 7 days.
-              </p>
+              <Surface className="text-center">
+                <p className="text-body text-text-tertiary">No posts in the last 7 days.</p>
+              </Surface>
             ) : (
               <div className="space-y-3">
                 {dedupedChatter.map(({ post, models }) => (
@@ -201,10 +187,7 @@ const Dashboard = () => {
               </div>
             )}
           </section>
-        </main>
-        <Footer />
-      </div>
-    </PageTransition>
+    </>
   );
 };
 

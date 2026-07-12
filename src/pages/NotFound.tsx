@@ -1,9 +1,6 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import NavBar from "@/components/NavBar";
-import Footer from "@/components/Footer";
-import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
 
 const NotFound = () => {
@@ -15,12 +12,9 @@ const NotFound = () => {
   });
 
   return (
-    <PageTransition>
-      <div className="min-h-screen bg-background flex flex-col">
-        <NavBar />
-        <main id="main-content" tabIndex={-1} className="flex flex-1 items-center justify-center scroll-mt-24">
+        <section className="container flex min-h-[calc(100svh-14rem)] items-center justify-center py-16">
           <div className="text-center">
-            <p className="text-score-xl text-foreground mb-4">404</p>
+            <h1 className="mb-4 text-score-xl text-foreground">404</h1>
             <p className="text-section text-text-secondary mb-8">
               This page doesn't exist.
             </p>
@@ -32,20 +26,17 @@ const NotFound = () => {
             </Button>
             <p className="mt-6 text-meta text-text-tertiary">
               Or jump to the{" "}
-              <Link to="/dashboard" className="text-foreground underline underline-offset-2">
+              <Link to="/dashboard" className="rounded-md text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                 dashboard
               </Link>{" "}
               or{" "}
-              <Link to="/research" className="text-foreground underline underline-offset-2">
+              <Link to="/research" className="rounded-md text-foreground underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background">
                 latest research
               </Link>
               .
             </p>
           </div>
-        </main>
-        <Footer />
-      </div>
-    </PageTransition>
+        </section>
   );
 };
 

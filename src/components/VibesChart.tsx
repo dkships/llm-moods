@@ -4,10 +4,10 @@ import { LIMITED_SAMPLE_THRESHOLD } from "@/lib/vibes";
 
 // Theme colors — mapped from CSS variables (Recharts needs raw strings)
 const CHART_COLORS = {
-  mutedForeground: "hsl(220 10% 50%)",  // --muted-foreground
-  card: "hsl(220 18% 10%)",             // --card
-  border: "hsl(220 14% 18%)",           // --border
-  referenceLine: "hsl(220 14% 18%)",    // --border (polish rule 1 — neutral midline)
+  mutedForeground: "hsl(var(--muted-foreground))",
+  card: "hsl(var(--card))",
+  border: "hsl(var(--border))",
+  referenceLine: "hsl(var(--border))",
 } as const;
 
 export interface ChartEventMarker {
@@ -83,7 +83,8 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
         background: CHART_COLORS.card,
         border: `1px solid ${CHART_COLORS.border}`,
         borderRadius: 8,
-        padding: "6px 10px",
+        boxShadow: "var(--shadow-elevated)",
+        padding: "9px 12px",
         fontSize: 12,
         fontFamily: "JetBrains Mono, monospace",
       }}
@@ -91,22 +92,22 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
       <p style={{ color: CHART_COLORS.mutedForeground, margin: 0 }}>{label}</p>
       <p style={{ color: accent, margin: "2px 0 0" }}>score: {datum.score}</p>
       {datum.isCarryForward && (
-        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 10, margin: "4px 0 0" }}>
+        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 11, margin: "5px 0 0" }}>
           Carry-forward — 0 posts scraped
         </p>
       )}
       {isLimitedSample && (
-        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 10, margin: "4px 0 0" }}>
+        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 11, margin: "5px 0 0" }}>
           Limited sample — {datum.eligiblePosts} high-confidence posts
         </p>
       )}
       {isPartialCoverage && (
-        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 10, margin: "4px 0 0" }}>
+        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 11, margin: "5px 0 0" }}>
           Partial coverage{queuedCount > 0 ? ` — ${queuedCount} queued` : ""}
         </p>
       )}
       {showAbandoned && (
-        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 10, margin: "4px 0 0" }}>
+        <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 11, margin: "5px 0 0" }}>
           {failedCount} abandoned (max retries reached)
         </p>
       )}
@@ -177,23 +178,26 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
   // and ResponsiveContainer's height:100% resolves to 0 in an unsized parent.
   <div role="img" aria-label={buildAriaLabel(chartData, timeRange)} className="h-full w-full">
   <ResponsiveContainer width="100%" height="100%">
-    <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 0, left: 0 }}>
+    <LineChart data={chartData} margin={{ top: 8, right: 12, bottom: 4, left: 0 }} accessibilityLayer>
       <XAxis
         dataKey="day"
-        tick={{ fill: CHART_COLORS.mutedForeground, fontSize: 10 }}
+        tick={{ fill: CHART_COLORS.mutedForeground, fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
         axisLine={false}
         tickLine={false}
+        tickMargin={8}
         interval={timeRange === "30d" ? Math.max(Math.floor(chartData.length / 5) - 1, 0) : timeRange === "7d" ? 0 : Math.max(Math.floor(chartData.length / 5) - 1, 0)}
         padding={{ left: 10, right: 10 }}
       />
       <YAxis
         domain={[yMin, yMax]}
-        tick={{ fill: CHART_COLORS.mutedForeground, fontSize: 10 }}
+        tick={{ fill: CHART_COLORS.mutedForeground, fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
         axisLine={false}
         tickLine={false}
-        width={30}
+        tickMargin={4}
+        width={32}
       />
       <RechartsTooltip
+        cursor={{ stroke: CHART_COLORS.border, strokeDasharray: "3 3" }}
         content={(props) => <CarryForwardTooltip {...(props as CarryForwardTooltipProps)} accent={accent} />}
       />
       {showMidlineRef && (

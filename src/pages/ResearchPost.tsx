@@ -1,9 +1,6 @@
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Download } from "lucide-react";
 import { useMemo } from "react";
-import NavBar from "@/components/NavBar";
-import Footer from "@/components/Footer";
-import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
 import Tag from "@/components/Tag";
 import { getResearchPost } from "@/data/research-posts";
@@ -107,15 +104,11 @@ const ResearchPostPage = () => {
   }
 
   return (
-    <PageTransition>
-      <div className="min-h-screen bg-background">
-        <NavBar />
-        <main id="main-content" tabIndex={-1} className="scroll-mt-24">
-          <article className="container pt-10 pb-16">
-            <div className="mx-auto max-w-3xl animate-fade-in">
+          <article className="container pb-16 pt-10 sm:pt-12">
+            <div className="mx-auto max-w-3xl">
               <Link
                 to="/research"
-                className="mb-6 inline-flex items-center gap-1.5 rounded-md text-meta text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="mb-6 inline-flex min-h-11 items-center gap-1.5 rounded-md text-meta text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 <ArrowLeft className="h-4 w-4" />
                 Back to Research
@@ -143,10 +136,10 @@ const ResearchPostPage = () => {
                   <a
                     href={post.dataset.path}
                     download
-                    className="mt-5 inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/40 px-4 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    aria-label={`Download ${post.dataset.label}`}
+                    className="mt-5 inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-border bg-secondary/40 px-4 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <Download className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="sr-only">Download </span>
                     {post.dataset.label}
                   </a>
                 )}
@@ -164,10 +157,6 @@ const ResearchPostPage = () => {
               </p>
             </div>
           </article>
-        </main>
-        <Footer />
-      </div>
-    </PageTransition>
   );
 };
 

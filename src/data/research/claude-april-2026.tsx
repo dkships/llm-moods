@@ -8,6 +8,7 @@ import EmbeddedModelChart from "@/components/research/EmbeddedModelChart";
 import AuthorBio from "@/components/research/AuthorBio";
 import PullQuote from "@/components/research/PullQuote";
 import StatCallout from "@/components/research/StatCallout";
+import ResearchTableFrame from "@/components/research/ResearchTableFrame";
 
 const ExternalLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <a href={href} target="_blank" rel="noopener noreferrer">
@@ -60,7 +61,7 @@ const ClaudeApril2026Body = () => (
       </ExternalLink>{" "}
       named three bugs running March 4 – April 20. Our classifier had already tagged complaints for all three.
     </p>
-    <div className="my-6 overflow-x-auto rounded-lg border border-border">
+    <ResearchTableFrame label="Anthropic confirmed bugs matched to LLM Vibes complaint categories">
       <table className="w-full">
         <caption className="sr-only">
           Anthropic's three confirmed bugs from the April 23 postmortem matched to LLM Vibes complaint
@@ -107,7 +108,7 @@ const ClaudeApril2026Body = () => (
           </tr>
         </tbody>
       </table>
-    </div>
+    </ResearchTableFrame>
     <p>
       For two of three bugs, our scrapers logged matching user-language complaints on the day the bug shipped.
       The mainstream tech press cycle (VentureBeat, Fortune, Simon Willison, The Register, The Decoder) landed
@@ -204,7 +205,7 @@ const ClaudeApril2026Body = () => (
       The classifier itself is one of the tracked models. Sentiment runs through Claude Haiku 4.5, classifying
       posts about Claude, ChatGPT, Gemini, and Grok.
       <sup id="ref-1">
-        <a href="#note-1" aria-label="See footnote 1">
+        <a href="#note-1" className="inline-flex min-h-6 min-w-6 items-center justify-center" aria-label="[1] See footnote 1">
           [1]
         </a>
       </sup>{" "}
@@ -275,8 +276,8 @@ const ClaudeApril2026Body = () => (
     <p id="note-1" className="scroll-mt-24 text-sm text-text-secondary">
       <a
         href="#ref-1"
-        className="font-bold no-underline hover:underline"
-        aria-label="Back to reference"
+        className="inline-flex min-h-6 min-w-6 items-center justify-center font-bold no-underline hover:underline"
+        aria-label="[1] Back to reference 1"
       >
         [1]
       </a>{" "}

@@ -11,7 +11,7 @@ interface ShareLinksProps {
 // Mirrors the dataset-download control in ResearchPost — neutral surface, mono text,
 // no accent tint (accent is reserved for chart/brand chrome).
 const CONTROL_CLASS =
-  "inline-flex items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-1.5 font-mono text-xs text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const ShareLinks = ({ url, title }: ShareLinksProps) => {
   const [copied, setCopied] = useState(false);

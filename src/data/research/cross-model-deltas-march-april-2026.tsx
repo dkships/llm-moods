@@ -6,6 +6,7 @@
 
 import EmbeddedModelChart from "@/components/research/EmbeddedModelChart";
 import AuthorBio from "@/components/research/AuthorBio";
+import ResearchTableFrame from "@/components/research/ResearchTableFrame";
 
 const ExternalLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <a href={href} target="_blank" rel="noopener noreferrer">
@@ -53,7 +54,7 @@ const CrossModelDeltasBody = () => (
     <p>
       Across the cache-bug window (March 26 – April 10, 2026), each tracked model's volume-weighted score was:
     </p>
-    <div className="my-6 overflow-x-auto rounded-lg border border-border">
+    <ResearchTableFrame label="Model sentiment scores and baseline deltas during the Claude cache bug">
       <table className="w-full">
         <thead>
           <tr>
@@ -105,7 +106,7 @@ const CrossModelDeltasBody = () => (
           </tr>
         </tbody>
       </table>
-    </div>
+    </ResearchTableFrame>
     <p>
       Claude held the highest absolute score in this window. It also had the smallest meaningful drop from its
       own February baseline of any well-trafficked model. ChatGPT and Gemini dropped much further from their

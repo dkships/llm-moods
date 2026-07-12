@@ -68,7 +68,7 @@ const TrendingComplaints = () => {
 
   if (isError) {
     return (
-      <Surface motion="fade">
+      <Surface>
         <SectionHeader title="Trending complaints" />
         <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
           Couldn't load complaint trends.
@@ -88,7 +88,7 @@ const TrendingComplaints = () => {
   const maxVolume = topMovers.reduce((m, row) => Math.max(m, row.this_week), 0);
 
   return (
-    <Surface motion="fade">
+    <Surface>
       <SectionHeader
         title="Trending complaints"
         action={<span className={`text-mono-cap text-text-tertiary`}>vs prior week</span>}

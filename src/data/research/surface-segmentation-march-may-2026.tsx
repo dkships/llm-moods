@@ -7,6 +7,7 @@ import EmbeddedModelChart from "@/components/research/EmbeddedModelChart";
 import AuthorBio from "@/components/research/AuthorBio";
 import PullQuote from "@/components/research/PullQuote";
 import StatCallout from "@/components/research/StatCallout";
+import ResearchTableFrame from "@/components/research/ResearchTableFrame";
 
 const ExternalLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <a href={href} target="_blank" rel="noopener noreferrer">
@@ -62,7 +63,7 @@ const SurfaceSegmentationBody = () => (
       that don't match a named surface stay in an <code>unknown</code> bucket.
     </p>
 
-    <div className="my-6 overflow-x-auto rounded-lg border border-border">
+    <ResearchTableFrame label="Sentiment scores by model and product surface from March 15 to May 14, 2026">
       <table className="w-full">
         <caption className="sr-only">
           Per-model, per-product-surface window-aggregate sentiment scores from LLM Vibes scraped_posts,
@@ -150,7 +151,7 @@ const SurfaceSegmentationBody = () => (
           </tr>
         </tbody>
       </table>
-    </div>
+    </ResearchTableFrame>
 
     <p>
       Two patterns to notice. First, for Claude and ChatGPT, one surface dominates the named conversation. Of
@@ -328,7 +329,7 @@ const SurfaceSegmentationBody = () => (
     <p>
       Sentiment runs through Claude Haiku 4.5 via the Anthropic API, classifying posts about its competitors.
       <sup id="ref-1">
-        <a href="#note-1" aria-label="See footnote 1">
+        <a href="#note-1" className="inline-flex min-h-6 min-w-6 items-center justify-center" aria-label="[1] See footnote 1">
           [1]
         </a>
       </sup>{" "}
@@ -356,8 +357,8 @@ const SurfaceSegmentationBody = () => (
     <p id="note-1" className="scroll-mt-24 text-sm text-text-secondary">
       <a
         href="#ref-1"
-        className="font-bold no-underline hover:underline"
-        aria-label="Back to reference"
+        className="inline-flex min-h-6 min-w-6 items-center justify-center font-bold no-underline hover:underline"
+        aria-label="[1] Back to reference 1"
       >
         [1]
       </a>{" "}

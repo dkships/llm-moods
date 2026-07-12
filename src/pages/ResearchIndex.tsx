@@ -1,8 +1,5 @@
 import { Link } from "react-router-dom";
 import { Rss } from "lucide-react";
-import NavBar from "@/components/NavBar";
-import Footer from "@/components/Footer";
-import PageTransition from "@/components/PageTransition";
 import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
 import Tag from "@/components/Tag";
@@ -54,21 +51,18 @@ const ResearchIndex = () => {
   }
 
   return (
-    <PageTransition>
-      <div className="min-h-screen bg-background">
-        <NavBar />
-        <main id="main-content" tabIndex={-1} className="scroll-mt-24">
-          <section className="container pt-10 pb-8 animate-fade-in">
+    <>
+          <section className="container pb-8 pt-10 sm:pt-12">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h1 className="text-page text-foreground">Research</h1>
-                <p className="mt-2 text-meta text-text-secondary">
+                <p className="mt-2 max-w-2xl text-body text-text-secondary">
                   Independent analysis of AI model quality, sourced from the LLM Vibes data set.
                 </p>
               </div>
               <a
                 href="/research/feed.xml"
-                className="mt-1 inline-flex shrink-0 items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-mono-cap text-text-tertiary transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-mono-cap text-text-tertiary transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 aria-label="Subscribe to the LLM Vibes Research RSS feed"
               >
                 <Rss className="h-3.5 w-3.5" aria-hidden="true" />
@@ -91,14 +85,14 @@ const ResearchIndex = () => {
                   >
                     <Surface
                       as="article"
-                      motion="fade"
+                      elevation="lift"
                       className="h-full"
                     >
                       <p className="text-mono-cap text-text-tertiary">
                         {formatDate(post.publishedAt)}
                       </p>
                       <h2
-                        className={`mt-2 text-foreground ${isFeatured ? "text-page" : "text-section"}`}
+                        className={`mt-2 text-foreground ${isFeatured ? "text-section sm:text-page" : "text-section"}`}
                       >
                         {post.title}
                       </h2>
@@ -114,10 +108,7 @@ const ResearchIndex = () => {
               })}
             </div>
           </section>
-        </main>
-        <Footer />
-      </div>
-    </PageTransition>
+    </>
   );
 };
 

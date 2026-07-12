@@ -1,6 +1,3 @@
-import NavBar from "@/components/NavBar";
-import Footer from "@/components/Footer";
-import PageTransition from "@/components/PageTransition";
 import useHead from "@/hooks/useHead";
 
 const LINK_CLASS =
@@ -11,20 +8,16 @@ const Privacy = () => {
     // Must stay byte-identical to the /privacy RouteMeta in scripts/prerender-routes.ts.
     title: "Privacy & data practices — LLM Vibes",
     description:
-      "What LLM Vibes collects, how long it keeps it, and how to request removal of a quoted post. No accounts, no cookies, no analytics.",
+      "What LLM Vibes collects, how long it keeps public posts, Lovable-hosted project analytics, and how to request removal of a quoted post.",
     url: "/privacy",
   });
 
   return (
-    <PageTransition>
-      <div className="min-h-screen bg-background flex flex-col">
-        <NavBar />
-        <main id="main-content" tabIndex={-1} className="flex-1 scroll-mt-24">
-          <section className="container max-w-3xl pt-10 pb-16 animate-fade-in">
+          <section className="container max-w-3xl pb-16 pt-10 sm:pt-12">
             <h1 className="text-page text-foreground">Privacy &amp; data practices</h1>
             <p className="mt-4 text-body text-text-secondary">
-              LLM Vibes has no accounts, no cookies, and no analytics or tracking scripts. It is an
-              independent, open-source dashboard run by{" "}
+              LLM Vibes has no accounts or advertising trackers. It is an independent, open-source
+              dashboard run by{" "}
               <a
                 href="https://dmkthinks.org"
                 target="_blank"
@@ -36,12 +29,31 @@ const Privacy = () => {
               .
             </p>
 
-            <h2 className="mt-10 text-section text-foreground">What it collects</h2>
+            <h2 className="mt-10 text-section text-foreground">Site analytics</h2>
+            <p className="mt-3 text-body text-text-secondary">
+              The site is hosted on Lovable. Lovable injects project analytics into published sites and
+              records visits and pageviews. The injected script sends the page address and path, referrer,
+              browser and device information, locale, and an approximate country inferred from the browser's
+              time zone. It also sets a secure <code className="rounded bg-secondary/60 px-1.5 py-0.5 text-meta text-primary">session-id</code>{" "}
+              cookie that expires after 30 minutes to group pageviews into one visit. LLM Vibes does not add
+              a separate visitor analytics service. See Lovable's{" "}
+              <a
+                href="https://docs.lovable.dev/features/analytics"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={LINK_CLASS}
+              >
+                project analytics documentation
+              </a>
+              .
+            </p>
+
+            <h2 className="mt-10 text-section text-foreground">Public posts</h2>
             <p className="mt-3 text-body text-text-secondary">
               LLM Vibes scrapes public posts about AI models from Reddit, Hacker News, Bluesky,
               X/Twitter, and Mastodon. Each post is stored with its text, author handle, source
-              link, and an AI-assigned sentiment classification. Nothing non-public is collected,
-              and nothing is collected about visitors to this site.
+              link, and an AI-assigned sentiment classification. Nothing non-public is collected from
+              those platforms.
             </p>
 
             <h2 className="mt-10 text-section text-foreground">How long it keeps it</h2>
@@ -80,10 +92,6 @@ const Privacy = () => {
               and Grok are trademarks of their respective owners.
             </p>
           </section>
-        </main>
-        <Footer />
-      </div>
-    </PageTransition>
   );
 };
 

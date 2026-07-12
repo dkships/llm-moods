@@ -54,7 +54,7 @@ const ChatterPost = memo(({ post, extraMeta, hideModel = false }: ChatterPostPro
       <Surface
         as="a"
         size="compact"
-        motion="fade"
+        elevation="lift"
         href={sourceUrl}
         target="_blank"
         rel="noopener noreferrer"
@@ -66,7 +66,7 @@ const ChatterPost = memo(({ post, extraMeta, hideModel = false }: ChatterPostPro
   }
 
   return (
-    <Surface size="compact" motion="fade">
+    <Surface size="compact">
       {content}
     </Surface>
   );

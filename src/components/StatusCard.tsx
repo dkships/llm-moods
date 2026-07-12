@@ -78,9 +78,9 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
               </li>
             ))}
             {remainingCount > 0 && (
-              <span className="text-mono-cap text-text-tertiary">
+              <li className="text-mono-cap text-text-tertiary">
                 +{remainingCount} more
-              </span>
+              </li>
             )}
           </ul>
         )}
@@ -91,7 +91,7 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Read ${event.title} on the official status page`}
-          className="shrink-0 self-start mt-0.5 text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="-mr-2 -mt-2 inline-flex h-11 w-11 shrink-0 items-center justify-center self-start rounded-md text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           <ExternalLink className="h-3.5 w-3.5" />
         </a>
@@ -115,7 +115,7 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
   }, [data?.events, anomalies, modelSlug]);
 
   return (
-    <Surface as="section" motion="fade" aria-label={`Official status for ${vendorName}`}>
+    <Surface as="section" aria-label={`Official status for ${vendorName}`}>
       <SectionHeader
         title="Official status"
         meta={vendorName}
@@ -124,7 +124,7 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
             href={data.publicUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1 text-meta text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            className="inline-flex min-h-11 items-center gap-1 rounded-md text-meta text-text-tertiary underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             aria-label={`Open ${vendorName} status page`}
           >
             status page

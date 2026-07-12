@@ -1,11 +1,11 @@
 const Shimmer = ({ className = "" }: { className?: string }) => (
-  <div className={`animate-pulse rounded-lg bg-secondary/50 ${className}`} />
+  <div className={`animate-pulse rounded-lg bg-secondary/35 ${className}`} />
 );
 
 export const CardSkeleton = () => (
-  <div className="glass rounded-xl overflow-hidden">
+  <div className="glass min-h-56 overflow-hidden rounded-xl sm:min-h-64">
     <Shimmer className="h-1.5 rounded-none" />
-    <div className="p-6 space-y-3">
+    <div className="space-y-3 p-4 sm:p-6">
       <Shimmer className="h-4 w-20" />
       <Shimmer className="h-5 w-32" />
       <div className="flex justify-between">
@@ -17,9 +17,9 @@ export const CardSkeleton = () => (
 );
 
 export const DashboardCardSkeleton = () => (
-  <div className="glass rounded-xl overflow-hidden">
+  <div className="glass min-h-56 overflow-hidden rounded-xl sm:min-h-64">
     <Shimmer className="h-1.5 rounded-none" />
-    <div className="p-6 space-y-4">
+    <div className="space-y-4 p-4 sm:p-6">
       <div className="flex justify-between">
         <div className="space-y-2">
           <Shimmer className="h-5 w-24" />
@@ -41,7 +41,7 @@ export const DashboardCardSkeleton = () => (
 );
 
 export const RumorCardSkeleton = () => (
-  <div className="glass rounded-xl p-6 space-y-4">
+  <div className="glass space-y-4 rounded-xl p-4 sm:p-6">
     <div className="flex justify-between">
       <Shimmer className="h-3.5 w-24" />
       <Shimmer className="h-3.5 w-28" />

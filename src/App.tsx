@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { lazy, Suspense, useEffect } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
+import PublicLayout from "./components/PublicLayout";
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 
@@ -16,7 +17,7 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 // Admin / generator pages are dev-only — production bundles physically exclude
 // the lazy import below thanks to Vite tree-shaking on the `import.meta.env.DEV`
 // flag. See AGENTS.md: public route inventory stays fixed to /, /dashboard,
-// /model/:slug, /research, /research/:slug, *.
+// /model/:slug, /research, /research/:slug, /rumors, /privacy, *.
 const ScraperMonitor = import.meta.env.DEV
   ? lazy(() => import("./pages/ScraperMonitor"))
   : null;
@@ -53,27 +54,26 @@ const ScrollToTop = () => {
 };
 
 const AnimatedRoutes = () => {
-  const location = useLocation();
   return (
     <>
       <ScrollToTop />
-      {/* key on Routes remounts the matched page per navigation, replaying the
-          CSS `animate-fade-in` in PageTransition (no framer-motion needed). */}
-      <Routes location={location} key={location.pathname}>
-        <Route path="/" element={<Index />} />
-        <Route path="/dashboard" element={<Suspense fallback={<PageFallback />}><Dashboard /></Suspense>} />
-        <Route path="/model/:slug" element={<Suspense fallback={<PageFallback />}><ModelDetail /></Suspense>} />
-        <Route path="/research" element={<Suspense fallback={<PageFallback />}><ResearchIndex /></Suspense>} />
-        <Route path="/research/:slug" element={<Suspense fallback={<PageFallback />}><ResearchPost /></Suspense>} />
-        <Route path="/rumors" element={<Suspense fallback={<PageFallback />}><Rumors /></Suspense>} />
-        <Route path="/privacy" element={<Suspense fallback={<PageFallback />}><Privacy /></Suspense>} />
+      <Routes>
+        <Route element={<PublicLayout />}>
+          <Route index element={<Index />} />
+          <Route path="dashboard" element={<Dashboard />} />
+          <Route path="model/:slug" element={<ModelDetail />} />
+          <Route path="research" element={<ResearchIndex />} />
+          <Route path="research/:slug" element={<ResearchPost />} />
+          <Route path="rumors" element={<Rumors />} />
+          <Route path="privacy" element={<Privacy />} />
+          <Route path="*" element={<NotFound />} />
+        </Route>
         {ScraperMonitor && (
           <Route path="/admin/scrapers" element={<Suspense fallback={<PageFallback />}><ScraperMonitor /></Suspense>} />
         )}
         {OgPreview && (
           <Route path="/og/:slug" element={<Suspense fallback={<PageFallback />}><OgPreview /></Suspense>} />
         )}
-        <Route path="*" element={<NotFound />} />
       </Routes>
     </>
   );

@@ -3,24 +3,40 @@
 @tailwind utilities;
 
 @layer base {
+  @font-face {
+    font-family: "Space Grotesk";
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url("/fonts/space-grotesk-latin.woff2") format("woff2");
+  }
+
+  @font-face {
+    font-family: "JetBrains Mono";
+    font-style: normal;
+    font-weight: 400 700;
+    font-display: swap;
+    src: url("/fonts/jetbrains-mono-latin.woff2") format("woff2");
+  }
+
   :root {
-    --background: 220 20% 7%;
-    --foreground: 160 5% 88%;
+    --background: 222 24% 6%;
+    --foreground: 160 6% 90%;
 
-    --card: 220 18% 10%;
-    --card-foreground: 160 5% 88%;
+    --card: 220 20% 9%;
+    --card-foreground: 160 6% 90%;
 
-    --popover: 220 18% 10%;
-    --popover-foreground: 160 5% 88%;
+    --popover: 220 20% 9%;
+    --popover-foreground: 160 6% 90%;
 
-    --primary: 142 72% 50%;
-    --primary-foreground: 220 20% 7%;
+    --primary: 142 70% 52%;
+    --primary-foreground: 222 24% 6%;
 
-    --secondary: 220 14% 16%;
-    --secondary-foreground: 160 5% 78%;
+    --secondary: 220 15% 15%;
+    --secondary-foreground: 160 5% 80%;
 
-    --muted: 220 14% 14%;
-    --muted-foreground: 220 10% 58%;
+    --muted: 220 15% 13%;
+    --muted-foreground: 220 10% 62%;
 
     --accent: 270 60% 60%;
     --accent-foreground: 0 0% 98%;
@@ -28,9 +44,9 @@
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 98%;
 
-    --border: 220 14% 18%;
-    --input: 220 14% 18%;
-    --ring: 142 72% 50%;
+    --border: 220 14% 20%;
+    --input: 220 14% 20%;
+    --ring: 142 70% 52%;
 
     --radius: 0.5rem;
 
@@ -44,16 +60,16 @@
     --sidebar-ring: 142 72% 50%;
 
     /* Custom tokens */
-    --glow: 142 72% 50%;
-    --surface: 220 16% 12%;
-    --surface-hover: 220 14% 16%;
+    --glow: 142 70% 52%;
+    --surface: 220 17% 12%;
+    --surface-hover: 220 16% 14%;
     --warning: 38 92% 50%;
 
     /* Elevation + surface depth tokens (additive — used via utilities below).
        Layered soft shadows give cards gentle depth without breaking the flat,
        restraint-first dark theme. */
-    --shadow-card: 0 1px 2px 0 hsl(220 40% 2% / 0.4), 0 1px 3px 0 hsl(220 40% 2% / 0.3);
-    --shadow-elevated: 0 4px 12px -2px hsl(220 40% 2% / 0.5), 0 12px 28px -8px hsl(220 40% 2% / 0.45);
+    --shadow-card: 0 1px 2px hsl(220 50% 2% / 0.42), 0 8px 24px -20px hsl(220 50% 1% / 0.8);
+    --shadow-elevated: 0 5px 16px -4px hsl(220 50% 1% / 0.7), 0 18px 38px -16px hsl(220 50% 1% / 0.72);
     /* Faint top highlight so card surfaces catch light at their upper edge. */
     --gradient-surface: linear-gradient(180deg, hsl(0 0% 100% / 0.035) 0%, hsl(0 0% 100% / 0) 38%);
   }
@@ -70,6 +86,8 @@
 
   body {
     @apply bg-background text-foreground font-body antialiased;
+    min-width: 320px;
+    overflow-x: clip;
   }
 
   h1, h2, h3, h4, h5, h6 {
@@ -142,7 +160,7 @@
   }
 
   .glass {
-    @apply bg-card/60 backdrop-blur-xl border border-border;
+    @apply border border-border bg-card;
   }
 
   /* Card elevation utilities (opt-in). `surface-card` adds a resting shadow and
@@ -152,16 +170,14 @@
     box-shadow: var(--shadow-card);
     background-image: var(--gradient-surface);
   }
-  .surface-lift {
-    transition: box-shadow 0.25s ease, border-color 0.2s ease, transform 0.25s ease;
-  }
-  .surface-lift:hover {
-    box-shadow: var(--shadow-elevated);
-    transform: translateY(-2px);
-  }
-  @media (prefers-reduced-motion: reduce) {
+  @media (hover: hover) and (pointer: fine) {
+    .surface-lift {
+      transition: box-shadow 0.25s ease, border-color 0.2s ease, transform 0.25s ease;
+    }
     .surface-lift:hover {
-      transform: none;
+      border-color: hsl(var(--border) / 0.95);
+      box-shadow: var(--shadow-elevated);
+      transform: translateY(-2px);
     }
   }
 
@@ -171,6 +187,7 @@
   }
   .scrollbar-thin::-webkit-scrollbar {
     width: 4px;
+    height: 6px;
   }
   .scrollbar-thin::-webkit-scrollbar-thumb {
     background: hsl(var(--border));
