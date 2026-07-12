@@ -25,12 +25,20 @@ import {
   isNonFrontierLabel,
   isReleasedVersion,
   mergeRumorRows,
+  releasedSetPrompt,
   sourceQualityLabel,
   splitCompoundLabel,
+  versionKeysFromReleaseText,
   type MergeableRumor,
 } from "../../supabase/functions/_shared/rumor-canon";
-import { deriveReleasedTokens, modelIdToTokens } from "../../supabase/functions/_shared/released-models";
+import {
+  deriveReleasedTokens,
+  modelIdToTokens,
+  openAiReleasedTokensFromRss,
+  parseOpenAiReleaseFeed,
+} from "../../supabase/functions/_shared/released-models";
 import { isCredibleReleaseSource, isReleaseAnnouncement } from "../../supabase/functions/_shared/release-detect";
+import { VENDOR_EVENTS } from "../data/vendor-events";
 
 function src(url: string, platform: string, posted_at: string, score = 0, extra: Partial<SourceRef> = {}): SourceRef {
   return { url, platform, posted_at, score, handle: null, snippet: "s", ...extra };
@@ -149,9 +157,9 @@ describe("buildContribution", () => {
     expect(c?.versionKey).toBe("orionmist");
   });
 
-  it("accepts a punctuation-variant label (post 'GPT-5,6' → label 'GPT-5.6')", () => {
-    const raw: RawClaim = { is_rumor: true, target_family: "chatgpt", version_label: "GPT-5.6", is_unreleased: true };
-    const c = buildContribution(raw, source, "GPT-5,6 dropping next week per a leaker");
+  it("accepts a punctuation-variant label for an unreleased version", () => {
+    const raw: RawClaim = { is_rumor: true, target_family: "chatgpt", version_label: "GPT-6.1", is_unreleased: true };
+    const c = buildContribution(raw, source, "GPT-6,1 dropping next week per a leaker");
     expect(c).not.toBeNull();
     expect(c!.modelSlug).toBe("chatgpt");
   });
@@ -161,7 +169,7 @@ describe("buildContribution", () => {
     expect(buildContribution(raw, source, "DeepSeek V3 is coming soon")).toBeNull();
   });
 
-  it("canonicalizes codename aliases to one version key", () => {
+  it("drops every released Bidi alias even when the model marks it unreleased", () => {
     const bidi = buildContribution(
       { is_rumor: true, target_family: "chatgpt", codename: "Bidi", is_unreleased: true },
       source,
@@ -172,9 +180,8 @@ describe("buildContribution", () => {
       source,
       "GPT Bidi 1 launching soon",
     );
-    expect(bidi?.versionKey).toBe("bidi");
-    expect(gptBidi?.versionKey).toBe("bidi");
-    expect(bidi?.versionLabel).toBe("GPT Bidi 1");
+    expect(bidi).toBeNull();
+    expect(gptBidi).toBeNull();
   });
 
   it("drops a launched version even when the model marks it unreleased", () => {
@@ -408,7 +415,7 @@ describe("source quality", () => {
 });
 
 describe("deterministic rumor recovery", () => {
-  it("recovers obvious GPT-5.6 delay and Gemini 3.5 Pro claims from a tracked source", () => {
+  it("recovers the unreleased Gemini claim but drops the launched GPT-5.6 claim", () => {
     const source = src("https://x.com/synthwavedd/status/2069432791184650426", "twitter", "2026-06-24", 4, {
       handle: "synthwavedd",
     });
@@ -419,17 +426,15 @@ describe("deterministic rumor recovery", () => {
     ].join("\n");
 
     const claims = recoverDeterministicClaims(source, text);
-    expect(claims).toHaveLength(2);
+    expect(claims).toHaveLength(1);
 
     const contributions = claims
       .map((raw) => buildContribution(raw, source, text))
       .filter(Boolean) as RumorContribution[];
     expect(contributions.map((c) => `${c.modelSlug}:${c.versionKey}:${c.claimType}`)).toEqual([
-      "chatgpt:gpt56:delayed",
       "gemini:gemini35pro:in_testing",
     ]);
-    expect(contributions[0].etaText).toBe("mid-July");
-    expect(contributions[1].versionLabel).toBe("Gemini 3.5 Pro");
+    expect(contributions[0].versionLabel).toBe("Gemini 3.5 Pro");
   });
 
   it("does not recover from low-signal uncorroborated posts", () => {
@@ -437,7 +442,7 @@ describe("deterministic rumor recovery", () => {
     expect(recoverDeterministicClaims(weakSource, "GPT-5.6 delayed to mid-July. 3.5 Pro in testing.")).toEqual([]);
   });
 
-  it("recovers GPT-5.6 enterprise partner testing with a wider-launch ETA from a tracked source", () => {
+  it("does not recover a released GPT-5.6 partner-preview claim", () => {
     const source = src("https://x.com/synthwavedd/status/207123", "twitter", "2026-06-25", 1300, {
       handle: "synthwavedd",
     });
@@ -449,13 +454,7 @@ describe("deterministic rumor recovery", () => {
     ].join("\n");
 
     const claims = recoverDeterministicClaims(source, text);
-    expect(claims).toHaveLength(1);
-
-    const contribution = buildContribution(claims[0], source, text);
-    expect(contribution?.modelSlug).toBe("chatgpt");
-    expect(contribution?.versionKey).toBe("gpt56");
-    expect(contribution?.claimType).toBe("in_testing");
-    expect(contribution?.etaText).toBe("2nd week of July");
+    expect(claims).toEqual([]);
   });
 });
 
@@ -558,6 +557,8 @@ describe("canonicalVersionKey", () => {
       [null, "GPT-BIDI"],
       ["GPT Bidi 1", null],
       ["Bidi", null],
+      ["GPT-Live", null],
+      ["GPT-Live-1", null],
     ] as [string | null, string | null][]) {
       const c = canonicalVersionKey("chatgpt", label, codename);
       expect(c.key).toBe("bidi");
@@ -616,14 +617,45 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("claude", "Sonnet 5", null)).toBe(true);
     expect(isReleasedVersion("claude", "Sonic 5", null)).toBe(true); // common mis-spelling
     expect(isReleasedVersion("claude", "Claude Sonnet 5", null)).toBe(true); // family-prefixed
+    expect(isReleasedVersion("chatgpt", "GPT-5.6", null)).toBe(true);
+    expect(isReleasedVersion("chatgpt", "GPT-5.6 Sol", null)).toBe(true);
+    expect(isReleasedVersion("chatgpt", null, "Bidi")).toBe(true);
+    expect(isReleasedVersion("chatgpt", "GPT-Live-1", null)).toBe(true);
+    expect(isReleasedVersion("grok", "Grok 4.5", null)).toBe(true);
     expect(isReleasedVersion("grok", "Fable 5", null)).toBe(true); // family-agnostic
   });
 
   it("keeps unreleased versions (no false positives)", () => {
     expect(isReleasedVersion("claude", "Opus 5", null)).toBe(false);
-    expect(isReleasedVersion("chatgpt", "GPT-5.6", null)).toBe(false);
+    expect(isReleasedVersion("chatgpt", "GPT-6", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
-    expect(isReleasedVersion("chatgpt", null, "Bidi")).toBe(false);
+    expect(isReleasedVersion("grok", "Grok 5", null)).toBe(false);
+  });
+
+  it("covers every model launch recorded in the vendor event timeline", () => {
+    for (const event of VENDOR_EVENTS.filter((item) => item.eventType === "model_launch" && item.modelSlug)) {
+      const label = event.title.replace(/\s+launch$/i, "");
+      expect(isReleasedVersion(event.modelSlug, label, null), event.id).toBe(true);
+    }
+  });
+});
+
+describe("released model catalog", () => {
+  it("generates the extractor prompt from the shared release entries", () => {
+    const prompt = releasedSetPrompt();
+    expect(prompt).toContain("GPT-5.6 (Sol, Terra, Luna) and earlier");
+    expect(prompt).toContain("GPT-Live 1 / Bidi");
+    expect(prompt).toContain("Grok 4.5 and earlier");
+    expect(prompt).toContain("Gemini 3.5 Flash");
+  });
+
+  it("extracts known aliases and future numbered labels from release text", () => {
+    expect(versionKeysFromReleaseText("GPT-5.6 Sol and GPT-Live are now available")).toEqual(
+      expect.arrayContaining(["gpt56", "bidi"]),
+    );
+    expect(versionKeysFromReleaseText("Today we're launching Grok 5 and GPT-6.1")).toEqual(
+      expect.arrayContaining(["grok5", "gpt61"]),
+    );
   });
 });
 
@@ -648,6 +680,47 @@ describe("modelIdToTokens / deriveReleasedTokens (API auto-detect)", () => {
   });
 });
 
+describe("OpenAI official release feed", () => {
+  const rss = `<?xml version="1.0"?>
+    <rss><channel>
+      <item>
+        <title><![CDATA[GPT-5.6 is now the preferred model]]></title>
+        <description><![CDATA[GPT-5.6 powers current production workflows.]]></description>
+        <link>https://openai.com/index/gpt-5-6</link>
+        <category><![CDATA[Product]]></category>
+        <pubDate>Thu, 09 Jul 2026 10:00:00 GMT</pubDate>
+      </item>
+      <item>
+        <title><![CDATA[Introducing GPT-Live]]></title>
+        <description><![CDATA[Now powering ChatGPT Voice.]]></description>
+        <link>https://openai.com/index/introducing-gpt-live</link>
+        <category><![CDATA[Product]]></category>
+      </item>
+      <item>
+        <title><![CDATA[Previewing GPT-6]]></title>
+        <description><![CDATA[A limited preview for select partners.]]></description>
+        <link>https://openai.com/index/previewing-gpt-6</link>
+        <category><![CDATA[Product]]></category>
+      </item>
+    </channel></rss>`;
+
+  it("parses item metadata", () => {
+    const items = parseOpenAiReleaseFeed(rss);
+    expect(items).toHaveLength(3);
+    expect(items[0]).toMatchObject({
+      title: "GPT-5.6 is now the preferred model",
+      category: "Product",
+      publishedAt: "Thu, 09 Jul 2026 10:00:00 GMT",
+    });
+  });
+
+  it("retires GA products but not previews", () => {
+    const tokens = openAiReleasedTokensFromRss(rss);
+    expect(tokens).toEqual(expect.arrayContaining(["gpt56", "bidi"]));
+    expect(tokens).not.toContain("gpt6");
+  });
+});
+
 describe("release-detect (social auto-detect)", () => {
   const officialTweet = { url: "https://x.com/OpenAI/status/1", platform: "twitter", handle: "OpenAI" };
   const randomTweet = { url: "https://x.com/someguy/status/2", platform: "twitter", handle: "someguy" };
@@ -656,6 +729,9 @@ describe("release-detect (social auto-detect)", () => {
     expect(isReleaseAnnouncement("GPT-5.6 is now available to everyone", "")).toBe(true);
     expect(isReleaseAnnouncement("Grok 5 released today", "you can use it now")).toBe(true);
     expect(isReleaseAnnouncement("Gemini 3 Pro is now live", null)).toBe(true);
+    expect(isReleaseAnnouncement("GPT-5.6", "We're launching for general availability after our limited preview.")).toBe(true);
+    expect(isReleaseAnnouncement("Introducing GPT-Live", "Now powering ChatGPT Voice.")).toBe(true);
+    expect(isReleaseAnnouncement("Today, we're launching Grok 4.5", "")).toBe(true);
   });
 
   it("does not flag hype, future tense, or a limited/EAP release", () => {
@@ -691,23 +767,23 @@ describe("mergeRumorRows", () => {
 
   it("collapses alias-duplicate rows into one card with summed distinct mentions", () => {
     const out = mergeRumorRows([
-      rrow({ model_slug: "chatgpt", codename: "Bidi", mention_count: 1, last_seen_at: "2026-06-22",
+      rrow({ model_slug: "gemini", version_label: "3.5 Pro", mention_count: 1, last_seen_at: "2026-06-22",
         representative_sources: [{ url: "u1", platform: "twitter" }] }),
-      rrow({ model_slug: "chatgpt", version_label: "GPT Bidi 1", mention_count: 1, last_seen_at: "2026-06-23",
+      rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Pro", mention_count: 1, last_seen_at: "2026-06-23",
         representative_sources: [{ url: "u2", platform: "reddit" }] }),
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("GPT Bidi 1");
-    expect(out[0].codename).toBe("Bidi");
+    expect(out[0].version_label).toBe("Gemini 3.5 Pro");
+    expect(out[0].codename).toBeNull();
     expect(out[0].mention_count).toBe(2); // single-unconfirmed-source tag now clears
     expect(out[0].platform_count).toBe(2);
   });
 
-  it("collapses Bidi alias rows and preserves the newest stated ETA", () => {
+  it("collapses unreleased alias rows and preserves the newest stated ETA", () => {
     const out = mergeRumorRows([
       rrow({
-        model_slug: "chatgpt",
-        codename: "Bidi",
+        model_slug: "gemini",
+        version_label: "3.5 Pro",
         claim_type: "imminent",
         eta_text: "this week",
         eta_conflicting: true,
@@ -719,8 +795,8 @@ describe("mergeRumorRows", () => {
         ],
       }),
       rrow({
-        model_slug: "chatgpt",
-        codename: "GPT Bidi 1",
+        model_slug: "gemini",
+        version_label: "Gemini 3.5 Pro",
         claim_type: "in_testing",
         mention_count: 1,
         last_seen_at: "2026-06-24",
@@ -728,8 +804,8 @@ describe("mergeRumorRows", () => {
       }),
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("GPT Bidi 1");
-    expect(out[0].codename).toBe("Bidi");
+    expect(out[0].version_label).toBe("Gemini 3.5 Pro");
+    expect(out[0].codename).toBeNull();
     expect(out[0].claim_type).toBe("imminent");
     expect((out[0] as { eta_text?: string | null }).eta_text).toBe("this week");
     expect((out[0] as { eta_conflicting?: boolean }).eta_conflicting).toBe(true);
@@ -759,8 +835,8 @@ describe("mergeRumorRows", () => {
 
   it("counts a url shared across two alias rows only once (no double-count)", () => {
     const out = mergeRumorRows([
-      rrow({ model_slug: "chatgpt", codename: "Bidi", representative_sources: [{ url: "shared", platform: "twitter" }] }),
-      rrow({ model_slug: "chatgpt", version_label: "GPT Bidi 1", representative_sources: [{ url: "shared", platform: "twitter" }] }),
+      rrow({ model_slug: "gemini", version_label: "3.5 Pro", representative_sources: [{ url: "shared", platform: "twitter" }] }),
+      rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Pro", representative_sources: [{ url: "shared", platform: "twitter" }] }),
     ]);
     expect(out).toHaveLength(1);
     expect(out[0].mention_count).toBe(1);
@@ -768,16 +844,16 @@ describe("mergeRumorRows", () => {
 
   it("applies claim_type precedence and takes display fields from the strongest row", () => {
     const out = mergeRumorRows([
-      rrow({ model_slug: "chatgpt", codename: "Bidi", claim_type: "launch", claim_summary: "old", last_seen_at: "2026-06-20",
+      rrow({ model_slug: "gemini", version_label: "3.5 Pro", claim_type: "launch", claim_summary: "old", last_seen_at: "2026-06-20",
         representative_sources: [{ url: "a", platform: "reddit" }] }),
-      rrow({ model_slug: "chatgpt", version_label: "GPT Bidi 1", claim_type: "delayed", claim_summary: "newest", last_seen_at: "2026-06-24",
+      rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Pro", claim_type: "delayed", claim_summary: "newest", last_seen_at: "2026-06-24",
         representative_sources: [{ url: "b", platform: "twitter" }] }),
     ]);
     expect(out[0].claim_type).toBe("delayed");
     expect(out[0].claim_summary).toBe("newest");
   });
 
-  it("replaces stale GPT-5.6 ETA text with a tracked-leaker delay during display merge", () => {
+  it("filters all persisted spellings of newly launched models", () => {
     const out = mergeRumorRows([
       rrow({
         model_slug: "chatgpt",
@@ -791,23 +867,15 @@ describe("mergeRumorRows", () => {
       }),
       rrow({
         model_slug: "chatgpt",
-        version_label: "GPT 5.6",
-        claim_type: "delayed",
-        claim_summary: "GPT-5.6 is delayed to mid-July.",
-        eta_text: "mid-July",
-        mention_count: 1,
-        has_credible_source: true,
+        version_label: "GPT-5.6 Sol",
         last_seen_at: "2026-06-23",
-        representative_sources: [{ url: "x", platform: "twitter", handle: "synthwavedd" }],
+        representative_sources: [{ url: "x", platform: "twitter" }],
       }),
+      rrow({ model_slug: "chatgpt", codename: "Bidi" }),
+      rrow({ model_slug: "chatgpt", version_label: "GPT-Live-1" }),
+      rrow({ model_slug: "grok", version_label: "Grok 4.5" }),
     ]);
-    expect(out).toHaveLength(1);
-    expect(out[0].claim_type).toBe("delayed");
-    expect(out[0].claim_summary).toBe("GPT-5.6 is delayed to mid-July.");
-    expect((out[0] as { eta_text?: string | null }).eta_text).toBe("mid-July");
-    expect((out[0] as { representative_sources?: Array<{ source_quality?: string | null }> }).representative_sources?.[0].source_quality).toBe(
-      "tracked_leaker",
-    );
+    expect(out).toEqual([]);
   });
 
   it("filters out non-frontier labels and untracked families", () => {
@@ -826,6 +894,9 @@ describe("mergeRumorRows", () => {
       rrow({ codename: "Mythos" }), // Fable 5 shipped
       rrow({ version_label: "Sonnet 5" }), // shipped
       rrow({ version_label: "Claude Sonnet 5" }), // shipped, family-prefixed spelling
+      rrow({ model_slug: "chatgpt", version_label: "GPT-5.6" }),
+      rrow({ model_slug: "chatgpt", codename: "Bidi" }),
+      rrow({ model_slug: "grok", version_label: "Grok 4.5" }),
     ]);
     expect(out).toHaveLength(1);
     expect(out[0].version_label).toBe("Opus 5");

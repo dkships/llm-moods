@@ -65,9 +65,9 @@ export interface SourceRef {
   source_quality?: SourceQuality | null;
 }
 
-// Tracked leaker handles (lowercased, no @). EPHEMERAL — refresh each model cycle
-// alongside the codename `model_keywords` and the RELEASED_SET in aggregate-rumors.
-// The matching `from:<handle>` Twitter search terms live in scraper_config.
+// Tracked leaker handles (lowercased, no @). EPHEMERAL: refresh each model cycle
+// alongside the codename `model_keywords` and rumor-canon alias catalog. The
+// matching `from:<handle>` Twitter search terms live in scraper_config.
 export const KNOWN_LEAKERS = TRACKED_LEAKER_HANDLES;
 
 const VERIFIED_FOLLOWER_FLOOR = 10000;
@@ -298,13 +298,10 @@ export function parseRecordRumors(input: unknown, batchLength: number): RawClaim
   return out;
 }
 
-const GPT56_RE = /\bgpt[-\s]?5[.,]\s*6\b/i;
 const GEMINI_35_PRO_RE = /\b(?:gemini\s*)?3[.,]\s*5\s*pro\b/i;
 const DELAY_RE = /\b(?:delays?|delayed|pushed back|slipped|postponed|stalled|no longer|give us until)\b/i;
 const TESTING_RE = /\b(?:in testing|early access|\bEAP\b|enterprise partners?|partner testing|testing ahead of|canary|spotted|api|arena|model[-\s]?(?:string|id)|codename)\b/i;
 const IMMINENT_RE = /\b(?:imminent|eta|next week|this week|any day now|coming soon|dropping|drops? (?:next|this)|rolling out|rolls? out|scheduled|wider launch)\b/i;
-const PARTNER_TESTING_RE =
-  /\b(?:launch(?:ed)? for .{0,80}testing|enterprise partners? for testing|testing ahead of (?:the )?(?:wider|public|general) launch)\b/i;
 
 function backstopEligible(source: SourceRef): boolean {
   return isCredibleSource(source);
@@ -360,8 +357,8 @@ function geminiClaimType(text: string): RumorClaimType | null {
 
 /**
  * Deterministic recovery for high-quality multi-claim posts where the extractor
- * can miss one obvious bullet. Kept intentionally narrow: current backstops only
- * cover the observed GPT-5.6 delay and Gemini 3.5 Pro variant.
+ * can miss one obvious bullet. Kept intentionally narrow: the current backstop
+ * covers the observed Gemini 3.5 Pro variant.
  */
 export function recoverDeterministicClaims(source: SourceRef, postText: string): RawClaim[] {
   if (!backstopEligible(source)) return [];
@@ -369,44 +366,6 @@ export function recoverDeterministicClaims(source: SourceRef, postText: string):
   if (!compactWhitespace(text)) return [];
 
   const claims: RawClaim[] = [];
-
-  const gptMatch = GPT56_RE.exec(text);
-  if (gptMatch) {
-    const gptWindow = claimScope(text, gptMatch);
-    if (DELAY_RE.test(gptWindow) || DELAY_RE.test(text)) {
-      const eta = etaFromText(gptWindow) ?? etaFromText(text);
-      claims.push({
-        is_rumor: true,
-        target_family: "chatgpt",
-        version_label: "GPT-5.6",
-        codename: null,
-        is_unreleased: true,
-        claim_type: "delayed",
-        claim_summary: eta ? `GPT-5.6 is delayed to ${eta}.` : "GPT-5.6 is delayed.",
-        rumored_benefit: null,
-        signals: "Tracked source delay claim",
-        eta_text: eta,
-        eta_date: null,
-        confidence: 0.85,
-      });
-    } else if (PARTNER_TESTING_RE.test(text)) {
-      const eta = etaFromText(text);
-      claims.push({
-        is_rumor: true,
-        target_family: "chatgpt",
-        version_label: "GPT-5.6",
-        codename: null,
-        is_unreleased: true,
-        claim_type: "in_testing",
-        claim_summary: "GPT-5.6 is in enterprise partner testing ahead of wider launch.",
-        rumored_benefit: null,
-        signals: "Tracked source enterprise partner testing claim",
-        eta_text: eta,
-        eta_date: null,
-        confidence: 0.85,
-      });
-    }
-  }
 
   const geminiMatch = GEMINI_35_PRO_RE.exec(text);
   if (geminiMatch) {

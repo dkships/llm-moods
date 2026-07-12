@@ -47,7 +47,7 @@ Read `AGENT-REFERENCE.md` before changing `_shared/classifier.ts` or any scraper
 
 ## Rumors radar (`/rumors`)
 
-Pipeline detail is in `AGENT-REFERENCE.md` — read it before touching anything rumor-related. Recurring manual touch: refresh the codename/next-version `model_keywords` rows each cycle, alongside `RELEASED_SET` in `aggregate-rumors/index.ts` and the `FAMILY_ALIASES` + `COMPETITOR_DENY` seeds in `_shared/rumor-canon.ts`. To hide a just-launched model instantly with zero backend deploy, set `released: true` on its `FAMILY_ALIASES` entry. ETAs are always framed as unconfirmed community estimates, never forecasts.
+Pipeline detail is in `AGENT-REFERENCE.md`; read it before touching anything rumor-related. Recurring manual touch: refresh the codename/next-version `model_keywords` rows and the `FAMILY_ALIASES` + `COMPETITOR_DENY` seeds in `_shared/rumor-canon.ts` each cycle. The extractor's released-set prompt is generated from `FAMILY_ALIASES`. To hide a just-launched model instantly with zero backend deploy, set `released: true` on its alias entry. ETAs are always framed as unconfirmed community estimates, never forecasts.
 
 ## Frontend design rules
 

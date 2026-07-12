@@ -14,16 +14,24 @@ import { inferSourceQuality, normalizeSourceHandle, type SourceQuality } from ".
 // GA phrasing. Narrow on purpose: present-tense general availability only.
 const GA_RE = new RegExp(
   "\\b(?:" +
-    "now (?:available|live|out)|" +
-    "is (?:now )?live|" +
-    "generally available|" +
+    "now (?:available|live|out|powering)|" +
+    "is (?:now )?(?:available|live)|" +
+    "is now (?:the )?(?:default|preferred) model|" +
+    "general availability|generally available|" +
     "released today|launched today|out now|shipped today|" +
-    "available (?:to everyone|to all|for everyone|now in the api|in the api now)|" +
+    "available (?:starting today|to everyone|to all|for everyone|now in the api|in the api now)|" +
     "rolling out to (?:everyone|all users|all)|" +
+    "(?:today,? )?we(?:['’]re| are) launching|" +
     "you can (?:now )?(?:use|try|access) it (?:now|today)" +
   ")\\b",
   "i",
 );
+
+// Strong public-GA wording wins if an announcement also references the preview
+// it followed. Without this override, "general availability after our limited
+// preview" would be rejected merely because both phrases appear in one post.
+const PUBLIC_GA_RE =
+  /\b(?:general availability|generally available|available (?:starting today|to everyone|to all|for everyone)|rolling out to (?:everyone|all users|all))\b/i;
 
 // Explicitly NOT-GA contexts — a limited/preview release stays on the radar.
 const LIMITED_RE =
@@ -36,7 +44,7 @@ export function isReleaseAnnouncement(
 ): boolean {
   const text = `${title ?? ""} ${body ?? ""}`;
   if (!GA_RE.test(text)) return false;
-  if (LIMITED_RE.test(text)) return false;
+  if (LIMITED_RE.test(text) && !PUBLIC_GA_RE.test(text)) return false;
   return true;
 }
 

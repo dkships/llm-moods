@@ -20,14 +20,20 @@ import {
   type RumorRow,
   type SourceRef,
 } from "../_shared/rumor-rollup.ts";
-import { canonicalVersionKey, isReleasedVersion } from "../_shared/rumor-canon.ts";
-import { deriveReleasedTokens } from "../_shared/released-models.ts";
+import {
+  canonicalVersionKey,
+  isReleasedVersion,
+  releasedSetPrompt,
+  versionKeysFromReleaseText,
+} from "../_shared/rumor-canon.ts";
+import { deriveReleasedTokens, openAiReleasedTokensFromRss } from "../_shared/released-models.ts";
 import { isCredibleReleaseSource, isReleaseAnnouncement } from "../_shared/release-detect.ts";
 
 const SOURCE = "aggregate-rumors";
 const LOCK_KEY = "rumor-aggregate";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
+const OPENAI_NEWS_RSS_URL = "https://openai.com/news/rss.xml";
 
 // Tuning. The candidate set is bounded by the leak-lexicon SQL pre-filter; batch
 // stays small (~10) because the per-post `claims[]` output is larger than the
@@ -40,15 +46,10 @@ const EXTRACT_MAX_TOKENS = 8000;
 const MAX_REPRESENTATIVE = 4;
 const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529]);
 
-// Current released flagships — drives the model's `is_unreleased` judgment.
-// EPHEMERAL: refresh this alongside the codename `model_keywords` rows each cycle
-// (see the residual-risk note in the plan / CLAUDE.md). Deterministic backstop:
-// launched versions are also dropped by `isReleasedVersion` (rumor-canon.ts), so
-// keep this list and the `released` FAMILY_ALIASES flags in step.
-const RELEASED_SET =
-  "Claude: Opus 4.8, Sonnet 5, Sonnet 4.6, Haiku 4.5, Fable 5 / Mythos 5. " +
-  "ChatGPT/OpenAI: GPT-5.4 and earlier. Gemini: 3 Pro, 3 Flash, 3.5 Flash. Grok: 4 and earlier. " +
-  "Anything newer/higher than these, or an unrecognized codename, is UNRELEASED.";
+// Drives the model's `is_unreleased` judgment. Generated from the same catalog
+// used by buildContribution + the frontend display filter so releases cannot
+// drift between three manually maintained lists.
+const RELEASED_SET = releasedSetPrompt();
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -287,6 +288,20 @@ async function fetchGeminiModelIds(apiKey: string): Promise<string[]> {
   }
 }
 
+// OpenAI has no API key in this project, but its official news RSS is public and
+// includes Product launch items. Parsing is conservative: only explicit GA
+// wording contributes tokens, so a limited preview cannot retire a rumor.
+async function fetchOpenAiReleaseRss(): Promise<string> {
+  try {
+    const res = await fetch(OPENAI_NEWS_RSS_URL, {
+      headers: { "User-Agent": "LLMVibes-RumorRadar/1.0" },
+    });
+    return res.ok ? await res.text() : "";
+  } catch {
+    return "";
+  }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
@@ -362,12 +377,16 @@ Deno.serve(async (req) => {
     // the Models APIs only list shipped ids, so a match can't be a false positive.
     const releasedTokens = new Set<string>();
     const geminiKey = Deno.env.get("GEMINI_API_KEY");
-    const [anthropicIds, geminiIds] = await Promise.all([
+    const [anthropicIds, geminiIds, openAiRss] = await Promise.all([
       fetchAnthropicModelIds(apiKey),
       geminiKey ? fetchGeminiModelIds(geminiKey) : Promise.resolve([]),
+      fetchOpenAiReleaseRss(),
     ]);
-    for (const token of deriveReleasedTokens(anthropicIds, geminiIds)) releasedTokens.add(token);
-    const apiTokenCount = releasedTokens.size;
+    const apiTokens = deriveReleasedTokens(anthropicIds, geminiIds);
+    for (const token of apiTokens) releasedTokens.add(token);
+    const officialFeedTokens = openAiReleasedTokensFromRss(openAiRss);
+    for (const token of officialFeedTokens) releasedTokens.add(token);
+    const apiTokenCount = apiTokens.length;
 
     if (candidates.length > 0) {
       const claimsByCandidate = await extractAll(candidates, apiKey, rumorModel(), logError);
@@ -387,13 +406,11 @@ Deno.serve(async (req) => {
           isReleaseAnnouncement(cand.row.title, cand.row.content) &&
           isCredibleReleaseSource(cand.source)
         ) {
-          for (const raw of auditClaims) {
-            const { key } = canonicalVersionKey(
-              (raw as RawClaim).target_family,
-              (raw as RawClaim).version_label,
-              (raw as RawClaim).codename,
-            );
-            if (key) releasedTokens.add(key);
+          // Extract the identity from the announcement text itself. Released
+          // posts correctly produce no rumor claims, so auditClaims is often
+          // empty and cannot be the source of the release token.
+          for (const key of versionKeysFromReleaseText(cand.postText)) {
+            releasedTokens.add(key);
           }
         }
 
@@ -495,6 +512,7 @@ Deno.serve(async (req) => {
       clusters_upserted: upserts,
       released_tokens: releasedList.length,
       released_from_api: apiTokenCount,
+      released_from_openai_feed: officialFeedTokens.length,
       released_rows_flagged: releasedFlagged,
     };
     await supabase.from("error_log").insert({

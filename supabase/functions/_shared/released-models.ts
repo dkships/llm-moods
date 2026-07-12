@@ -6,10 +6,64 @@
 // The Models API only ever lists PUBLIC ids, never pre-release codenames — so
 // this reliably catches version-numbered launches (Sonnet 5, Gemini 3.x) and a
 // codename whose tracked key already equals the shipped token (Fable 5 → fable5).
-// A codename that ships under a different number is handled by the social layer
-// (release-detect.ts) and the manual FAMILY_ALIASES `released` flag.
+// OpenAI's public RSS and the credible-source social layer cover families without
+// a Models API key. A renamed codename is linked through FAMILY_ALIASES.
 
-import { squash } from "./rumor-canon.ts";
+import { squash, versionKeysFromReleaseText } from "./rumor-canon.ts";
+import { isReleaseAnnouncement } from "./release-detect.ts";
+
+export interface OfficialReleaseFeedItem {
+  title: string;
+  description: string;
+  link: string;
+  category: string | null;
+  publishedAt: string | null;
+}
+
+function decodeXmlText(value: string | null): string {
+  return (value ?? "")
+    .replace(/^\s*<!\[CDATA\[/, "")
+    .replace(/\]\]>\s*$/, "")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;|&apos;/g, "'")
+    .trim();
+}
+
+function xmlTag(block: string, tag: string): string {
+  const match = block.match(new RegExp(`<${tag}(?:\\s[^>]*)?>([\\s\\S]*?)</${tag}>`, "i"));
+  return decodeXmlText(match?.[1] ?? null);
+}
+
+/** Parse the fields needed from OpenAI's public RSS feed without an XML dependency. */
+export function parseOpenAiReleaseFeed(xml: string | null | undefined): OfficialReleaseFeedItem[] {
+  const items = (xml ?? "").match(/<item>[\s\S]*?<\/item>/gi) ?? [];
+  return items.map((item) => ({
+    title: xmlTag(item, "title"),
+    description: xmlTag(item, "description"),
+    link: xmlTag(item, "link"),
+    category: xmlTag(item, "category") || null,
+    publishedAt: xmlTag(item, "pubDate") || null,
+  })).filter((item) => item.title.length > 0);
+}
+
+/**
+ * Derive shipped version keys only from Product items with explicit GA wording.
+ * Preview announcements remain excluded even when their title names a model.
+ */
+export function openAiReleasedTokensFromRss(xml: string | null | undefined): string[] {
+  const tokens = new Set<string>();
+  for (const item of parseOpenAiReleaseFeed(xml)) {
+    if (item.category?.toLowerCase() !== "product") continue;
+    if (!isReleaseAnnouncement(item.title, item.description)) continue;
+    for (const token of versionKeysFromReleaseText(`${item.title} ${item.description}`)) {
+      tokens.add(token);
+    }
+  }
+  return [...tokens];
+}
 
 // Leading family words to also strip: people say "Sonnet 5" (→ sonnet5), not
 // "Claude Sonnet 5" — but the Anthropic id is `claude-sonnet-5`. Gemini ids keep

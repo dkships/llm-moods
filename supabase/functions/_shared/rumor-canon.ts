@@ -5,9 +5,9 @@
 // `src/test/rumors.test.ts`.
 //
 // EPHEMERAL DATA: `FAMILY_ALIASES`, `COMPETITOR_DENY`, and
-// `TRACKED_LEAKER_HANDLES` are refreshed each model cycle alongside RELEASED_SET
-// (aggregate-rumors) and the codename `model_keywords` rows. A stale alias map
-// silently stops merging next cycle's codenames — keep them in lockstep.
+// `TRACKED_LEAKER_HANDLES` are refreshed each model cycle alongside the codename
+// `model_keywords` rows. `releasedSetPrompt()` derives the extractor's released
+// list from this catalog so the write path and display filter cannot drift.
 
 export type TrackedFamily = "claude" | "chatgpt" | "gemini" | "grok";
 
@@ -189,6 +189,8 @@ interface AliasEntry {
   codename: string | null; // canonical codename
   aliases: string[]; // squashed spellings that resolve here
   released?: boolean; // true once shipped → retired from the radar (see isReleasedVersion)
+  releasePrompt?: string; // released-set wording; omit on superseded snapshots
+  releaseAliases?: string[]; // distinctive names safe to scan in GA announcement text
 }
 
 // Known upcoming versions whose codenames/labels are aliases of one model. The
@@ -201,11 +203,35 @@ interface AliasEntry {
 const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
   claude: [
     {
+      key: "opus47",
+      label: "Opus 4.7",
+      codename: null,
+      aliases: ["opus47", "claudeopus47"],
+      released: true,
+    },
+    {
+      key: "opus48",
+      label: "Opus 4.8",
+      codename: null,
+      aliases: ["opus48", "claudeopus48"],
+      released: true,
+      releasePrompt: "Opus 4.8 and earlier",
+    },
+    {
+      key: "sonnet46",
+      label: "Sonnet 4.6",
+      codename: null,
+      aliases: ["sonnet46", "claudesonnet46"],
+      released: true,
+    },
+    {
       key: "fable5",
       label: "Fable 5",
       codename: "Mythos",
       aliases: ["fable", "mythos", "fable5", "mythos5"],
       released: true,
+      releasePrompt: "Fable 5 / Mythos 5",
+      releaseAliases: ["fable", "mythos", "fable5", "mythos5"],
     },
     {
       key: "sonnet5",
@@ -215,17 +241,61 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       // it canonically collapses here rather than surfacing as a stray card.
       aliases: ["sonnet5", "sonic5"],
       released: true,
+      releasePrompt: "Sonnet 5 and earlier",
+    },
+    {
+      key: "haiku45",
+      label: "Haiku 4.5",
+      codename: null,
+      aliases: ["haiku45", "claudehaiku45"],
+      released: true,
+      releasePrompt: "Haiku 4.5 and earlier",
     },
   ],
   chatgpt: [
     {
+      key: "gpt56",
+      label: "GPT-5.6",
+      codename: null,
+      aliases: ["gpt56", "gpt56sol", "gpt56terra", "gpt56luna"],
+      released: true,
+      releasePrompt: "GPT-5.6 (Sol, Terra, Luna) and earlier",
+    },
+    {
       key: "bidi",
       label: "GPT Bidi 1",
       codename: "Bidi",
-      aliases: ["bidi", "gptbidi", "gptbidi1"],
+      aliases: ["bidi", "gptbidi", "gptbidi1", "gptlive", "gptlive1"],
+      released: true,
+      releasePrompt: "GPT-Live 1 / Bidi",
+      releaseAliases: ["bidi", "gptbidi", "gptbidi1", "gptlive", "gptlive1"],
     },
   ],
   gemini: [
+    {
+      key: "gemini3pro",
+      label: "Gemini 3 Pro",
+      codename: null,
+      aliases: ["gemini3pro"],
+      released: true,
+      releasePrompt: "Gemini 3 Pro",
+    },
+    {
+      key: "gemini3flash",
+      label: "Gemini 3 Flash",
+      codename: null,
+      aliases: ["gemini3flash"],
+      released: true,
+      releasePrompt: "Gemini 3 Flash",
+    },
+    {
+      key: "gemini35flash",
+      label: "Gemini 3.5 Flash",
+      codename: null,
+      aliases: ["gemini35flash"],
+      released: true,
+      releasePrompt: "Gemini 3.5 Flash",
+    },
     {
       key: "gemini35pro",
       label: "Gemini 3.5 Pro",
@@ -233,8 +303,35 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       aliases: ["35pro", "gemini35pro"],
     },
   ],
-  grok: [],
+  grok: [
+    {
+      key: "grok45",
+      label: "Grok 4.5",
+      codename: null,
+      aliases: ["grok45"],
+      released: true,
+      releasePrompt: "Grok 4.5 and earlier",
+    },
+  ],
 };
+
+const FAMILY_PROMPT_LABELS: Record<TrackedFamily, string> = {
+  claude: "Claude",
+  chatgpt: "ChatGPT/OpenAI",
+  gemini: "Gemini",
+  grok: "Grok",
+};
+
+/** Build the extractor's released-set prompt from the display/write-time catalog. */
+export function releasedSetPrompt(): string {
+  const families = Object.entries(FAMILY_ALIASES).map(([family, entries]) => {
+    const releases = entries
+      .filter((entry) => entry.released && entry.releasePrompt)
+      .map((entry) => entry.releasePrompt);
+    return `${FAMILY_PROMPT_LABELS[family as TrackedFamily]}: ${releases.join(", ")}.`;
+  });
+  return `${families.join(" ")} Anything newer, or an unrecognized codename, is UNRELEASED.`;
+}
 
 // Non-frontier model/company names. A claim whose label or codename matches one
 // is dropped — it isn't a Claude/ChatGPT/Gemini/Grok version, regardless of which
@@ -353,6 +450,42 @@ export function canonicalVersionKey(
     label: cleanStr(label),
     codename: cleanStr(codename),
   };
+}
+
+const RELEASE_LABEL_PATTERNS: ReadonlyArray<{ family: TrackedFamily; source: string }> = [
+  { family: "chatgpt", source: "\\bGPT[-\\s]?\\d+(?:[.,]\\d+)*(?:\\s+(?:Sol|Terra|Luna))?\\b" },
+  { family: "grok", source: "\\bGrok[-\\s]?\\d+(?:[.,]\\d+)*\\b" },
+  { family: "claude", source: "\\b(?:Claude\\s+)?(?:Opus|Sonnet|Haiku|Fable)\\s+\\d+(?:[.,]\\d+)*\\b" },
+  { family: "gemini", source: "\\bGemini\\s+\\d+(?:[.,]\\d+)*(?:\\s+(?:Pro|Flash|Ultra|Nano))?\\b" },
+];
+
+/**
+ * Extract canonical model keys from a credible release announcement. Known
+ * aliases catch codename-to-public-name launches (Bidi -> GPT-Live); family
+ * patterns catch future numbered releases before the catalog is refreshed.
+ */
+export function versionKeysFromReleaseText(text: string | null | undefined): string[] {
+  const raw = text ?? "";
+  if (!raw.trim()) return [];
+  const squashedText = squash(raw);
+  const keys = new Set<string>();
+
+  for (const entries of Object.values(FAMILY_ALIASES)) {
+    for (const entry of entries) {
+      if ((entry.releaseAliases ?? []).some((alias) => squashedText.includes(alias))) {
+        keys.add(entry.key);
+      }
+    }
+  }
+
+  for (const pattern of RELEASE_LABEL_PATTERNS) {
+    for (const match of raw.matchAll(new RegExp(pattern.source, "gi"))) {
+      const key = canonicalVersionKey(pattern.family, match[0], null).key;
+      if (key) keys.add(key);
+    }
+  }
+
+  return [...keys];
 }
 
 // Squashed family stems stripped from a leading label word so a family-prefixed
