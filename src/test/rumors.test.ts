@@ -23,12 +23,17 @@ import {
 } from "../../supabase/functions/_shared/rumor-rollup";
 import {
   canonicalVersionKey,
+  dedupeRumorSources,
   inferSourceQuality,
   isFamilyConsistentLabel,
   isNonFrontierLabel,
   isReleasedVersion,
+  isStrongPublicRumor,
   mergeRumorRows,
   releasedSetPrompt,
+  rumorStrengthScore,
+  sourceHandleFromUrl,
+  sourceIdentityKey,
   sourceQualityLabel,
   splitCompoundLabel,
   versionKeysFromReleaseText,
@@ -145,6 +150,69 @@ describe("buildContribution", () => {
     expect(c!.modelSlug).toBe("claude");
     expect(c!.versionKey).toBe("opus5");
     expect(c!.claimType).toBe("in_testing");
+  });
+
+  it("drops sentiment, hypotheticals, and unsupported performance comparisons", () => {
+    const base: RawClaim = {
+      is_rumor: true,
+      target_family: "claude",
+      version_label: "Opus 5",
+      is_unreleased: true,
+      claim_type: "launch",
+      confidence: 0.8,
+    };
+    expect(
+      buildContribution(
+        base,
+        source,
+        "Anthropic needs Opus 5 to hit just below Fable 5, so Fable 5.1 would make room for it.",
+      ),
+    ).toBeNull();
+    expect(
+      buildContribution(
+        { ...base, claim_mode: "speculation", evidence_kind: "none" },
+        source,
+        "Opus 5 is probably coming someday.",
+      ),
+    ).toBeNull();
+  });
+
+  it("keeps an observed app artifact and stores its claim assessment", () => {
+    const artifact = buildContribution(
+      {
+        is_rumor: true,
+        target_family: "claude",
+        codename: "Honeycomb",
+        is_unreleased: true,
+        claim_type: "in_testing",
+        claim_mode: "observed_signal",
+        evidence_kind: "artifact",
+        confidence: 0.82,
+      },
+      source,
+      "Honeycomb appeared in Cursor app data with a new context setting.",
+    );
+    expect(artifact?.source.claim_mode).toBe("observed_signal");
+    expect(artifact?.source.evidence_kind).toBe("artifact");
+    expect(isCredibleSource(artifact!.source)).toBe(true);
+  });
+
+  it("drops low-confidence extracted claims", () => {
+    expect(
+      buildContribution(
+        {
+          is_rumor: true,
+          target_family: "chatgpt",
+          version_label: "GPT-6",
+          is_unreleased: true,
+          claim_mode: "reported_information",
+          evidence_kind: "none",
+          confidence: 0.3,
+        },
+        source,
+        "GPT-6 is coming soon, according to gossip.",
+      ),
+    ).toBeNull();
   });
 
   it("drops non-rumors, released versions, and unknown family", () => {
@@ -268,6 +336,17 @@ describe("mergeCluster", () => {
     expect(mergeCluster(null, dup, 4).mention_count).toBe(1);
   });
 
+  it("counts multiple posts from the same account as one corroborating source", () => {
+    const repeatedAccount = [
+      contrib({ source: src("https://x.com/one/status/1", "twitter", "2026-06-22", 1, { handle: "one" }) }),
+      contrib({ source: src("https://x.com/one/status/2", "twitter", "2026-06-23", 2, { handle: "one" }) }),
+    ];
+    const row = mergeCluster(null, repeatedAccount, 12);
+    expect(row.mention_count).toBe(1);
+    expect(row.representative_sources).toHaveLength(1);
+    expect(row.representative_sources[0].url).toBe("https://x.com/one/status/2");
+  });
+
   it("accumulates into an existing row by distinct new urls and unions platforms", () => {
     const existing: RumorRow = {
       model_slug: "claude",
@@ -350,6 +429,36 @@ describe("mergeCluster", () => {
     expect(row.representative_sources[0].source_quality).toBe("tracked_leaker");
   });
 
+  it("keeps an observed artifact ahead of a weaker imminent claim", () => {
+    const row = mergeCluster(
+      null,
+      [
+        contrib({
+          versionKey: "opus5",
+          versionLabel: "Opus 5",
+          codename: "Honeycomb",
+          claimType: "imminent",
+          claimSummary: "Opus 5 is dropping Monday.",
+          source: src("https://x.com/unknown/status/1", "twitter", "2026-07-12", 0),
+        }),
+        contrib({
+          versionKey: "opus5",
+          versionLabel: "Opus 5",
+          codename: "Honeycomb",
+          claimType: "in_testing",
+          claimSummary: "Honeycomb appeared in Cursor app data.",
+          source: src("https://x.com/researcher/status/2", "twitter", "2026-07-11", 0, {
+            claim_mode: "observed_signal",
+            evidence_kind: "artifact",
+          }),
+        }),
+      ],
+      12,
+    );
+    expect(row.claim_type).toBe("in_testing");
+    expect(row.claim_summary).toBe("Honeycomb appeared in Cursor app data.");
+  });
+
   it("caps representative_sources to the top N by score", () => {
     const many = [10, 40, 20, 5, 30].map((s, i) => contrib({ source: src(`u${i}`, "reddit", "2026-06-22", s) }));
     const row = mergeCluster(null, many, 2);
@@ -368,10 +477,12 @@ describe("credibility", () => {
     expect(isCredibleSource(src("https://x.com/OpenAI/status/1", "twitter", "2026-06-22", 0, { handle: "@OpenAI" }))).toBe(true);
     expect(isCredibleSource(src("https://x.com/someone/status/2", "twitter", "2026-06-22", 0, { quotedStatusId: "1" }))).toBe(false);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true }))).toBe(false);
-    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true, followers: 50000 }))).toBe(true);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { verified: true, followers: 50000 }))).toBe(false);
     expect(isCredibleSource(src("u", "reddit", "2026-06-22", 500))).toBe(false);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 1000, { handle: "bedros_p" }))).toBe(false);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 1000, { handle: "nima_owji" }))).toBe(false);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "Fried_rice" }))).toBe(true);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "pankajkumar_dev" }))).toBe(true);
     expect(isCredibleSource(src("https://www.testingcatalog.com/openai-app-string-leak/", "web", "2026-06-22", 0))).toBe(true);
     expect(isCredibleSource(src("u", "bluesky", "2026-06-22", 2))).toBe(false);
   });
@@ -440,6 +551,12 @@ describe("source quality", () => {
     expect(inferSourceQuality({ url: "https://x.com/OpenAI/status/1", platform: "twitter", handle: "@OpenAI" })).toBe(
       "official",
     );
+    expect(inferSourceQuality({ url: "https://x.com/Fried_rice/status/1", platform: "twitter" })).toBe(
+      "artifact_leak",
+    );
+    expect(inferSourceQuality({ url: "https://x.com/haydenfield/status/1", platform: "twitter" })).toBe(
+      "press_scoop",
+    );
     expect(inferSourceQuality({ url: "https://www.axios.com/2026/06/27/fable-5", platform: "web" })).toBe(
       "press_scoop",
     );
@@ -448,6 +565,26 @@ describe("source quality", () => {
     );
     expect(sourceQualityLabel("prediction_market")).toBe("prediction market signal");
     expect(sourceQualityLabel("press_scoop")).toBe("reported scoop");
+  });
+});
+
+describe("independent source identity", () => {
+  it("recovers handles from X and Bluesky URLs", () => {
+    expect(sourceHandleFromUrl("https://x.com/SynthWaveDD/status/1")).toBe("synthwavedd");
+    expect(sourceHandleFromUrl("https://bsky.app/profile/timkellogg.me/post/abc")).toBe("timkellogg.me");
+  });
+
+  it("counts repeated account posts and shared quote echoes as one origin", () => {
+    expect(sourceIdentityKey({ url: "https://x.com/a/status/1", platform: "twitter" })).toBe(
+      sourceIdentityKey({ url: "https://x.com/a/status/2", platform: "twitter" }),
+    );
+    expect(sourceIdentityKey({ url: "x", platform: "twitter", quotedStatusId: "99" })).toBe(
+      sourceIdentityKey({ url: "y", platform: "twitter", quotedStatusId: "99" }),
+    );
+    expect(dedupeRumorSources([
+      { url: "https://x.com/original/status/99", platform: "twitter" },
+      { url: "https://news.ycombinator.com/item?id=1", platform: "hackernews", quotedStatusId: "99" },
+    ])).toHaveLength(1);
   });
 });
 
@@ -506,11 +643,41 @@ describe("groupByCluster", () => {
     expect(groups.get("claude:sonnet5")).toHaveLength(2);
     expect(groups.get("gemini:orionmist")).toHaveLength(1);
   });
+
+  it("uses an existing label-codename bridge to route codename-only claims", () => {
+    const honeycomb = contrib({
+      versionKey: "honeycomb",
+      versionLabel: null,
+      codename: "Honeycomb",
+      source: src("h", "hackernews", "2026-07-12"),
+    });
+    const groups = groupByCluster([honeycomb], [
+      {
+        model_slug: "claude",
+        version_key: "opus5",
+        version_label: "Opus 5",
+        codename: "Honeycomb",
+      },
+      {
+        model_slug: "claude",
+        version_key: "honeycomb",
+        version_label: null,
+        codename: "Honeycomb",
+      },
+    ]);
+    expect([...groups.keys()]).toEqual(["claude:opus5"]);
+    expect(groups.get("claude:opus5")?.[0]).toMatchObject({
+      versionKey: "opus5",
+      versionLabel: "Opus 5",
+      codename: "Honeycomb",
+    });
+  });
 });
 
 describe("statusIdFromUrl / collapseQuoteEchoes", () => {
   it("extracts the tweet status id from a url", () => {
     expect(statusIdFromUrl("https://x.com/synthwavedd/status/12345")).toBe("12345");
+    expect(statusIdFromUrl("https://bsky.app/profile/example.com/post/3abc")).toBe("3abc");
     expect(statusIdFromUrl("https://reddit.com/r/x/comments/abc")).toBeNull();
     expect(statusIdFromUrl(null)).toBeNull();
   });
@@ -931,6 +1098,92 @@ describe("mergeRumorRows", () => {
     ]);
     expect(out[0].claim_type).toBe("delayed");
     expect(out[0].claim_summary).toBe("newest");
+  });
+
+  it("auto-links a version/codename bridge and lets artifact evidence lead", () => {
+    const out = mergeRumorRows([
+      rrow({
+        version_label: "Opus 5",
+        codename: "Honeycomb",
+        claim_type: "imminent",
+        claim_summary: "Opus 5 is dropping Monday.",
+        signals: "speculative comparison",
+        mention_count: 8,
+        platform_count: 2,
+        representative_sources: [
+          {
+            url: "https://x.com/theRattey/status/1",
+            platform: "twitter",
+            snippet: "they are dropping opus 5 on monday",
+          },
+          {
+            url: "https://bsky.app/profile/timkellogg.me/post/one",
+            platform: "bluesky",
+            snippet: "Anthropic needs Opus 5 to hit below Fable, so Fable 5.1 would make room.",
+          },
+          {
+            url: "https://bsky.app/profile/cameron.stream/post/two",
+            platform: "bluesky",
+            snippet: "If I were them, I would announce Opus 5 this week.",
+          },
+        ],
+      }),
+      rrow({
+        version_label: null,
+        codename: "Honeycomb",
+        claim_type: "in_testing",
+        claim_summary: "Honeycomb appeared in Cursor app data.",
+        signals: "Cursor app data / codename leak",
+        mention_count: 3,
+        platform_count: 2,
+        last_seen_at: "2026-07-12",
+        representative_sources: [
+          { url: "https://x.com/real_klea/status/2", platform: "twitter" },
+          { url: "https://news.ycombinator.com/item?id=3", platform: "hackernews" },
+          { url: "https://x.com/SerAlpha_AI/status/4", platform: "twitter" },
+        ],
+      }),
+    ]);
+
+    expect(out).toHaveLength(1);
+    expect(out[0]).toMatchObject({
+      version_label: "Opus 5",
+      codename: "Honeycomb",
+      claim_type: "in_testing",
+      claim_summary: "Honeycomb appeared in Cursor app data.",
+      mention_count: 3,
+      platform_count: 2,
+    });
+    expect(out[0].representative_sources?.map((source) => source.handle)).not.toContain("timkellogg.me");
+  });
+
+  it("requires independent origins for untracked cards", () => {
+    const repeated = mergeRumorRows([
+      rrow({
+        model_slug: "chatgpt",
+        version_label: "GPT-6",
+        mention_count: 2,
+        platform_count: 1,
+        representative_sources: [
+          { url: "https://bsky.app/profile/one.test/post/a", platform: "bluesky" },
+          { url: "https://bsky.app/profile/one.test/post/b", platform: "bluesky" },
+        ],
+      }),
+    ])[0];
+    expect(repeated.mention_count).toBe(1);
+    expect(isStrongPublicRumor(repeated)).toBe(false);
+
+    const tracked = mergeRumorRows([
+      rrow({
+        model_slug: "gemini",
+        version_label: "Gemini 3.5 Pro",
+        representative_sources: [
+          { url: "https://x.com/synthwavedd/status/1", platform: "twitter" },
+        ],
+      }),
+    ])[0];
+    expect(isStrongPublicRumor(tracked)).toBe(true);
+    expect(rumorStrengthScore(tracked)).toBeGreaterThan(rumorStrengthScore(repeated));
   });
 
   it("filters all persisted spellings of newly launched models", () => {

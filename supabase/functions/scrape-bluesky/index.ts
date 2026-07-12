@@ -33,12 +33,37 @@ const SEARCH_TERMS = [
   "Claude AI",
   "ChatGPT",
   "Opus 5",
+  "Claude Honeycomb",
+  "Fable 5.1",
   "GPT-6",
   "Gemini AI",
   "Gemini 3.5 Pro",
+  "Gemini 4",
+  "Orionmist",
+  "Nightwhisper",
+  "Lithiumflow",
   "Grok AI",
   "Grok 5",
 ];
+
+interface BlueskyQuoteView {
+  embed?: {
+    record?: { uri?: unknown; record?: { uri?: unknown } };
+  };
+  record?: {
+    embed?: { record?: { uri?: unknown } };
+  };
+}
+
+function quotedPostId(post: BlueskyQuoteView): string | null {
+  const uri =
+    post?.embed?.record?.uri ??
+    post?.embed?.record?.record?.uri ??
+    post?.record?.embed?.record?.uri;
+  if (typeof uri !== "string") return null;
+  const parts = uri.split("/").filter(Boolean);
+  return parts[parts.length - 1] || null;
+}
 
 async function fetchWithTimeout(
   url: string,
@@ -165,6 +190,8 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
       sourceUrl: string;
       createdAt: string;
       score: number;
+      authorHandle: string | null;
+      quotedStatusId: string | null;
     }[] = [];
     const candidateUrls = new Set<string>();
 
@@ -236,6 +263,8 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
             sourceUrl,
             createdAt: createdAt.toISOString(),
             score: post.likeCount || 0,
+            authorHandle: handle || null,
+            quotedStatusId: quotedPostId(post),
           });
           candidateUrls.add(sourceUrl);
         }
@@ -259,6 +288,8 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
           content_type: "full_content",
           score: candidate.score,
           posted_at: candidate.createdAt,
+          author_handle: candidate.authorHandle,
+          quoted_status_id: candidate.quotedStatusId,
         });
 
         if (upsertResult.error) {

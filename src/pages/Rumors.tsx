@@ -8,6 +8,7 @@ import { RumorCardSkeleton } from "@/components/Skeletons";
 import useHead from "@/hooks/useHead";
 import { useRumors } from "@/hooks/useRumors";
 import { useModelsWithLatestVibes } from "@/hooks/useVibesData";
+import { rumorStrengthScore } from "../../supabase/functions/_shared/rumor-canon";
 
 const MODEL_LABELS: Record<string, string> = {
   claude: "Claude",
@@ -15,12 +16,6 @@ const MODEL_LABELS: Record<string, string> = {
   gemini: "Gemini",
   grok: "Grok",
 };
-
-// Blended corroboration strength matching the card sort: platform breadth
-// dominates, mention volume breaks ties. Drives the bar length only — the
-// caption always shows real counts.
-const strengthOf = (r: { platform_count: number; mention_count: number }) =>
-  (r.platform_count ?? 0) * 1000 + (r.mention_count ?? 0);
 
 const Rumors = () => {
   const { data: rumors, isLoading, isError } = useRumors();
@@ -35,14 +30,14 @@ const Rumors = () => {
 
   const brand = new Map((models ?? []).map((m) => [m.slug, m]));
 
-  // Strongest corroboration first; recency breaks ties.
+  // Concrete artifacts and vetted reporting lead; independent corroboration and
+  // recency break ties. The same score drives the relative card meter.
   const sorted = [...(rumors ?? [])].sort(
     (a, b) =>
-      b.platform_count - a.platform_count ||
-      b.mention_count - a.mention_count ||
+      rumorStrengthScore(b) - rumorStrengthScore(a) ||
       (b.last_seen_at ?? "").localeCompare(a.last_seen_at ?? ""),
   );
-  const boardMax = Math.max(...sorted.map(strengthOf), 1);
+  const boardMax = Math.max(...sorted.map(rumorStrengthScore), 1);
 
   return (
     <PageTransition>
@@ -74,8 +69,8 @@ const Rumors = () => {
               <Surface motion="fade" className="max-w-2xl">
                 <p className="text-body text-text-secondary">No strong rumors right now.</p>
                 <p className="mt-2 text-meta text-text-tertiary">
-                  A rumor surfaces here once it's corroborated across posts — or flagged by a tracked
-                  source. Check back around model-launch season.
+                  A rumor surfaces here once it's independently corroborated or backed by a vetted
+                  source or observed artifact. Check back around model-launch season.
                 </p>
               </Surface>
             ) : (
@@ -88,7 +83,7 @@ const Rumors = () => {
                       rumor={rumor}
                       accent={m?.accent_color ?? "#888"}
                       modelName={m?.name ?? MODEL_LABELS[rumor.model_slug] ?? rumor.model_slug}
-                      strengthPct={Math.round((strengthOf(rumor) / boardMax) * 100)}
+                      strengthPct={Math.round((rumorStrengthScore(rumor) / boardMax) * 100)}
                     />
                   );
                 })}

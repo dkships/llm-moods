@@ -27,12 +27,31 @@ export type SourceQuality =
   | "official"
   | "unknown";
 
-interface SourceQualityInput {
+export type RumorClaimMode =
+  | "observed_signal"
+  | "reported_information"
+  | "inference"
+  | "speculation";
+
+export type RumorEvidenceKind =
+  | "artifact"
+  | "firsthand_access"
+  | "named_source"
+  | "official_hint"
+  | "prediction_market"
+  | "none";
+
+export interface SourceQualityInput {
   url?: string | null;
   platform?: string | null;
   handle?: string | null;
+  snippet?: string | null;
+  posted_at?: string | null;
   quotedStatusId?: string | null;
   source_quality?: string | null;
+  claim_mode?: RumorClaimMode | null;
+  evidence_kind?: RumorEvidenceKind | null;
+  claim_confidence?: number | null;
 }
 
 // Tracked leaker handles (lowercased, no @). Mirrors scraper_config X search
@@ -46,12 +65,21 @@ export const TRACKED_LEAKER_HANDLES: ReadonlySet<string> = new Set([
   "m1astra",
 ]);
 
+// Security researchers and reverse engineers with a demonstrated primary-
+// artifact track record. Their posts are labeled as artifact leaks rather than
+// generic leaker reports so concrete app/API/source findings rank correctly.
+export const ARTIFACT_LEAKER_HANDLES: ReadonlySet<string> = new Set([
+  "fried_rice",
+  "pankajkumar_dev",
+]);
+
 const PRESS_SCOOP_HANDLES: ReadonlySet<string> = new Set([
   "axios",
   "semafor",
   "theinformation",
   "fortunemagazine",
   "alexeheath",
+  "haydenfield",
 ]);
 
 // Company accounts are authoritative for previews and release status. Keep
@@ -146,6 +174,25 @@ export function normalizeSourceHandle(handle: string | null | undefined): string
   return (handle ?? "").trim().replace(/^@/, "").toLowerCase();
 }
 
+/** Recover an account handle from the canonical X/Bluesky URL when old rows did not store one. */
+export function sourceHandleFromUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  try {
+    const parsed = new URL(url);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if ((host === "x.com" || host === "twitter.com") && parts[1] === "status") {
+      return normalizeSourceHandle(parts[0]) || null;
+    }
+    if (host === "bsky.app" && parts[0] === "profile" && parts[2] === "post") {
+      return normalizeSourceHandle(parts[1]) || null;
+    }
+  } catch {
+    // Invalid external URLs are already rendered as inert text by the frontend.
+  }
+  return null;
+}
+
 function normalizeSourceQuality(value: string | null | undefined): SourceQuality | null {
   const q = (value ?? "").trim().toLowerCase();
   return VALID_SOURCE_QUALITIES.has(q) ? (q as SourceQuality) : null;
@@ -169,8 +216,9 @@ export function inferSourceQuality(source: SourceQualityInput): SourceQuality {
   const explicit = normalizeSourceQuality(source.source_quality);
   if (explicit && explicit !== "unknown") return explicit;
 
-  const handle = normalizeSourceHandle(source.handle);
+  const handle = normalizeSourceHandle(source.handle) || sourceHandleFromUrl(source.url) || "";
   if (TRACKED_LEAKER_HANDLES.has(handle)) return "tracked_leaker";
+  if (ARTIFACT_LEAKER_HANDLES.has(handle)) return "artifact_leak";
   if (PRESS_SCOOP_HANDLES.has(handle)) return "press_scoop";
   if (OFFICIAL_VENDOR_HANDLES.has(handle)) return "official";
 
@@ -187,6 +235,105 @@ export function inferSourceQuality(source: SourceQualityInput): SourceQuality {
   }
 
   return explicit ?? "unknown";
+}
+
+function sourcePostToken(source: SourceQualityInput): string | null {
+  const platform = (source.platform ?? "unknown").trim().toLowerCase() || "unknown";
+  if (!source.url) return null;
+  try {
+    const parsed = new URL(source.url);
+    const host = parsed.hostname.toLowerCase().replace(/^www\./, "");
+    const parts = parsed.pathname.split("/").filter(Boolean);
+    if ((host === "x.com" || host === "twitter.com") && parts[1] === "status" && parts[2]) {
+      return `${platform}:post:${parts[2]}`;
+    }
+    if (host === "bsky.app" && parts[0] === "profile" && parts[2] === "post" && parts[3]) {
+      return `${platform}:post:${parts[3]}`;
+    }
+  } catch {
+    // Invalid URLs fall through to ordinary URL identity.
+  }
+  return null;
+}
+
+/** All identities that can prove two source rows share one origin. */
+export function sourceIdentityTokens(source: SourceQualityInput): string[] {
+  const platform = (source.platform ?? "unknown").trim().toLowerCase() || "unknown";
+  const tokens = new Set<string>();
+  const handle = normalizeSourceHandle(source.handle) || sourceHandleFromUrl(source.url);
+  if (handle) tokens.add(`${platform}:account:${handle}`);
+  const ownPost = sourcePostToken(source);
+  if (ownPost) tokens.add(ownPost);
+  if (source.quotedStatusId) {
+    // Numeric status ids are X ids even when a Reddit/HN post links them.
+    const quotedPlatform = /^\d+$/.test(source.quotedStatusId) ? "twitter" : platform;
+    tokens.add(`${quotedPlatform}:post:${source.quotedStatusId}`);
+  }
+
+  const host = hostnameFromUrl(source.url);
+  if (host && (platform === "web" || platform === "press" || platform === "official")) {
+    tokens.add(`${platform}:domain:${host}`);
+  }
+  if (tokens.size === 0) tokens.add(`${platform}:url:${source.url ?? "unknown"}`);
+  return [...tokens];
+}
+
+/** Primary stable identity for sets/logging; use dedupeRumorSources for full echo linking. */
+export function sourceIdentityKey(source: SourceQualityInput): string {
+  const tokens = sourceIdentityTokens(source);
+  return tokens.find((token) => token.includes(":account:")) ??
+    tokens.find((token) => token.includes(":domain:")) ??
+    tokens[tokens.length - 1];
+}
+
+/**
+ * Keep the first (caller-ranked) source from each connected origin component.
+ * Account, own-post, and quoted-post tokens make both repeated authors and
+ * multi-account quote echoes collapse correctly.
+ */
+export function dedupeRumorSources<T extends SourceQualityInput>(sources: T[]): T[] {
+  const parent = sources.map((_source, index) => index);
+  const find = (index: number): number => {
+    let root = index;
+    while (parent[root] !== root) root = parent[root];
+    while (parent[index] !== index) {
+      const next = parent[index];
+      parent[index] = root;
+      index = next;
+    }
+    return root;
+  };
+  const union = (a: number, b: number) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent[rootB] = rootA;
+  };
+  const tokenOwner = new Map<string, number>();
+  sources.forEach((source, index) => {
+    for (const token of sourceIdentityTokens(source)) {
+      const owner = tokenOwner.get(token);
+      if (owner == null) tokenOwner.set(token, index);
+      else union(index, owner);
+    }
+  });
+  const firstByRoot = new Map<number, T>();
+  sources.forEach((source, index) => {
+    const root = find(index);
+    if (!firstByRoot.has(root)) firstByRoot.set(root, source);
+  });
+  return [...firstByRoot.values()];
+}
+
+/** Only curated sources or a concrete observed artifact can open a one-source card. */
+export function isVettedRumorSource(source: SourceQualityInput): boolean {
+  const quality = inferSourceQuality(source);
+  return (
+    quality === "official" ||
+    quality === "tracked_leaker" ||
+    quality === "press_scoop" ||
+    quality === "artifact_leak" ||
+    (source.claim_mode === "observed_signal" && source.evidence_kind === "artifact")
+  );
 }
 
 export function sourceQualityRank(source: SourceQuality | SourceQualityInput | null | undefined): number {
@@ -648,11 +795,16 @@ interface MergeSource {
   url?: string | null;
   platform?: string | null;
   handle?: string | null;
+  snippet?: string | null;
+  posted_at?: string | null;
   verified?: boolean | null;
   followers?: number | null;
   score?: number | null;
   quotedStatusId?: string | null;
   source_quality?: SourceQuality | null;
+  claim_mode?: RumorClaimMode | null;
+  evidence_kind?: RumorEvidenceKind | null;
+  claim_confidence?: number | null;
 }
 
 /** Minimal row shape both PublicRumorRow and the backend RumorRow satisfy. */
@@ -662,16 +814,56 @@ export interface MergeableRumor {
   codename: string | null;
   claim_type: string;
   claim_summary: string;
+  signals?: string | null;
   mention_count: number;
   platform_count: number;
+  has_credible_source?: boolean;
   representative_sources: MergeSource[] | null;
   last_seen_at: string | null;
+}
+
+const ARTIFACT_SIGNAL_RE =
+  /\b(?:api|app|cursor|config(?:uration)?|feature[- ]?flag|model[- ]?(?:id|string|selector)|sitemap|changelog|source code|checkpoint|canary|arena|endpoint)\b/i;
+const SPECULATIVE_SIGNAL_RE = /\b(?:speculative|wish|guess|prediction|comparison|vibes?)\b/i;
+const STRICT_SPECULATION_RE = [
+  /^\s*if\b/i,
+  /\bif i were\b/i,
+  /\bwould not be surprised if\b/i,
+  /\bi (?:think|guess|bet|hope|wish|expect)\b/i,
+  /\b(?:needs?|would need|has to)\b[^.!?\n]{0,120}\b(?:hit|be|make|release|launch|drop)\b/i,
+  /\b(?:should|could|might|would)\b[^.!?\n]{0,80}\b(?:make room|be interesting|be better|contend|hit)\b/i,
+];
+
+/** Strict fallback for legacy rows created before claim_mode was stored. */
+export function isSpeculativeRumorSource(source: SourceQualityInput): boolean {
+  if (source.claim_mode === "speculation") return true;
+  if (source.claim_mode) return false;
+  const snippet = (source.snippet ?? "").trim();
+  return snippet.length > 0 && STRICT_SPECULATION_RE.some((pattern) => pattern.test(snippet));
+}
+
+function sourceEvidenceRank(source: MergeSource | null | undefined): number {
+  if (!source || isSpeculativeRumorSource(source)) return -100;
+  const qualityRank = sourceQualityRank(source) * 10;
+  const evidenceRank =
+    source.evidence_kind === "artifact"
+      ? 38
+      : source.evidence_kind === "official_hint"
+        ? 34
+        : source.evidence_kind === "prediction_market"
+          ? 20
+          : source.evidence_kind === "firsthand_access"
+            ? 18
+            : source.evidence_kind === "named_source"
+              ? 12
+              : 0;
+  return Math.max(qualityRank, evidenceRank);
 }
 
 function sourceSortRank(source: MergeSource | null | undefined): number {
   if (!source) return 0;
   const quality = inferSourceQuality(source);
-  const qualityRank = sourceQualityRank(quality) * 10;
+  const evidenceRank = sourceEvidenceRank(source);
   const accountRank =
     quality === "tracked_leaker"
       ? 0
@@ -680,21 +872,93 @@ function sourceSortRank(source: MergeSource | null | undefined): number {
         : source.handle
           ? 4
           : 0;
-  return Math.max(qualityRank, accountRank);
+  return Math.max(evidenceRank, accountRank);
 }
 
 function withSourceQuality<T extends MergeSource>(source: T): T {
-  return { ...source, source_quality: inferSourceQuality(source) } as T;
+  const recoveredHandle = normalizeSourceHandle(source.handle) || sourceHandleFromUrl(source.url);
+  return {
+    ...source,
+    handle: normalizeSourceHandle(source.handle) ? source.handle : recoveredHandle,
+    source_quality: inferSourceQuality(source),
+  } as T;
+}
+
+function rowEvidenceRank<T extends MergeableRumor>(row: T): number {
+  const sources = (row.representative_sources ?? []).filter((source) => !isSpeculativeRumorSource(source));
+  const sourceRank = Math.max(...sources.map(sourceEvidenceRank), sources.length > 0 ? 0 : -100);
+  const signals = row.signals ?? "";
+  const signalRank = ARTIFACT_SIGNAL_RE.test(signals)
+    ? 36
+    : SPECULATIVE_SIGNAL_RE.test(signals)
+      ? -20
+      : 0;
+  return Math.max(sourceRank, signalRank);
 }
 
 function compareMergeRows<T extends MergeableRumor>(a: T, b: T): number {
-  const claimDelta = claimTypeRank(b.claim_type) - claimTypeRank(a.claim_type);
-  if (claimDelta !== 0) return claimDelta;
+  const evidenceDelta = rowEvidenceRank(b) - rowEvidenceRank(a);
+  if (evidenceDelta !== 0) return evidenceDelta;
   const sourceDelta =
     sourceSortRank((b.representative_sources ?? [])[0]) -
     sourceSortRank((a.representative_sources ?? [])[0]);
   if (sourceDelta !== 0) return sourceDelta;
+  const claimDelta = claimTypeRank(b.claim_type) - claimTypeRank(a.claim_type);
+  if (claimDelta !== 0) return claimDelta;
   return tsNum(b.last_seen_at) - tsNum(a.last_seen_at);
+}
+
+function identitySpecificity<T extends MergeableRumor>(row: T): number {
+  const label = cleanStr(row.version_label);
+  const codename = cleanStr(row.codename);
+  return (label ? 20 : 0) + (codename ? 10 : 0);
+}
+
+function identityTokens<T extends MergeableRumor>(row: T): string[] {
+  const slug = row.model_slug.toLowerCase();
+  const tokens = new Set<string>();
+  const canon = canonicalVersionKey(slug, row.version_label, row.codename);
+  if (canon.key) tokens.add(canon.key);
+  const label = squash(row.version_label);
+  if (label.length >= 2) tokens.add(label);
+  for (const part of splitCompoundLabel(row.codename)) {
+    const raw = squash(part);
+    if (raw.length >= 2) tokens.add(raw);
+    const key = canonicalVersionKey(slug, null, part).key;
+    if (key) tokens.add(key);
+  }
+  return [...tokens];
+}
+
+function compareSources(a: MergeSource, b: MergeSource): number {
+  return (
+    sourceSortRank(b) - sourceSortRank(a) ||
+    Number(Boolean(b.verified)) - Number(Boolean(a.verified)) ||
+    tsNum(b.posted_at) - tsNum(a.posted_at) ||
+    (b.score ?? 0) - (a.score ?? 0)
+  );
+}
+
+function mergeIndependentSources(group: MergeableRumor[]): MergeSource[] {
+  const sources = group
+    .flatMap((row) => {
+      const artifact = ARTIFACT_SIGNAL_RE.test(row.signals ?? "");
+      const speculative = SPECULATIVE_SIGNAL_RE.test(row.signals ?? "") && !artifact;
+      return (row.representative_sources ?? [])
+        .filter((source) => !speculative || isVettedRumorSource(source))
+        .map((source) => artifact
+          ? {
+            ...source,
+            claim_mode: source.claim_mode ?? "observed_signal",
+            evidence_kind: source.evidence_kind ?? "artifact",
+          }
+          : source);
+    })
+    .filter((source): source is MergeSource => Boolean(source?.url))
+    .map(withSourceQuality)
+    .filter((source) => !isSpeculativeRumorSource(source))
+    .sort(compareSources);
+  return dedupeRumorSources(sources);
 }
 
 function mergeGroup<T extends MergeableRumor>(group: T[]): T {
@@ -702,7 +966,14 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
   const newest = sortedByTime[0];
   const sortedByLead = [...group].sort(compareMergeRows);
   const lead = sortedByLead[0];
-  const canon = canonicalVersionKey(lead.model_slug, lead.version_label, lead.codename);
+  const identityLead = [...group].sort(
+    (a, b) => identitySpecificity(b) - identitySpecificity(a) || tsNum(b.last_seen_at) - tsNum(a.last_seen_at),
+  )[0];
+  const canon = canonicalVersionKey(
+    identityLead.model_slug,
+    identityLead.version_label,
+    identityLead.codename,
+  );
 
   // Preserve every distinct codename attached to the now-single model card.
   // Legacy duplicate rows can contain a broad list on one row ("Sol, Terra,
@@ -722,33 +993,26 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
   }
   const mergedCodename = codenameByKey.size > 0 ? [...codenameByKey.values()].join(", ") : null;
 
-  // Union representative sources by url (keeps the full original objects), then
-  // surface credible / handled sources first so the card's lead stays sensible.
-  const byUrl = new Map<string, MergeSource>();
-  for (const r of group) {
-    for (const s of r.representative_sources ?? []) {
-      if (s && s.url) byUrl.set(s.url, withSourceQuality(s));
-    }
-  }
-  const reps = [...byUrl.values()].sort(
-    (a, b) =>
-      sourceSortRank(b) - sourceSortRank(a) ||
-      Number(Boolean(b.verified)) - Number(Boolean(a.verified)) ||
-      Number(Boolean(b.handle)) - Number(Boolean(a.handle)) ||
-      (b.score ?? 0) - (a.score ?? 0),
+  // A source account is one corroborating origin even when it posted repeatedly.
+  // Strictly hypothetical legacy snippets are removed before counts and display.
+  const hadRepresentativeEvidence = group.some((row) =>
+    (row.representative_sources ?? []).some((source) => Boolean(source?.url))
   );
-
-  // mention_count = |union of visible urls| + Σ (each row's unseen tail). Exact
-  // when rows are disjoint; subtracts a shared influential url once.
-  let hidden = 0;
-  for (const r of group) {
-    const repUrls = new Set((r.representative_sources ?? []).map((s) => s?.url).filter(Boolean));
-    hidden += Math.max(0, (r.mention_count ?? 0) - repUrls.size);
-  }
-  const mentionCount = byUrl.size + hidden;
-
+  const reps = mergeIndependentSources(group);
   const repPlatforms = new Set(reps.map((s) => s.platform).filter(Boolean));
-  const platformCount = Math.max(...group.map((r) => r.platform_count ?? 0), repPlatforms.size);
+  // Old rows retained only four representative URLs, so exact historic origin
+  // counts cannot be reconstructed. Prefer the evidence we can audit instead of
+  // carrying forward opaque tail counts that may contain echoes/speculation.
+  const platformCount = reps.length > 0
+    ? repPlatforms.size
+    : hadRepresentativeEvidence
+      ? 0
+      : Math.max(...group.map((r) => r.platform_count ?? 0), 0);
+  const mentionCount = reps.length > 0
+    ? reps.length
+    : hadRepresentativeEvidence
+      ? 0
+      : Math.max(...group.map((r) => r.mention_count ?? 0), 0);
 
   const etaTexts = new Set(
     group
@@ -768,8 +1032,8 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
   );
 
   const merged = { ...lead } as T;
-  merged.version_label = canon.label ?? newest.version_label;
-  merged.codename = mergedCodename ?? canon.codename ?? newest.codename;
+  merged.version_label = canon.label ?? identityLead.version_label ?? newest.version_label;
+  merged.codename = mergedCodename ?? canon.codename ?? identityLead.codename ?? newest.codename;
   merged.claim_type = lead.claim_type;
   merged.mention_count = mentionCount;
   merged.platform_count = platformCount;
@@ -778,7 +1042,7 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
 
   // Passthrough fields not in MergeableRumor (present on PublicRumorRow / RumorRow).
   const m = merged as unknown as Record<string, unknown>;
-  m.has_credible_source = group.some((r) => (r as { has_credible_source?: boolean }).has_credible_source);
+  m.has_credible_source = reps.some(isVettedRumorSource);
   m.eta_text = etaSource ? cleanStr((etaSource as { eta_text?: string | null }).eta_text) : null;
   m.eta_date = etaSource ? cleanStr((etaSource as { eta_date?: string | null }).eta_date) : null;
   m.eta_conflicting =
@@ -795,25 +1059,87 @@ function mergeGroup<T extends MergeableRumor>(group: T[]): T {
 
 /**
  * Filter to tracked-frontier rumors and collapse alias-duplicate rows into one
- * card each. Drops untracked families and non-frontier labels, groups by
- * (model_slug, canonical version key), and merges each group's counts, sources,
- * and display fields. Singletons pass through with canonical label/codename
- * applied so e.g. a lone "Mythos" card still reads "Fable 5 · Mythos".
+ * card each. In addition to the maintained alias catalog, rows are connected by
+ * identities explicitly observed together: "Opus 5" + codename "Honeycomb"
+ * bridges a later codename-only Honeycomb row automatically. Singletons pass
+ * through with canonical display identity applied.
  */
 export function mergeRumorRows<T extends MergeableRumor>(rows: T[]): T[] {
-  const groups = new Map<string, T[]>();
+  const filtered: T[] = [];
   for (const r of rows ?? []) {
     const slug = (r.model_slug ?? "").toLowerCase();
     if (!TRACKED_FAMILIES.has(slug)) continue;
     if (isNonFrontierLabel(slug, r.version_label, r.codename)) continue;
     if (isReleasedVersion(slug, r.version_label, r.codename)) continue;
-    const { key } = canonicalVersionKey(slug, r.version_label, r.codename);
-    const groupKey = `${slug}:${key ?? squash(r.version_label || r.codename || "")}`;
-    const arr = groups.get(groupKey) ?? [];
-    arr.push(r);
-    groups.set(groupKey, arr);
+    filtered.push(r);
   }
+
+  const parent = filtered.map((_row, index) => index);
+  const find = (index: number): number => {
+    let root = index;
+    while (parent[root] !== root) root = parent[root];
+    while (parent[index] !== index) {
+      const next = parent[index];
+      parent[index] = root;
+      index = next;
+    }
+    return root;
+  };
+  const union = (a: number, b: number) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent[rootB] = rootA;
+  };
+
+  const tokenOwner = new Map<string, number>();
+  filtered.forEach((row, index) => {
+    const slug = row.model_slug.toLowerCase();
+    for (const token of identityTokens(row)) {
+      const scoped = `${slug}:${token}`;
+      const owner = tokenOwner.get(scoped);
+      if (owner == null) tokenOwner.set(scoped, index);
+      else union(index, owner);
+    }
+  });
+
+  const groups = new Map<number, T[]>();
+  filtered.forEach((row, index) => {
+    const root = find(index);
+    const group = groups.get(root) ?? [];
+    group.push(row);
+    groups.set(root, group);
+  });
+
   const out: T[] = [];
   for (const group of groups.values()) out.push(mergeGroup(group));
   return out;
+}
+
+/**
+ * Public quality gate after display-time source cleanup. Curated/artifact
+ * sources can surface alone; untracked reports need either two platforms or
+ * three independent origins on one platform.
+ */
+export function isStrongPublicRumor(row: MergeableRumor): boolean {
+  const sources = (row.representative_sources ?? []).filter(
+    (source) => source?.url && !isSpeculativeRumorSource(source),
+  );
+  if (sources.length === 0) return false;
+  if (sources.some(isVettedRumorSource)) return true;
+  const origins = new Set(sources.map(sourceIdentityKey));
+  const platforms = new Set(sources.map((source) => source.platform).filter(Boolean));
+  const sourceCount = Math.max(origins.size, row.mention_count ?? 0);
+  const platformCount = Math.max(platforms.size, row.platform_count ?? 0);
+  return sourceCount >= 3 || (sourceCount >= 2 && platformCount >= 2);
+}
+
+/** Evidence-first board ordering and corroboration-meter input. */
+export function rumorStrengthScore(row: MergeableRumor): number {
+  const sources = (row.representative_sources ?? []).filter(
+    (source) => source?.url && !isSpeculativeRumorSource(source),
+  );
+  const sourceRank = Math.max(...sources.map(sourceEvidenceRank), 0);
+  const signalRank = ARTIFACT_SIGNAL_RE.test(row.signals ?? "") ? 36 : 0;
+  const evidence = Math.max(sourceRank, signalRank);
+  return evidence * 10_000 + (row.platform_count ?? 0) * 100 + (row.mention_count ?? 0);
 }

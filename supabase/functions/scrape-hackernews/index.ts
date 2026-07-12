@@ -146,6 +146,7 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
       title: string;
       score: number;
       postedAt: string;
+      authorHandle: string | null;
     }[] = [];
     const candidateUrls = new Set<string>();
 
@@ -216,6 +217,7 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
             title: hit.title,
             score: hit.points || 0,
             postedAt: hit.created_at,
+            authorHandle: typeof hit.author === "string" ? hit.author : null,
           });
           candidateUrls.add(sourceUrl);
         }
@@ -241,6 +243,7 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
           content_type: candidate.body ? "title_and_body" : "title_only",
           score: candidate.score,
           posted_at: candidate.postedAt,
+          author_handle: candidate.authorHandle,
         });
 
         if (upsertResult.error) {
@@ -269,6 +272,7 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
       sourceUrl: string;
       score: number;
       postedAt: string;
+      authorHandle: string | null;
     }[] = [];
 
     for (const term of STORY_SEARCH_TERMS) {
@@ -320,6 +324,7 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
             sourceUrl,
             score: hit.points || 0,
             postedAt: hit.created_at,
+            authorHandle: typeof hit.author === "string" ? hit.author : null,
           });
           candidateUrls.add(sourceUrl);
         }
@@ -344,6 +349,7 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
           content_type: "comment",
           score: candidate.score,
           posted_at: candidate.postedAt,
+          author_handle: candidate.authorHandle,
         });
 
         if (upsertResult.error) {

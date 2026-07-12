@@ -43,7 +43,7 @@ const CANDIDATE_LIMIT = 200;
 const EXTRACT_BATCH_SIZE = 10;
 const EXTRACT_CONCURRENCY = 4;
 const EXTRACT_MAX_TOKENS = 8000;
-const MAX_REPRESENTATIVE = 4;
+const MAX_REPRESENTATIVE = 12;
 const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529]);
 
 // Drives the model's `is_unreleased` judgment. Generated from the same catalog
@@ -72,7 +72,16 @@ const RECORD_RUMORS_TOOL_NAME = "record_rumors";
 const CLAIM_SCHEMA = {
   type: "object",
   additionalProperties: false,
-  required: ["is_rumor", "target_family", "is_unreleased", "claim_type", "claim_summary", "confidence"],
+  required: [
+    "is_rumor",
+    "target_family",
+    "is_unreleased",
+    "claim_type",
+    "claim_summary",
+    "claim_mode",
+    "evidence_kind",
+    "confidence",
+  ],
   properties: {
     is_rumor: { type: "boolean" },
     target_family: { type: "string", enum: ["claude", "chatgpt", "gemini", "grok", "unknown"] },
@@ -85,6 +94,14 @@ const CLAIM_SCHEMA = {
     signals: { type: ["string", "null"] },
     eta_text: { type: ["string", "null"] },
     eta_date: { type: ["string", "null"] },
+    claim_mode: {
+      type: "string",
+      enum: ["observed_signal", "reported_information", "inference", "speculation"],
+    },
+    evidence_kind: {
+      type: "string",
+      enum: ["artifact", "firsthand_access", "named_source", "official_hint", "prediction_market", "none"],
+    },
     confidence: { type: "number" },
   },
 };
@@ -121,9 +138,12 @@ const SYSTEM_PROMPT =
   `RELEASED SET (already out — NOT rumors): ${RELEASED_SET}\n\n` +
   "For each numbered post, return an entry in `posts` with its `index` and a `claims` array.\n" +
   "A single post may contain MULTIPLE claims about different models/versions — emit one claim per (model, version).\n" +
-  "If a post is not about an unreleased model, return its index with an empty claims array.\n\n" +
+  "If a post is not asserting information about an unreleased model, return its index with an empty claims array. " +
+  "Merely naming or comparing a future model is not a rumor.\n\n" +
   "Per claim:\n" +
-  "- is_rumor: true only if it references an unreleased version/codename.\n" +
+  "- is_rumor: true only if the post asserts information about an unreleased version/codename.\n" +
+  "  Set false for sentiment, hopes, wish lists, jokes, hypotheticals, 'needs to/should/could' performance comparisons, " +
+  "or guesses with no claimed source or observed evidence.\n" +
   "- Fable/Mythos public news or official availability pages are NOT rumors unless the post claims return, suspension, access change, or timing.\n" +
   "- target_family: claude (Anthropic) | chatgpt (OpenAI) | gemini (Google) | grok (xAI). " +
   "Use 'unknown' for ANY model from another maker (DeepSeek, Qwen, Llama, Mistral, Kimi, etc.) " +
@@ -138,12 +158,17 @@ const SYSTEM_PROMPT =
   "- claim_summary: one concise sentence on what's claimed.\n" +
   "- rumored_benefit: what it's rumored to improve, if stated (else null). Do not invent benchmark numbers.\n" +
   "- signals: the evidence cited — API slug, codename, app-code/string leak, benchmark leak, staff/exec hint, prediction-market odds (else null).\n" +
+  "- claim_mode: observed_signal for a concrete app/API/config/selector artifact; reported_information when the author explicitly " +
+  "claims non-public stage/timing from a source; inference when a concrete named signal supports a conclusion; speculation for " +
+  "wishes, hypotheticals, jokes, unsupported predictions, or performance expectations.\n" +
+  "- evidence_kind: artifact | firsthand_access | named_source | official_hint | prediction_market | none. " +
+  "Use none for unsupported chatter and comparisons.\n" +
   "- eta_text: the raw timeframe phrase if stated or directly implied in the same bullet/sentence as this claim " +
   "(e.g. 'next week', '2nd week of July', 'mid-July', 'Q3'); NEVER invent one or copy another model's ETA — null if absent.\n" +
   "- eta_date: ISO date (YYYY-MM-DD) only for an exact calendar day or explicitly stated anchor date " +
   "(e.g. 'by July 1', 'week of July 30'). For vague windows like 'this week', 'next week', 'soon', " +
   "'mid-July', or 'Q3', set eta_date to null and preserve the phrase in eta_text.\n" +
-  "- confidence: 0..1 that this is a genuine rumor signal (down-weight wishful/speculative posts).";
+  "- confidence: 0..1 that the post genuinely asserts non-public information, not the probability that the model will eventually exist.";
 
 interface CandidateRow {
   id: string;
@@ -437,8 +462,17 @@ Deno.serve(async (req) => {
       }
     }
 
-    // Phase 2 — incremental accumulator upsert into model_rumors (one row per cluster).
-    const clusters = groupByCluster(contributions);
+    // Phase 2 — incremental accumulator upsert into model_rumors (one row per
+    // product). Existing rows teach the run identity links discovered earlier,
+    // so a codename-only claim joins a linked numbered-version cluster.
+    const { data: identityRows, error: identityErr } = await supabase
+      .from("model_rumors")
+      .select("model_slug, version_key, version_label, codename")
+      .eq("is_released", false);
+    if (identityErr) {
+      await logError(`identity bridge fetch failed: ${identityErr.message}`, "identity-bridge");
+    }
+    const clusters = groupByCluster(contributions, identityRows ?? []);
     let upserts = 0;
     for (const rawGroup of clusters.values()) {
       // Drop quote-tweet echoes so they can't self-corroborate a single leak.

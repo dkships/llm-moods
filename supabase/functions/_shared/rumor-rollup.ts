@@ -6,18 +6,23 @@
 // sibling `rumor-canon.ts` (also used by the frontend display merge).
 //
 // The accumulator model: `model_rumors` is keyed by (model_slug, version_key) and
-// updated incrementally each run. `mention_count` counts DISTINCT source_url ever
-// seen — and since a post is extracted exactly once (the `rumor_checked_at` gate),
-// a url contributes to exactly one run, so we can safely add this run's distinct
-// new urls without double-counting.
+// updated incrementally each run. `mention_count` counts independent origins:
+// repeated posts by one account and quote echoes of one upstream post count once.
+// Representative origin metadata is retained so later runs do not re-count it.
 
 import {
   TRACKED_LEAKER_HANDLES,
   canonicalVersionKey,
+  dedupeRumorSources,
   inferSourceQuality,
   isNonFrontierLabel,
   isReleasedVersion,
+  isVettedRumorSource,
+  sourceHandleFromUrl,
   sourceQualityRank,
+  splitCompoundLabel,
+  type RumorClaimMode,
+  type RumorEvidenceKind,
   type SourceQuality,
   squash,
 } from "./rumor-canon.ts";
@@ -46,6 +51,8 @@ export interface RawClaim {
   eta_text?: string | null;
   eta_date?: string | null;
   confidence?: number;
+  claim_mode?: string;
+  evidence_kind?: string;
 }
 
 /** Self-contained source reference stored in `representative_sources` (jsonb). */
@@ -59,10 +66,16 @@ export interface SourceRef {
   /** Author credibility signals (Twitter-only; null elsewhere). */
   verified?: boolean | null;
   followers?: number | null;
-  /** Tweet id this post quotes, if any (Twitter-only) — used to drop echoes. */
+  /** Platform post id this source quotes, if any — used to collapse echoes. */
   quotedStatusId?: string | null;
   /** Display/source-quality context inferred from handle, domain, or source type. */
   source_quality?: SourceQuality | null;
+  /** Whether the post reports/observes information or merely speculates. */
+  claim_mode?: RumorClaimMode | null;
+  /** Concrete basis for the claim, when the post supplies one. */
+  evidence_kind?: RumorEvidenceKind | null;
+  /** Extractor confidence that this post asserts genuine non-public information. */
+  claim_confidence?: number | null;
 }
 
 // Tracked leaker handles (lowercased, no @). EPHEMERAL: refresh each model cycle
@@ -74,33 +87,37 @@ const VERIFIED_FOLLOWER_FLOOR = 10000;
 const HIGH_ENGAGEMENT_FLOOR = 250;
 
 /**
- * A source is "credible" if it's a tracked leaker, curated press scoop,
- * official/artifact evidence, or an established verified account. Engagement
- * still affects representative-source ordering, but popularity alone cannot
- * make a single-source rumor public. A paid/verified checkmark alone is not enough.
+ * A source is "credible" if it is curated reporting/official evidence or a
+ * concrete observed artifact. Verified/follower counts affect ordering only;
+ * popularity never lets an untracked account open a one-source card.
  */
 function hasCredibleAccount(s: SourceRef): boolean {
   return s.verified === true && (s.followers ?? 0) >= VERIFIED_FOLLOWER_FLOOR;
 }
 
 export function isCredibleSource(s: SourceRef): boolean {
-  const quality = inferSourceQuality(s);
-  return (
-    quality === "official" ||
-    quality === "tracked_leaker" ||
-    quality === "press_scoop" ||
-    quality === "artifact_leak" ||
-    hasCredibleAccount(s)
-  );
+  return isVettedRumorSource(s);
 }
 
 // Higher rank = more authoritative; used to order representative_sources so a
 // tracked-leaker / verified tweet leads even when a Reddit post has more upvotes.
 function credibilityRank(s: SourceRef): number {
   const qualityRank = sourceQualityRank(s) * 10;
+  const evidenceRank =
+    s.evidence_kind === "artifact"
+      ? 38
+      : s.evidence_kind === "official_hint"
+        ? 34
+        : s.evidence_kind === "prediction_market"
+          ? 20
+          : s.evidence_kind === "firsthand_access"
+            ? 18
+            : s.evidence_kind === "named_source"
+              ? 12
+              : 0;
   const accountRank = hasCredibleAccount(s) ? 15 : 0;
   const engagementRank = (s.score ?? 0) >= HIGH_ENGAGEMENT_FLOOR ? 10 : 0;
-  return Math.max(qualityRank, accountRank, engagementRank);
+  return Math.max(qualityRank, evidenceRank, accountRank, engagementRank);
 }
 
 /** A validated claim attached to its source, ready to roll up. */
@@ -150,6 +167,28 @@ const VALID_CLAIM_TYPES = new Set<RumorClaimType>([
   "return",
   "other",
 ]);
+const VALID_CLAIM_MODES = new Set<RumorClaimMode>([
+  "observed_signal",
+  "reported_information",
+  "inference",
+  "speculation",
+]);
+const VALID_EVIDENCE_KINDS = new Set<RumorEvidenceKind>([
+  "artifact",
+  "firsthand_access",
+  "named_source",
+  "official_hint",
+  "prediction_market",
+  "none",
+]);
+const SPECULATIVE_CLAIM_RE = [
+  /^\s*if\b/i,
+  /\bif i were\b/i,
+  /\bwould not be surprised if\b/i,
+  /\bi (?:think|guess|bet|hope|wish|expect)\b/i,
+  /\b(?:needs?|would need|has to)\b[^.!?\n]{0,120}\b(?:hit|be|make|release|launch|drop)\b/i,
+  /\b(?:should|could|might|would)\b[^.!?\n]{0,80}\b(?:make room|be interesting|be better|contend|hit)\b/i,
+];
 
 // Highest precedence first. `delayed` and `return` are "sticky" lifecycle states
 // that should win over an older `launch`/`in_testing` once they've been observed.
@@ -214,8 +253,59 @@ function clampConfidence(c: unknown): number {
   return Math.max(0, Math.min(1, n));
 }
 
+function claimMode(value: unknown): RumorClaimMode | null {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return VALID_CLAIM_MODES.has(normalized as RumorClaimMode)
+    ? (normalized as RumorClaimMode)
+    : null;
+}
+
+function evidenceKind(value: unknown): RumorEvidenceKind {
+  const normalized = typeof value === "string" ? value.trim().toLowerCase() : "";
+  return VALID_EVIDENCE_KINDS.has(normalized as RumorEvidenceKind)
+    ? (normalized as RumorEvidenceKind)
+    : "none";
+}
+
+function claimSpecificText(
+  postText: string,
+  label: string | null,
+  codename: string | null,
+): string {
+  const identities = [label, codename]
+    .flatMap((value) => splitCompoundLabel(value))
+    .map(squash)
+    .filter((value) => value.length >= 2);
+  if (identities.length === 0) return postText;
+  const chunks = postText
+    .split(/\n+|(?<=[.!?])\s+/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  const matches = chunks.filter((part) => {
+    const normalized = squash(part);
+    return identities.some((identity) => normalized.includes(identity));
+  });
+  return matches.length > 0 ? matches.join(" ") : postText;
+}
+
+function isLegacySpeculation(
+  source: SourceRef,
+  postText: string,
+  label: string | null,
+  codename: string | null,
+): boolean {
+  if (isCredibleSource(source)) return false;
+  const scoped = claimSpecificText(postText, label, codename);
+  return SPECULATIVE_CLAIM_RE.some((pattern) => pattern.test(scoped));
+}
+
 function withSourceQuality<T extends SourceRef>(source: T): T {
-  return { ...source, source_quality: inferSourceQuality(source) } as T;
+  const recoveredHandle = source.handle?.trim() || sourceHandleFromUrl(source.url);
+  return {
+    ...source,
+    handle: recoveredHandle,
+    source_quality: inferSourceQuality(source),
+  } as T;
 }
 
 /**
@@ -229,14 +319,25 @@ export function buildContribution(
   source: SourceRef,
   postText: string,
 ): RumorContribution | null {
-  if (!raw || raw.is_rumor === false) return null;
-  if (raw.is_unreleased === false) return null;
+  if (!raw || raw.is_rumor !== true) return null;
+  if (raw.is_unreleased !== true) return null;
 
   const family = String(raw.target_family ?? "").toLowerCase() as TargetFamily;
   if (!VALID_FAMILIES.has(family)) return null;
 
   const versionLabel = cleanStr(raw.version_label);
   const codename = cleanStr(raw.codename);
+  const mode = claimMode(raw.claim_mode);
+  const evidence = evidenceKind(raw.evidence_kind);
+  const confidence = clampConfidence(raw.confidence);
+
+  // The extractor now labels sentiment, wishes, conditional scenarios, and
+  // jokes explicitly. The strict text fallback cleans up old/malformed model
+  // output without rejecting hedged reports from vetted sources.
+  if (mode === "speculation") return null;
+  if (!mode && isLegacySpeculation(source, postText, versionLabel, codename)) return null;
+  if (mode === "inference" && evidence === "none") return null;
+  if (raw.confidence != null && confidence < 0.55) return null;
 
   // Anti-hallucination: a stated version token must appear in the post — compared
   // punctuation-insensitively so a label of "GPT-5.6" still matches a post that
@@ -275,8 +376,13 @@ export function buildContribution(
     signals: cleanStr(raw.signals),
     etaText: cleanStr(raw.eta_text),
     etaDate: cleanStr(raw.eta_date),
-    confidence: clampConfidence(raw.confidence),
-    source: withSourceQuality(source),
+    confidence,
+    source: withSourceQuality({
+      ...source,
+      claim_mode: mode,
+      evidence_kind: evidence,
+      claim_confidence: confidence,
+    }),
   };
 }
 
@@ -393,6 +499,8 @@ export function recoverDeterministicClaims(source: SourceRef, postText: string):
         signals: "Tracked source multi-claim post",
         eta_text: eta,
         eta_date: null,
+        claim_mode: "reported_information",
+        evidence_kind: "named_source",
         confidence: 0.75,
       });
     }
@@ -406,11 +514,16 @@ function mergeSources(
   incoming: SourceRef[],
   maxSources: number,
 ): SourceRef[] {
-  const byUrl = new Map<string, SourceRef>();
-  for (const s of [...existing, ...incoming]) if (s?.url) byUrl.set(s.url, withSourceQuality(s));
-  return [...byUrl.values()]
-    .sort((a, b) => credibilityRank(b) - credibilityRank(a) || (b.score ?? 0) - (a.score ?? 0))
-    .slice(0, maxSources);
+  const ranked = [...existing, ...incoming]
+    .filter((source): source is SourceRef => Boolean(source?.url))
+    .map(withSourceQuality)
+    .sort(
+      (a, b) =>
+        credibilityRank(b) - credibilityRank(a) ||
+        ts(b.posted_at) - ts(a.posted_at) ||
+        (b.score ?? 0) - (a.score ?? 0),
+    );
+  return dedupeRumorSources(ranked).slice(0, maxSources);
 }
 
 interface LeadClaim {
@@ -430,10 +543,10 @@ function claimTypeRank(type: RumorClaimType): number {
 }
 
 function compareLeadClaims(a: LeadClaim, b: LeadClaim): number {
-  const claimDelta = claimTypeRank(b.claimType) - claimTypeRank(a.claimType);
-  if (claimDelta !== 0) return claimDelta;
   const sourceDelta = credibilityRank(b.source ?? emptySource()) - credibilityRank(a.source ?? emptySource());
   if (sourceDelta !== 0) return sourceDelta;
+  const claimDelta = claimTypeRank(b.claimType) - claimTypeRank(a.claimType);
+  if (claimDelta !== 0) return claimDelta;
   const timeDelta = ts(b.source?.posted_at) - ts(a.source?.posted_at);
   if (timeDelta !== 0) return timeDelta;
   return b.confidence - a.confidence;
@@ -507,10 +620,13 @@ export function mergeCluster(
   const lead = leadClaims[0];
   const leadEta = etaForLead(lead, leadClaims);
 
-  // Distinct sources this run, by url.
-  const bySrc = new Map<string, SourceRef>();
-  for (const c of contributions) if (!bySrc.has(c.source.url)) bySrc.set(c.source.url, withSourceQuality(c.source));
-  const distinctNewSources = [...bySrc.values()];
+  // Distinct corroborating origins this run. Repeated posts by one account and
+  // multiple quote echoes of the same upstream post count once.
+  const distinctNewSources = mergeSources(
+    [],
+    contributions.map((contribution) => contribution.source),
+    contributions.length,
+  );
 
   const newPlatforms = new Set(contributions.map((c) => c.source.platform));
   const etaTexts = new Set(
@@ -549,6 +665,15 @@ export function mergeCluster(
     };
   }
 
+  const combinedKnownSources = mergeSources(
+    existing.representative_sources,
+    distinctNewSources,
+    existing.representative_sources.length + distinctNewSources.length,
+  );
+  const mentionCount = existing.representative_sources.length > 0
+    ? Math.max(combinedKnownSources.length, existing.platforms.length, newPlatforms.size)
+    : existing.mention_count + distinctNewSources.length;
+
   return {
     ...existing,
     version_label: existing.version_label ?? newest.versionLabel,
@@ -560,30 +685,146 @@ export function mergeCluster(
     eta_text: leadEta.etaText,
     eta_date: leadEta.etaDate,
     eta_conflicting: existing.eta_conflicting || etaTexts.size > 1 || etaDates.size > 1,
-    mention_count: existing.mention_count + distinctNewSources.length,
+    mention_count: mentionCount,
     platforms: [...new Set([...existing.platforms, ...newPlatforms])],
     representative_sources: mergeSources(existing.representative_sources, distinctNewSources, maxSources),
-    has_credible_source: existing.has_credible_source || contributions.some((c) => isCredibleSource(c.source)),
+    has_credible_source:
+      existing.representative_sources.some(isCredibleSource) ||
+      contributions.some((c) => isCredibleSource(c.source)),
     last_seen_at: maxTs([existing.last_seen_at, ...contributions.map((c) => c.source.posted_at)]),
   };
 }
 
-/** Group validated contributions by cluster key for the upsert loop. */
-export function groupByCluster(contributions: RumorContribution[]): Map<string, RumorContribution[]> {
-  const groups = new Map<string, RumorContribution[]>();
-  for (const c of contributions) {
-    const key = `${c.modelSlug}:${c.versionKey}`;
-    const arr = groups.get(key) ?? [];
-    arr.push(c);
-    groups.set(key, arr);
+export interface RumorIdentity {
+  model_slug: string;
+  version_key: string;
+  version_label: string | null;
+  codename: string | null;
+}
+
+interface IdentityNode {
+  family: string;
+  versionKey: string;
+  versionLabel: string | null;
+  codename: string | null;
+  contributionIndex: number | null;
+}
+
+function nodeIdentityTokens(node: IdentityNode): string[] {
+  const tokens = new Set<string>([node.versionKey]);
+  const canon = canonicalVersionKey(node.family, node.versionLabel, node.codename);
+  if (canon.key) tokens.add(canon.key);
+  const label = squash(node.versionLabel);
+  if (label.length >= 2) tokens.add(label);
+  for (const part of splitCompoundLabel(node.codename)) {
+    const raw = squash(part);
+    if (raw.length >= 2) tokens.add(raw);
+    const codenameKey = canonicalVersionKey(node.family, null, part).key;
+    if (codenameKey) tokens.add(codenameKey);
   }
+  return [...tokens];
+}
+
+function nodeIdentityScore(node: IdentityNode): number {
+  return (node.versionLabel ? 20 : 0) + (node.codename ? 10 : 0);
+}
+
+/**
+ * Group validated contributions by product identity. Existing accumulator rows
+ * participate as bridges, so once one claim links "Opus 5" to "Honeycomb", a
+ * later codename-only post writes to the Opus cluster without a manual alias.
+ */
+export function groupByCluster(
+  contributions: RumorContribution[],
+  existingIdentities: RumorIdentity[] = [],
+): Map<string, RumorContribution[]> {
+  const nodes: IdentityNode[] = [
+    ...existingIdentities.map((row) => ({
+      family: row.model_slug.toLowerCase(),
+      versionKey: row.version_key,
+      versionLabel: row.version_label,
+      codename: row.codename,
+      contributionIndex: null,
+    })),
+    ...contributions.map((contribution, contributionIndex) => ({
+      family: contribution.modelSlug,
+      versionKey: contribution.versionKey,
+      versionLabel: contribution.versionLabel,
+      codename: contribution.codename,
+      contributionIndex,
+    })),
+  ];
+  const parent = nodes.map((_node, index) => index);
+  const find = (index: number): number => {
+    let root = index;
+    while (parent[root] !== root) root = parent[root];
+    while (parent[index] !== index) {
+      const next = parent[index];
+      parent[index] = root;
+      index = next;
+    }
+    return root;
+  };
+  const union = (a: number, b: number) => {
+    const rootA = find(a);
+    const rootB = find(b);
+    if (rootA !== rootB) parent[rootB] = rootA;
+  };
+  const tokenOwner = new Map<string, number>();
+  nodes.forEach((node, index) => {
+    for (const token of nodeIdentityTokens(node)) {
+      const scoped = `${node.family}:${token}`;
+      const owner = tokenOwner.get(scoped);
+      if (owner == null) tokenOwner.set(scoped, index);
+      else union(index, owner);
+    }
+  });
+
+  const nodesByRoot = new Map<number, IdentityNode[]>();
+  nodes.forEach((node, index) => {
+    const root = find(index);
+    const component = nodesByRoot.get(root) ?? [];
+    component.push(node);
+    nodesByRoot.set(root, component);
+  });
+  const anchorByRoot = new Map<number, IdentityNode>();
+  for (const [root, component] of nodesByRoot) {
+    anchorByRoot.set(
+      root,
+      [...component].sort(
+        (a, b) =>
+          nodeIdentityScore(b) - nodeIdentityScore(a) ||
+          a.versionKey.length - b.versionKey.length,
+      )[0],
+    );
+  }
+
+  const groups = new Map<string, RumorContribution[]>();
+  nodes.forEach((node, nodeIndex) => {
+    if (node.contributionIndex == null) return;
+    const anchor = anchorByRoot.get(find(nodeIndex)) ?? node;
+    const original = contributions[node.contributionIndex];
+    const contribution: RumorContribution = {
+      ...original,
+      versionKey: anchor.versionKey,
+      versionLabel: anchor.versionLabel ?? original.versionLabel,
+      codename: original.codename ?? anchor.codename,
+    };
+    const key = `${contribution.modelSlug}:${contribution.versionKey}`;
+    const group = groups.get(key) ?? [];
+    group.push(contribution);
+    groups.set(key, group);
+  });
   return groups;
 }
 
-/** Pull the numeric status id out of an x.com/twitter.com /status/<id> URL. */
+/** Pull the platform post id out of an X status or Bluesky post URL. */
 export function statusIdFromUrl(url: string | null | undefined): string | null {
-  const m = /status\/(\d+)/.exec(url ?? "");
-  return m ? m[1] : null;
+  const raw = url ?? "";
+  const x = /(?:x|twitter)\.com\/[^/]+\/status\/(\d+)/i.exec(raw);
+  if (x) return x[1];
+  const bluesky = /bsky\.app\/profile\/[^/]+\/post\/([^/?#]+)/i.exec(raw);
+  return bluesky ? bluesky[1] : null;
 }
 
 const REFERENCED_X_STATUS_RE =
@@ -604,10 +845,9 @@ export function referencedStatusIdFromText(
 }
 
 /**
- * Within one cluster, drop a quote-tweet that quotes another tweet already in
- * the cluster — an echo is not independent corroboration (e.g. "Build with
- * Hasan" quoting "synthwavedd"). Keeps the quoted original. Quotes whose
- * original we didn't scrape are kept (we can't know they're echoes).
+ * Within one cluster, drop an X/Bluesky quote that references another post
+ * already in the cluster. Keeps the quoted original. Quotes whose original we
+ * did not scrape are deduped later by shared quotedStatusId.
  */
 export function collapseQuoteEchoes(group: RumorContribution[]): RumorContribution[] {
   const ownIds = new Set<string>();

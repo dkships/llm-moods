@@ -56,7 +56,9 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
   const eta = etaLabel(rumor);
   const isSingleSource = rumor.mention_count < 2;
   const sources = (rumor.representative_sources ?? []).slice(0, 3);
-  const leadContext = sources.map(sourceContextLabel).find(Boolean);
+  const leadContext = sources.some((source) => source.evidence_kind === "artifact")
+    ? "artifact signal"
+    : sources.map(sourceContextLabel).find(Boolean);
 
   const platforms = Array.from(
     new Set((rumor.representative_sources ?? []).map((s) => formatSourceDisplay(s.platform).label)),
@@ -65,7 +67,7 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
   const corroboration =
     (leadContext ? `${leadContext} · ` : "") +
     `${platformCount} platform${platformCount === 1 ? "" : "s"} · ` +
-    `${rumor.mention_count} mention${rumor.mention_count === 1 ? "" : "s"}`;
+    `${rumor.mention_count} independent source${rumor.mention_count === 1 ? "" : "s"}`;
 
   return (
     <Surface as="article" motion="fade" className="h-full">
@@ -114,7 +116,7 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
         />
         {isSingleSource && (
           <div className="mt-3">
-            <Tag tone="warning">single unconfirmed source</Tag>
+            <Tag tone="warning">single vetted source</Tag>
           </div>
         )}
         {sources.length > 0 && (

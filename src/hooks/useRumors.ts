@@ -1,6 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { mergeRumorRows, type SourceQuality } from "../../supabase/functions/_shared/rumor-canon";
+import {
+  isStrongPublicRumor,
+  mergeRumorRows,
+  type RumorClaimMode,
+  type RumorEvidenceKind,
+  type SourceQuality,
+} from "../../supabase/functions/_shared/rumor-canon";
 
 // Self-contained source reference stored in `model_rumors.representative_sources`
 // (jsonb), so links survive `cleanup-old-posts` deleting the underlying row.
@@ -15,6 +21,9 @@ export interface RumorSourceRef {
   followers?: number | null;
   quotedStatusId?: string | null;
   source_quality?: SourceQuality | null;
+  claim_mode?: RumorClaimMode | null;
+  evidence_kind?: RumorEvidenceKind | null;
+  claim_confidence?: number | null;
 }
 
 export type RumorClaimType =
@@ -56,8 +65,8 @@ interface PublicRumorsRpcClient {
 
 const publicRpc = supabase as unknown as PublicRumorsRpcClient;
 
-// Rumors are recomputed by the aggregate-rumors cron ~2×/day; a 10-min stale
-// window matches the rest of the dashboard and avoids refetch churn on revisit.
+// Rumors are recomputed hourly; a 10-min stale window matches the rest of the
+// dashboard and avoids refetch churn on revisit.
 const QUERY_STALE_TIME = 10 * 60_000;
 
 export function useRumors() {
@@ -71,7 +80,7 @@ export function useRumors() {
       // labels at the display layer — see _shared/rumor-canon.ts. This cleans up
       // rows already persisted under the old keys; the backend adopts the same
       // canon at write-time so new rows are clean too.
-      return mergeRumorRows(data ?? []);
+      return mergeRumorRows(data ?? []).filter(isStrongPublicRumor);
     },
   });
 }
