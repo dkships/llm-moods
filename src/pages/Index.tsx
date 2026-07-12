@@ -52,7 +52,7 @@ const Index = () => {
                 </Button>
               </div>
               <p className="mt-8 text-mono-cap text-text-tertiary">
-                Independent · 100% automated · open source · {PLATFORM_COUNT} platforms, no user votes
+                Independent · 100% automated · open source · {PLATFORM_COUNT} platforms
               </p>
             </div>
           </section>
