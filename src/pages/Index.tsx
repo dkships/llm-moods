@@ -41,7 +41,7 @@ const Index = () => {
                 a <span className="text-primary glow-text">bad day</span>?
               </h1>
               <p className="mt-6 text-body text-text-secondary max-w-xl">
-                A daily read on community sentiment, before the AI Twitter discourse catches up.
+                A daily read on community sentiment, across social media.
               </p>
               <div className="mt-8 flex flex-wrap items-center gap-4">
                 <Button asChild size="lg" variant="outline" className="font-mono text-sm gap-2 group border-primary/40 text-foreground transition-all hover:bg-primary/10 hover:text-foreground hover:border-primary/60">
