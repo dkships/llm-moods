@@ -25,13 +25,13 @@ const Footer = () => (
               href="https://github.com/dkships/llm-moods"
               target="_blank"
               rel="noopener noreferrer"
-              className={`${LINK_CLASS} text-foreground`}
+              className={`${LINK_CLASS} text-text-secondary`}
             >
               GitHub
             </a>
           </li>
           <li>
-            <Link to="/privacy" className={LINK_CLASS}>
+            <Link to="/privacy" className={`${LINK_CLASS} text-text-secondary`}>
               Privacy
             </Link>
           </li>
