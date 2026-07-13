@@ -1,9 +1,5 @@
 import { Link } from "react-router-dom";
-import {
-  AUTHOR_LINKEDIN_URL,
-  AUTHOR_NAME,
-  AUTHOR_PORTFOLIO_URL,
-} from "@/data/author";
+import { AUTHOR_NAME, AUTHOR_PORTFOLIO_URL } from "@/data/author";
 
 const LINK_CLASS =
   "inline-flex min-h-11 items-center rounded-md underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background md:min-h-0";
@@ -26,26 +22,6 @@ const Footer = () => (
         <ul className="flex flex-wrap gap-x-5 gap-y-1">
           <li>
             <a
-              href={AUTHOR_PORTFOLIO_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={LINK_CLASS}
-            >
-              Portfolio
-            </a>
-          </li>
-          <li>
-            <a
-              href={AUTHOR_LINKEDIN_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={LINK_CLASS}
-            >
-              LinkedIn
-            </a>
-          </li>
-          <li>
-            <a
               href="https://github.com/dkships/llm-moods"
               target="_blank"
               rel="noopener noreferrer"
@@ -53,14 +29,6 @@ const Footer = () => (
             >
               GitHub
             </a>
-          </li>
-          <li>
-            <Link
-              to="/research/how-llm-vibes-classifies-sentiment"
-              className={LINK_CLASS}
-            >
-              Methodology
-            </Link>
           </li>
           <li>
             <Link to="/privacy" className={LINK_CLASS}>
