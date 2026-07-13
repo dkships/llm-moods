@@ -11,7 +11,7 @@ interface HeroVibeGaugeProps {
 
 const DIMENSIONS = {
   lg: { size: 280, stroke: 10, scoreClass: "text-score-xl", labelClass: "text-section" },
-  sm: { size: 188, stroke: 8, scoreClass: "text-score", labelClass: "text-body text-foreground" },
+  sm: { size: 156, stroke: 7, scoreClass: "text-score", labelClass: "text-body text-foreground" },
 } as const;
 
 /**
