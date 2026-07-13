@@ -1,23 +1,34 @@
-# Footer Link Color Harmonization
+# Visual Polish Pass — Mobile Hero + Micro-Refinements
 
-## Problem
-In the footer nav, "GitHub" uses `text-foreground` (full-brightness white) while "Privacy" inherits `text-text-tertiary` (dim grey) from the parent. Neither link is more important than the other, so the brightness gap reads as an accidental inconsistency — exactly what the annotation flags. The bright GitHub also competes with the genuinely-emphasized "David Kelly" author link to its left.
+## Audit summary
+Reviewed all routes at 1440px and 390px with fixed-viewport captures: `/`, `/dashboard`, `/model/:slug`, `/research`, `/rumors`, `/privacy`. The site is already cohesive and well-crafted — the type ladder, sentiment colors, and restraint contract are applied consistently. I'm deliberately **not** churning the pages that already work. One real defect and two small refinements are worth doing.
 
-## Fix
-Make both footer nav links share one calm, consistent resting color with a clear hover lift:
-- Set both **GitHub** and **Privacy** to `text-text-secondary` at rest (a lighter grey than today's GitHub is too bright and today's Privacy is too dim — this lands between them).
-- Both already animate `hover:text-foreground` via `LINK_CLASS`, so hover/focus gives the interactive payoff.
-- Remove the one-off `text-foreground` override on the GitHub `<a>` so it no longer stands out from Privacy.
+## 1. Mobile hero dead zone (primary fix)
+**Problem:** On mobile the hero uses `min-h-[calc(100svh-3.5rem)]` with `flex items-center`, so the headline is vertically centered in a full-height viewport — leaving ~40% of the screen empty above "Is your AI having a bad day?" The vibe gauge we added is desktop-only (`hidden lg:flex`), so mobile gets the void with nothing to anchor it.
 
-This preserves the visual hierarchy: the "David Kelly" author link stays the single emphasized element in the footer (brighter + primary-hover), while the two utility nav links sit quietly and equally beside it.
+**Fix — give mobile the same focal payoff as desktop:**
+- Make `HeroVibeGauge` responsive: accept a `size` (or use a compact ~200px variant) so it works at small widths. Font rungs and stroke scale down proportionally.
+- Show a compact gauge on mobile **above** the headline, centered, so the hero reads top-to-bottom as: gauge → headline → tagline → CTA → tagline row. This fills the space purposefully and answers the "bad day?" question instantly on mobile too.
+- Reduce the mobile hero from full-`svh` centering to top-aligned with balanced padding (`pt-10`/`pt-12`), so content sits high and the section height is content-driven, not a forced full screen. Desktop layout (`sm:` and up) is unchanged — the gauge stays in the right column there.
 
-### Technical
-- `src/components/Footer.tsx`: change the GitHub link `className` from `` `${LINK_CLASS} text-foreground` `` to `` `${LINK_CLASS} text-text-secondary` ``, and add `text-text-secondary` to the Privacy `Link` so both are explicit and equal (rather than relying on inherited tertiary).
-- No token/CSS changes, no other components touched.
+**Net:** mobile hero becomes a centered, single-column composition with a live gauge; no empty top band. Desktop untouched.
 
-## Wider polish review
-I reviewed the homepage (hero, live model cards, "How it works", footer) at desktop/tablet/mobile. Aside from this footer mismatch, the surfaces hold up and follow the restraint contract — no further changes proposed, to avoid churn. If you want, I can do a deeper dedicated pass on a specific page (e.g. `/dashboard`, `/rumors`, or a model detail page) as a follow-up.
+## 2. Rumors card height alignment (small)
+On desktop the two rumor cards render at different heights (the taller card sets the row, the shorter one leaves trailing space). Add `items-start` is already fine, but make the cards equal-height within a row (`h-full` on the card surface) so the row reads as a tidy pair rather than mismatched blocks. Purely presentational; no data change.
+
+## 3. Hero glow alignment with the gauge (small)
+The ambient radial glow currently sits behind the (now-occupied) right column but is centered slightly off from the gauge. Nudge the primary glow to sit concentric with the gauge on `lg` so the glow reads as the gauge's halo rather than a stray blob. On mobile, position a smaller glow behind the compact gauge.
+
+## What I am intentionally leaving alone
+- Dashboard "Recent community chatter" list, trending complaints, model detail charts/breakdowns, research grid, privacy page — all consistent and legible; changing them would add churn without clear benefit.
+- Color palette stays (dark theme, sentiment green/amber/red). No token changes.
+
+## Technical
+- `src/components/HeroVibeGauge.tsx`: add responsive sizing (prop-driven diameter + proportional stroke/typography); keep colors from `getVibeStatus`/`SENTIMENT_HSL` and the reduced-motion guard.
+- `src/pages/Index.tsx`: restructure the hero so the gauge renders in a mobile slot (compact, above headline) and the desktop right column (as today); adjust mobile min-height/padding; align the glow.
+- `src/pages/Rumors.tsx` (or the rumor card component): equal-height cards in a row.
+- No backend, no routing, no dependency changes.
 
 ## Verification
-- `npm run build` passes.
-- Playwright footer screenshot at desktop confirming GitHub and Privacy now read at equal weight, with David Kelly still the emphasized link.
+- `npm run build` passes; `npm run test` and `tsgo` clean.
+- Fixed-viewport Playwright screenshots at 390 / 768 / 1024 / 1440 confirming: mobile hero has no dead zone and shows the gauge; desktop hero unchanged; rumor cards equal height; gauge value still equals the rounded average of the four model scores with matching sentiment color.
