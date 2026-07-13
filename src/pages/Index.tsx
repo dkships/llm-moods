@@ -4,6 +4,7 @@ import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import ModelCard from "@/components/ModelCard";
 import SectionHeader from "@/components/SectionHeader";
+import HeroVibeGauge from "@/components/HeroVibeGauge";
 import useHead from "@/hooks/useHead";
 import { useModelsWithLatestVibes, usePrefetchModelDetail } from "@/hooks/useVibesData";
 import { CardSkeleton } from "@/components/Skeletons";
@@ -19,6 +20,13 @@ const Index = () => {
   const { data: models, isLoading, isError } = useModelsWithLatestVibes();
   const prefetch = usePrefetchModelDetail();
 
+  const avgScore =
+    models && models.length > 0
+      ? Math.round(
+          models.reduce((sum, m) => sum + m.latestScore, 0) / models.length,
+        )
+      : null;
+
   const handleHover = useCallback((slug: string, id: string) => {
     prefetch(slug, id);
   }, [prefetch]);
@@ -29,7 +37,8 @@ const Index = () => {
       <section className="container relative flex min-h-[calc(100svh-3.5rem)] items-center overflow-hidden py-16 sm:block sm:min-h-0 sm:pb-24 sm:pt-24 lg:pt-28">
             <div className="pointer-events-none absolute -right-[32%] -top-48 h-[620px] w-[620px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.13)_0%,_hsl(var(--glow)/0.035)_36%,_transparent_68%)] sm:-right-[12%]" aria-hidden="true" />
             <div className="pointer-events-none absolute -left-[28%] top-44 h-[360px] w-[360px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.055)_0%,_transparent_70%)] sm:-left-[8%]" aria-hidden="true" />
-            <div className="relative max-w-3xl">
+            <div className="relative grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_auto]">
+            <div className="max-w-3xl">
               <h1 className="text-hero text-foreground">
                 Is your AI having<br />
                 a <span className="text-primary glow-text">bad day</span>?
@@ -48,6 +57,10 @@ const Index = () => {
               <p className="mt-8 text-mono-cap text-text-tertiary">
                 Independent · 100% automated · open source
               </p>
+            </div>
+            <div className="hidden lg:flex lg:justify-center">
+              <HeroVibeGauge score={avgScore} isLoading={isLoading} />
+            </div>
             </div>
       </section>
 
