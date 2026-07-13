@@ -5,20 +5,27 @@ interface HeroVibeGaugeProps {
   /** Rounded average score across tracked models (0–100). Null while loading/empty. */
   score: number | null;
   isLoading?: boolean;
+  /** Visual size: "lg" for the desktop right column, "sm" for the compact mobile slot. */
+  size?: "lg" | "sm";
 }
 
-const SIZE = 280;
-const STROKE = 10;
-const RADIUS = (SIZE - STROKE) / 2;
-const CIRC = 2 * Math.PI * RADIUS;
+const DIMENSIONS = {
+  lg: { size: 280, stroke: 10, scoreClass: "text-score-xl", labelClass: "text-section" },
+  sm: { size: 188, stroke: 8, scoreClass: "text-score", labelClass: "text-body text-foreground" },
+} as const;
 
 /**
- * Live "overall vibe" gauge for the hero right column (large screens only).
+ * Live "overall vibe" gauge for the hero. Renders large in the desktop right
+ * column and compact above the headline on mobile.
  * Presentational: parent computes the average score. Colors route through
  * getVibeStatus (SENTIMENT_HSL) — the gauge is a large sibling of the score
  * number, so sentiment hue here is intentional, not decorative chrome.
  */
-const HeroVibeGauge = ({ score, isLoading = false }: HeroVibeGaugeProps) => {
+const HeroVibeGauge = ({ score, isLoading = false, size = "lg" }: HeroVibeGaugeProps) => {
+  const { size: SIZE, stroke: STROKE, scoreClass, labelClass } = DIMENSIONS[size];
+  const RADIUS = (SIZE - STROKE) / 2;
+  const CIRC = 2 * Math.PI * RADIUS;
+
   const prefersReduced =
     typeof window !== "undefined" &&
     window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
@@ -95,10 +102,10 @@ const HeroVibeGauge = ({ score, isLoading = false }: HeroVibeGaugeProps) => {
         />
       </svg>
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1">
-        <span className="text-score-xl leading-none" style={{ color: vibe.color }}>
+        <span className={`${scoreClass} leading-none`} style={{ color: vibe.color }}>
           {score}
         </span>
-        <span className="text-section text-foreground">{vibe.label}</span>
+        <span className={`${labelClass} text-foreground`}>{vibe.label}</span>
         <span className="text-mono-cap text-text-tertiary">Avg · all models</span>
       </div>
     </div>
