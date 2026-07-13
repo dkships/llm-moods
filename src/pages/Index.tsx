@@ -39,7 +39,7 @@ const Index = () => {
             <div className="pointer-events-none absolute -left-[28%] top-44 h-[360px] w-[360px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.055)_0%,_transparent_70%)] sm:-left-[8%]" aria-hidden="true" />
             <div className="relative grid items-center gap-12 lg:grid-cols-[minmax(0,1fr)_auto]">
             <div className="max-w-3xl">
-              <div className="mb-10 flex justify-center lg:hidden">
+              <div className="mb-8 flex justify-start lg:hidden">
                 <HeroVibeGauge score={avgScore} isLoading={isLoading} size="sm" />
               </div>
               <h1 className="text-hero text-foreground">
