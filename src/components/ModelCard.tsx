@@ -39,7 +39,7 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
         {/* Sentiment cue: 3px top bar on >=sm (grid layouts), 2px left rail on mobile
             stacks so four cards don't read as a barcode of stacked color bars. */}
         <div
-          className="absolute inset-y-0 left-0 w-[3px] sm:inset-x-0 sm:bottom-auto sm:h-1.5 sm:w-auto"
+          className={`absolute inset-y-0 left-0 w-[3px] sm:inset-x-0 sm:bottom-auto sm:h-1.5 sm:w-auto ${m.isStale ? "opacity-60" : ""}`}
           style={{ background: vibe.color }}
           aria-hidden="true"
         />
@@ -50,14 +50,17 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
               <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: brandColor }} />
               <p className="truncate text-section text-foreground">{m.name}</p>
             </div>
-            <p className="shrink-0 text-score" style={{ color: vibe.color }}>
+            <p
+              className={`shrink-0 text-score ${m.isStale ? "opacity-60" : ""}`}
+              style={{ color: vibe.color }}
+            >
               {m.latestScore}
             </p>
           </div>
 
           {showSparkline && m.sparkline.length > 1 && (
             <div className="mt-3 h-10 sm:mt-4 sm:h-12" aria-hidden="true">
-              <Suspense fallback={<div className="h-12 animate-pulse rounded bg-secondary/40" />}>
+              <Suspense fallback={<div className="h-full animate-pulse rounded bg-secondary/35" />}>
                 <LazySparkline data={m.sparkline} accent="hsl(var(--foreground) / 0.7)" />
               </Suspense>
             </div>

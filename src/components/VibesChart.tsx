@@ -93,7 +93,7 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
       <p style={{ color: accent, margin: "2px 0 0" }}>score: {datum.score}</p>
       {datum.isCarryForward && (
         <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 11, margin: "5px 0 0" }}>
-          Carry-forward — 0 posts scraped
+          No new posts — previous score carried forward
         </p>
       )}
       {isLimitedSample && (
@@ -103,12 +103,12 @@ const CarryForwardTooltip = ({ active, payload, label, accent }: CarryForwardToo
       )}
       {isPartialCoverage && (
         <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 11, margin: "5px 0 0" }}>
-          Partial coverage{queuedCount > 0 ? ` — ${queuedCount} queued` : ""}
+          Partial data{queuedCount > 0 ? ` — ${queuedCount} posts still processing` : ""}
         </p>
       )}
       {showAbandoned && (
         <p style={{ color: CHART_COLORS.mutedForeground, fontSize: 11, margin: "5px 0 0" }}>
-          {failedCount} abandoned (max retries reached)
+          {failedCount} posts couldn't be classified
         </p>
       )}
     </div>

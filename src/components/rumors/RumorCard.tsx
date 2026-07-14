@@ -77,13 +77,11 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
           <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: accent }} aria-hidden />
           <span className="truncate text-mono-cap text-text-secondary">{modelName}</span>
         </span>
-        {claim.warn ? (
-          <Tag tone="warning">{claim.label}</Tag>
-        ) : (
-          <span className="shrink-0 text-mono-cap text-text-tertiary">{claim.label}</span>
-        )}
+        <Tag tone={claim.warn ? "warning" : "neutral"} className="shrink-0">
+          {claim.label}
+        </Tag>
       </div>
-      <h3 className="mt-1.5 text-section text-foreground">{rumorTitle(rumor)}</h3>
+      <h3 className="mt-2 text-section text-foreground">{rumorTitle(rumor)}</h3>
 
       {/* Claim — what + when */}
       <p className="mt-3 text-body text-text-secondary">{rumor.claim_summary}</p>
@@ -94,14 +92,14 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
         </p>
       )}
       {rumor.rumored_benefit && (
-        <p className="mt-2 text-body text-text-secondary">
+        <p className="mt-3 text-body text-text-secondary">
           <span className="text-text-tertiary">Rumored benefit · </span>
           {rumor.rumored_benefit}
           {!rumor.benefit_verified && <Tag className="ml-1.5">unverified</Tag>}
         </p>
       )}
       {rumor.signals && (
-        <p className="mt-2 text-body text-text-secondary">
+        <p className="mt-3 text-body text-text-secondary">
           <span className="text-text-tertiary">Signals · </span>
           {rumor.signals}
         </p>
@@ -109,17 +107,21 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
 
       {/* Evidence — how sure */}
       <div className="mt-5 border-t border-border pt-4">
-        <BarList
-          accent={accent}
-          max={100}
-          secondaryLayout="stacked-mobile"
-          items={[{ label: "Corroboration", value: strengthPct, secondary: corroboration }]}
-        />
-        {isSingleSource && (
-          <div className="mt-3">
-            <Tag tone="warning">single vetted source</Tag>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <BarList
+              accent={accent}
+              max={100}
+              secondaryLayout="stacked-mobile"
+              items={[{ label: "Corroboration", value: strengthPct, secondary: corroboration }]}
+            />
           </div>
-        )}
+          {isSingleSource && (
+            <Tag tone="warning" className="mt-0.5 shrink-0">
+              single vetted source
+            </Tag>
+          )}
+        </div>
         {sources.length > 0 && (
           <ul className="mt-3 space-y-1.5">
             {sources.map((s) => {
@@ -135,7 +137,7 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
                 <>
                   <span className="truncate">{meta}</span>
                   <ArrowUpRight
-                    className="h-3.5 w-3.5 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
+                    className="h-3.5 w-3.5 shrink-0 opacity-40 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
                     aria-hidden
                   />
                 </>

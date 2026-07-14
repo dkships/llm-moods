@@ -62,7 +62,7 @@ const ResearchIndex = () => {
               </div>
               <a
                 href="/research/feed.xml"
-                className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-mono-cap text-text-tertiary transition-colors hover:border-primary/40 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-mono-cap text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 aria-label="Subscribe to the LLM Vibes Research RSS feed"
               >
                 <Rss className="h-3.5 w-3.5" aria-hidden="true" />

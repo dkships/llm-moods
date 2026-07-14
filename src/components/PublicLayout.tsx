@@ -3,6 +3,7 @@ import { Outlet, useLocation } from "react-router-dom";
 import Footer from "@/components/Footer";
 import NavBar from "@/components/NavBar";
 import PageTransition from "@/components/PageTransition";
+import { Shimmer } from "@/components/Skeletons";
 
 const PublicRouteFallback = () => (
   <div
@@ -11,10 +12,10 @@ const PublicRouteFallback = () => (
     aria-live="polite"
   >
     <span className="sr-only">Loading page</span>
-    <div
-      className="h-8 w-40 animate-pulse rounded-lg bg-secondary/45"
-      aria-hidden="true"
-    />
+    <div className="space-y-3" aria-hidden="true">
+      <Shimmer className="h-9 w-48 sm:h-11 sm:w-64" />
+      <Shimmer className="h-4 w-32" />
+    </div>
   </div>
 );
 

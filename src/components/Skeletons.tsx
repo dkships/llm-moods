@@ -1,4 +1,4 @@
-const Shimmer = ({ className = "" }: { className?: string }) => (
+export const Shimmer = ({ className = "" }: { className?: string }) => (
   <div className={`animate-pulse rounded-lg bg-secondary/35 ${className}`} />
 );
 
@@ -65,14 +65,10 @@ export const RumorCardSkeleton = () => (
 );
 
 export const ChatterSkeleton = () => (
-  <div className="glass rounded-lg p-4 flex flex-col sm:flex-row sm:items-center gap-3">
-    <Shimmer className="h-5 w-20 shrink-0" />
-    <Shimmer className="h-4 flex-1" />
-    <div className="flex items-center gap-2 shrink-0">
-      <Shimmer className="h-4 w-16" />
-      <Shimmer className="h-4 w-14" />
-      <Shimmer className="h-4 w-10" />
-    </div>
+  <div className="glass rounded-lg p-4 flex flex-col gap-2">
+    <Shimmer className="h-3 w-40" />
+    <Shimmer className="h-4 w-full" />
+    <Shimmer className="h-4 w-2/3" />
   </div>
 );
 

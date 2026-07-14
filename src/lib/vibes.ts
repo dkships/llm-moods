@@ -39,6 +39,15 @@ export function getVibeStatus(score: number) {
   return { label: "Good Vibes", color: SENTIMENT_HSL.good };
 }
 
+// Applies alpha to one of the SENTIMENT_HSL colors, e.g. "hsl(142 72% 50%)"
+// + 0.25 -> "hsl(142 72% 50% / 0.25)". Plain string concatenation like
+// `${color}40` (treating the hsl() string as a hex color) produces invalid
+// CSS and silently no-ops — this is the safe way to build a translucent
+// variant for glow/shadow layers.
+export function sentimentAlpha(color: string, alpha: number): string {
+  return color.replace(/\)\s*$/, ` / ${alpha})`);
+}
+
 // Sample-size warning threshold for asymmetric "Limited sample" notes on
 // the model detail page and chart tooltips. Mirrors DEFAULT_MIN_POSTS=5 in
 // vibes-scoring.ts: below this floor the smoothing weights tip heavily

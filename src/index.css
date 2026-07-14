@@ -38,8 +38,10 @@
     --muted: 220 15% 13%;
     --muted-foreground: 220 10% 62%;
 
-    --accent: 270 60% 60%;
-    --accent-foreground: 0 0% 98%;
+    /* --accent is the neutral outline/ghost button hover tint (not a brand
+       accent hue) — keep it a calm dark neutral close to --secondary. */
+    --accent: 220 14% 16%;
+    --accent-foreground: 160 6% 90%;
 
     --destructive: 0 70% 55%;
     --destructive-foreground: 0 0% 98%;
@@ -170,15 +172,26 @@
     box-shadow: var(--shadow-card);
     background-image: var(--gradient-surface);
   }
+  .surface-lift {
+    transition: box-shadow 0.25s ease, border-color 0.2s ease, transform 0.25s ease;
+  }
   @media (hover: hover) and (pointer: fine) {
-    .surface-lift {
-      transition: box-shadow 0.25s ease, border-color 0.2s ease, transform 0.25s ease;
-    }
     .surface-lift:hover {
       border-color: hsl(var(--border) / 0.95);
       box-shadow: var(--shadow-elevated);
       transform: translateY(-2px);
     }
+  }
+  /* Keyboard-focus equivalent of the hover lift above, kept outside the
+     hover media query so tabbing to a card's interactive content gets the
+     same affordance regardless of pointer capability. The second selector
+     covers cards whose focusable link wraps the surface (e.g. ModelCard),
+     where :focus-within on the surface itself can't match. */
+  .surface-lift:focus-within,
+  a:focus-visible > .surface-lift {
+    border-color: hsl(var(--border) / 0.95);
+    box-shadow: var(--shadow-elevated);
+    transform: translateY(-2px);
   }
 
   .scrollbar-thin {
@@ -206,14 +219,6 @@
 
   .prose a:focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background rounded-sm;
-  }
-
-  /* Recharts injects `cursor: default` as an inline style on .recharts-wrapper,
-     which beats class rules without !important. Force inherit when the chart
-     sits inside an opt-in clickable ancestor (e.g., the dashboard sparkline). */
-  .cursor-pointer .recharts-wrapper,
-  .cursor-pointer .recharts-wrapper * {
-    cursor: inherit !important;
   }
 }
 

@@ -14,7 +14,7 @@ const FilterChip = ({ pressed, className = "", children, ...rest }: FilterChipPr
       type="button"
       aria-pressed={pressed}
       className={[
-        "min-h-11 shrink-0 rounded-md border px-3 py-2 font-mono text-xs transition-colors",
+        "min-h-11 shrink-0 rounded-md border px-3 py-2 text-mono-cap transition-colors",
         state,
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
         className,

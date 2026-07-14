@@ -4,11 +4,10 @@ import { useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import ModelCard from "@/components/ModelCard";
 import SectionHeader from "@/components/SectionHeader";
+import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
 import { useModelsWithLatestVibes, usePrefetchModelDetail } from "@/hooks/useVibesData";
 import { CardSkeleton } from "@/components/Skeletons";
-
-const PLATFORM_COUNT = 5;
 
 const Index = () => {
   useHead({
@@ -35,7 +34,7 @@ const Index = () => {
             a <span className="text-primary glow-text">bad day</span>?
           </h1>
           <p className="mt-6 max-w-xl text-body text-text-secondary">
-            A daily read on community sentiment, across social media.
+            A daily read on how the community feels about each model.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Button asChild size="lg" variant="outline" className="group gap-2 border-primary/40 font-mono text-sm text-foreground transition-colors hover:border-primary/60 hover:bg-primary/10 hover:text-foreground">
@@ -63,9 +62,10 @@ const Index = () => {
                 {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
               </div>
             ) : isError ? (
-              <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
-                Failed to load data
-              </p>
+              <Surface className="text-center" role="status" aria-live="polite">
+                <p className="text-section text-foreground">Model scores are unavailable</p>
+                <p className="mt-2 text-body text-text-tertiary">Refresh the page to try again.</p>
+              </Surface>
             ) : (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {(models || []).map((m) => (
@@ -84,7 +84,7 @@ const Index = () => {
                 {[
                   {
                     title: "Scrape",
-                    body: `${PLATFORM_COUNT} social platforms checked throughout the day — Reddit, Hacker News, Bluesky, X/Twitter, Mastodon.`,
+                    body: "Reddit, Hacker News, Bluesky, X/Twitter, and Mastodon checked throughout the day, plus App Store reviews.",
                   },
                   {
                     title: "Classify",
@@ -92,7 +92,7 @@ const Index = () => {
                   },
                   {
                     title: "Score",
-                    body: "Volume-weighted into a 0–100 daily vibe per model. Higher means happier users.",
+                    body: "Volume-weighted into a 0–100 daily score per model. Higher means happier users.",
                   },
                 ].map((step, i) => (
                   <li key={step.title} className="text-left">

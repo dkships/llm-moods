@@ -6,14 +6,14 @@ const LINK_CLASS =
 
 const Footer = () => (
   <footer className="border-t border-border bg-card/35">
-    <div className="container flex flex-col gap-3 pb-24 pt-6 text-meta text-text-tertiary sm:pb-14 md:flex-row md:items-center md:justify-between md:gap-6">
+    <div className="container flex flex-col gap-3 pb-28 pt-6 text-meta text-text-tertiary sm:pb-16 md:flex-row md:items-center md:justify-between md:gap-6">
       <p className="text-text-secondary">
         LLM Vibes · Built by{" "}
         <a
           href={AUTHOR_PORTFOLIO_URL}
           target="_blank"
           rel="noopener noreferrer"
-          className="rounded-md text-foreground underline underline-offset-4 transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+          className="rounded-md text-foreground underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
           {AUTHOR_NAME}
         </a>

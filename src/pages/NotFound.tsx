@@ -18,10 +18,10 @@ const NotFound = () => {
             <p className="text-section text-text-secondary mb-8">
               This page doesn't exist.
             </p>
-            <Button asChild variant="outline" className="font-mono text-sm gap-2">
+            <Button asChild variant="outline" className="min-h-11 font-mono text-sm gap-2">
               <Link to="/">
                 <ArrowLeft className="h-4 w-4" />
-                Back to Home
+                Back to home
               </Link>
             </Button>
             <p className="mt-6 text-meta text-text-tertiary">

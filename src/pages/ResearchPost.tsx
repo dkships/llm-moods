@@ -136,7 +136,7 @@ const ResearchPostPage = () => {
                   <a
                     href={post.dataset.path}
                     download
-                    className="mt-5 inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-border bg-secondary/40 px-4 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className="mt-5 inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-border bg-secondary/40 px-4 py-2 text-mono-cap text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                   >
                     <Download className="h-3.5 w-3.5" aria-hidden="true" />
                     <span className="sr-only">Download </span>
@@ -149,12 +149,14 @@ const ResearchPostPage = () => {
                 <Body />
               </div>
 
-              <ShareLinks url={`https://llmvibes.ai/research/${post.slug}`} title={post.title} />
+              <footer className="mt-12 border-t border-border pt-6">
+                <ShareLinks url={`https://llmvibes.ai/research/${post.slug}`} title={post.title} />
 
-              <p className="mt-6 text-meta text-text-tertiary">
-                Cite this analysis: {post.author}, &ldquo;{post.title},&rdquo; LLM Vibes,{" "}
-                {formatDate(post.publishedAt)}. llmvibes.ai/research/{post.slug}
-              </p>
+                <p className="mt-4 text-meta text-text-tertiary">
+                  Cite this analysis: {post.author}, &ldquo;{post.title},&rdquo; LLM Vibes,{" "}
+                  {formatDate(post.publishedAt)}. llmvibes.ai/research/{post.slug}
+                </p>
+              </footer>
             </div>
           </article>
   );

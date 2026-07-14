@@ -107,7 +107,7 @@ const Dashboard = () => {
           {/* Model Cards */}
           <section className="container pb-12">
             {modelsLoading ? (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4" role="status" aria-live="polite">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="status" aria-live="polite">
                 {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
               </div>
             ) : modelsError ? (
@@ -116,7 +116,7 @@ const Dashboard = () => {
                 <p className="mt-2 text-body text-text-tertiary">Refresh the page to try again.</p>
               </Surface>
             ) : (
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {(models || []).map((m) => (
                   <ModelCard key={m.id} m={m} showSparkline onHover={handleHover} />
                 ))}
@@ -141,7 +141,6 @@ const Dashboard = () => {
           {/* Community Chatter — lazy loaded on scroll */}
           <section className="container pb-12" ref={chatterRef}>
             <SectionHeader
-              level="page"
               title="Recent community chatter"
             />
 
@@ -180,7 +179,7 @@ const Dashboard = () => {
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
                   aria-label="Load more community posts"
-                  className="font-mono text-xs"
+                  className="min-h-11 font-mono text-xs"
                 >
                   {isFetchingNextPage ? "Loading…" : "Load more"}
                 </Button>

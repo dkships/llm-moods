@@ -92,7 +92,7 @@ const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, ca
       </div>
       <div className="h-56 sm:h-64">
         {isLoading ? (
-          <div className="h-full animate-pulse rounded bg-secondary/40" aria-hidden="true" />
+          <div className="h-full animate-pulse rounded bg-secondary/35" aria-hidden="true" />
         ) : (
           <ErrorBoundary
             fallback={
@@ -101,7 +101,7 @@ const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, ca
               </p>
             }
           >
-            <Suspense fallback={<div className="h-full animate-pulse rounded bg-secondary/40" aria-hidden="true" />}>
+            <Suspense fallback={<div className="h-full animate-pulse rounded bg-secondary/35" aria-hidden="true" />}>
               <LazyVibesChart chartData={chartData} accent={accent} timeRange="30d" events={chartEvents} />
             </Suspense>
           </ErrorBoundary>
@@ -158,8 +158,10 @@ const EmbeddedModelChart = (props: EmbeddedModelChartProps) => {
 
   return (
     <div ref={placeholderRef} className="my-6" role="status">
-      <Surface className="flex min-h-[17rem] items-center justify-center sm:min-h-[19rem]">
-        <div className="h-40 w-full animate-pulse rounded-lg bg-secondary/30" aria-hidden="true" />
+      {/* Matches mounted height: Surface p-4/sm:p-6 + mono-cap header row (line-height
+          ~18px) + mb-3 + h-56/sm:h-64 chart, so stacked charts don't jump on mount. */}
+      <Surface className="flex min-h-[18rem] items-center justify-center sm:min-h-[21rem]">
+        <div className="h-40 w-full animate-pulse rounded-lg bg-secondary/35" aria-hidden="true" />
         <span className="sr-only">Chart loads when it nears the viewport.</span>
       </Surface>
     </div>

@@ -21,9 +21,9 @@ import BarList from "@/components/BarList";
 import Tag from "@/components/Tag";
 import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
 import {
-  getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
+  getVibeStatus, formatComplaintLabel, SOURCE_LABELS, sentimentAlpha,
 } from "@/lib/vibes";
-import { ChartSkeleton, BarsSkeleton, ChatterSkeleton } from "@/components/Skeletons";
+import { ChartSkeleton, BarsSkeleton, ChatterSkeleton, Shimmer } from "@/components/Skeletons";
 
 
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
@@ -68,9 +68,7 @@ const ModelDetail = () => {
     `${latestEligiblePosts.toLocaleString()} SCORED`,
     `${recentPosts7d.toLocaleString()} COLLECTED`,
     "7D",
-    enriched?.isStale ? "STALE" : null,
-    enriched?.scoreBasisStatus === "thin_sample" ? "LOW SAMPLE" : null,
-  ].filter(Boolean) as string[];
+  ];
   const vibe = getVibeStatus(latestScore);
   const accent = model?.accent_color || "#888";
 
@@ -100,7 +98,7 @@ const ModelDetail = () => {
   for (const { post, surface } of postsWithSurface) {
     if (post.sentiment !== "negative") continue;
     totalNegativePosts++;
-    const key = surface?.label ?? "Unknown";
+    const key = surface?.label ?? "Unspecified";
     negativeBySurface.set(key, (negativeBySurface.get(key) ?? 0) + 1);
   }
   const negativeSurfaceRows = Array.from(negativeBySurface.entries())
@@ -112,7 +110,7 @@ const ModelDetail = () => {
 
   // Only surface this panel when there is a real product-surface signal — a
   // lone "Unknown 100%" bar carries no information (asymmetric-caveat pattern).
-  const hasMeaningfulSurfaceRows = negativeSurfaceRows.some((r) => r.label !== "Unknown");
+  const hasMeaningfulSurfaceRows = negativeSurfaceRows.some((r) => r.label !== "Unspecified");
 
   useHead({
     title: model ? `${model.name} Vibes — LLM Vibes` : "Loading — LLM Vibes",
@@ -146,11 +144,11 @@ const ModelDetail = () => {
   if ((!model && (modelLoading || landingLoading)) || (model && !enriched && landingLoading)) {
     return (
             <section className="container min-h-[calc(100svh-3.5rem)] pb-8 pt-10 sm:min-h-[calc(100svh-4rem)] sm:pt-12">
-              <div className="animate-pulse space-y-4" role="status" aria-live="polite">
+              <div className="space-y-4" role="status" aria-live="polite">
                 <span className="sr-only">Loading model data</span>
-                <div className="h-4 w-32 bg-secondary/60 rounded" />
-                <div className="h-10 w-48 bg-secondary/60 rounded" />
-                <div className="h-16 w-32 bg-secondary/60 rounded" />
+                <Shimmer className="h-4 w-32" />
+                <Shimmer className="h-10 w-48" />
+                <Shimmer className="h-16 w-32" />
               </div>
             </section>
     );
@@ -160,9 +158,9 @@ const ModelDetail = () => {
     return (
           <section className="container flex min-h-[calc(100svh-14rem)] items-center justify-center py-16">
             <div className="text-center">
-              <h1 className="mb-4 text-page text-foreground">Failed to load model data</h1>
+              <h1 className="mb-4 text-page text-foreground">Couldn't load model data</h1>
               <p className="text-body text-text-secondary mb-8">Check your connection and reload the page.</p>
-              <Button asChild variant="outline" className="font-mono text-sm">
+              <Button asChild variant="outline" className="min-h-11 font-mono text-sm">
                 <Link to="/dashboard">Back to Dashboard</Link>
               </Button>
             </div>
@@ -240,7 +238,7 @@ const ModelDetail = () => {
                 <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-5">
                   <p
                     className="text-score sm:text-score-xl"
-                    style={{ color: vibe.color, textShadow: `0 0 30px ${vibe.color}40, 0 0 60px ${vibe.color}15` }}
+                    style={{ color: vibe.color, textShadow: `0 0 30px ${sentimentAlpha(vibe.color, 0.25)}, 0 0 60px ${sentimentAlpha(vibe.color, 0.08)}` }}
                   >
                     {latestScore}
                   </p>
@@ -248,8 +246,18 @@ const ModelDetail = () => {
                 </div>
                 <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-mono-cap text-text-tertiary">
                   <span>{metaParts.join(" · ")}</span>
+                  {enriched?.isStale && (
+                    <Tag tone="warning" shape="pill" title="Score not refreshed with new posts recently">
+                      Stale
+                    </Tag>
+                  )}
+                  {enriched?.scoreBasisStatus === "thin_sample" && (
+                    <Tag tone="warning" shape="pill" title="Today's score rests on a small number of high-confidence posts">
+                      Low sample
+                    </Tag>
+                  )}
                   {failedPosts > 0 && (
-                    <Tag tone="warning" shape="pill" title="Posts the classifier gave up on after max retries">
+                    <Tag tone="warning" shape="pill" title="Posts that couldn't be classified after several attempts">
                       {failedPosts.toLocaleString()} abandoned
                     </Tag>
                   )}
@@ -258,9 +266,9 @@ const ModelDetail = () => {
             ) : landingError ? (
               <p className="mt-4 text-body text-text-secondary">Live score unavailable right now.</p>
             ) : (
-              <div className="mt-4 animate-pulse space-y-3" role="status" aria-live="polite">
-                <div className="h-14 w-32 rounded bg-secondary/60" />
-                <div className="h-4 w-52 rounded bg-secondary/60" />
+              <div className="mt-4 space-y-3" role="status" aria-live="polite">
+                <Shimmer className="h-14 w-32" />
+                <Shimmer className="h-4 w-52" />
               </div>
             )}
             {siblingModels.length > 0 && (
@@ -271,7 +279,7 @@ const ModelDetail = () => {
                     <Link
                       to={`/model/${m.slug}`}
                       onMouseEnter={() => prefetch(m.slug, m.id)}
-                      className="inline-flex min-h-11 items-center rounded-md text-text-secondary underline decoration-border underline-offset-4 transition-colors hover:text-foreground hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      className="inline-flex min-h-11 items-center rounded-md text-text-secondary underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                     >
                       {m.name}
                     </Link>
@@ -322,7 +330,7 @@ const ModelDetail = () => {
                 <Surface>
                   {historyError ? (
                     <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
-                      Failed to load data
+                      Couldn't load the chart.
                     </p>
                   ) : historyLoading ? (
                     <ChartSkeleton />
@@ -333,7 +341,7 @@ const ModelDetail = () => {
                         <ErrorBoundary
                           fallback={
                             <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
-                              Chart failed to render.
+                              Couldn't render the chart.
                             </p>
                           }
                         >
@@ -360,7 +368,11 @@ const ModelDetail = () => {
                             {chartEvents.map((evt, i) => (
                               <li key={`legend-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta">
                                 <span
-                                  className="inline-block h-2 w-3 shrink-0 rounded-sm"
+                                  className={
+                                    evt.endLabel
+                                      ? "inline-block h-2 w-3 shrink-0 rounded-sm"
+                                      : "inline-block h-3 w-1 shrink-0 rounded-sm"
+                                  }
                                   style={{ background: evt.color, opacity: 0.7 }}
                                   aria-hidden="true"
                                 />
@@ -397,7 +409,7 @@ const ModelDetail = () => {
                 <Surface>
                   <SectionHeader title="Complaint breakdown" meta="Last 30 days" />
                   {complaintsError ? (
-                    <p className="text-body text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
+                    <p className="text-body text-text-tertiary" role="status" aria-live="polite">Couldn't load complaints.</p>
                   ) : complaintsLoading ? (
                     <BarsSkeleton count={5} />
                   ) : complaints && complaints.length > 0 ? (
@@ -414,7 +426,7 @@ const ModelDetail = () => {
                 <Surface>
                   <SectionHeader title="Sources" meta="Share of posts over the last 30 days" />
                   {sourcesError ? (
-                    <p className="text-body text-text-tertiary" role="status" aria-live="polite">Failed to load data</p>
+                    <p className="text-body text-text-tertiary" role="status" aria-live="polite">Couldn't load sources.</p>
                   ) : sourcesLoading ? (
                     <BarsSkeleton count={3} />
                   ) : sources && sources.filter((s) => s.pct > 0).length > 0 ? (
@@ -439,32 +451,38 @@ const ModelDetail = () => {
               className="mb-3"
             />
             {availableSurfaceLabels.length > 0 && (
-              <div
-                className="mb-6 -mx-4 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:flex-wrap sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
-                role="group"
-                aria-label="Filter recent posts by product surface"
-              >
-                <FilterChip
-                  pressed={surfaceFilter === "all"}
-                  onClick={() => setSurfaceFilter("all")}
+              <div className="relative mb-6 -mx-4 sm:mx-0">
+                <div
+                  className="flex gap-2 overflow-x-auto px-4 pb-1 sm:flex-wrap sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+                  role="group"
+                  aria-label="Filter recent posts by product surface"
                 >
-                  All ({postsWithSurface.length})
-                </FilterChip>
-                {availableSurfaceLabels.map((label) => (
                   <FilterChip
-                    key={label}
-                    pressed={surfaceFilter === label}
-                    onClick={() => setSurfaceFilter(label)}
+                    pressed={surfaceFilter === "all"}
+                    onClick={() => setSurfaceFilter("all")}
                   >
-                    {label} ({surfaceCounts.get(label) ?? 0})
+                    All ({postsWithSurface.length})
                   </FilterChip>
-                ))}
+                  {availableSurfaceLabels.map((label) => (
+                    <FilterChip
+                      key={label}
+                      pressed={surfaceFilter === label}
+                      onClick={() => setSurfaceFilter(label)}
+                    >
+                      {label} ({surfaceCounts.get(label) ?? 0})
+                    </FilterChip>
+                  ))}
+                </div>
+                <div
+                  className="pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-background to-transparent sm:hidden"
+                  aria-hidden="true"
+                />
               </div>
             )}
 
             {postsError ? (
               <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
-                Failed to load data
+                Couldn't load posts.
               </p>
             ) : postsLoading ? (
               <div className="space-y-3" role="status" aria-live="polite">

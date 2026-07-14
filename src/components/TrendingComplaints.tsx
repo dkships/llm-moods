@@ -58,9 +58,9 @@ const TrendingComplaints = () => {
   if (isLoading) {
     return (
       <Surface className="animate-pulse">
-        <div className="mb-4 h-5 w-48 rounded bg-secondary/50" />
+        <div className="mb-4 h-5 w-48 rounded bg-secondary/35" />
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-8 rounded bg-secondary/40" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="h-8 rounded bg-secondary/35" />)}
         </div>
       </Surface>
     );
@@ -91,7 +91,7 @@ const TrendingComplaints = () => {
     <Surface>
       <SectionHeader
         title="Trending complaints"
-        action={<span className={`text-mono-cap text-text-tertiary`}>vs prior week</span>}
+        action={<span className="text-mono-cap text-text-tertiary">vs prior week</span>}
       />
 
       <div className="mt-2">
@@ -119,7 +119,7 @@ const TrendingComplaints = () => {
                   <p className="text-mono-cap text-text-tertiary">{item.model_name}</p>
                 </div>
 
-                <span className={`text-right text-mono-cap text-text-secondary`}>
+                <span className="text-right text-mono-cap text-text-secondary">
                   {item.this_week.toLocaleString()}
                 </span>
 

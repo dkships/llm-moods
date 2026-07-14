@@ -8,10 +8,10 @@ interface ShareLinksProps {
   title: string;
 }
 
-// Mirrors the dataset-download control in ResearchPost — neutral surface, mono text,
-// no accent tint (accent is reserved for chart/brand chrome).
+// Mirrors the dataset-download control in ResearchPost — neutral surface, mono-cap
+// label, no accent tint (accent is reserved for chart/brand chrome).
 const CONTROL_CLASS =
-  "inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 font-mono text-xs text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+  "inline-flex min-h-11 items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-mono-cap text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const ShareLinks = ({ url, title }: ShareLinksProps) => {
   const [copied, setCopied] = useState(false);
@@ -30,7 +30,7 @@ const ShareLinks = ({ url, title }: ShareLinksProps) => {
   };
 
   return (
-    <div className="mt-12 flex flex-wrap items-center gap-3 border-t border-border pt-6">
+    <div className="flex flex-wrap items-center gap-3">
       <span className="text-mono-cap text-text-tertiary">Share</span>
       <a className={CONTROL_CLASS} href={xHref} target="_blank" rel="noopener noreferrer">
         Post on X

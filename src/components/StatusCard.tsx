@@ -141,7 +141,7 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
         </p>
       ) : !data?.supported ? (
         <p className="text-body text-text-tertiary">
-          {data?.message ?? "No public status feed published by this vendor."}
+          {data?.message ?? "This vendor doesn't publish a status feed."}
         </p>
       ) : data.events.length === 0 ? (
         <>
