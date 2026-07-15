@@ -1,7 +1,5 @@
-import { ArrowUpRight } from "lucide-react";
 import Surface from "@/components/Surface";
 import Tag from "@/components/Tag";
-import BarList from "@/components/BarList";
 import { formatTimeAgo, formatSourceDisplay } from "@/lib/vibes";
 import { getSafeExternalUrl } from "@/lib/safe-url";
 import { formatRumorEta } from "@/lib/rumor-eta";
@@ -64,112 +62,119 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
     new Set((rumor.representative_sources ?? []).map((s) => formatSourceDisplay(s.platform).label)),
   );
   const platformCount = Math.max(rumor.platform_count ?? 0, platforms.length);
-  const corroboration =
-    (leadContext ? `${leadContext} · ` : "") +
-    `${platformCount} platform${platformCount === 1 ? "" : "s"} · ` +
-    `${rumor.mention_count} independent source${rumor.mention_count === 1 ? "" : "s"}`;
 
   return (
-    <Surface as="article" className="h-full">
-      {/* Identity — who */}
+    <Surface as="article" className="flex h-full flex-col">
+      {/* Header: model + claim */}
       <div className="flex items-center justify-between gap-3">
         <span className="flex min-w-0 items-center gap-2">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: accent }} aria-hidden />
+          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: accent }} aria-hidden />
           <span className="truncate text-mono-cap text-text-secondary">{modelName}</span>
         </span>
         <Tag tone={claim.warn ? "warning" : "neutral"} className="shrink-0">
           {claim.label}
         </Tag>
       </div>
-      <h3 className="mt-2 text-section text-foreground">{rumorTitle(rumor)}</h3>
 
-      {/* Claim — what + when */}
-      <p className="mt-3 text-body text-text-secondary">{rumor.claim_summary}</p>
+      {/* Title + ETA lockup */}
+      <h3 className="mt-3 text-section text-foreground">{rumorTitle(rumor)}</h3>
       {eta && (
-        <p className="mt-3 text-meta">
-          <span className="text-text-tertiary">ETA · </span>
-          <span className="text-text-secondary">{eta}</span>
-        </p>
-      )}
-      {rumor.rumored_benefit && (
-        <p className="mt-3 text-body text-text-secondary">
-          <span className="text-text-tertiary">Rumored benefit · </span>
-          {rumor.rumored_benefit}
-          {!rumor.benefit_verified && <Tag className="ml-1.5">unverified</Tag>}
-        </p>
-      )}
-      {rumor.signals && (
-        <p className="mt-3 text-body text-text-secondary">
-          <span className="text-text-tertiary">Signals · </span>
-          {rumor.signals}
-        </p>
+        <p className="mt-1 text-meta text-text-tertiary">{eta}</p>
       )}
 
-      {/* Evidence — how sure */}
-      <div className="mt-5 border-t border-border pt-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="min-w-0 flex-1">
-            <BarList
-              accent={accent}
-              max={100}
-              secondaryLayout="stacked-mobile"
-              items={[{ label: "Corroboration", value: strengthPct, secondary: corroboration }]}
-            />
-          </div>
-          {isSingleSource && (
-            <Tag tone="warning" className="mt-0.5 shrink-0">
-              single vetted source
-            </Tag>
+      {/* Summary */}
+      <p className="mt-4 text-body text-text-secondary">{rumor.claim_summary}</p>
+
+      {/* Details — quiet definition list; only render if present */}
+      {(rumor.rumored_benefit || rumor.signals) && (
+        <dl className="mt-5 space-y-3">
+          {rumor.rumored_benefit && (
+            <div>
+              <dt className="text-mono-cap text-text-tertiary">
+                Rumored benefit
+                {!rumor.benefit_verified && <Tag className="ml-1.5">unverified</Tag>}
+              </dt>
+              <dd className="mt-1 text-body text-text-secondary">{rumor.rumored_benefit}</dd>
+            </div>
+          )}
+          {rumor.signals && (
+            <div>
+              <dt className="text-mono-cap text-text-tertiary">Signals</dt>
+              <dd className="mt-1 text-body text-text-secondary">{rumor.signals}</dd>
+            </div>
+          )}
+        </dl>
+      )}
+
+      {/* Evidence footer — pushed to bottom for equal-height cards */}
+      <div className="mt-6 flex-1" />
+      <div className="border-t border-border pt-4">
+        {/* Corroboration line: thin meter + inline counts */}
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-mono-cap text-text-tertiary">Corroboration</span>
+          {isSingleSource ? (
+            <Tag tone="warning" className="shrink-0">single vetted source</Tag>
+          ) : (
+            <span className="text-meta text-text-tertiary">
+              {rumor.mention_count} sources · {platformCount} platform{platformCount === 1 ? "" : "s"}
+              {leadContext && <> · <span className="text-text-secondary">{leadContext}</span></>}
+            </span>
           )}
         </div>
+        <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-border/60">
+          <div
+            className="h-full rounded-full transition-[width] duration-500"
+            style={{ width: `${Math.max(4, strengthPct)}%`, background: accent }}
+            aria-hidden
+          />
+        </div>
+
+        {/* Sources as inline chips */}
         {sources.length > 0 && (
-          <ul className="mt-3 divide-y divide-border/60 border-t border-border/60">
+          <ul className="mt-4 flex flex-wrap gap-1.5">
             {sources.map((s) => {
               const href = getSafeExternalUrl(s.url);
-              const context = sourceContextLabel(s);
               const platform = formatSourceDisplay(s.platform).label;
-              const handle = s.handle ? `@${s.handle}` : null;
+              const handle = s.handle ? `@${s.handle}` : platform;
               const when = s.posted_at ? formatTimeAgo(s.posted_at) : null;
+              const title = [
+                s.handle ? `@${s.handle}${s.verified ? " ✓" : ""}` : null,
+                platform,
+                sourceContextLabel(s),
+                when,
+              ].filter(Boolean).join(" · ");
+              const chipClasses =
+                "inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-surface/60 px-2.5 py-1 text-meta text-text-secondary transition-colors";
               const inner = (
                 <>
-                  <span className="flex min-w-0 flex-1 items-center gap-2">
-                    <span className="truncate text-text-secondary">
-                      {handle ?? platform}
-                      {handle && s.verified && (
-                        <span className="ml-1 text-text-tertiary" aria-label="verified">✓</span>
-                      )}
-                    </span>
-                    {handle && (
-                      <span className="shrink-0 text-text-tertiary">{platform}</span>
-                    )}
-                    {context && (
-                      <span className="hidden shrink-0 text-text-tertiary sm:inline">· {context}</span>
-                    )}
-                  </span>
-                  <span className="flex shrink-0 items-center gap-1.5 text-text-tertiary">
-                    {when && <span>{when}</span>}
-                    <ArrowUpRight
-                      className="h-3.5 w-3.5 opacity-40 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                      aria-hidden
-                    />
-                  </span>
+                  <span className="truncate">{handle}</span>
+                  {s.verified && s.handle && (
+                    <span className="text-text-tertiary" aria-label="verified">✓</span>
+                  )}
+                  <span className="text-text-tertiary">·</span>
+                  <span className="shrink-0 text-text-tertiary">{platform}</span>
+                  {when && (
+                    <>
+                      <span className="text-text-tertiary">·</span>
+                      <span className="shrink-0 text-text-tertiary">{when}</span>
+                    </>
+                  )}
                 </>
               );
               return (
-                <li key={s.url}>
+                <li key={s.url} className="max-w-full">
                   {href ? (
                     <a
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group flex items-center justify-between gap-3 py-2 text-meta transition-colors hover:bg-surface-hover/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [&>*:first-child>span:first-child]:group-hover:text-foreground"
+                      title={title}
+                      className={`${chipClasses} hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
                     >
                       {inner}
                     </a>
                   ) : (
-                    <span className="flex items-center justify-between gap-3 py-2 text-meta">
-                      {inner}
-                    </span>
+                    <span className={chipClasses}>{inner}</span>
                   )}
                 </li>
               );
