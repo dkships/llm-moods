@@ -123,23 +123,36 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
           )}
         </div>
         {sources.length > 0 && (
-          <ul className="mt-3 space-y-1.5">
+          <ul className="mt-3 divide-y divide-border/60 border-t border-border/60">
             {sources.map((s) => {
               const href = getSafeExternalUrl(s.url);
               const context = sourceContextLabel(s);
-              const meta = [
-                context,
-                formatSourceDisplay(s.platform).label,
-                s.handle ? `@${s.handle}${s.verified ? " ✓" : ""}` : null,
-                s.posted_at ? formatTimeAgo(s.posted_at) : null,
-              ].filter(Boolean).join(" · ");
+              const platform = formatSourceDisplay(s.platform).label;
+              const handle = s.handle ? `@${s.handle}` : null;
+              const when = s.posted_at ? formatTimeAgo(s.posted_at) : null;
               const inner = (
                 <>
-                  <span className="truncate">{meta}</span>
-                  <ArrowUpRight
-                    className="h-3.5 w-3.5 shrink-0 opacity-40 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                    aria-hidden
-                  />
+                  <span className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="truncate text-text-secondary">
+                      {handle ?? platform}
+                      {handle && s.verified && (
+                        <span className="ml-1 text-text-tertiary" aria-label="verified">✓</span>
+                      )}
+                    </span>
+                    {handle && (
+                      <span className="shrink-0 text-text-tertiary">{platform}</span>
+                    )}
+                    {context && (
+                      <span className="hidden shrink-0 text-text-tertiary sm:inline">· {context}</span>
+                    )}
+                  </span>
+                  <span className="flex shrink-0 items-center gap-1.5 text-text-tertiary">
+                    {when && <span>{when}</span>}
+                    <ArrowUpRight
+                      className="h-3.5 w-3.5 opacity-40 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                      aria-hidden
+                    />
+                  </span>
                 </>
               );
               return (
@@ -149,12 +162,12 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="group flex min-h-11 items-center justify-between gap-3 rounded-md text-meta text-text-tertiary underline decoration-border underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      className="group flex items-center justify-between gap-3 py-2 text-meta transition-colors hover:bg-surface-hover/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [&>*:first-child>span:first-child]:group-hover:text-foreground"
                     >
                       {inner}
                     </a>
                   ) : (
-                    <span className="flex items-center justify-between gap-3 text-meta text-text-tertiary">
+                    <span className="flex items-center justify-between gap-3 py-2 text-meta">
                       {inner}
                     </span>
                   )}
