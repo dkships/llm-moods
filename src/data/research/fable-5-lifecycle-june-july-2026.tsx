@@ -324,14 +324,16 @@ const FableLifecycleBody = () => (
       So: raw mention <em>counts</em> jump after July 10 partly because our net widened — that's why every
       series in this article is a share, not a count. Mention share is computed within each day's corpus, so
       a bigger net mostly cancels out. The refusal proxy is a text match, so it doesn't care what our
-      sentiment classifier thinks. Score comparisons across July 10 are the casualty: the neutral rescoring
-      makes pre- and post-deploy scores non-comparable, which is why every score claim above stays inside
-      one side of that boundary. The June suspension dip and the July 1–7 honeymoon both sit safely pre-deploy.
+      sentiment classifier thinks. Score comparisons across July 10 are the casualty — we measured the
+      scoring-formula change itself at only ~1 point on average, but the same deploy changed which posts get
+      ingested, and there's no clean way to separate a real shift from a different sample. Every score claim
+      above stays inside one side of that boundary; the June suspension dip and the July 1–7 honeymoon both
+      sit safely pre-deploy.
     </p>
     <p>
       One confound survives honestly unresolved: Claude's score sag after July 8 (49.9 average July 8–16,
       down from 59.1) could be classifier fatigue, deadline sourness, unflattering Grok/GPT-5.6 comparisons,
-      our scoring change, or all four. We're not assigning it.
+      our source-mix change, or all four. We're not assigning it.
     </p>
 
     <h2 id="what-a-product-team-takes-from-this">What a product team takes from this</h2>

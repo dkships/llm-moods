@@ -182,7 +182,7 @@ const CrossModelDeltasBody = () => (
       When the next Claude, GPT, Gemini, or Grok regression happens (and it will), the early signal will not
       be a single model's drop and probably won't even be its delta from baseline. Industry-wide news cycles
       pull every visible model down at the same time. The signal that one model is actually still degraded
-      (not just absorbing a press wave) is post-recovery divergence: most models climb back; one doesn't.
+      (as opposed to absorbing a press wave) is post-recovery divergence: most models climb back; one doesn't.
     </p>
     <p>
       That comparison currently requires eyeballing four charts side by side. The next iteration of LLM Vibes

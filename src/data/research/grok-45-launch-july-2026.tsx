@@ -234,8 +234,8 @@ const Grok45LaunchBody = () => (
           </tr>
           <tr>
             <td>Any pre/post-Jul-10 score delta</td>
-            <td>Neutral posts rescored 0.3 → 0.5 in the deploy</td>
-            <td>No — not comparable without reprocessing</td>
+            <td>Formula effect measured at ~1 pt (note 1), but the source mix changed in the same deploy</td>
+            <td>No — source-mix change, not formula</td>
           </tr>
         </tbody>
       </table>
