@@ -4,6 +4,38 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-07-17 — Apify cost audit (live-measured, $29/mo Starter budget)
+
+Trigger: suspected Reddit-actor price increase. Verdict: **no price increase** —
+harshmaur/reddit-scraper's pay-per-event pricing was last changed 2026-04-07 and that
+change was a *decrease* ("Reducing the costs further..."); store shows $0.02/GB actor
+start + $0.0015–0.002/result tiered, apidojo/tweet-scraper flat $0.0004/tweet. The
+squeeze is structural: steady-state spend ≈ $25/30d vs $29 of plan credits ($28
+in-code guard), so any manual/debug runs ride the guard edge.
+
+Live-measured economics (scheduler-body triggers, real runs):
+- Reddit fan-out window (8 subs × 10 posts, 80 items): **$0.268/window**, ~60% of it
+  actor-start fees (8 × ~$0.02). 2 windows/day (04:00/16:00 UTC) → ~$16.1/30d.
+- Twitter (apidojo, 250 items × 3 runs/day at 04:06/12:06/21:06) → ~$9.0/30d.
+- Billing cycle appears to start ~June 20 (matches secret-store verification date);
+  mid-cycle reading was $24.74 with ~3 days left — fits steady state + manual runs.
+- **`single_run: true` validation run: REJECTED.** One combined 8-subreddit run
+  ($0.164) returned all 80 items from r/ClaudeAI — `maxPostsCount` is a sequential
+  total cap and starved the other 7 subs, exactly the starvation the code comment
+  feared. Do not enable `single_run_mode` with the harshmaur actor.
+- Alternatives surveyed live via the Apify store API (July 17): Reddit —
+  automation-lab/reddit-scraper (~$0.003 start + $0.00028–0.00115/post, but
+  self-described "recovered" after Reddit blocked its prior paths and vote data
+  often 0, which degrades the ln(upVotes+1) engagement weight in vibes-scoring);
+  practicaltools/apify-reddit-api (official OAuth2, $0.002–0.004/item, 87.7%
+  30-day success). Twitter — xquik/x-tweet-scraper ($0.15/1k, no run fee, small
+  review base) vs apidojo ($0.40/1k, 68k users, battle-tested). trudax-lite
+  confirmed still degraded (~68% 30-day success).
+- Actionable levers if headroom is wanted (not applied this session): Reddit
+  1×20/sub daily window instead of 2×10 (−$2.7/30d, same item volume, halved
+  intraday freshness); smoke-test xquik for Twitter via a temporary helper fn
+  (−$5.6/30d if it passes). Both need a Lovable-side config/cron change.
+
 ## 2026-07-10 — Sentiment-accuracy audit (Fable 5, 30-agent fan-out + blind re-judge)
 
 Full-pipeline accuracy audit: 8 parallel code audits (classifier, scoring, each
