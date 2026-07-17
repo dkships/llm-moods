@@ -8,6 +8,7 @@
  */
 
 import AuthorBio from "@/components/research/AuthorBio";
+import ResearchTableFrame from "@/components/research/ResearchTableFrame";
 
 const ExternalLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
   <a href={href} target="_blank" rel="noopener noreferrer">
@@ -31,20 +32,66 @@ const HowLlmVibesClassifiesSentimentBody = () => (
     </p>
 
     <h2>What gets scraped</h2>
-    <p>Five platforms, five edge functions, five independent cron schedules.</p>
+    <p>Six sources, six edge functions, six independent cron schedules.</p>
+    <ResearchTableFrame label="LLM Vibes sources as of July 2026">
+      <table className="w-full">
+        <caption className="sr-only">The six scraped sources with access method and cadence.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Source</th>
+            <th scope="col">How</th>
+            <th scope="col" className="whitespace-nowrap">Cadence</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Reddit</td>
+            <td>
+              Apify <code>harshmaur/reddit-scraper</code>, 8 subreddits in parallel
+            </td>
+            <td className="whitespace-nowrap">2×/day</td>
+          </tr>
+          <tr>
+            <td>Hacker News</td>
+            <td>Algolia API — stories, comments, and Ask HN bodies (comments added Jul 10)</td>
+            <td className="whitespace-nowrap">3×/day</td>
+          </tr>
+          <tr>
+            <td>Bluesky</td>
+            <td>AT Protocol, authenticated, 5 neutral search terms</td>
+            <td className="whitespace-nowrap">3×/day</td>
+          </tr>
+          <tr>
+            <td>Twitter/X</td>
+            <td>
+              Apify <code>apidojo~tweet-scraper</code>, combined latest-search query, up to 250 posts/run
+            </td>
+            <td className="whitespace-nowrap">3×/day</td>
+          </tr>
+          <tr>
+            <td>Mastodon</td>
+            <td>Public hashtag timelines across 5 instances (phrase search removed Jul 10 — it was dead upstream)</td>
+            <td className="whitespace-nowrap">3×/day</td>
+          </tr>
+          <tr>
+            <td>App Store</td>
+            <td>Apple review RSS, free and keyless (added Jul 10)</td>
+            <td className="whitespace-nowrap">3×/day</td>
+          </tr>
+        </tbody>
+      </table>
+    </ResearchTableFrame>
     <p>
       Reddit comes from the Apify <code>harshmaur/reddit-scraper</code> actor (HTML-parsing on residential
       proxies, adopted after Reddit shut down its public <code>.json</code> API in May 2026 and broke the
       previous actor). It runs once per subreddit, in parallel, across eight communities spanning the four models
-      (r/ClaudeAI and r/ClaudeCode; r/ChatGPT, r/OpenAI, and r/ChatGPTPro; r/GoogleGemini and r/GeminiAI; r/grok),
-      pulling recent posts. Hacker News uses
-      the Algolia API, free and rate-friendly. Bluesky uses the AT Protocol with an authenticated handle. Twitter/X
-      uses the Apify <code>apidojo~tweet-scraper</code> actor, one combined latest-search query, 50 posts per run.
-      Mastodon uses the public API across five instances.
+      (r/ClaudeAI and r/ClaudeCode; r/ChatGPT, r/Bard, and r/ChatGPTPro; r/GoogleGemini and r/GeminiAI; r/grok),
+      pulling recent posts twice a day — the cadence dropped from three windows to two in July 2026 because
+      per-subreddit actor start fees are the dominant cost on a $29/month Apify budget.
     </p>
     <p>
-      Each scraper has its own Supabase <code>pg_cron</code> row, firing three times a day at the same
-      Pacific-time windows (05:00, 14:00, 21:00) and staggered by a couple of minutes so they never contend.
+      Each scraper has its own Supabase <code>pg_cron</code> row at fixed Pacific-time windows (05:00, 14:00,
+      21:00 for the 3×/day scrapers), staggered by a couple of minutes so they never contend.
       Classification is decoupled: scrapers insert posts as <code>pending</code>, a separate cron drains the
       classification queue every two minutes, and a third refreshes aggregate scores every 30 minutes. There's no
       orchestrator and no shared failure domain: a Reddit timeout can't take Mastodon down with it.
@@ -112,9 +159,15 @@ const HowLlmVibesClassifiesSentimentBody = () => (
     </p>
     <p>For each eligible post in a 24-hour Pacific-local window:</p>
     <pre>
-      <code>{`weight = confidence × log(engagement + 1) × content_multiplier
+      <code>{`weight = confidence × engagement × content_multiplier
+engagement = clamp(ln(upvotes + 1), 1.0, ln(1001))
 content_multiplier = 0.6 if title-only else 1.0`}</code>
     </pre>
+    <p>
+      The engagement clamp is a July 2026 fix from our accuracy audit: the raw <code>ln(score + 1)</code> made
+      a 1-upvote post weigh <em>less</em> than a 0-upvote post, and an uncapped value let one viral tweet
+      supply most of a day's weight. Floored at 1 and capped at ln(1001), engagement is monotonic and bounded.
+    </p>
     <p>
       Eligibility means <code>confidence &gt;= 0.65</code>. Below that floor the classifier says it's a weak
       signal; we drop it.
@@ -128,13 +181,16 @@ content_multiplier = 0.6 if title-only else 1.0`}</code>
     </p>
     <p>After capping, the per-day score is:</p>
     <pre>
-      <code>{`effective_positive = positive_weight + 0.3 × neutral_weight
+      <code>{`effective_positive = positive_weight + 0.5 × neutral_weight
 score = round((effective_positive / total_weight) × 100)`}</code>
     </pre>
     <p>
-      The 0.3 coefficient on neutral weight is a soft hand: a day full of <em>"meh"</em> posts scores around 30,
-      not 0. Empty days (zero eligible posts) default to 50, the visual midpoint, so the chart line doesn't dive
-      on missing data.
+      Neutral posts count as exactly score-neutral: a day full of <em>"meh"</em> posts scores 50, matching the
+      empty-day default, so the chart line doesn't dive on missing data. This coefficient was 0.3 until July
+      10, 2026 — an all-neutral day used to score 30, which our accuracy audit flagged as the largest
+      structural bias in the formula: it dragged scores down exactly on launch and news days, when factual
+      comparison posts spike. Scores on either side of that date aren't directly comparable until the
+      historical window is reprocessed under the current formula.
     </p>
     <p>The top-complaint label per day is the highest-weighted complaint category from negative posts that day.</p>
 

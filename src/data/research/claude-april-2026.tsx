@@ -210,7 +210,7 @@ const ClaudeApril2026Body = () => (
         </a>
       </sup>{" "}
       The structural risk is real: the classifier could favor Claude. We cross-check labels against an
-      independent free-tier Gemini grader before changing the production classifier.
+      independent Gemini grader before changing the production classifier.
     </p>
 
     <h2 id="what-this-changes">What this changes</h2>
@@ -237,9 +237,9 @@ const ClaudeApril2026Body = () => (
 
     <h2 id="methodology">Methodology</h2>
     <p>
-      LLM Vibes scrapes posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across five social platforms:
+      During this article's window, LLM Vibes scraped posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across five social platforms:
       Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), and Mastodon (5
-      instances). Each scraper runs on its own cron three times a day, and the scoring pipeline aggregates a
+      instances). Each scraper ran on its own cron three times a day, and the scoring pipeline aggregates a
       daily 0–100 score per model.
     </p>
     <p>
@@ -283,7 +283,7 @@ const ClaudeApril2026Body = () => (
       </a>{" "}
       Self-bias risk on the classifier. Claude Haiku 4.5 is the model performing classification and is
       also one of the four tracked models, so the risk now runs toward favoring Claude. Mitigation: around
-      classifier changes we rerun a sample of labels through an independent free-tier Gemini grader and compare.
+      classifier changes we rerun a sample of labels through an independent Gemini grader and compare.
       That is a check, not an always-on monitor. An earlier comparison of the two graders found roughly 92%
       agreement on sentiment, which suggests vendor identity isn't the main driver of the label, but it does
       not prove neutrality.

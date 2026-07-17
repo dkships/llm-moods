@@ -6,7 +6,30 @@
     <atom:link href="https://llmvibes.ai/research/feed.xml" rel="self" type="application/rss+xml" />
     <description>Independent analysis of AI model quality and incidents from the LLM Vibes data set.</description>
     <language>en-us</language>
-    <lastBuildDate>Sat, 16 May 2026 12:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Fri, 17 Jul 2026 12:00:00 GMT</lastBuildDate>
+    <item>
+      <title>Fable 5&apos;s launch took 17% of tracked AI chatter. Its return from the government ban took 21%.</title>
+      <link>https://llmvibes.ai/research/fable-5-lifecycle-june-july-2026</link>
+      <guid isPermaLink="true">https://llmvibes.ai/research/fable-5-lifecycle-june-july-2026</guid>
+      <description>Launched June 9, suspended by government directive June 12, redeployed behind a stricter classifier July 1, farewell postponed twice. Five weeks of daily data on the strangest frontier-model lifecycle yet.</description>
+      <pubDate>Fri, 17 Jul 2026 12:00:00 GMT</pubDate>
+      <category>claude</category>
+      <category>anthropic</category>
+      <category>incident</category>
+      <category>case-study</category>
+    </item>
+    <item>
+      <title>Grok 4.5&apos;s launch pop faded in five days. The audience it pulled in stayed.</title>
+      <link>https://llmvibes.ai/research/grok-45-launch-july-2026</link>
+      <guid isPermaLink="true">https://llmvibes.ai/research/grok-45-launch-july-2026</guid>
+      <description>What survives the messiest measurement week in our dataset: a tripled share of voice, a five-day sentiment pop, a feed that flipped from Musk-chatter to product-chatter, and almost no evidence for the switching narrative.</description>
+      <pubDate>Fri, 17 Jul 2026 12:00:00 GMT</pubDate>
+      <category>grok</category>
+      <category>cross-model</category>
+      <category>case-study</category>
+      <category>claude</category>
+      <category>chatgpt</category>
+    </item>
     <item>
       <title>Claude Code lost 19 points during the cache bug. The rest of Claude lost 4.</title>
       <link>https://llmvibes.ai/research/surface-segmentation-march-may-2026</link>
@@ -35,7 +58,7 @@
       <title>How LLM Vibes Classifies Sentiment</title>
       <link>https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</guid>
-      <description>The full pipeline from scraper to score. Five platforms, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we&apos;ve documented but not yet solved.</description>
+      <description>The full pipeline from scraper to score. Six sources, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we&apos;ve documented but not yet solved.</description>
       <pubDate>Sat, 25 Apr 2026 12:00:00 GMT</pubDate>
       <category>methodology</category>
     </item>

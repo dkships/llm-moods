@@ -4,6 +4,8 @@ import ClaudeApril2026Body from "./research/claude-april-2026";
 import HowLlmVibesClassifiesSentimentBody from "./research/how-llm-vibes-classifies-sentiment";
 import CrossModelDeltasBody from "./research/cross-model-deltas-march-april-2026";
 import SurfaceSegmentationBody from "./research/surface-segmentation-march-may-2026";
+import FableLifecycleBody from "./research/fable-5-lifecycle-june-july-2026";
+import Grok45LaunchBody from "./research/grok-45-launch-july-2026";
 
 /**
  * Slug -> body component lookup. Kept separate from `research-posts.ts`
@@ -19,6 +21,8 @@ export const RESEARCH_BODIES: Record<string, ComponentType> = {
   "how-llm-vibes-classifies-sentiment": HowLlmVibesClassifiesSentimentBody,
   "cross-model-deltas-march-april-2026": CrossModelDeltasBody,
   "surface-segmentation-march-may-2026": SurfaceSegmentationBody,
+  "fable-5-lifecycle-june-july-2026": FableLifecycleBody,
+  "grok-45-launch-july-2026": Grok45LaunchBody,
 };
 
 export function getResearchBody(slug: string): ComponentType | undefined {

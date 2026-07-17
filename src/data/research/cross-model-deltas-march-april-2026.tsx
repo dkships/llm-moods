@@ -8,12 +8,6 @@ import EmbeddedModelChart from "@/components/research/EmbeddedModelChart";
 import AuthorBio from "@/components/research/AuthorBio";
 import ResearchTableFrame from "@/components/research/ResearchTableFrame";
 
-const ExternalLink = ({ href, children }: { href: string; children: React.ReactNode }) => (
-  <a href={href} target="_blank" rel="noopener noreferrer">
-    {children}
-  </a>
-);
-
 const CrossModelDeltasBody = () => (
   <>
     <h2>Watch the recovery shape, not the drop</h2>
@@ -153,7 +147,7 @@ const CrossModelDeltasBody = () => (
     <p>
       The classifier is Claude Haiku 4.5, which scores all four models including itself, so the risk to watch
       is a pro-Claude tilt. The validation check samples recent low-confidence or incomplete posts, reruns them
-      through an independent free-tier Gemini grader, and compares its sentiment and complaint labels against
+      through an independent Gemini grader, and compares its sentiment and complaint labels against
       the stored Claude labels without writing public scores. We run it around classifier changes, not as an
       always-on monitor. It does not remove self-bias risk, but it keeps a cutover auditable against a
       different vendor's read. An earlier Gemini/Claude comparison in April 2026 found roughly 92% sentiment

@@ -33,9 +33,21 @@
   <!-- lastmod = updatedAt ?? publishedAt from src/data/research-posts.ts; update when a post changes. -->
   <url>
     <loc>https://llmvibes.ai/research</loc>
-    <lastmod>2026-05-16</lastmod>
+    <lastmod>2026-07-17</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
+  </url>
+  <url>
+    <loc>https://llmvibes.ai/research/fable-5-lifecycle-june-july-2026</loc>
+    <lastmod>2026-07-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://llmvibes.ai/research/grok-45-launch-july-2026</loc>
+    <lastmod>2026-07-17</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
   </url>
   <url>
     <loc>https://llmvibes.ai/research/claude-april-2026</loc>
@@ -45,7 +57,7 @@
   </url>
   <url>
     <loc>https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</loc>
-    <lastmod>2026-05-16</lastmod>
+    <lastmod>2026-07-17</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>

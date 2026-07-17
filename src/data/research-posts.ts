@@ -61,6 +61,48 @@ export interface ResearchPost {
  */
 export const RESEARCH_POSTS: ResearchPost[] = [
   {
+    slug: "fable-5-lifecycle-june-july-2026",
+    title: "Fable 5's launch took 17% of tracked AI chatter. Its return from the government ban took 21%.",
+    publishedAt: "2026-07-17",
+    summary:
+      "Launched June 9, suspended by government directive June 12, redeployed behind a stricter classifier July 1, farewell postponed twice. Five weeks of daily data on the strangest frontier-model lifecycle yet.",
+    metaDescription:
+      "Five weeks of daily sentiment data across Fable 5's launch, government suspension, classifier redeploy, and twice-extended farewell.",
+    author: "David Kelly",
+    tags: ["claude", "anthropic", "incident", "case-study"],
+    relatedModelSlug: "claude",
+    ogImage: "/research/fable-5-lifecycle-june-july-2026/og.png",
+    dataset: {
+      label: "Daily Fable 5 lifecycle series · Jun 1 – Jul 16, 2026 (CSV)",
+      path: "/research/fable-5-lifecycle-june-july-2026/data.csv",
+      description:
+        "Daily Claude sentiment score with Fable/Mythos mention counts, corpus row totals, and refusal-language post counts. Source for every series in the article.",
+      publishedAt: "2026-07-17",
+      license: "MIT",
+    },
+  },
+  {
+    slug: "grok-45-launch-july-2026",
+    title: "Grok 4.5's launch pop faded in five days. The audience it pulled in stayed.",
+    publishedAt: "2026-07-17",
+    summary:
+      "What survives the messiest measurement week in our dataset: a tripled share of voice, a five-day sentiment pop, a feed that flipped from Musk-chatter to product-chatter, and almost no evidence for the switching narrative.",
+    metaDescription:
+      "What our sentiment data can honestly attribute to Grok 4.5's launch: tripled share of voice, a five-day score pop, and a feed that flipped to product talk.",
+    author: "David Kelly",
+    tags: ["grok", "cross-model", "case-study", "claude", "chatgpt"],
+    relatedModelSlug: "grok",
+    ogImage: "/research/grok-45-launch-july-2026/og.png",
+    dataset: {
+      label: "Daily cross-model launch-window series · Jun 1 – Jul 16, 2026 (CSV)",
+      path: "/research/grok-45-launch-july-2026/data.csv",
+      description:
+        "Daily sentiment score, post volume, and eligible-post counts for all four tracked models, plus Grok share-of-chatter and Grok 4.5 mention counts. Source for every series in the article.",
+      publishedAt: "2026-07-17",
+      license: "MIT",
+    },
+  },
+  {
     slug: "surface-segmentation-march-may-2026",
     title: "Claude Code lost 19 points during the cache bug. The rest of Claude lost 4.",
     publishedAt: "2026-05-16",
@@ -102,11 +144,11 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     slug: "how-llm-vibes-classifies-sentiment",
     title: "How LLM Vibes Classifies Sentiment",
     publishedAt: "2026-04-25",
-    updatedAt: "2026-05-16",
+    updatedAt: "2026-07-17",
     summary:
-      "The full pipeline from scraper to score. Five platforms, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we've documented but not yet solved.",
+      "The full pipeline from scraper to score. Six sources, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we've documented but not yet solved.",
     metaDescription:
-      "How LLM Vibes turns posts into scores: five platforms, 12 complaint categories, a volume-weighted 0–100 score, and its known failure modes.",
+      "How LLM Vibes turns posts into scores: six sources, 12 complaint categories, a volume-weighted 0–100 score, and its known failure modes.",
     author: "David Kelly",
     tags: ["methodology"],
     ogImage: "/research/how-llm-vibes-classifies-sentiment/og.png",

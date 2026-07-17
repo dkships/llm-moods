@@ -322,7 +322,9 @@ const SurfaceSegmentationBody = () => (
       <code>score = 100 × (positive + 0.3 × neutral) / (positive + negative + neutral)</code>, with posts
       filtered to <code>confidence ≥ 0.65</code> and a (model, surface, day) cell skipped when eligible
       posts &lt; 5. The production dashboard score in <code>supabase/functions/_shared/vibes-scoring.ts</code>{" "}
-      adds source-share capping and engagement weighting we don't replicate here. The downloadable CSV ships
+      adds source-share capping and engagement weighting we don't replicate here. (The production formula's
+      neutral coefficient moved from 0.3 to 0.5 in July 2026; this article's dataset and per-surface numbers
+      predate that change and keep the 0.3 they were computed with.) The downloadable CSV ships
       the per-cell raw counts behind every charted number; cells below the five-post floor are omitted, so
       window totals computed from the CSV reflect chartable volume, not raw scrape volume.
     </p>
@@ -364,7 +366,7 @@ const SurfaceSegmentationBody = () => (
       </a>{" "}
       Classifier self-bias risk. Claude Haiku 4.5 classifies posts about its three competitors and itself, so
       the risk to watch is a pro-Claude tilt. We cross-check a sample of recent uncertain posts against an
-      independent free-tier Gemini grader around classifier changes. The cross-check doesn't prove neutrality,
+      independent Gemini grader around classifier changes. The cross-check doesn't prove neutrality,
       and the surface-coverage numbers are a separate axis: Gemini's low surface-coverage rate could look like
       classifier sandbagging if you squint at it. It isn't. Posts simply don't name Gemini's surfaces in plain
       English often enough for the detector to bucket them.
