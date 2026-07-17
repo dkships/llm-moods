@@ -228,7 +228,12 @@ const FableLifecycleBody = () => (
     </p>
     <p>
       Launch week tripled it, with the raw single-day peak — 8% on June 10 — landing 48 hours after release.
-      The first refusal complaint in our corpus is titled "
+      The classifier's own labels agree, and put the spike even higher: posts our classifier tagged with a{" "}
+      <code>refusals</code> or <code>censorship</code> complaint were 1.9% of Claude posts the week before
+      launch, 11.2% launch week, and 6.7–7.3% in the two weeks after the redeploy. (The classifier series
+      doesn't go quiet during the suspension the way the text proxy does — it counts refusal complaints
+      about any Claude model, including the Opus 4.8 everyone fell back to.) The first refusal complaint in
+      our corpus is titled "
       <ExternalLink href="https://www.reddit.com/r/ClaudeAI/comments/1u1hhhu/fable_5_blocking_all_my_security_audits/">
         Fable 5 blocking all my security audits
       </ExternalLink>

@@ -189,8 +189,12 @@ score = round((effective_positive / total_weight) × 100)`}</code>
       empty-day default, so the chart line doesn't dive on missing data. This coefficient was 0.3 until July
       10, 2026 — an all-neutral day used to score 30, which our accuracy audit flagged as the largest
       structural bias in the formula: it dragged scores down exactly on launch and news days, when factual
-      comparison posts spike. Scores on either side of that date aren't directly comparable until the
-      historical window is reprocessed under the current formula.
+      comparison posts spike. We measured the seam on July 17 by recomputing every June–July model-day from
+      raw posts under the current formula: the coefficient change moves stored daily scores by about 1 point
+      on average, because neutral share runs only ~6% after the relevance gate. Historical scores were left
+      as stored — a 1-point correction isn't worth rewriting the public record — but the July 10 deploy also
+      changed the source mix (new sources, bigger Twitter pulls), so treat cross-boundary comparisons with
+      care for that reason.
     </p>
     <p>The top-complaint label per day is the highest-weighted complaint category from negative posts that day.</p>
 

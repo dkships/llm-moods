@@ -138,36 +138,54 @@ const Grok45LaunchBody = () => (
       ") and app bugs, the complaints of a product straining under demand rather than failing on output.
     </p>
 
-    <h2 id="the-switching-story">The switching story is mostly a media story</h2>
+    <h2 id="the-switching-story">The switching story: smaller and more price-driven than the headlines</h2>
     <p>
       The tech-press framing of this launch was defection: users abandoning Claude and ChatGPT for the
-      cheaper model. I went looking for it. Across 16,724 unique posts in our 90-day corpus, explicit
+      cheaper model. Our passive corpus barely shows it. Across 16,724 unique posts in 90 days, explicit
       switching statements — "switched to Grok," "cancelled my Claude subscription," "moved to Grok," and a
       dozen pattern variants — matched <strong>three posts</strong>.
     </p>
+    <p>
+      A negative result from a passive sample is weak evidence, so we tested it: a targeted Top-sorted
+      search of X for those exact phrases, run July 17 through the same Apify actor our pipeline uses. That
+      search found the current our broad-term sampling missed — roughly a dozen post-launch Grok-bound
+      defection statements among 80 returned tweets, including two with four-digit like counts inside 72
+      hours of launch.
+    </p>
     <PullQuote
-      text="opus 5 will be a crippled version of fable 5 - Anthropic is massively compute constrained - I have cancelled and moved to grok 4.5 and codex, never looking back"
-      handle="@mobile14u"
+      text="I cancelled my Claude subscriptions in exchange for Grok 4.5. Far cheaper, faster, and just as good for my use cases. COMPETITION IS HEATING UP!"
+      handle="@farzyness"
       platform="X"
-      timestamp="2026-07-14 20:37 UTC"
-      href="https://x.com/mobile14u/status/2077130372148539557"
-      archivedHref="https://web.archive.org/web/2026/https://x.com/mobile14u/status/2077130372148539557"
+      timestamp="2026-07-11 02:23 UTC"
+      href="https://x.com/farzyness/status/2075768021168148946"
+      archivedHref="https://web.archive.org/web/2026/https://x.com/farzyness/status/2075768021168148946"
+    />
+    <PullQuote
+      text="I cancelled Claude today in favor of Grok and GPT. Now is the perfect time for Anthropic to enable Fable on subscription and frustrate me."
+      handle="@Grummz"
+      platform="X"
+      timestamp="2026-07-11 16:28 UTC"
+      href="https://x.com/Grummz/status/2075980632694616398"
+      archivedHref="https://web.archive.org/web/2026/https://x.com/Grummz/status/2075980632694616398"
     />
     <p>
-      One real defection post, and its stated reason is Anthropic's pricing and capacity, not Grok's quality.
-      What the corpus has instead of switching is <em>comparison</em>: nearly half the posts that name Grok
-      4.5 were classified under a different model, because they're side-by-side posts — build-offs,
-      benchmark threads, "which one for my stack" questions. The pattern in those posts is remarkably
+      So the switching current is real. Three things shrink it back to size. The volume is modest — a dozen
+      declarations, not a wave, concentrated July 10–13. The stated reasons are Claude's pricing and limits
+      at least as often as Grok's quality — both quotes above are complaints about Anthropic wearing a Grok
+      hat. And the same phrase search returns parallel cancel-for-Codex and cancel-for-GPT streams running
+      since April; public churn-posting is a genre, and Grok 4.5 is its newest destination, not its cause.
+    </p>
+    <p>
+      What the corpus has in volume instead of switching is <em>comparison</em>: nearly half the posts that
+      name Grok 4.5 were classified under a different model, because they're side-by-side posts —
+      build-offs, benchmark threads, "which one for my stack" questions. The pattern is remarkably
       consistent: Fable 5 holds the quality crown, Grok 4.5 wins on price, and the poster keeps both
       opinions in the same breath.
     </p>
     <p>
-      Two honest caveats. Our scrapers search broad model terms, not switching phrases, so a migration wave
-      happening outside our sampled queries could be invisible to us — absence of evidence here is weak
-      evidence of absence. And subscription decisions lag sentiment: the Fable 5 free-access window (extended
-      to July 19 as I write this) means the cancel-or-keep moment for a lot of Claude users hasn't arrived
-      yet. If a defection wave shows up, my money is on it showing up in the week after that deadline, not
-      launch week.
+      The timing caveat still matters most: the Fable 5 free-access window (extended to July 19 as I write
+      this) means the cancel-or-keep moment for a lot of Claude users hasn't arrived. If a defection wave
+      shows up, my money is on the week after that deadline, not launch week.
     </p>
 
     <h2 id="the-worst-measurement-week">Untangling the worst possible measurement week</h2>
@@ -268,7 +286,11 @@ const Grok45LaunchBody = () => (
       comparison post counts toward both models — that's deliberate, it's chatter about both. Keyword and
       switching-phrase matching is regex over title + content; the patterns are listed in the repo. Daily
       scores come from <code>get_public_vibes_history</code>. Where scores cross our July 10 pipeline
-      deploy, they're flagged as non-comparable rather than adjusted.
+      deploy, they're flagged as non-comparable rather than adjusted. The targeted switching-phrase search
+      was a one-shot, Top-sorted query set ("switched to grok," "cancelled claude," and variants) through
+      the same <code>apidojo~tweet-scraper</code> actor the pipeline uses, run July 17, 80 tweets returned;
+      Top-sorting biases it toward high-engagement posts, which is the point — it bounds the visible
+      ceiling of the switching narrative, not its base rate.
     </p>
     <p>
       The classifier is a Claude model scoring posts about Claude's competitors, including this article's
@@ -300,9 +322,11 @@ const Grok45LaunchBody = () => (
       </a>{" "}
       The July 10 deploy rescored neutral posts from 0.3 to 0.5 on the positive-negative axis, after our
       accuracy audit found the old weighting punished models on launch-news days — exactly the kind of day
-      this article is about. The fix was right and its timing was terrible for this analysis. We're
-      reprocessing the historical window under the current formula; until then, cross-boundary score deltas
-      stay out of our claims.
+      this article is about. The fix was right and its timing was terrible for this analysis. On July 17 we
+      recomputed every model-day in the June–July window from raw posts under the current formula and
+      compared against stored scores: the formula's own effect is about 1 point on average (neutral share
+      runs ~6%, so the coefficient change barely moves the needle). Cross-boundary score deltas still stay
+      out of our claims — the source mix changed in the same deploy, and that's the confound that matters.
     </p>
 
     <AuthorBio />

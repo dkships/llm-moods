@@ -86,9 +86,9 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     title: "Grok 4.5's launch pop faded in five days. The audience it pulled in stayed.",
     publishedAt: "2026-07-17",
     summary:
-      "What survives the messiest measurement week in our dataset: a tripled share of voice, a five-day sentiment pop, a feed that flipped from Musk-chatter to product-chatter, and almost no evidence for the switching narrative.",
+      "What survives the messiest measurement week in our dataset: a tripled share of voice, a five-day sentiment pop, a feed that flipped from Musk-chatter to product-chatter, and a switching story that's real but smaller and more price-driven than the headlines.",
     metaDescription:
-      "What our sentiment data can honestly attribute to Grok 4.5's launch: tripled share of voice, a five-day score pop, and a feed that flipped to product talk.",
+      "What our sentiment data can honestly attribute to Grok 4.5's launch: tripled share of voice, a five-day score pop, and a switching story smaller than the headlines.",
     author: "David Kelly",
     tags: ["grok", "cross-model", "case-study", "claude", "chatgpt"],
     relatedModelSlug: "grok",
