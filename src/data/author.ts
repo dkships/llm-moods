@@ -16,7 +16,7 @@ export const BIO_LINKS: ReadonlyArray<{ label: string; href: string; external: b
 
 export const AUTHOR_NAME = "David Kelly";
 export const AUTHOR_BIO =
-  "David Kelly built 9 products to 1M+ users across 180+ countries as Founding GM and Head of Product at AppSumo Originals — TidyCal, SendFox, and KingSumo among them, three crossing $1M in lifetime revenue. He now advises Originals and works as a fractional Head of Product & Growth. He built LLM Vibes as an open-source project tracking real user sentiment across Claude, ChatGPT, Gemini, and Grok.";
+  "David Kelly\u00a0built 9 products to 1M+ users across 180+ countries as Founding GM and Head of Product at AppSumo Originals — TidyCal, SendFox, and KingSumo among them, three crossing $1M in lifetime revenue. He now advises Originals and works as a fractional Head of Product & Growth. He built LLM Vibes as an open-source project tracking real user sentiment across Claude, ChatGPT, Gemini, and Grok.";
 export const AUTHOR_SAMEAS: readonly string[] = BIO_LINKS.map((l) => l.href);
 export const AUTHOR_PORTFOLIO_URL = "https://dmkthinks.org";
 export const AUTHOR_LINKEDIN_URL = "https://www.linkedin.com/in/thedmkelly/";
