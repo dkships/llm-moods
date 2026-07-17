@@ -14,7 +14,6 @@ const AuthorBio = () => (
       About the author
     </p>
     <p className="mt-2 text-body text-foreground">
-      <strong className="font-semibold">{AUTHOR_NAME}</strong>{" "}
       {AUTHOR_BIO}
     </p>
     <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-meta text-text-secondary">
