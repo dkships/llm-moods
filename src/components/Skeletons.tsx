@@ -2,15 +2,21 @@ export const Shimmer = ({ className = "" }: { className?: string }) => (
   <div className={`animate-pulse rounded-lg bg-secondary/35 ${className}`} />
 );
 
+// Mirrors ModelCard's anatomy (label / name+score / sparkline / meta /
+// complaint row) so the loaded card lands in place instead of reflowing.
 export const CardSkeleton = () => (
   <div className="glass min-h-56 overflow-hidden rounded-xl sm:min-h-64">
-    <Shimmer className="h-1.5 rounded-none" />
-    <div className="space-y-3 p-4 sm:p-6">
-      <Shimmer className="h-4 w-20" />
-      <Shimmer className="h-5 w-32" />
-      <div className="flex justify-between">
-        <Shimmer className="h-4 w-12" />
-        <Shimmer className="h-4 w-24" />
+    <Shimmer className="hidden h-1.5 rounded-none sm:block" />
+    <div className="px-5 py-4 sm:p-6">
+      <Shimmer className="h-3.5 w-24" />
+      <div className="mt-2 flex items-start justify-between gap-3">
+        <Shimmer className="h-6 w-28" />
+        <Shimmer className="h-9 w-14" />
+      </div>
+      <Shimmer className="mt-3 h-10 w-full sm:mt-4 sm:h-12" />
+      <Shimmer className="mt-3 h-3.5 w-36" />
+      <div className="mt-3 border-t border-border pt-3 sm:mt-4">
+        <Shimmer className="h-4 w-40" />
       </div>
     </div>
   </div>

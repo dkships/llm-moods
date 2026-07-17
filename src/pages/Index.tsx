@@ -7,6 +7,7 @@ import SectionHeader from "@/components/SectionHeader";
 import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
 import { useModelsWithLatestVibes, usePrefetchModelDetail } from "@/hooks/useVibesData";
+import { formatTimeAgo } from "@/lib/vibes";
 import { CardSkeleton } from "@/components/Skeletons";
 
 const Index = () => {
@@ -22,10 +23,18 @@ const Index = () => {
     prefetch(slug, id);
   }, [prefetch]);
 
+  // Oldest ingest across models — same honesty rule as the dashboard header: a
+  // stalled scraper must not be masked by the healthiest model.
+  const oldestModelIngestAt = (models || []).reduce<string | null>((oldest, model) => {
+    if (!model.lastUpdated) return oldest;
+    if (!oldest) return model.lastUpdated;
+    return new Date(model.lastUpdated).getTime() < new Date(oldest).getTime() ? model.lastUpdated : oldest;
+  }, null);
+
   return (
     <>
       {/* Hero */}
-      <section className="container relative overflow-hidden pb-16 pt-20 sm:pb-24 sm:pt-24 lg:pt-28">
+      <section className="container relative overflow-hidden pb-12 pt-16 sm:pb-16 sm:pt-20 lg:pt-24">
         <div className="pointer-events-none absolute -right-[18%] -top-40 h-[620px] w-[620px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.14)_0%,_hsl(var(--glow)/0.04)_36%,_transparent_68%)] sm:-right-[12%]" aria-hidden="true" />
         <div className="pointer-events-none absolute -left-[24%] top-40 h-[420px] w-[420px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.06)_0%,_transparent_70%)] sm:-left-[8%]" aria-hidden="true" />
         <div className="relative flex flex-col items-center text-center">
@@ -55,7 +64,11 @@ const Index = () => {
         <div className="container py-10 sm:py-12">
             <div className="mb-5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <h2 className="text-section text-foreground">Live model scores</h2>
-              <span className="text-mono-cap text-text-tertiary">Updated throughout the day</span>
+              <span className="text-mono-cap text-text-tertiary">
+                {oldestModelIngestAt
+                  ? `Updated ${formatTimeAgo(oldestModelIngestAt)}`
+                  : "Updated throughout the day"}
+              </span>
             </div>
             {isLoading ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="status" aria-live="polite">
@@ -78,9 +91,9 @@ const Index = () => {
 
       {/* How it works */}
       <section>
-            <div className="container py-14 sm:py-20">
-              <SectionHeader title="How it works" className="mb-8 sm:mb-10" />
-              <ol className="grid grid-cols-1 gap-8 sm:gap-10 md:grid-cols-3">
+            <div className="container py-12 sm:py-16">
+              <SectionHeader title="How it works" className="mb-6 sm:mb-8" />
+              <ol className="grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-3">
                 {[
                   {
                     title: "Scrape",
@@ -95,14 +108,12 @@ const Index = () => {
                     body: "Volume-weighted into a 0–100 daily score per model. Higher means happier users.",
                   },
                 ].map((step, i) => (
-                  <li key={step.title} className="text-left">
-                    <p className="text-mono-cap text-text-tertiary">
-                      0{i + 1}
-                    </p>
-                    <p className="mt-2 text-section text-foreground">
-                      {step.title}
-                    </p>
-                    <p className="mt-2 text-body text-text-secondary">
+                  <li key={step.title} className="border-t border-border pt-5 text-left">
+                    <div className="flex items-baseline gap-3">
+                      <span className="text-mono-cap text-text-tertiary">0{i + 1}</span>
+                      <p className="text-section text-foreground">{step.title}</p>
+                    </div>
+                    <p className="mt-2.5 text-body text-text-secondary">
                       {step.body}
                     </p>
                   </li>

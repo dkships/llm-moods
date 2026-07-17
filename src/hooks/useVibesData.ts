@@ -119,6 +119,34 @@ interface PublicRpcClient {
 
 const publicRpc = supabase as unknown as PublicRpcClient;
 
+declare global {
+  interface Window {
+    /** Set by the inline early-fetch script in index.html; single-use. */
+    __earlyVibes?: { landing: Promise<Response>; spark: Promise<Response> };
+  }
+}
+
+// index.html kicks off the two landing RPCs in an inline <head> script so the
+// network round-trip overlaps the JS download instead of following it. Cleared
+// on first read: interval refetches and retries go through supabase-js.
+async function consumeEarlyVibes(): Promise<
+  { landing: LandingVibesRow[]; spark: PublicVibesScoreRow[] } | null
+> {
+  if (typeof window === "undefined") return null;
+  const early = window.__earlyVibes;
+  if (!early) return null;
+  window.__earlyVibes = undefined;
+  try {
+    const [lRes, sRes] = await Promise.all([early.landing, early.spark]);
+    if (!lRes.ok || !sRes.ok) return null;
+    const [landing, spark] = await Promise.all([lRes.json(), sRes.json()]);
+    if (!Array.isArray(landing) || !Array.isArray(spark)) return null;
+    return { landing, spark };
+  } catch {
+    return null;
+  }
+}
+
 export interface SparklinePoint {
   score: number;
   isCarryForward: boolean;
@@ -191,17 +219,27 @@ export function useModelsWithLatestVibes() {
     refetchIntervalInBackground: false,
     staleTime: QUERY_STALE_TIME,
     queryFn: async () => {
-      // Independent RPCs; supabase-js resolves with {data,error} (never rejects),
-      // so Promise.all can't short-circuit — check both errors after.
-      const [
-        { data: landing, error: lErr },
-        { data: sparkRows, error: sErr },
-      ] = await Promise.all([
-        supabase.rpc("get_landing_vibes"),
-        publicRpc.rpc("get_public_vibes_sparkline", { days_back: 10 }),
-      ]);
-      if (lErr) throw lErr;
-      if (sErr) throw sErr;
+      let landing: LandingVibesRow[] | null;
+      let sparkRows: PublicVibesScoreRow[] | null;
+      const early = await consumeEarlyVibes();
+      if (early) {
+        landing = early.landing;
+        sparkRows = early.spark;
+      } else {
+        // Independent RPCs; supabase-js resolves with {data,error} (never rejects),
+        // so Promise.all can't short-circuit — check both errors after.
+        const [
+          { data: landingData, error: lErr },
+          { data: sparkData, error: sErr },
+        ] = await Promise.all([
+          supabase.rpc("get_landing_vibes"),
+          publicRpc.rpc("get_public_vibes_sparkline", { days_back: 10 }),
+        ]);
+        if (lErr) throw lErr;
+        if (sErr) throw sErr;
+        landing = landingData;
+        sparkRows = sparkData;
+      }
 
       const sparkByModel = new Map<
         string,

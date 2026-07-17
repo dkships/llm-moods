@@ -24,6 +24,7 @@
   <link rel="canonical" href="https://llmvibes.ai/" />
   <link rel="alternate" type="application/rss+xml" title="LLM Vibes Research" href="https://llmvibes.ai/research/feed.xml" />
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="preconnect" href="https://trhmcunttvpmylcxjkbd.supabase.co" crossorigin />
   <link rel="preload" href="/fonts/space-grotesk-latin.woff2" as="font" type="font/woff2" crossorigin />
   <link rel="preload" href="/fonts/jetbrains-mono-latin.woff2" as="font" type="font/woff2" crossorigin />
   <meta name="theme-color" content="#0c0e13" />
@@ -45,6 +46,32 @@
       }
     ]
   }
+  </script>
+  <script>
+  // Early kick-off for the two RPCs behind the landing/dashboard model cards:
+  // the fetches start while the JS bundle is still downloading/parsing instead
+  // of after React mounts. Consumed exactly once by useModelsWithLatestVibes
+  // (src/hooks/useVibesData.ts) — keep the fn names and args in sync with it.
+  // The anon key mirrors the public fallback in src/integrations/supabase/client.ts.
+  (function () {
+    var path = location.pathname.replace(/\/?(index)?\.html$/, "").replace(/\/$/, "") || "/";
+    if (path !== "/" && path !== "/dashboard") return;
+    var base = "https://trhmcunttvpmylcxjkbd.supabase.co/rest/v1/rpc/";
+    var key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRyaG1jdW50dHZwbXlsY3hqa2JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMwMDgzNDcsImV4cCI6MjA4ODU4NDM0N30.zzccv_H7YbqDml3YQgd05eiSSQSgg_v8Ov1w17BaPc4";
+    function call(fn, body) {
+      var p = fetch(base + fn, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", apikey: key, Authorization: "Bearer " + key },
+        body: JSON.stringify(body),
+      });
+      p.catch(function () {}); // mark handled; the consumer awaits the original
+      return p;
+    }
+    window.__earlyVibes = {
+      landing: call("get_landing_vibes", {}),
+      spark: call("get_public_vibes_sparkline", { days_back: 10 }),
+    };
+  })();
   </script>
 </head>
 
