@@ -4,7 +4,7 @@
  * prerender plugin can import them); re-exported here for existing callers.
  */
 
-import { AUTHOR_NAME, AUTHOR_SAMEAS, BIO_LINKS } from "@/data/author";
+import { AUTHOR_BIO, AUTHOR_NAME, AUTHOR_SAMEAS, BIO_LINKS } from "@/data/author";
 
 export { AUTHOR_NAME, AUTHOR_SAMEAS };
 
@@ -14,9 +14,8 @@ const AuthorBio = () => (
       About the author
     </p>
     <p className="mt-2 text-body text-foreground">
-      <strong className="font-semibold">David Kelly</strong> is a product and growth contractor focused on
-      consumer AI tools, currently exploring product roles in AI safety and frontier-model reliability. He
-      builds llmvibes.ai independently, and advises on product, growth, and AI tooling for AppSumo Originals.
+      <strong className="font-semibold">{AUTHOR_NAME}</strong>{" "}
+      {AUTHOR_BIO}
     </p>
     <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-meta text-text-secondary">
       {BIO_LINKS.map((link) => (
@@ -33,5 +32,6 @@ const AuthorBio = () => (
     </ul>
   </aside>
 );
+
 
 export default AuthorBio;
