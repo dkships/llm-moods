@@ -68,7 +68,8 @@ const FableLifecycleBody = () => (
       No frontier model has had a five-week run like Claude Fable 5's. Launched June 9. Ordered offline by a
       US government export-control directive on June 12. Restored July 1 behind a stricter safety
       classifier. Scheduled to leave paid plans, then given two stays of execution — first to July 12, then
-      July 19. Our scrapers classified posts about Claude every day of it, and the dataset reads like a
+      July 19 — and finally, on July 20, a pardon: permanent inclusion in Max and Team Premium plans. Our
+      scrapers classified posts about Claude every day of it, and the dataset reads like a
       stress test for the question every model provider should care about: what does a governance event do
       to how people talk about your product?
     </p>
@@ -145,6 +146,16 @@ const FableLifecycleBody = () => (
             <td className="whitespace-nowrap">Jul 7, Jul 12</td>
             <td>Paid-plan access extended to Jul 12, then Jul 19</td>
             <td>Peak mention share of the entire arc: 22.7% on Jul 7</td>
+          </tr>
+          <tr>
+            <td className="whitespace-nowrap">Jul 20</td>
+            <td>
+              <ExternalLink href="https://x.com/claudeai/status/2078302415804379218">
+                Fable 5 made permanent in Max and Team Premium plans
+              </ExternalLink>
+              , at 50% of usage limits
+            </td>
+            <td>After this article's Jul 16 data cutoff; the <a href="/model/claude">live chart</a> carries the marker</td>
           </tr>
         </tbody>
       </table>
@@ -386,9 +397,13 @@ const FableLifecycleBody = () => (
 
     <h2 id="what-you-can-do-next">What you can do next</h2>
     <p>
-      The <a href="/model/claude">live Claude chart</a> has the suspension band and both access deadlines
-      marked. July 19 is the date to watch: it's the first time the deadline arrives without an extension
-      announced, and the week after it answers whether the deadline economy converts to paid usage or churn.
+      <em>Update, July 21:</em> the deadline never arrived. On July 20 Anthropic{" "}
+      <ExternalLink href="https://x.com/claudeai/status/2078302415804379218">announced</ExternalLink> that
+      Fable 5 is permanently included in Max and Team Premium plans at 50% of usage limits, with Pro and
+      Team Standard keeping usage-credit access plus a one-time $100 credit. That settles the churn
+      question this article originally closed on. What's left to watch is whether the 16% mention share
+      holds once no countdown is feeding it — the <a href="/model/claude">live Claude chart</a> has the
+      suspension band and the July 20 announcement marked.
     </p>
     <p>
       Download the{" "}

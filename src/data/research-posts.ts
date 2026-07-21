@@ -64,10 +64,11 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     slug: "fable-5-lifecycle-june-july-2026",
     title: "Fable 5's launch took 17% of tracked AI chatter. Its return from the government ban took 21%.",
     publishedAt: "2026-07-17",
+    updatedAt: "2026-07-21",
     summary:
-      "Launched June 9, suspended by government directive June 12, redeployed behind a stricter classifier July 1, farewell postponed twice. Five weeks of daily data on the strangest frontier-model lifecycle yet.",
+      "Launched June 9, suspended by government directive June 12, redeployed behind a stricter classifier July 1, farewell postponed twice — then called off. Five weeks of daily data on the strangest frontier-model lifecycle yet.",
     metaDescription:
-      "Five weeks of daily sentiment data across Fable 5's launch, government suspension, classifier redeploy, and twice-extended farewell.",
+      "Five weeks of daily sentiment data across Fable 5's launch, government suspension, classifier redeploy, and the farewell that was finally called off.",
     author: "David Kelly",
     tags: ["claude", "anthropic", "incident", "case-study"],
     relatedModelSlug: "claude",

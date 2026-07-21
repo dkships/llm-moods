@@ -143,6 +143,17 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     notes: "Included-in-plans window extended to July 12 (announced July 7), then to July 19 (announced July 12).",
   },
   {
+    id: "anthropic-fable-5-permanent-plans",
+    vendor: "anthropic",
+    modelSlug: "claude",
+    eventDate: "2026-07-20",
+    eventType: "pricing_change",
+    title: "Fable 5 made permanent in Max and Team Premium plans",
+    url: "https://x.com/claudeai/status/2078302415804379218",
+    notes:
+      "Included at 50% of usage limits with no end date; Pro and Team Standard keep usage-credit access plus a one-time $100 credit.",
+  },
+  {
     id: "openai-gpt-5-6-launch",
     vendor: "openai",
     modelSlug: "chatgpt",
