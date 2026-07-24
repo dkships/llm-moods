@@ -463,10 +463,21 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releasePrompt: "Gemini 3.5 Flash",
     },
     {
+      key: "gemini35flashcyber",
+      label: "Gemini 3.5 Flash Cyber",
+      codename: null,
+      aliases: ["gemini35flashcyber", "35flashcyber", "flashcyber"],
+      released: true,
+      releasePrompt: "Gemini 3.5 Flash Cyber",
+      releaseAliases: ["flashcyber"],
+    },
+    {
       key: "gemini35pro",
       label: "Gemini 3.5 Pro",
       codename: null,
-      aliases: ["35pro", "gemini35pro"],
+      // Bare "Gemini 3.5" chatter means the pending Pro (Flash 3.5 already
+      // shipped), so fold it in rather than surfacing a duplicate card.
+      aliases: ["35", "gemini35", "35pro", "gemini35pro"],
     },
   ],
   grok: [

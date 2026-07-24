@@ -772,7 +772,7 @@ describe("canonicalVersionKey", () => {
   });
 
   it("collapses Gemini 3.5 Pro spelling variants to one canonical identity", () => {
-    for (const label of ["3.5 Pro", "Gemini 3.5 Pro", "Gemini-3.5-Pro"]) {
+    for (const label of ["3.5 Pro", "Gemini 3.5 Pro", "Gemini-3.5-Pro", "Gemini 3.5", "3.5"]) {
       const c = canonicalVersionKey("gemini", label, null);
       expect(c.key).toBe("gemini35pro");
       expect(c.label).toBe("Gemini 3.5 Pro");
@@ -846,6 +846,8 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("chatgpt", "GPT-Live-1", null)).toBe(true);
     expect(isReleasedVersion("grok", "Grok 4.5", null)).toBe(true);
     expect(isReleasedVersion("grok", "Fable 5", null)).toBe(true); // family-agnostic
+    expect(isReleasedVersion("gemini", "Gemini 3.5 Flash Cyber", null)).toBe(true);
+    expect(isReleasedVersion("gemini", "Flash Cyber", null)).toBe(true);
   });
 
   it("keeps unreleased versions (no false positives)", () => {
@@ -999,6 +1001,21 @@ describe("mergeRumorRows", () => {
     expect(out[0].version_label).toBe("Gemini 3.5 Pro");
     expect(out[0].codename).toBeNull();
     expect(out[0].mention_count).toBe(2); // single-unconfirmed-source tag now clears
+    expect(out[0].platform_count).toBe(2);
+  });
+
+  it("folds bare 'Gemini 3.5' chatter into the Pro card and retires shipped Flash Cyber (live board 2026-07-24)", () => {
+    const out = mergeRumorRows([
+      rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Pro", claim_type: "delayed", last_seen_at: "2026-07-24",
+        representative_sources: [{ url: "u1", platform: "twitter" }] }),
+      rrow({ model_slug: "gemini", version_label: "Gemini 3.5", claim_type: "delayed", last_seen_at: "2026-07-22",
+        representative_sources: [{ url: "u2", platform: "reddit" }] }),
+      rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Flash Cyber", claim_type: "in_testing", last_seen_at: "2026-07-22",
+        representative_sources: [{ url: "u3", platform: "hackernews" }] }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].version_label).toBe("Gemini 3.5 Pro");
+    expect(out[0].mention_count).toBe(2);
     expect(out[0].platform_count).toBe(2);
   });
 
