@@ -52,8 +52,8 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
         return this.props.fallback;
       }
       return (
-        <div className="min-h-screen bg-background flex items-center justify-center">
-          <div className="max-w-md rounded-lg border border-border bg-secondary/30 px-8 py-10 text-center">
+        <div className="flex min-h-svh items-center justify-center bg-background px-4">
+          <div className="max-w-md rounded-xl border border-border bg-card px-8 py-10 text-center surface-card">
             <p className="text-page text-foreground mb-3">Something went wrong</p>
             <p className="text-body text-text-secondary mb-8">
               The page hit an unexpected error. Reloading usually fixes it.
@@ -61,7 +61,7 @@ class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
             <button
               type="button"
               onClick={() => window.location.reload()}
-              className="min-h-11 rounded-md border border-input bg-background px-4 py-2 font-mono text-sm text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              className="min-h-11 rounded-md border border-input bg-background px-4 py-2 text-meta text-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
             >
               Reload page
             </button>

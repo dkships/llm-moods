@@ -3,6 +3,7 @@ import { Rss } from "lucide-react";
 import Surface from "@/components/Surface";
 import useHead from "@/hooks/useHead";
 import Tag from "@/components/Tag";
+import { controlPill } from "@/components/ControlPill";
 import { RESEARCH_POSTS } from "@/data/research-posts";
 import NotFound from "@/pages/NotFound";
 
@@ -62,7 +63,7 @@ const ResearchIndex = () => {
               </div>
               <a
                 href="/research/feed.xml"
-                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-lg border border-border bg-secondary/40 px-3 py-2 text-mono-cap text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className={controlPill("shrink-0")}
                 aria-label="Subscribe to the LLM Vibes Research RSS feed"
               >
                 <Rss className="h-3.5 w-3.5" aria-hidden="true" />
@@ -91,16 +92,32 @@ const ResearchIndex = () => {
                       <p className="text-mono-cap text-text-tertiary">
                         {formatDate(post.publishedAt)}
                       </p>
-                      <h2
-                        className={`mt-2 text-foreground ${isFeatured ? "text-section sm:text-page" : "text-section"}`}
+                      {/* The featured card spans both grid columns. Setting its
+                          headline and deck across the full ~1290px gave ~90 and
+                          ~140 characters per line; splitting them into a lede
+                          pair holds both near a readable measure and uses the
+                          width instead of leaving it blank. Half-width cards
+                          already sit at a natural measure and stay single-column. */}
+                      <div
+                        className={
+                          isFeatured
+                            ? "mt-2 md:grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:gap-x-10"
+                            : "mt-2"
+                        }
                       >
-                        {post.title}
-                      </h2>
-                      <p className="mt-3 text-body text-text-secondary">{post.summary}</p>
-                      <div className="mt-4 flex flex-wrap items-center gap-2">
-                        {post.tags.slice(0, 3).map((tag) => (
-                          <Tag key={tag} shape="pill">{tag}</Tag>
-                        ))}
+                        <h2
+                          className={`text-foreground ${isFeatured ? "text-section sm:text-page" : "text-section"}`}
+                        >
+                          {post.title}
+                        </h2>
+                        <div className={isFeatured ? "mt-3 md:mt-0" : "mt-3"}>
+                          <p className="text-body text-text-secondary">{post.summary}</p>
+                          <div className="mt-4 flex flex-wrap items-center gap-2">
+                            {post.tags.slice(0, 3).map((tag) => (
+                              <Tag key={tag} shape="pill">{tag}</Tag>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     </Surface>
                   </Link>

@@ -76,7 +76,6 @@ const ArticleSeriesChart = memo(
     const values = data.map((d) => d.value).filter((v): v is number => typeof v === "number");
     const autoMax = values.length > 0 ? Math.ceil(Math.max(...values) * 1.15) : 10;
     const [yMin, yMax] = yDomain ?? [0, autoMax];
-    const tickInterval = Math.max(Math.floor(data.length / 5) - 1, 0);
     return (
       <div role="img" aria-label={ariaLabel} className="my-6 w-full" style={{ height }}>
         <ResponsiveContainer width="100%" height="100%">
@@ -87,7 +86,10 @@ const ArticleSeriesChart = memo(
               axisLine={false}
               tickLine={false}
               tickMargin={8}
-              interval={tickInterval}
+              // Width-aware thinning; see the same change in VibesChart. Labels
+              // here are shorter (MM-DD via tickFormatter), so the gap is too.
+              interval="preserveStartEnd"
+              minTickGap={40}
               padding={{ left: 10, right: 10 }}
               tickFormatter={(day: string) => day.slice(5)}
             />
@@ -140,6 +142,9 @@ const ArticleSeriesChart = memo(
               dot={false}
               activeDot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
               connectNulls={false}
+              // JS-driven (rAF), so the global prefers-reduced-motion rule in
+              // index.css cannot neutralise it. See VibesChart.
+              isAnimationActive={false}
             />
           </LineChart>
         </ResponsiveContainer>

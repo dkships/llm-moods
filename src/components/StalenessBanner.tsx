@@ -20,7 +20,9 @@ export default function StalenessBanner({ mostRecentScoreAt, staleAfterHours = S
       className="border-y border-warning/30 bg-warning/5 px-4 py-3"
     >
       <p className="text-meta text-text-secondary">
-        <span className="text-warning">Scores stale.</span>{" "}
+        {/* Neutral text on a warning-tinted container, per the severity rule:
+            the hue lives in the border/background, never in the copy. */}
+        <span className="font-medium text-foreground">Scores stale.</span>{" "}
         Last refreshed {formatTimeAgo(mostRecentScoreAt)}. Newer numbers will appear automatically.
       </p>
     </div>

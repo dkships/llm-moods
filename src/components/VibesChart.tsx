@@ -185,7 +185,14 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
         axisLine={false}
         tickLine={false}
         tickMargin={8}
-        interval={timeRange === "30d" ? Math.max(Math.floor(chartData.length / 5) - 1, 0) : timeRange === "7d" ? 0 : Math.max(Math.floor(chartData.length / 5) - 1, 0)}
+        // Width-aware thinning instead of a hardcoded nth-tick interval. The
+        // old formula pinned 7d to interval={0} (every tick) and the others to
+        // ~5 ticks regardless of width; at 320px that put "Jul 10"/"Jul 16"
+        // labels 39px apart with a 40px glyph box, i.e. overlapping. minTickGap
+        // lets Recharts drop labels only when they would actually collide, so
+        // the chart stays dense on desktop and legible on a phone.
+        interval="preserveStartEnd"
+        minTickGap={56}
         padding={{ left: 10, right: 10 }}
       />
       <YAxis
@@ -240,6 +247,11 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
         dot={renderCarryForwardDot(accent)}
         activeDot={{ r: 4, fill: accent, strokeWidth: 0 }}
         connectNulls={false}
+        // Recharts animates via rAF, not CSS, so the global
+        // prefers-reduced-motion rule in index.css can't reach it. It also
+        // replayed the full ~1.5s draw-in on every 24h/7d/30d switch, which
+        // read as the chart reloading rather than updating.
+        isAnimationActive={false}
       />
     </LineChart>
   </ResponsiveContainer>

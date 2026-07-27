@@ -78,6 +78,10 @@ const Rumors = () => {
                       accent={m?.accent_color ?? "#888"}
                       modelName={m?.name ?? MODEL_LABELS[rumor.model_slug] ?? rumor.model_slug}
                       strengthPct={Math.round((rumorStrengthScore(rumor) / boardMax) * 100)}
+                      // A lone rumor would otherwise sit half-width with an
+                      // empty cell beside it; ResearchIndex spans its featured
+                      // card for the same reason.
+                      className={sorted.length === 1 ? "md:col-span-2" : undefined}
                     />
                   );
                 })}

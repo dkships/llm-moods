@@ -92,7 +92,10 @@ const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, ca
       </div>
       <div className="h-56 sm:h-64">
         {isLoading ? (
-          <div className="h-full animate-pulse rounded bg-secondary/35" aria-hidden="true" />
+          <div className="h-full" role="status" aria-live="polite">
+            <span className="sr-only">Loading chart data</span>
+            <div className="h-full animate-pulse rounded bg-secondary/35" aria-hidden="true" />
+          </div>
         ) : (
           <ErrorBoundary
             fallback={
@@ -108,7 +111,7 @@ const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, ca
         )}
       </div>
       {chartEvents.length > 0 && (
-        <ul className="mt-3 space-y-1 border-t border-border/40 pt-3">
+        <ul className="mt-3 space-y-1 border-t border-border pt-3">
           {chartEvents.map((evt, i) => (
             <li key={`evt-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta">
               <span

@@ -46,7 +46,7 @@ const Index = () => {
             A daily read on how the community feels about each model.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <Button asChild size="lg" variant="outline" className="group gap-2 border-primary/40 font-mono text-sm text-foreground transition-colors hover:border-primary/60 hover:bg-primary/10 hover:text-foreground">
+            <Button asChild size="lg" variant="outline" className="group gap-2 border-primary/40 text-meta text-foreground transition-colors hover:border-primary/60 hover:bg-primary/10 hover:text-foreground">
               <Link to="/dashboard">
                 Check the Vibes
                 <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-1" />
@@ -60,7 +60,7 @@ const Index = () => {
       </section>
 
       {/* Live Vibes Preview */}
-      <section className="border-y border-border/80 bg-card/20">
+      <section className="border-y border-border bg-card/20">
         <div className="container py-10 sm:py-12">
             <div className="mb-5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <h2 className="text-section text-foreground">Live model scores</h2>
@@ -125,7 +125,7 @@ const Index = () => {
                   className="inline-flex min-h-11 items-center gap-1 rounded-md text-text-secondary underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
                 >
                   Read the full methodology
-                  <ArrowRight className="h-3.5 w-3.5" />
+                  <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
                 </Link>
               </p>
             </div>

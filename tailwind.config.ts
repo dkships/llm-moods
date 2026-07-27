@@ -40,6 +40,9 @@ export default {
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
+          // `text-destructive-text` — use for red text at body/meta sizes.
+          // Plain `text-destructive` fails AA below large-text size.
+          text: "hsl(var(--destructive-text))",
         },
         muted: {
           DEFAULT: "hsl(var(--muted))",
@@ -59,6 +62,7 @@ export default {
         },
         surface: "hsl(var(--surface))",
         "surface-hover": "hsl(var(--surface-hover))",
+        track: "hsl(var(--track))",
         glow: "hsl(var(--glow))",
         warning: {
           DEFAULT: "hsl(var(--warning))",

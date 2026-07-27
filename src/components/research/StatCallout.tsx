@@ -15,7 +15,7 @@ const StatCallout = ({ stats }: StatCalloutProps) => (
       {stats.map((stat) => (
         <div key={stat.label}>
           <dt className="text-mono-cap text-text-tertiary">{stat.label}</dt>
-          <dd className="mt-2 font-display text-4xl font-bold leading-none text-foreground sm:text-5xl">
+          <dd className="mt-2 text-score text-foreground">
             {stat.value}
           </dd>
         </div>

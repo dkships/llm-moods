@@ -1,8 +1,10 @@
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, Download } from "lucide-react";
-import { useMemo } from "react";
+import { Suspense, useMemo } from "react";
 import useHead from "@/hooks/useHead";
 import Tag from "@/components/Tag";
+import { controlPill } from "@/components/ControlPill";
+import { Shimmer } from "@/components/Skeletons";
 import { getResearchPost } from "@/data/research-posts";
 import { getResearchBody } from "@/data/research-bodies";
 import { PROSE_CLASS_NAME } from "@/lib/prose-styles";
@@ -123,7 +125,11 @@ const ResearchPostPage = () => {
                     <Tag shape="pill">Updated · {formatDate(post.updatedAt)}</Tag>
                   )}
                 </div>
-                <h1 className="mt-3 text-page text-foreground">
+                {/* text-section below sm: .text-page is a fixed 36px, and
+                    headlines here run to ~97 characters — at 320px that wraps
+                    to 6-7 oversized lines before any article body is visible.
+                    ResearchIndex already uses this pair for the same titles. */}
+                <h1 className="mt-3 text-section text-foreground sm:text-page">
                   {post.title}
                 </h1>
                 <p className="mt-4 text-body text-text-secondary">{post.summary}</p>
@@ -136,7 +142,7 @@ const ResearchPostPage = () => {
                   <a
                     href={post.dataset.path}
                     download
-                    className="mt-5 inline-flex min-h-11 max-w-full items-center gap-2 rounded-lg border border-border bg-secondary/40 px-4 py-2 text-mono-cap text-text-secondary transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                    className={controlPill("mt-5")}
                   >
                     <Download className="h-3.5 w-3.5" aria-hidden="true" />
                     <span className="sr-only">Download </span>
@@ -146,7 +152,18 @@ const ResearchPostPage = () => {
               </header>
 
               <div className={PROSE_CLASS_NAME}>
-                <Body />
+                <Suspense
+                  fallback={
+                    <div className="space-y-3" role="status" aria-live="polite">
+                      <span className="sr-only">Loading article</span>
+                      <Shimmer className="h-5 w-full" />
+                      <Shimmer className="h-5 w-11/12" />
+                      <Shimmer className="h-5 w-4/5" />
+                    </div>
+                  }
+                >
+                  <Body />
+                </Suspense>
               </div>
 
               <footer className="mt-12 border-t border-border pt-6">

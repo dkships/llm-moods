@@ -12,7 +12,7 @@ import {
   usePrefetchModelDetail,
 } from "@/hooks/useVibesData";
 import { formatTimeAgo } from "@/lib/vibes";
-import { DashboardCardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
+import { CardSkeleton, ChatterSkeleton } from "@/components/Skeletons";
 import TrendingComplaints from "@/components/TrendingComplaints";
 
 const Dashboard = () => {
@@ -108,7 +108,7 @@ const Dashboard = () => {
           <section className="container pb-12">
             {modelsLoading ? (
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4" role="status" aria-live="polite">
-                {Array.from({ length: 4 }).map((_, i) => <DashboardCardSkeleton key={i} />)}
+                {Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}
               </div>
             ) : modelsError ? (
               <Surface className="text-center" role="status" aria-live="polite">
@@ -126,7 +126,7 @@ const Dashboard = () => {
               Scores are 0–100 · higher means happier users ·{" "}
               <Link
                 to="/research/how-llm-vibes-classifies-sentiment"
-                className="rounded-md underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                className="inline-flex min-h-11 items-center rounded-md underline underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
               >
                 How scoring works
               </Link>
@@ -179,7 +179,7 @@ const Dashboard = () => {
                   onClick={() => fetchNextPage()}
                   disabled={isFetchingNextPage}
                   aria-label="Load more community posts"
-                  className="min-h-11 font-mono text-xs"
+                  className="min-h-11 text-meta"
                 >
                   {isFetchingNextPage ? "Loading…" : "Load more"}
                 </Button>

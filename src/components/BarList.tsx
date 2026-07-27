@@ -43,7 +43,7 @@ const BarList = ({ items, max, accent, ramp = false, secondaryLayout = "inline" 
                 {row.secondary ?? `${pct}%`}
               </span>
             </div>
-            <div className="h-1 w-full overflow-hidden rounded-full bg-border/60">
+            <div className="h-1 w-full overflow-hidden rounded-full bg-track">
               <div
                 className="h-full rounded-full"
                 style={{ width: `${pct}%`, background: accent, opacity }}

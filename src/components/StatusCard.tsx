@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react";
 import { ExternalLink } from "lucide-react";
 import Tag, { type TagTone } from "@/components/Tag";
-import { BarsSkeleton } from "@/components/Skeletons";
+import { StatusEventsSkeleton } from "@/components/Skeletons";
 import Surface from "@/components/Surface";
 import SectionHeader from "@/components/SectionHeader";
 import { useVendorStatus, type StatusSeverity } from "@/hooks/useVendorStatus";
@@ -43,7 +43,11 @@ function severityLabel(severity: StatusSeverity): string {
 }
 
 function formatAnomalyDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", {
+  const d = new Date(iso);
+  // Scraped/vendor timestamps have shown up malformed; without this the UI
+  // renders a literal "Invalid Date". Mirrors formatTimeAgo in lib/vibes.ts.
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-US", {
     month: "short",
     day: "numeric",
     timeZone: "UTC",
@@ -56,7 +60,7 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
   const remainingCount = event.correlatedAnomalies.length - topCorrelations.length;
 
   return (
-    <li className="flex items-start justify-between gap-3 py-3 border-b border-border/40 last:border-b-0">
+    <li className="flex items-start justify-between gap-3 py-3 border-b border-border last:border-b-0">
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <Tag tone={severityTone(event.severity)} className="shrink-0">
@@ -93,7 +97,7 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
           aria-label={`Read ${event.title} on the official status page`}
           className="-mr-2 -mt-2 inline-flex h-11 w-11 shrink-0 items-center justify-center self-start rounded-md text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
         >
-          <ExternalLink className="h-3.5 w-3.5" />
+          <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
         </a>
       )}
     </li>
@@ -134,9 +138,12 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
       />
 
       {isLoading ? (
-        <BarsSkeleton count={3} />
+        <div role="status" aria-live="polite">
+          <span className="sr-only">Loading official status</span>
+          <StatusEventsSkeleton count={3} />
+        </div>
       ) : isError ? (
-        <p className="text-body text-text-tertiary">
+        <p className="text-body text-text-tertiary" role="status" aria-live="polite">
           Status data temporarily unavailable.
         </p>
       ) : !data?.supported ? (

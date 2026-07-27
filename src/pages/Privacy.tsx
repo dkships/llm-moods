@@ -34,7 +34,7 @@ const Privacy = () => {
               The site is hosted on Lovable. Lovable injects project analytics into published sites and
               records visits and pageviews. The injected script sends the page address and path, referrer,
               browser and device information, locale, and an approximate country inferred from the browser's
-              time zone. It also sets a secure <code className="rounded bg-secondary/60 px-1.5 py-0.5 text-meta text-primary">session-id</code>{" "}
+              time zone. It also sets a secure <code className="rounded bg-secondary/60 px-1.5 py-0.5 text-meta text-foreground">session-id</code>{" "}
               cookie that expires after 30 minutes to group pageviews into one visit. LLM Vibes does not add
               a separate visitor analytics service. See Lovable's{" "}
               <a

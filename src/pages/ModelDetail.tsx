@@ -160,7 +160,7 @@ const ModelDetail = () => {
             <div className="text-center">
               <h1 className="mb-4 text-page text-foreground">Couldn't load model data</h1>
               <p className="text-body text-text-secondary mb-8">Check your connection and reload the page.</p>
-              <Button asChild variant="outline" className="min-h-11 font-mono text-sm">
+              <Button asChild variant="outline" className="min-h-11 text-meta">
                 <Link to="/dashboard">Back to Dashboard</Link>
               </Button>
             </div>
@@ -324,16 +324,41 @@ const ModelDetail = () => {
 
           {/* Main Content: Two Columns */}
           <section className="container pb-12">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* md step added: this jumped straight from one column to three, so
+                768-1023px tablets stacked chart, status, complaints and sources
+                into a single full-width column and stretched the fixed h-64
+                chart into a very wide, very short strip. */}
+            <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
               {/* Left Column — Chart + Official Status stacked */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className="space-y-6 md:col-span-2">
                 <Surface>
                   {historyError ? (
                     <p className="py-8 text-center text-body text-text-tertiary" role="status" aria-live="polite">
                       Couldn't load the chart.
                     </p>
                   ) : historyLoading ? (
-                    <ChartSkeleton />
+                    <div role="status" aria-live="polite">
+                      <span className="sr-only">Loading sentiment history</span>
+                      <ChartSkeleton />
+                    </div>
+                  ) : chartData.every((d) => d.score == null) ? (
+                    // A window that predates collection for this model resolves
+                    // successfully with an all-null grid; without this branch the
+                    // panel renders a bare axis box that reads as broken.
+                    // EmbeddedModelChart already guards the same case.
+                    <>
+                      <SectionHeader title="Vibes over time" />
+                      <p className="py-8 text-center text-body text-text-tertiary">
+                        No score data for this window.
+                      </p>
+                      <div className="mt-4 flex gap-2" role="group" aria-label="Chart time range">
+                        {TIME_RANGES.map((r) => (
+                          <FilterChip key={r} pressed={timeRange === r} onClick={() => setTimeRange(r)}>
+                            {r}
+                          </FilterChip>
+                        ))}
+                      </div>
+                    </>
                   ) : (
                     <>
                       <SectionHeader title="Vibes over time" />
@@ -362,7 +387,7 @@ const ModelDetail = () => {
                         ))}
                       </div>
                       {chartEvents.length > 0 && (
-                        <div className="mt-4 border-t border-border/40 pt-3">
+                        <div className="mt-4 border-t border-border pt-3">
                           <p className="mb-2 text-meta text-text-tertiary">Known events on this chart</p>
                           <ul className="space-y-2">
                             {chartEvents.map((evt, i) => (
@@ -411,7 +436,10 @@ const ModelDetail = () => {
                   {complaintsError ? (
                     <p className="text-body text-text-tertiary" role="status" aria-live="polite">Couldn't load complaints.</p>
                   ) : complaintsLoading ? (
-                    <BarsSkeleton count={5} />
+                    <div role="status" aria-live="polite">
+                      <span className="sr-only">Loading complaint breakdown</span>
+                      <BarsSkeleton count={5} />
+                    </div>
                   ) : complaints && complaints.length > 0 ? (
                     <BarList
                       max={100}
@@ -428,7 +456,10 @@ const ModelDetail = () => {
                   {sourcesError ? (
                     <p className="text-body text-text-tertiary" role="status" aria-live="polite">Couldn't load sources.</p>
                   ) : sourcesLoading ? (
-                    <BarsSkeleton count={3} />
+                    <div role="status" aria-live="polite">
+                      <span className="sr-only">Loading source breakdown</span>
+                      <BarsSkeleton count={3} />
+                    </div>
                   ) : sources && sources.filter((s) => s.pct > 0).length > 0 ? (
                     <BarList
                       max={100}

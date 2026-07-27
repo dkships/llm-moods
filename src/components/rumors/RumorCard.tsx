@@ -47,9 +47,11 @@ interface RumorCardProps {
   modelName: string;
   /** Corroboration bar length (0–100), normalized against the board's top card. */
   strengthPct: number;
+  /** Grid-placement utilities from the caller (e.g. a single-card col-span). */
+  className?: string;
 }
 
-const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) => {
+const RumorCard = ({ rumor, accent, modelName, strengthPct, className }: RumorCardProps) => {
   const claim = CLAIM_TYPE[rumor.claim_type] ?? CLAIM_TYPE.other;
   const eta = etaLabel(rumor);
   const isSingleSource = rumor.mention_count < 2;
@@ -64,7 +66,7 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
   const platformCount = Math.max(rumor.platform_count ?? 0, platforms.length);
 
   return (
-    <Surface as="article" className="flex h-full flex-col">
+    <Surface as="article" className={`flex h-full flex-col${className ? ` ${className}` : ""}`}>
       {/* Header: model + claim */}
       <div className="flex items-center justify-between gap-3">
         <span className="flex min-w-0 items-center gap-2">
@@ -76,8 +78,11 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
         </Tag>
       </div>
 
-      {/* Title + ETA lockup */}
-      <h3 className="mt-3 text-section text-foreground">{rumorTitle(rumor)}</h3>
+      {/* Title + ETA lockup.
+          h2, not h3: /rumors has no intermediate heading between the page h1
+          and these cards, so h3 skipped a level (axe heading-order flags it).
+          ResearchIndex's card titles are already h2 for the same reason. */}
+      <h2 className="mt-3 text-section text-foreground">{rumorTitle(rumor)}</h2>
       {eta && (
         <p className="mt-1 text-meta text-text-tertiary">{eta}</p>
       )}
@@ -110,10 +115,15 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
       <div className="mt-6 flex-1" />
       <div className="border-t border-border pt-4">
         {/* Corroboration line: thin meter + inline counts */}
-        <div className="flex items-center justify-between gap-3">
+        {/* flex-wrap, not a rigid two-up row: at 320px "Corroboration" plus an
+            unshrinkable "single vetted source" Tag needed ~334px and overflowed
+            the card (silently, because body has overflow-x: clip). Wrapping
+            also stops the multi-source variant from stacking three ragged lines
+            against a vertically-centred label. */}
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
           <span className="text-mono-cap text-text-tertiary">Corroboration</span>
           {isSingleSource ? (
-            <Tag tone="warning" className="shrink-0">single vetted source</Tag>
+            <Tag tone="warning">single vetted source</Tag>
           ) : (
             <span className="text-meta text-text-tertiary">
               {rumor.mention_count} sources · {platformCount} platform{platformCount === 1 ? "" : "s"}
@@ -121,7 +131,7 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
             </span>
           )}
         </div>
-        <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-border/60">
+        <div className="mt-2 h-[3px] w-full overflow-hidden rounded-full bg-track">
           <div
             className="h-full rounded-full transition-[width] duration-500"
             style={{ width: `${Math.max(4, strengthPct)}%`, background: accent }}
@@ -143,8 +153,14 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct }: RumorCardProps) =>
                 sourceContextLabel(s),
                 when,
               ].filter(Boolean).join(" · ");
+              // Aligned to Tag's pill recipe (rounded-full, border-border,
+              // bg-secondary/40) so /rumors doesn't introduce a third pill
+              // style. Deliberately text-meta rather than Tag's text-mono-cap:
+              // these carry @handles, and uppercasing a username misrepresents
+              // an identifier. min-h-8 + py-1.5 lifts the tap target off ~26px;
+              // these are real links out to third-party posts.
               const chipClasses =
-                "inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-surface/60 px-2.5 py-1 text-meta text-text-secondary transition-colors";
+                "inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-2.5 py-1.5 text-meta text-text-secondary transition-colors";
               const inner = (
                 <>
                   <span className="truncate">{handle}</span>

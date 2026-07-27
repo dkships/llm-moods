@@ -1,7 +1,6 @@
-import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import PublicLayout from "./components/PublicLayout";
 import Index from "./pages/Index";
@@ -36,7 +35,7 @@ const queryClient = new QueryClient({
 });
 
 const PageFallback = () => (
-  <div className="min-h-screen bg-background">
+  <div className="min-h-svh bg-background">
     <div className="container pt-24" role="status" aria-live="polite">
       <div className="h-8 w-40 animate-pulse rounded bg-secondary/60" />
     </div>
@@ -45,9 +44,21 @@ const PageFallback = () => (
 
 const ScrollToTop = () => {
   const { pathname } = useLocation();
+  const isFirstRender = useRef(true);
 
   useEffect(() => {
     window.scrollTo({ top: 0, behavior: "auto" });
+
+    // Scrolling alone leaves keyboard/screen-reader focus on whatever <Link>
+    // was just clicked — now off-screen — so the next Tab resumes from the old
+    // page's position. Move focus to <main> (tabIndex={-1} in PublicLayout) on
+    // client navigations only; stealing focus on first paint would fight the
+    // browser's own restoration and skip the skip-link.
+    if (isFirstRender.current) {
+      isFirstRender.current = false;
+      return;
+    }
+    document.getElementById("main-content")?.focus({ preventScroll: true });
   }, [pathname]);
 
   return null;
@@ -79,15 +90,16 @@ const AnimatedRoutes = () => {
   );
 };
 
+// No TooltipProvider: nothing in the public route tree renders a <Tooltip>
+// (the only Radix tooltip consumers are the unused ui/chart and ui/sidebar
+// scaffolds), so it only pulled @radix-ui/react-tooltip into the entry chunk.
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <BrowserRouter>
-        <ErrorBoundary>
-          <AnimatedRoutes />
-        </ErrorBoundary>
-      </BrowserRouter>
-    </TooltipProvider>
+    <BrowserRouter>
+      <ErrorBoundary>
+        <AnimatedRoutes />
+      </ErrorBoundary>
+    </BrowserRouter>
   </QueryClientProvider>
 );
 

@@ -17,9 +17,15 @@ export const PROSE_CLASS_NAME = [
   // inline links
   "prose-a:text-primary prose-a:underline prose-a:decoration-primary/50 prose-a:underline-offset-4 hover:prose-a:decoration-primary",
   "prose-strong:text-foreground",
-  // inline code
+  // inline code — break-words is load-bearing: file paths like
+  // `supabase/functions/_shared/vibes-scoring.ts` measure ~299px and overflowed
+  // the 288px content box at a 320px viewport (silently, under overflow-x: clip).
   "prose-code:text-primary prose-code:before:content-none prose-code:after:content-none",
   "prose-code:bg-secondary/60 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-[0.85em]",
+  "prose-code:[overflow-wrap:anywhere]",
+  // Long unbroken tokens in body copy (slugs, hyphenated compounds) wrap
+  // instead of pushing the column wider than the phone.
+  "prose-p:[overflow-wrap:break-word]",
   // pre/code blocks
   "prose-pre:bg-secondary/60 prose-pre:overflow-x-auto prose-pre:rounded-lg prose-pre:p-4 prose-pre:font-mono prose-pre:text-sm",
   // blockquotes
