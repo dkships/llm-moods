@@ -63,7 +63,7 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 | `pipeline-watchdog-1h` | `17 * * * *` | hourly at :17 | `pipeline-watchdog` |
 | `cleanup-stuck-scraper-runs` | `*/30 * * * *` | every 30 min | (SQL only — marks runs >30 min as failed) |
 | `cleanup-old-posts-weekly` | `0 8 * * 0` | Sun 01:00 PT | `cleanup-old-posts` |
-| `aggregate-rumors-2x` | `40 4,16 * * *` | ~21:40/09:40 PT | `aggregate-rumors` (rumors radar; ~40 min after the Reddit windows) |
+| `aggregate-rumors-hourly` | `40 * * * *` | hourly at :40 | `aggregate-rumors` (rumors radar; hourly fast lane since `20260711210000_rumor_discovery_fast_lane.sql` — replaced the 2×/day `aggregate-rumors-2x` row) |
 
 Drain capacity: every 2 min at `limit=200`, `batch_size=20` ≈ 6,000 posts/hr. The watchdog writes `severity='critical'` rows into `error_log`. Drain/queue mechanics, failed-vs-queued semantics, and watchdog thresholds: `AGENT-REFERENCE.md`.
 

@@ -350,6 +350,67 @@ describe("Anthropic classifier path", () => {
     expect(results[0].sentiment).toBe("positive");
     expect(results[1].sentiment).toBe("negative");
   });
+
+  it("accepts the compact {relevant:false} irrelevant form (2026-07-30 output trim)", async () => {
+    const fetchMock = vi.fn(async () => anthropicToolUseResponse([
+      { relevant: false },
+      { relevant: true, sentiment: "negative", complaint_category: "speed", praise_category: null, confidence: 0.85, language: null, english_translation: null },
+    ]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const results = await classifyBatch(
+      ["OpenAI raised $6B", "Claude has gotten so slow"],
+      "anthropic-key",
+      25,
+      vi.fn(async () => {}),
+      { model: CLAUDE_MODEL },
+    );
+
+    // The Anthropic tool schema requires only `relevant`, so the model may omit
+    // the other six fields on irrelevant posts; the mixed-shape array must parse.
+    const [, anthropicInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const sentBody = JSON.parse(anthropicInit.body as string);
+    expect(sentBody.tools[0].input_schema.properties.results.items.required).toEqual(["relevant"]);
+
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({ relevant: false, status: "irrelevant", sentiment: null });
+    expect(results[1]).toMatchObject({ sentiment: "negative", complaint_category: "speed", status: "classified" });
+  });
+
+  it("keeps the Gemini strict schema fully required (rollback/spillover path unchanged)", async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({ result:
+        { relevant: false, sentiment: null, complaint_category: null, praise_category: null, confidence: 0, language: null, english_translation: null },
+      }) } }],
+      usage: { prompt_tokens: 100, completion_tokens: 30, total_tokens: 130 },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const results = await classifyBatch(
+      ["Gemini mentioned in passing"],
+      "gemini-key",
+      25,
+      vi.fn(async () => {}),
+      { model: "gemini-2.5-flash" },
+    );
+
+    // classifyBatch's 1-text path routes through classifyPost (single mode) —
+    // the strict response_format contract is identical for single and batch.
+    const [, geminiInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const sentBody = JSON.parse(geminiInit.body as string);
+    const schema = sentBody.response_format.json_schema;
+    expect(schema.strict).toBe(true);
+    expect(schema.schema.properties.result.required).toEqual([
+      "relevant",
+      "sentiment",
+      "complaint_category",
+      "praise_category",
+      "confidence",
+      "language",
+      "english_translation",
+    ]);
+    expect(results[0].status).toBe("irrelevant");
+  });
 });
 
 describe("free-Gemini spillover", () => {

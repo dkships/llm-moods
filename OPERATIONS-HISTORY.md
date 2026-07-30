@@ -4,6 +4,35 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-07-30 — Anthropic spend audit + compact-irrelevant output trim
+
+Trigger: "are we overspending on Anthropic?" Estimated total Anthropic spend
+**~$20–30/mo** (chars÷4 modeling; no token telemetry stored for the drain):
+~90% is the Haiku 4.5 classifier drain at the **current ~1,090 posts/day**
+ingest (12-day mean from `get_scraper_monitor_runs`, 2026-07-18→29 — roughly
+2× the ~500–650/day the June 1 note in `AGENT-REFERENCE.md` was modeled on,
+after the 2026-07-10 App Store + HN-comment source additions). Output tokens
+(≈$5/MTok) are the larger half of the bill; input ≈ $8/mo.
+
+- **Shipped**: compact-irrelevant output trim — irrelevant posts return bare
+  `{"relevant": false}` on the Anthropic path (prompt edits in all three
+  variants + `ANTHROPIC_RESULT_SCHEMA` with `required: ["relevant"]` in
+  `anthropicTool`). Gemini's strict `CLASSIFICATION_RESULT_SCHEMA` deliberately
+  untouched (strict subset needs every property in `required`; guards the
+  no-redeploy rollback, spillover, self-bias oracle). ~45% of queued posts
+  classify irrelevant (≈600/day relevant of ~1,090 queued) × ~45 output tokens
+  saved ≈ **$3–4/mo**. `CLASSIFIER_VERSION_DATE` bumped to 2026-07-30.
+- **Re-confirmed the 2026-07-17 Batch API rejection** after a fresh adversarial
+  review: beyond the known two-phase rework + watchdog conflict, an in-flight
+  status would read as coverage 1.0 in `score-refresh.ts` (falsely `measured`/
+  high-confidence scores, suppressed partial-coverage warnings, anomaly false
+  positives), needs a `classification_status` CHECK migration + RPC widening,
+  and has lock/orphan-batch double-billing races. At ~$8–12/mo upside the
+  verdict stands; revisit only if classifier volume grows ~5×.
+- **Doc fix**: `docs/architecture-reference.md` cron table still showed
+  `aggregate-rumors-2x`; live schedule has been hourly (`40 * * * *`) since
+  `20260711210000_rumor_discovery_fast_lane.sql`. Rumors extractor ≈ $1–3/mo.
+
 ## 2026-07-17 — Apify cost audit (live-measured, $29/mo Starter budget)
 
 Trigger: suspected Reddit-actor price increase. Verdict: **no price increase** —
