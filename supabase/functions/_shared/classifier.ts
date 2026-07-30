@@ -834,17 +834,20 @@ async function fetchGemini(
 // Forcing this tool guarantees schema-shaped output without prose JSON.
 const ANTHROPIC_CLASSIFY_TOOL_NAME = "record_classifications";
 
-// NOTE (2026-07-30, validated live — do NOT re-attempt as-is): relaxing this
-// schema's `required` to ["relevant"] so irrelevant posts return a compact
-// {"relevant": false} made Haiku OMIT irrelevant posts from the results array
-// entirely instead of emitting compact entries. A short array keeps its
-// "trustworthy prefix" (see batchClassifyWithPrompt), so interleaved omissions
-// silently shifted sentiment onto the wrong posts as terminal `classified`.
-// Caught same-day by a live drain (66 posts → 30 classified / 0 irrelevant /
-// 36 parse_error) and reverted; cleanup keyed on classifier_version
-// `…2026-07-30`. Any retry needs index-keyed results (e.g. {"i": N, ...}) or
-// a hard length-match guard, not prompt wording. Full record in
-// OPERATIONS-HISTORY.md.
+// NOTE (2026-07-30, validated live — do NOT re-attempt as-is): asking for a
+// compact {"relevant": false} on irrelevant posts (with `required` relaxed to
+// ["relevant"] here) made the classifier OMIT irrelevant posts from the
+// results array entirely instead of emitting compact entries. A short array
+// keeps its "trustworthy prefix" (see batchClassifyWithPrompt), so interleaved
+// omissions silently shifted sentiment onto the wrong posts as terminal
+// `classified`. Caught same-day by a live drain (66 posts → 30 classified /
+// 0 irrelevant / 36 parse_error) and reverted; cleanup keyed on
+// classifier_version `…2026-07-30`. Observed on the GEMINI spillover path
+// (Anthropic was blocked on the monthly usage cap; strict response_format
+// constrains item shape, not array length) — treat full-shape output as an
+// alignment invariant for BOTH providers. Any retry needs index-keyed results
+// (e.g. {"i": N, ...}) or a hard length-match guard, not prompt wording. Full
+// record in OPERATIONS-HISTORY.md.
 function anthropicTool(mode: "single" | "batch") {
   const input_schema = mode === "single"
     ? {

@@ -352,11 +352,13 @@ describe("Anthropic classifier path", () => {
   });
 
   it("keeps all fields required on the Anthropic tool schema (2026-07-30 compact-form NO-GO)", async () => {
-    // Live validation 2026-07-30: relaxing `required` to ["relevant"] made
-    // Haiku OMIT irrelevant posts from the results array (not emit compact
-    // entries), silently shifting sentiment onto the wrong posts. The full
-    // required list is what keeps one entry per post. The parser itself stays
-    // tolerant of a bare {relevant:false} entry — that part is harmless.
+    // Live validation 2026-07-30: prompting for compact {relevant:false}
+    // entries (with `required` relaxed to ["relevant"]) made the classifier
+    // OMIT irrelevant posts from the results array (observed via the Gemini
+    // spillover during an Anthropic usage-cap outage), silently shifting
+    // sentiment onto the wrong posts. The full required list + full-shape
+    // prompt keep one entry per post. The parser itself stays tolerant of a
+    // bare {relevant:false} entry — that part is harmless.
     const fetchMock = vi.fn(async () => anthropicToolUseResponse([
       { relevant: false },
       { relevant: true, sentiment: "negative", complaint_category: "speed", praise_category: null, confidence: 0.85, language: null, english_translation: null },

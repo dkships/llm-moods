@@ -18,11 +18,19 @@ after the 2026-07-10 App Store + HN-comment source additions). Output tokens
   output trim (bare `{"relevant": false}` for irrelevant posts; Anthropic tool
   schema `required` relaxed to `["relevant"]`; est. ~$3–4/mo). Live drain after
   deploy (66 fresh HN posts): **30 classified / 0 irrelevant / 36 parse_error**
-  — Haiku OMITTED irrelevant posts from the results array entirely instead of
-  emitting compact entries. Short arrays keep their "trustworthy prefix" (the
-  May truncation decision), so interleaved omissions shifted sentiment onto
-  the wrong posts as terminal `classified`. Reverted in the follow-up commit;
-  prompts/schema restored byte-identical. **Do not re-attempt via prompt
+  — the classifier OMITTED irrelevant posts from the results array entirely
+  instead of emitting compact entries. Short arrays keep their "trustworthy
+  prefix" (the May truncation decision), so interleaved omissions shifted
+  sentiment onto the wrong posts as terminal `classified`.
+  **Attribution correction (post-incident):** the Anthropic account had
+  already hit its monthly usage cap (~00:40 UTC, the hourly rumors run), so
+  Haiku never actually served these drains — every batch 400'd and the
+  **Gemini spillover ran the compact prompts instead**. Gemini's strict
+  `response_format` constrains item *shape* but not array *length*, so the
+  omissions came from Gemini; Haiku's behavior under the relaxed schema was
+  never observed. The NO-GO stands regardless — the change corrupted
+  alignment through a live path — but the mechanism is provider-agnostic
+  prompt/shape ambiguity, not a Haiku quirk. **Do not re-attempt via prompt
   wording** — a safe retry needs index-keyed results (`{"i": N, ...}`) or a
   hard length-match guard (which conflicts with truncation-prefix recovery).
   Cleanup (run after redeploying the revert) — every bad-code write carries
@@ -46,6 +54,19 @@ after the 2026-07-10 App Store + HN-comment source additions). Output tokens
 - **Doc fix**: `docs/architecture-reference.md` cron table still showed
   `aggregate-rumors-2x`; live schedule has been hourly (`40 * * * *`) since
   `20260711210000_rumor_discovery_fast_lane.sql`. Rumors extractor ≈ $1–3/mo.
+- **Monthly usage cap hit 2026-07-30 ~00:40 UTC** ("You have reached your
+  specified API usage limits… regain access 2026-08-01 00:00 UTC" — HTTP 400
+  `invalid_request_error`, NOT transient-classed, so rows dead-letter after 5
+  attempts instead of deferring). July's classifier spend consumed the
+  Console-configured cap by day 30 — independent confirmation the drain runs
+  ~$20+/mo at current volume. **Diagnostic lesson: a cap-hit 400 masquerades
+  as a classifier bug** — the drain keeps "working" via Gemini spillover
+  (~200 posts/day bucket) while everything else churns to `failed`. Check
+  `last_classification_error` for the usage-limit string before diagnosing
+  code. Recovery: after cap reset (or a Console limit raise), `retry` rows
+  self-heal; dead-lettered rows need `reclassify-posts?mode=reset_failed`
+  with an `error_pattern` matching "usage limits" (NOT `transient` — the
+  pattern list won't match a 400), then `reaggregate-vibes`.
 
 ## 2026-07-17 — Apify cost audit (live-measured, $29/mo Starter budget)
 
