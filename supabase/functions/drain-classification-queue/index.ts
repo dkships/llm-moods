@@ -12,6 +12,11 @@ import { claimServiceLock, releaseServiceLock } from "../_shared/score-refresh.t
 import { corsHeaders, logToErrorLog } from "../_shared/utils.ts";
 
 const SOURCE = "drain-classification-queue";
+// Deploy-verification marker (see reference: Lovable deploy prompts sometimes
+// ship stale/rewritten code). Bump whenever the drain or its _shared imports
+// change; verify after redeploy with a dry_run invocation and check the
+// response's code_version. "r1" = the compact-irrelevant revert (2026-07-30).
+const CODE_VERSION = "2026-07-30-r1-compact-irrelevant-revert";
 // Fallbacks for invocations that omit limit/batch_size. Match the pg_cron
 // production body (limit=200, batch_size=20); batch_size stays at 20 to
 // respect the batch-JSON-size cap decision (see AGENT-REFERENCE.md).
@@ -44,7 +49,7 @@ Deno.serve(async (req) => {
 
   const lock = await claimServiceLock(supabase, SOURCE, 240);
   if (!lock.claimed) {
-    return new Response(JSON.stringify({ status: "skipped", reason: "already_running" }), {
+    return new Response(JSON.stringify({ status: "skipped", reason: "already_running", code_version: CODE_VERSION }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
@@ -62,6 +67,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       status: summary.errors.length > 0 ? "partial" : "success",
+      code_version: CODE_VERSION,
       ...summary,
     }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
