@@ -14,14 +14,28 @@ ingest (12-day mean from `get_scraper_monitor_runs`, 2026-07-18→29 — roughly
 after the 2026-07-10 App Store + HN-comment source additions). Output tokens
 (≈$5/MTok) are the larger half of the bill; input ≈ $8/mo.
 
-- **Shipped**: compact-irrelevant output trim — irrelevant posts return bare
-  `{"relevant": false}` on the Anthropic path (prompt edits in all three
-  variants + `ANTHROPIC_RESULT_SCHEMA` with `required: ["relevant"]` in
-  `anthropicTool`). Gemini's strict `CLASSIFICATION_RESULT_SCHEMA` deliberately
-  untouched (strict subset needs every property in `required`; guards the
-  no-redeploy rollback, spillover, self-bias oracle). ~45% of queued posts
-  classify irrelevant (≈600/day relevant of ~1,090 queued) × ~45 output tokens
-  saved ≈ **$3–4/mo**. `CLASSIFIER_VERSION_DATE` bumped to 2026-07-30.
+- **Shipped, then validated NO-GO and reverted same day**: compact-irrelevant
+  output trim (bare `{"relevant": false}` for irrelevant posts; Anthropic tool
+  schema `required` relaxed to `["relevant"]`; est. ~$3–4/mo). Live drain after
+  deploy (66 fresh HN posts): **30 classified / 0 irrelevant / 36 parse_error**
+  — Haiku OMITTED irrelevant posts from the results array entirely instead of
+  emitting compact entries. Short arrays keep their "trustworthy prefix" (the
+  May truncation decision), so interleaved omissions shifted sentiment onto
+  the wrong posts as terminal `classified`. Reverted in the follow-up commit;
+  prompts/schema restored byte-identical. **Do not re-attempt via prompt
+  wording** — a safe retry needs index-keyed results (`{"i": N, ...}`) or a
+  hard length-match guard (which conflicts with truncation-prefix recovery).
+  Cleanup (run after redeploying the revert) — every bad-code write carries
+  the version tag:
+  `UPDATE public.scraped_posts SET classification_status='pending',
+  classification_attempts=0, next_classification_at=null,
+  last_classification_error=null, classified_at=null, sentiment=null,
+  complaint_category=null, praise_category=null, confidence=null
+  WHERE classifier_version LIKE '%-2026-07-30';`
+  (Also resets the Gemini-spillover-recovered rows with the same tag — those
+  were correct, but re-classifying them costs pennies and keeps the predicate
+  simple.) `CLASSIFIER_VERSION_DATE` restored to 2026-06-01, so post-revert
+  writes are distinguishable from bad-code writes.
 - **Re-confirmed the 2026-07-17 Batch API rejection** after a fresh adversarial
   review: beyond the known two-phase rework + watchdog conflict, an in-flight
   status would read as coverage 1.0 in `score-refresh.ts` (falsely `measured`/

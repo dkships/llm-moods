@@ -147,7 +147,7 @@ Is this post expressing a PERSONAL opinion about an AI model's quality, behavior
 
 KEY TEST: Ask yourself "Is this person expressing satisfaction or frustration with the MODEL ITSELF based on using it?" If no → not relevant. When unsure whether a post is personal experience vs. news/announcement/commentary, DEFAULT TO NOT RELEVANT.
 
-If not relevant, return exactly {"relevant": false} as the result — omit every other field. (Returning the other fields as null is also accepted.)
+If not relevant, return {"relevant": false, "sentiment": null, "complaint_category": null, "praise_category": null, "confidence": 0.0, "language": null, "english_translation": null}
 
 STEP 1b — LANGUAGE
 If the post is NOT in English, detect the language (ISO 639-1 code, e.g. "ja", "ko", "zh", "de", "fr", "es", "pt") and provide a concise English translation. Classify sentiment based on the translated meaning.
@@ -181,8 +181,7 @@ STEP 4 — CONFIDENCE (0.0-1.0)
 - Below 0.5: Weak signal, likely not relevant
 
 Return ONLY valid JSON:
-{"result":{"relevant": true, "sentiment": "positive"/"negative"/"neutral", "complaint_category": "<category>"/null, "praise_category": "<category>"/null, "confidence": 0.0-1.0, "language": "<iso-code>"/null, "english_translation": "<translation>"/null}}
-If relevant is true, include ALL fields (use null where a field does not apply). If relevant is false, return exactly {"result":{"relevant": false}}.
+{"result":{"relevant": true/false, "sentiment": "positive"/"negative"/"neutral"/null, "complaint_category": "<category>"/null, "praise_category": "<category>"/null, "confidence": 0.0-1.0, "language": "<iso-code>"/null, "english_translation": "<translation>"/null}}
 
 Post to classify: `;
 
@@ -226,8 +225,7 @@ Category guidance: hallucinations = model generated false info (NOT someone usin
 CONFIDENCE: 0.0-1.0 (0.9+ = explicit model name + clear sentiment from direct experience, 0.7-0.8 = clear but indirect, below 0.5 = weak)
 
 Return ONLY a JSON object with one result per post in the same order:
-{"results":[{"relevant": true, "sentiment": "...", "complaint_category": "..."/null, "praise_category": "..."/null, "confidence": 0.0-1.0, "language": "..."/null, "english_translation": "..."/null}, {"relevant": false}, ...]}
-For a RELEVANT post, include ALL fields (use null where a field does not apply). For a NOT RELEVANT post, return exactly {"relevant": false} — omit every other field.
+{"results":[{"relevant": true/false, "sentiment": "..."/null, "complaint_category": "..."/null, "praise_category": "..."/null, "confidence": 0.0-1.0, "language": "..."/null, "english_translation": "..."/null}, ...]}
 
 Posts to classify:
 `;
@@ -263,7 +261,7 @@ RELEVANCE: Is this post expressing a PERSONAL opinion about the TARGET model's q
 - RELEVANT: direct experience, quality complaints/praise, model comparisons, switching decisions, user-reported quality trends
   Examples: "Claude keeps refusing my coding requests", "GPT just hallucinated my bibliography", "has anyone noticed Gemini getting worse?", "I switched from ChatGPT to Claude"
 - IMPLICIT TARGET: if the post context says it was posted in the TARGET model's dedicated community (e.g. "(posted in r/ClaudeAI)") or is an App Store review of the TARGET model's app, the author may refer to the target implicitly — "it just deleted my whole repo" in r/ClaudeAI is a RELEVANT experience post about Claude even though no model is named. For app reviews, judge only opinions about the MODEL's output/behavior; app-shell complaints (login, crashes, billing, UI) stay NOT RELEVANT.
-- NOT RELEVANT (return {"relevant": false} even when a model name appears and the tone seems positive/negative):
+- NOT RELEVANT (return relevant:false, sentiment:null even when a model name appears and the tone seems positive/negative):
   - Pure availability/status posts with no judgment of output quality: "is X down?", outage reports, login failures, 5xx/API errors, app crashes, billing/subscription gripes about the app or plan. (Complaints that the model's OUTPUT quality degraded remain relevant negative — api_reliability.)
   - News / research / novelty reporting, incl. benchmark stunts: "ChatGPT loses at chess to an Atari 2600", "ChatGPT and DeepSeek play chess against Stockfish", "study finds ChatGPT acts as a cognitive crutch"
   - Product / feature announcements or changelogs: "ChatGPT rebuilt Scheduled Tasks into its own page, rolling out to paid plans", "Gemini now available on…", anything framed as "introducing / rolling out / now available"
@@ -290,8 +288,7 @@ Category guidance: hallucinations = model generated factually incorrect info (NO
 CONFIDENCE: 0.0-1.0 (0.9+ = explicit target model name + clear sentiment from direct experience, 0.7-0.8 = clear but indirect, below 0.5 = weak)
 
 Return ONLY a JSON object with one result per post in the same order:
-{"results":[{"relevant": true, "sentiment": "...", "complaint_category": "..."/null, "praise_category": "..."/null, "confidence": 0.0-1.0, "language": "..."/null, "english_translation": "..."/null}, {"relevant": false}, ...]}
-For a RELEVANT post, include ALL fields (use null where a field does not apply). For a NOT RELEVANT post, return exactly {"relevant": false} — omit every other field.
+{"results":[{"relevant": true/false, "sentiment": "..."/null, "complaint_category": "..."/null, "praise_category": "..."/null, "confidence": 0.0-1.0, "language": "..."/null, "english_translation": "..."/null}, ...]}
 
 Posts to classify:
 `;
@@ -837,33 +834,30 @@ async function fetchGemini(
 // Forcing this tool guarantees schema-shaped output without prose JSON.
 const ANTHROPIC_CLASSIFY_TOOL_NAME = "record_classifications";
 
-// Anthropic-only relaxation of CLASSIFICATION_RESULT_SCHEMA: `required` lists
-// just `relevant`, so an irrelevant post can be recorded as the compact
-// {"relevant": false} the prompts ask for (parseResult short-circuits on
-// relevant === false and never reads the other fields; ~45% of posts are
-// irrelevant, each saving ~45 output tokens). The Gemini path MUST keep
-// CLASSIFICATION_RESULT_SCHEMA untouched: its strict response_format subset
-// requires every property to be listed in `required`, and that schema carries
-// the no-redeploy rollback (CLASSIFIER_MODEL=gemini-2.5-flash), the spillover,
-// and the self-bias oracle.
-const ANTHROPIC_RESULT_SCHEMA = {
-  ...CLASSIFICATION_RESULT_SCHEMA,
-  required: ["relevant"],
-};
-
+// NOTE (2026-07-30, validated live — do NOT re-attempt as-is): relaxing this
+// schema's `required` to ["relevant"] so irrelevant posts return a compact
+// {"relevant": false} made Haiku OMIT irrelevant posts from the results array
+// entirely instead of emitting compact entries. A short array keeps its
+// "trustworthy prefix" (see batchClassifyWithPrompt), so interleaved omissions
+// silently shifted sentiment onto the wrong posts as terminal `classified`.
+// Caught same-day by a live drain (66 posts → 30 classified / 0 irrelevant /
+// 36 parse_error) and reverted; cleanup keyed on classifier_version
+// `…2026-07-30`. Any retry needs index-keyed results (e.g. {"i": N, ...}) or
+// a hard length-match guard, not prompt wording. Full record in
+// OPERATIONS-HISTORY.md.
 function anthropicTool(mode: "single" | "batch") {
   const input_schema = mode === "single"
     ? {
       type: "object",
       additionalProperties: false,
       required: ["result"],
-      properties: { result: ANTHROPIC_RESULT_SCHEMA },
+      properties: { result: CLASSIFICATION_RESULT_SCHEMA },
     }
     : {
       type: "object",
       additionalProperties: false,
       required: ["results"],
-      properties: { results: { type: "array", items: ANTHROPIC_RESULT_SCHEMA } },
+      properties: { results: { type: "array", items: CLASSIFICATION_RESULT_SCHEMA } },
     };
   return {
     name: ANTHROPIC_CLASSIFY_TOOL_NAME,

@@ -10,9 +10,11 @@ type DenoGlobal = typeof globalThis & {
   Deno?: { env: { get(name: string): string | undefined } };
 };
 
-// 2026-07-30: compact-irrelevant prompt/schema change (irrelevant posts may
-// return bare {"relevant": false} on the Anthropic path).
-const CLASSIFIER_VERSION_DATE = "2026-07-30";
+// Stays 2026-06-01: the 2026-07-30 compact-irrelevant experiment briefly bumped
+// this; rows tagged `…2026-07-30` are its (reverted) output — reset via the
+// cleanup SQL in OPERATIONS-HISTORY.md, and treat any straggler with that tag
+// as suspect.
+const CLASSIFIER_VERSION_DATE = "2026-06-01";
 
 // Provenance tag stored on each row. Derived from the active model so it tracks
 // the Gemini→Claude cutover automatically — setting CLASSIFIER_MODEL flips both

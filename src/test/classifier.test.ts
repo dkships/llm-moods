@@ -351,7 +351,12 @@ describe("Anthropic classifier path", () => {
     expect(results[1].sentiment).toBe("negative");
   });
 
-  it("accepts the compact {relevant:false} irrelevant form (2026-07-30 output trim)", async () => {
+  it("keeps all fields required on the Anthropic tool schema (2026-07-30 compact-form NO-GO)", async () => {
+    // Live validation 2026-07-30: relaxing `required` to ["relevant"] made
+    // Haiku OMIT irrelevant posts from the results array (not emit compact
+    // entries), silently shifting sentiment onto the wrong posts. The full
+    // required list is what keeps one entry per post. The parser itself stays
+    // tolerant of a bare {relevant:false} entry — that part is harmless.
     const fetchMock = vi.fn(async () => anthropicToolUseResponse([
       { relevant: false },
       { relevant: true, sentiment: "negative", complaint_category: "speed", praise_category: null, confidence: 0.85, language: null, english_translation: null },
@@ -366,11 +371,17 @@ describe("Anthropic classifier path", () => {
       { model: CLAUDE_MODEL },
     );
 
-    // The Anthropic tool schema requires only `relevant`, so the model may omit
-    // the other six fields on irrelevant posts; the mixed-shape array must parse.
     const [, anthropicInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const sentBody = JSON.parse(anthropicInit.body as string);
-    expect(sentBody.tools[0].input_schema.properties.results.items.required).toEqual(["relevant"]);
+    expect(sentBody.tools[0].input_schema.properties.results.items.required).toEqual([
+      "relevant",
+      "sentiment",
+      "complaint_category",
+      "praise_category",
+      "confidence",
+      "language",
+      "english_translation",
+    ]);
 
     expect(results).toHaveLength(2);
     expect(results[0]).toMatchObject({ relevant: false, status: "irrelevant", sentiment: null });
