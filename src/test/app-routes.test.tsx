@@ -217,6 +217,28 @@ describe("public app routes", () => {
     expect(screen.getByRole("heading", { name: /recent community chatter/i })).toBeInTheDocument();
   });
 
+  it("renders the benchmark route", async () => {
+    await renderAt("/benchmark");
+
+    // Same waitFor rationale as the dashboard case: lazy + Suspense can
+    // transiently remount the tree in jsdom.
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /^ship sense$/i })).toBeInTheDocument();
+    });
+    // Static snapshot data, no hooks to mock: the board leader and a
+    // generations verdict row should both be present.
+    expect(screen.getByText(/muse spark 1\.1/i)).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /current vs\. previous generations/i })).toBeInTheDocument();
+    // Both the Footer ("GitHub" -> llm-moods) and the page header pill are
+    // links named "GitHub"; the pill is the one pointing at the benchmark repo.
+    const githubLinks = screen.getAllByRole("link", { name: /^github$/i });
+    expect(
+      githubLinks.filter(
+        (a) => a.getAttribute("href") === "https://github.com/dkships/ship-sense",
+      ),
+    ).toHaveLength(1);
+  });
+
   it("renders the model detail route and chart controls", async () => {
     await renderAt("/model/chatgpt");
 

@@ -74,6 +74,12 @@
     <priority>0.8</priority>
   </url>
   <url>
+    <loc>https://llmvibes.ai/benchmark</loc>
+    <lastmod>2026-07-31</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.7</priority>
+  </url>
+  <url>
     <loc>https://llmvibes.ai/rumors</loc>
     <changefreq>daily</changefreq>
     <priority>0.7</priority>

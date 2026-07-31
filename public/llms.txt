@@ -13,6 +13,7 @@ LLM Vibes is 100% automated — there are no user-submitted reports or votes. Se
 - [Gemini](https://llmvibes.ai/model/gemini): Community sentiment history, complaint breakdown, and incidents for Gemini.
 - [Grok](https://llmvibes.ai/model/grok): Community sentiment history, complaint breakdown, and incidents for Grok.
 - [Research](https://llmvibes.ai/research): Independent long-form analysis of AI model quality and incidents.
+- [Benchmark](https://llmvibes.ai/benchmark): Ship Sense — a benchmark of product judgment under uncertainty, scoring 21 frontier models on restraint, honesty, and conviction against ten years of documented product decisions. Full harness at github.com/dkships/ship-sense.
 - [Rumors](https://llmvibes.ai/rumors): Aggregated community chatter about unreleased AI models, ranked by cross-platform corroboration. Unconfirmed estimates, not forecasts.
 - [Privacy & data practices](https://llmvibes.ai/privacy): What LLM Vibes collects, how long it keeps it, and how to request removal of a quoted post.
 

@@ -24,6 +24,8 @@ import { dirname, join } from "node:path";
 import type { Plugin, ResolvedConfig } from "vite";
 import { RESEARCH_POSTS } from "../src/data/research-posts";
 import { AUTHOR_NAME, AUTHOR_SAMEAS } from "../src/data/author";
+import { SHIP_SENSE_DESCRIPTION, buildShipSenseJsonLd } from "../src/data/ship-sense";
+import { SHIP_SENSE_RUN } from "../src/data/ship-sense-snapshot";
 
 const BASE_URL = "https://llmvibes.ai";
 
@@ -192,6 +194,16 @@ function buildRoutes(): RouteMeta[] {
             name: post.title,
           })),
       },
+    },
+    {
+      path: "/benchmark",
+      // Mirrors the useHead call in src/pages/Benchmark.tsx; the JSON-LD comes
+      // from the shared builder in src/data/ship-sense.ts so it can't drift.
+      title: "Ship Sense Benchmark — LLM Vibes",
+      description: SHIP_SENSE_DESCRIPTION,
+      ogImage: `${BASE_URL}/benchmark/og.png`,
+      ogType: "website",
+      jsonLd: buildShipSenseJsonLd(SHIP_SENSE_RUN),
     },
     {
       path: "/rumors",

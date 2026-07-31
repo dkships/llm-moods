@@ -24,6 +24,7 @@ Reference material moved out of `CLAUDE.md` (2026-07-07). Operating rules live i
 - `/model/:slug` — Model detail (history chart, complaint/source breakdown, posts, vendor events overlay, recent-incident card, official status card with anomaly correlation, surface-tagged recent posts)
 - `/research` — Research index (long-form articles index)
 - `/research/:slug` — Research article (live embedded charts via `chart-model` markdown sentinel; first article ships with CSV download + Dataset JSON-LD)
+- `/benchmark` — Ship Sense benchmark leaderboard (static snapshot from github.com/dkships/ship-sense; regenerate via `npm run sync:shipsense` after each official run)
 - `/rumors` — Rumors radar: auto-aggregated community chatter about *unreleased* models (version + stage + hedged ETA + rumored benefit + signals), ranked by cross-platform corroboration. DB-driven via `get_public_rumors`.
 - `/privacy` — Privacy & data practices + content-removal channel (GitHub issues / LinkedIn; no email on public surfaces)
 - `/admin/scrapers` — Scraper run monitor + score anomalies panel. **Dev-only** (gated on `import.meta.env.DEV`; production bundles physically exclude the chunk).

@@ -32,10 +32,11 @@ const NavBar = () => {
   const showResearchLink = RESEARCH_POSTS.length > 0;
   const isResearchActive = pathname === "/research" || pathname.startsWith("/research/");
   const isRumorsActive = pathname === "/rumors";
+  const isBenchmarkActive = pathname === "/benchmark";
   const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/model/");
 
   const navLinkClass = (active: boolean) =>
-    `inline-flex min-h-11 items-center rounded-md px-1.5 text-mono-cap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:px-2 sm:py-1 ${
+    `inline-flex min-h-11 items-center rounded-md px-1 text-mono-cap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:px-2 sm:py-1 ${
       active ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-foreground"
     }`;
 
@@ -51,14 +52,20 @@ const NavBar = () => {
           className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:gap-2"
         >
           <SvgMark />
-          <span className="whitespace-nowrap text-section text-foreground">
-            <span className="hidden min-[360px]:inline">LLM </span>
+          {/* Four nav links leave no room for the wordmark on the narrowest
+              screens (320–400px): the mark alone carries the brand there, and
+              the aria-label keeps the accessible name. */}
+          <span className="hidden whitespace-nowrap text-section text-foreground min-[400px]:inline">
+            <span className="hidden min-[460px]:inline">LLM </span>
             <span className="text-primary">Vibes</span>
           </span>
         </Link>
         <div className="flex flex-none items-center gap-0.5 sm:gap-3 lg:gap-5">
           <Link to="/dashboard" className={navLinkClass(isDashboardActive)}>
             Dashboard
+          </Link>
+          <Link to="/benchmark" className={navLinkClass(isBenchmarkActive)}>
+            Benchmark
           </Link>
           {showResearchLink && (
             <Link to="/research" className={navLinkClass(isResearchActive)}>

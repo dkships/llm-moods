@@ -9,6 +9,10 @@ import useHead from "@/hooks/useHead";
 import { useModelsWithLatestVibes, usePrefetchModelDetail } from "@/hooks/useVibesData";
 import { formatTimeAgo } from "@/lib/vibes";
 import { CardSkeleton } from "@/components/Skeletons";
+// Teaser-only generated module — Index is in the entry chunk, and importing
+// the full snapshot here would hoist the whole lineup into the entry bundle
+// (a module shared with the lazy /benchmark chunk isn't split per-export).
+import { SHIP_SENSE_TEASER, SHIP_SENSE_TEASER_RUN } from "@/data/ship-sense-teaser";
 
 const Index = () => {
   useHead({
@@ -129,6 +133,50 @@ const Index = () => {
                 </Link>
               </p>
             </div>
+      </section>
+
+      {/* Ship Sense benchmark teaser — vibes track how models feel; the
+          benchmark measures how they judge. Same border-y strip treatment as
+          the live preview, same numbered-list grammar as "How it works". */}
+      <section className="border-t border-border bg-card/20">
+        <div className="container py-10 sm:py-12">
+          <div className="mb-5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+            <h2 className="text-section text-foreground">Ship Sense benchmark</h2>
+            <span className="text-mono-cap text-text-tertiary">
+              {SHIP_SENSE_TEASER_RUN.version} · {SHIP_SENSE_TEASER_RUN.modelCount} models
+            </span>
+          </div>
+          <p className="max-w-2xl text-body text-text-secondary">
+            Vibes track how models feel to their users. Ship Sense measures how
+            they judge: {SHIP_SENSE_TEASER_RUN.bankItems} real product decisions, scored
+            on what a model refuses to build, what it won't claim from thin
+            evidence, and whether it holds a call under pressure.
+          </p>
+          <ol className="mt-6 grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-3">
+            {SHIP_SENSE_TEASER.map((m, i) => (
+              <li key={m.label} className="border-t border-border pt-5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <div className="flex min-w-0 items-baseline gap-3">
+                    <span className="text-mono-cap text-text-tertiary">0{i + 1}</span>
+                    <p className="truncate text-section text-foreground">{m.label}</p>
+                  </div>
+                  <span className="text-meta font-semibold text-foreground">
+                    {m.score.toFixed(1)}
+                  </span>
+                </div>
+              </li>
+            ))}
+          </ol>
+          <p className="mt-8 text-meta text-text-tertiary">
+            <Link
+              to="/benchmark"
+              className="inline-flex min-h-11 items-center gap-1 rounded-md text-text-secondary underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+            >
+              Full leaderboard
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+            </Link>
+          </p>
+        </div>
       </section>
     </>
   );

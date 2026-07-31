@@ -36,7 +36,8 @@
     "preview": "vite preview",
     "generate-rss": "tsx scripts/generate-rss.ts",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "sync:shipsense": "tsx scripts/sync-ship-sense.ts"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.14",

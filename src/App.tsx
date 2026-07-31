@@ -8,6 +8,7 @@ import NotFound from "./pages/NotFound";
 
 const Dashboard = lazy(() => import("./pages/Dashboard"));
 const ModelDetail = lazy(() => import("./pages/ModelDetail"));
+const Benchmark = lazy(() => import("./pages/Benchmark"));
 const ResearchIndex = lazy(() => import("./pages/ResearchIndex"));
 const ResearchPost = lazy(() => import("./pages/ResearchPost"));
 const Rumors = lazy(() => import("./pages/Rumors"));
@@ -16,7 +17,7 @@ const Privacy = lazy(() => import("./pages/Privacy"));
 // Admin / generator pages are dev-only — production bundles physically exclude
 // the lazy import below thanks to Vite tree-shaking on the `import.meta.env.DEV`
 // flag. See AGENTS.md: public route inventory stays fixed to /, /dashboard,
-// /model/:slug, /research, /research/:slug, /rumors, /privacy, *.
+// /model/:slug, /benchmark, /research, /research/:slug, /rumors, /privacy, *.
 const ScraperMonitor = import.meta.env.DEV
   ? lazy(() => import("./pages/ScraperMonitor"))
   : null;
@@ -73,6 +74,7 @@ const AnimatedRoutes = () => {
           <Route index element={<Index />} />
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="model/:slug" element={<ModelDetail />} />
+          <Route path="benchmark" element={<Benchmark />} />
           <Route path="research" element={<ResearchIndex />} />
           <Route path="research/:slug" element={<ResearchPost />} />
           <Route path="rumors" element={<Rumors />} />
