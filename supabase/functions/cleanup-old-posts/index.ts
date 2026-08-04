@@ -18,7 +18,7 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   const body = await readJsonBody(req);
-  if (!isInternalServiceRequest(req) && !isSchedulerRequest(body, SOURCE)) {
+  if (!isInternalServiceRequest(req) && !(await isSchedulerRequest(body, SOURCE))) {
     return internalOnlyResponse(corsHeaders);
   }
 

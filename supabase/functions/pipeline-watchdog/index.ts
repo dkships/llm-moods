@@ -44,7 +44,7 @@ Deno.serve(async (req) => {
   if (
     !isInternalServiceRequest(req)
     && !isRunPipelineTriggerRequest(req)
-    && !isSchedulerRequest(body, "pipeline-watchdog")
+    && !await isSchedulerRequest(body, "pipeline-watchdog")
   ) {
     return internalOnlyResponse(corsHeaders);
   }
