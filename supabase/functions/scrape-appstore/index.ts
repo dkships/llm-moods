@@ -80,7 +80,7 @@ export async function handleScrapeAppstore(req: Request): Promise<Response> {
   if (
     !isInternalServiceRequest(req)
     && !isRunPipelineTriggerRequest(req)
-    && !isSchedulerRequest(body, "scrape-appstore")
+    && !await isSchedulerRequest(body, "scrape-appstore")
   ) {
     return internalOnlyResponse(corsHeaders);
   }
