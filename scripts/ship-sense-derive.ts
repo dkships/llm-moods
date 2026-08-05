@@ -17,6 +17,10 @@ export interface DeriveModel {
   is_baseline: boolean;
   ranked_eligible?: boolean;
   superseded_by?: string | null;
+  /** ISO date the model's price was checked. Ship Sense verifies prices at
+   * scoring time, so for models merged in after the run date this is the
+   * merge date — see scoringDates(). */
+  price_verified?: string | null;
   score: DeriveScore;
 }
 
@@ -117,6 +121,46 @@ export function leaderBand(sortedDesc: DeriveModel[]): Set<string> {
     band.add(m.name);
   }
   return band.size > 1 ? band : new Set();
+}
+
+export interface ScoringDateGroup {
+  /** ISO date this group of models was scored on. */
+  date: string;
+  /** Model labels scored on this date, in board order (score descending). */
+  labels: string[];
+}
+
+/**
+ * Reconstruct the run's scoring dates. A Ship Sense run keeps one run_id but
+ * absorbs models scored later on the identical bank (v3.0: 17 on 2026-07-10,
+ * then four merges through 08-03), and leaderboard.json records no per-model
+ * scoring date. `price_verified` stands in: Ship Sense verifies a model's
+ * price when it scores it, so a merged-in model carries a price_verified
+ * AFTER the run date while every base-run model carries one at or before it.
+ * Clamping to run_id collapses the base run into a single group.
+ *
+ * Verified against the ship-sense README "How the current snapshot was built"
+ * for v3.0: 07-10 / 07-17 / 07-21 / 07-24 / 08-03, exact match. If the two
+ * ever diverge, the README is the source of truth and this heuristic is the
+ * thing to fix.
+ *
+ * `models` must already be in board order; the caller decides which models
+ * count (ranked only — baselines never appear on the page).
+ */
+export function scoringDates(
+  models: Pick<DeriveModel, "label" | "price_verified">[],
+  runId: string,
+): ScoringDateGroup[] {
+  const groups = new Map<string, string[]>();
+  for (const m of models) {
+    const verified = m.price_verified ?? "";
+    const date = verified > runId ? verified : runId;
+    if (!groups.has(date)) groups.set(date, []);
+    groups.get(date)!.push(m.label);
+  }
+  return [...groups.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, labels]) => ({ date, labels }));
 }
 
 export interface OrientedPair {

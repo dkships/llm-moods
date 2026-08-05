@@ -8,10 +8,11 @@ import {
   SHIP_SENSE_DESCRIPTION,
   SHIP_SENSE_DIMENSIONS,
   SHIP_SENSE_REPO_URL,
-  SHIP_SENSE_SCORED_WINDOW,
   SHIP_SENSE_VERDICT_TEXT,
   buildShipSenseJsonLd,
+  describeScoringDates,
   providerLabel,
+  scoredWindowLabel,
   type ShipSenseVerdict,
 } from "@/data/ship-sense";
 import {
@@ -20,13 +21,29 @@ import {
   SHIP_SENSE_RUN,
 } from "@/data/ship-sense-snapshot";
 
-// Shared score axis for the interval strips — matches the canonical board's
-// field plot (ticks 70–95). The naive floor (39.1) is deliberately OFF this
-// axis: stretching to include it would compress every interval into the right
-// third and erase the differences the strips exist to show.
-const AXIS_MIN = 70;
-const AXIS_MAX = 95;
-const AXIS_TICKS = [70, 75, 80, 85, 90, 95];
+// Shared score axis for the interval strips — 70–95 by default, matching the
+// canonical board's field plot. It only ever WIDENS, in 5-point steps, so a
+// model the daily sync pulls in below 70 or above 95 still lands on the lane
+// instead of overflowing it; the usual board keeps the exact ticks it had.
+// The naive floor (39.1) is deliberately OFF this axis: stretching to include
+// it would compress every interval into the right third and erase the
+// differences the strips exist to show.
+const axisFor = (rows: { lo: number; hi: number }[]) => {
+  const lo = Math.min(70, ...rows.map((m) => m.lo));
+  const hi = Math.max(95, ...rows.map((m) => m.hi));
+  // Widen past ~40 points and 5-point ticks crowd the lane; step to 10 and
+  // re-snap both bounds so the last tick still lands on AXIS_MAX.
+  const step = hi - lo > 40 ? 10 : 5;
+  const min = Math.floor(lo / step) * step;
+  const max = Math.ceil(hi / step) * step;
+  return {
+    min,
+    max,
+    ticks: Array.from({ length: (max - min) / step + 1 }, (_, i) => min + i * step),
+  };
+};
+
+const { min: AXIS_MIN, max: AXIS_MAX, ticks: AXIS_TICKS } = axisFor(SHIP_SENSE_LINEUP);
 const pct = (v: number) => ((v - AXIS_MIN) / (AXIS_MAX - AXIS_MIN)) * 100;
 
 const fmt1 = (n: number) => n.toFixed(1);
@@ -66,7 +83,7 @@ const IntervalStrip = ({ lo, hi, score }: { lo: number; hi: number; score: numbe
 
 const Benchmark = () => {
   const run = SHIP_SENSE_RUN;
-  const scoredWindow = SHIP_SENSE_SCORED_WINDOW[run.runId] ?? `run ${run.runId}`;
+  const scoredWindow = scoredWindowLabel(run);
   const anyRepriced = SHIP_SENSE_LINEUP.some((m) => m.atTestPriceIn !== undefined);
 
   useHead({
@@ -282,12 +299,9 @@ const Benchmark = () => {
             statistics are open.
           </p>
           <p>
-            The {run.version} board merges four scoring dates on the identical{" "}
-            {run.bankItems}-item bank: 17 models on 2026-07-10, then Kimi K3
-            (07-17), Gemini 3.6 Flash and 3.5 Flash-Lite (07-21), and Claude Opus 5
-            (07-24). The Ship Sense Score is the equal-weight mean of the three
-            dimensions, with a 95% confidence interval from an item-clustered
-            bootstrap.
+            {describeScoringDates(run)} The Ship Sense Score is the equal-weight
+            mean of the three dimensions, with a 95% confidence interval from an
+            item-clustered bootstrap.
           </p>
           <p>
             This is one product leader's documented judgment, not an industry

@@ -49,6 +49,15 @@ Read `AGENT-REFERENCE.md` before changing `_shared/classifier.ts` or any scraper
 
 Pipeline detail is in `AGENT-REFERENCE.md`; read it before touching anything rumor-related. Recurring manual touch: refresh the codename/next-version `model_keywords` rows and the `FAMILY_ALIASES` + `COMPETITOR_DENY` seeds in `_shared/rumor-canon.ts` each cycle. The extractor's released-set prompt is generated from `FAMILY_ALIASES`. To hide a just-launched model instantly with zero backend deploy, set `released: true` on its alias entry. ETAs are always framed as unconfirmed community estimates, never forecasts.
 
+## Ship Sense benchmark (`/benchmark`)
+
+`.github/workflows/sync-ship-sense.yml` polls github.com/dkships/ship-sense daily, regenerates the snapshot, and **pushes to `main` on its own** — expect bot commits touching `src/data/ship-sense-{snapshot,teaser}.ts` and `public/benchmark/og.png`, and always `git fetch` before local edits. It verifies with lint + test + build before pushing.
+
+- Those three files are generated. Edit `scripts/sync-ship-sense.ts` (derivation, ported from ship-sense `src/leaderboard.py`) or `src/data/ship-sense.ts` (types + prose helpers) instead; `npm run sync:shipsense` regenerates locally, `-- --dry-run` reports without writing.
+- Everything the page renders is derived, including the scored-window eyebrow and the provenance sentence. Don't reintroduce hand-copied counts, dates, or model names — they defeat the unattended sync. Same for the tests: assert internal consistency, never a model count.
+- A new run_id or version does **not** auto-push; the workflow opens an issue, because a re-scored bank can change the README-sourced copy this repo keeps by hand (`SHIP_SENSE_DIMENSIONS`, the method/limitations paragraphs). Re-run with `force` to push anyway.
+- Scoring dates are reconstructed from `price_verified` (Ship Sense verifies prices at scoring time) — see `scoringDates()` in `scripts/ship-sense-derive.ts`. If it ever disagrees with the ship-sense README, the README wins.
+
 ## Frontend design rules
 
 Full pattern catalog (vendor events overlay, surface tagging, anomaly detection, status integration, research-article system, prerender/OG pipeline, primitive APIs) is in `AGENT-REFERENCE.md` — read the relevant entry before touching those areas. Always-on rules:

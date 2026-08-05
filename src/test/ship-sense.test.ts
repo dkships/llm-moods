@@ -3,9 +3,16 @@ import {
   leaderBand,
   lineage,
   orientPair,
+  scoringDates,
   successions,
   type DeriveModel,
 } from "../../scripts/ship-sense-derive";
+import {
+  describeScoringDates,
+  providerLabel,
+  scoredWindowLabel,
+  type ShipSenseRunMeta,
+} from "@/data/ship-sense";
 import {
   SHIP_SENSE_GENERATIONS,
   SHIP_SENSE_LINEUP,
@@ -150,11 +157,127 @@ describe("orientPair", () => {
   });
 });
 
+describe("scoringDates", () => {
+  const m = (label: string, price_verified: string | null) => ({ label, price_verified });
+
+  it("collapses the base run into the run date and splits later merges out", () => {
+    expect(
+      scoringDates(
+        [
+          m("Base A", "2026-06-16"), // bulk price check before the run
+          m("Base B", "2026-07-10"),
+          m("Merged", "2026-07-24"),
+        ],
+        "2026-07-10",
+      ),
+    ).toEqual([
+      { date: "2026-07-10", labels: ["Base A", "Base B"] },
+      { date: "2026-07-24", labels: ["Merged"] },
+    ]);
+  });
+
+  it("groups same-day merges together and keeps board order within a group", () => {
+    const groups = scoringDates(
+      [m("Higher", "2026-07-21"), m("Lower", "2026-07-21"), m("Base", null)],
+      "2026-07-10",
+    );
+    expect(groups).toHaveLength(2);
+    expect(groups[1]).toEqual({ date: "2026-07-21", labels: ["Higher", "Lower"] });
+  });
+});
+
+describe("run prose", () => {
+  const run = (scoringDates: { date: string; labels: string[] }[]): ShipSenseRunMeta => ({
+    version: "v3.0",
+    runId: scoringDates[0].date,
+    bankItems: 67,
+    modelCount: scoringDates.reduce((n, d) => n + d.labels.length, 0),
+    naiveFloor: 39.1,
+    decisivePairs: 1,
+    totalPairs: 3,
+    scoringDates,
+  });
+
+  it("reads a single-date run as one run, not a window", () => {
+    const one = run([{ date: "2026-07-10", labels: ["A", "B"] }]);
+    expect(scoredWindowLabel(one)).toBe("scored 2026-07-10");
+    expect(describeScoringDates(one)).toContain("in a single run on 2026-07-10");
+  });
+
+  it("names small merge groups and counts large ones", () => {
+    const many = run([
+      { date: "2026-07-10", labels: ["A", "B", "C", "D"] },
+      { date: "2026-07-21", labels: ["Gemini 3.6 Flash", "Gemini 3.5 Flash-Lite"] },
+      { date: "2026-08-03", labels: ["Qwen 3.8 Max"] },
+    ]);
+    expect(scoredWindowLabel(many)).toBe("scored 2026-07-10 – 08-03");
+    expect(describeScoringDates(many)).toBe(
+      "The v3.0 board merges three scoring dates on the identical 67-item bank: " +
+        "4 models on 2026-07-10, then Gemini 3.6 Flash with Gemini 3.5 Flash-Lite (07-21) " +
+        "and Qwen 3.8 Max (08-03).",
+    );
+  });
+
+  it("spells out the year when a run spans one", () => {
+    expect(
+      scoredWindowLabel(
+        run([
+          { date: "2026-12-20", labels: ["A"] },
+          { date: "2027-01-06", labels: ["B"] },
+        ]),
+      ),
+    ).toBe("scored 2026-12-20 – 2027-01-06");
+  });
+
+  it("titles an unmapped provider rather than dropping it", () => {
+    expect(providerLabel("qwen")).toBe("Qwen");
+    expect(providerLabel("xai")).toBe("xAI");
+    expect(providerLabel("newlab")).toBe("Newlab");
+  });
+});
+
 describe("committed snapshot invariants", () => {
-  it("holds the board shape the page renders", () => {
-    expect(SHIP_SENSE_LINEUP).toHaveLength(13);
-    expect(SHIP_SENSE_GENERATIONS).toHaveLength(8);
-    expect(SHIP_SENSE_RUN.totalPairs).toBe(210);
+  // Deliberately NOT pinned to a model count: the daily sync workflow commits
+  // this snapshot unattended, so a new model upstream must not read as a test
+  // failure. These assert internal consistency instead — the things that only
+  // break if the derivation port breaks.
+  it("splits every ranked model into exactly one of lineup or generations", () => {
+    expect(SHIP_SENSE_LINEUP.length + SHIP_SENSE_GENERATIONS.length).toBe(
+      SHIP_SENSE_RUN.modelCount,
+    );
+    expect(SHIP_SENSE_LINEUP.length).toBeGreaterThan(1);
+  });
+
+  it("pairs every ranked model against every other exactly once", () => {
+    const n = SHIP_SENSE_RUN.modelCount;
+    expect(SHIP_SENSE_RUN.totalPairs).toBe((n * (n - 1)) / 2);
+    expect(SHIP_SENSE_RUN.decisivePairs).toBeLessThanOrEqual(SHIP_SENSE_RUN.totalPairs);
+  });
+
+  it("keeps every point score inside its own confidence interval", () => {
+    SHIP_SENSE_LINEUP.forEach((m) => {
+      expect(m.lo).toBeLessThanOrEqual(m.score);
+      expect(m.score).toBeLessThanOrEqual(m.hi);
+    });
+  });
+
+  it("retires each previous generation to a model still in the lineup", () => {
+    const current = new Set(SHIP_SENSE_LINEUP.map((m) => m.label));
+    SHIP_SENSE_GENERATIONS.forEach((g) => {
+      expect(current.has(g.currLabel)).toBe(true);
+      expect(current.has(g.prevLabel)).toBe(false);
+    });
+  });
+
+  it("covers every ranked model with exactly one scoring date, starting at the run", () => {
+    const { scoringDates, runId, modelCount } = SHIP_SENSE_RUN;
+    expect(scoringDates[0].date).toBe(runId);
+    const labels = scoringDates.flatMap((d) => d.labels);
+    expect(labels).toHaveLength(modelCount);
+    expect(new Set(labels).size).toBe(modelCount);
+    scoringDates.forEach((d, i) => {
+      if (i > 0) expect(d.date > scoringDates[i - 1].date).toBe(true);
+    });
   });
 
   it("is sorted by score with contiguous positions", () => {

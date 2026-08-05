@@ -12,15 +12,6 @@ export const SHIP_SENSE_BOARD_URL = "https://dkships.github.io/ship-sense/";
 export const SHIP_SENSE_DESCRIPTION =
   "Ship Sense scores frontier models on product judgment under uncertainty — what not to build, what evidence can't support, and when to hold a call under pressure — against decisions David Kelly documented across ten years of product work.";
 
-// The v3.0 board was merged across four scoring dates (17 models on the run
-// date, then Kimi K3 07-17, Gemini 3.6 Flash + 3.5 Flash-Lite 07-21, Claude
-// Opus 5 07-24 — ship-sense README "What it found"). The window exists only in
-// prose, not in leaderboard.json, so it's keyed by runId here: update this map
-// deliberately with each sync. Missing runId falls back to "Run <runId>".
-export const SHIP_SENSE_SCORED_WINDOW: Record<string, string> = {
-  "2026-07-10": "scored 2026-07-10 – 07-24",
-};
-
 export interface ShipSenseModelRow {
   name: string;
   label: string;
@@ -67,6 +58,11 @@ export interface ShipSenseGeneration {
   verdict: ShipSenseVerdict;
 }
 
+export interface ShipSenseScoringDate {
+  date: string;
+  labels: string[];
+}
+
 export interface ShipSenseRunMeta {
   version: string;
   runId: string;
@@ -76,6 +72,10 @@ export interface ShipSenseRunMeta {
   /** Paired comparisons decisive after Holm correction, of totalPairs. */
   decisivePairs: number;
   totalPairs: number;
+  /** A run keeps one runId but absorbs models scored later on the identical
+   * bank. Reconstructed by scripts/ship-sense-derive.ts `scoringDates()`;
+   * ascending, first entry is always the run date. */
+  scoringDates: ShipSenseScoringDate[];
 }
 
 export interface ShipSenseTeaserRow {
@@ -94,6 +94,9 @@ export const SHIP_SENSE_VERDICT_TEXT: Record<ShipSenseVerdict, string> = {
   "decisive-down": "decisive downgrade",
 };
 
+// Only labs whose display name isn't plain title-case need an entry; a lab
+// added upstream falls through to the capitalized id rather than blocking the
+// unattended sync.
 const PROVIDER_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
@@ -101,11 +104,74 @@ const PROVIDER_LABELS: Record<string, string> = {
   xai: "xAI",
   meta: "Meta",
   moonshot: "Moonshot",
+  qwen: "Qwen",
+  deepseek: "DeepSeek",
+  mistral: "Mistral",
 };
 
 export const providerLabel = (provider: string): string =>
   PROVIDER_LABELS[provider] ??
   provider.charAt(0).toUpperCase() + provider.slice(1);
+
+/** "2026-08-03" -> "08-03" when it shares a year with the run date. */
+const shortDate = (date: string, reference: string): string =>
+  date.slice(0, 4) === reference.slice(0, 4) ? date.slice(5) : date;
+
+const joinList = (items: string[], conjunction: string, oxford = false): string => {
+  if (items.length <= 1) return items[0] ?? "";
+  const head = items.slice(0, -1).join(", ");
+  const comma = oxford && items.length > 2 ? "," : "";
+  return `${head}${comma} ${conjunction} ${items[items.length - 1]}`;
+};
+
+const COUNT_WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten"];
+const countWord = (n: number): string => COUNT_WORDS[n] ?? String(n);
+
+/**
+ * Eyebrow text for the run: the span of dates the board was scored across.
+ * A run absorbs later models on the same bank, so this is a window, not a
+ * single date — derived from the snapshot rather than copied from the
+ * ship-sense README, so an unattended sync keeps it honest.
+ */
+export const scoredWindowLabel = (run: ShipSenseRunMeta): string => {
+  const dates = run.scoringDates;
+  if (!dates?.length) return `run ${run.runId}`;
+  const last = dates[dates.length - 1].date;
+  return last === dates[0].date
+    ? `scored ${dates[0].date}`
+    : `scored ${dates[0].date} – ${shortDate(last, dates[0].date)}`;
+};
+
+/**
+ * Provenance sentence for the method section: which models were scored when.
+ * Groups of four or more are counted rather than named, so the sentence stays
+ * readable as the board grows.
+ */
+export const describeScoringDates = (run: ShipSenseRunMeta): string => {
+  const dates = run.scoringDates;
+  if (!dates?.length)
+    return `The ${run.version} board scores ${run.modelCount} models on a ${run.bankItems}-item bank.`;
+  if (dates.length === 1)
+    return `The ${run.version} board scored all ${run.modelCount} models in a single run on ${dates[0].date}, against one ${run.bankItems}-item bank.`;
+  const [base, ...merged] = dates;
+  const baseText =
+    base.labels.length > 3
+      ? `${base.labels.length} models on ${base.date}`
+      : `${joinList(base.labels, "and")} on ${base.date}`;
+  // Merged groups join with "with", not "and", so the multi-model group reads
+  // as one date rather than blurring into the outer comma list.
+  const mergedText = joinList(
+    merged.map((g) => {
+      const date = shortDate(g.date, base.date);
+      return g.labels.length > 3
+        ? `${g.labels.length} models (${date})`
+        : `${joinList(g.labels, "with")} (${date})`;
+    }),
+    "and",
+    true,
+  );
+  return `The ${run.version} board merges ${countWord(dates.length)} scoring dates on the identical ${run.bankItems}-item bank: ${baseText}, then ${mergedText}.`;
+};
 
 /**
  * Dataset JSON-LD for /benchmark — single source shared by the page's useHead

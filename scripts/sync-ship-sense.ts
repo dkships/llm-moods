@@ -1,9 +1,14 @@
 /**
  * Sync the Ship Sense benchmark snapshot from github.com/dkships/ship-sense.
  *
- * Manual, not part of the build: run `npm run sync:shipsense` after each
- * official Ship Sense run, review the diff, update EXPECTED below and the
- * SHIP_SENSE_SCORED_WINDOW entry in src/data/ship-sense.ts, then commit.
+ * Runs unattended: `.github/workflows/sync-ship-sense.yml` calls this daily
+ * and pushes the regenerated snapshot to main, so a model added upstream
+ * reaches /benchmark without a hand edit. `npm run sync:shipsense` does the
+ * same thing locally.
+ *
+ * Everything the page renders is derived here — including the scoring-window
+ * and provenance prose, which used to be hand-copied from the ship-sense
+ * README. Nothing downstream is pinned to a model count.
  *
  * Fetches leaderboard.json (scores), models.yaml (current prices + explicit
  * successions), docs/pairwise.json (paired head-to-head records), and
@@ -18,6 +23,11 @@
  *   - _generation_pairs(): pairwise records are stored in arbitrary
  *     orientation on a 0–1 scale — normalize to (current − previous) × 100
  *     and swap-negate the CI bounds when flipping.
+ *
+ * Flags:
+ *   --summary <path>  write a JSON change report (what moved vs. the committed
+ *                     snapshot) for the workflow to turn into a commit message.
+ *   --dry-run         derive and report, write nothing.
  */
 
 import { mkdirSync, writeFileSync } from "node:fs";
@@ -25,6 +35,7 @@ import { join } from "node:path";
 import {
   leaderBand,
   orientPair,
+  scoringDates,
   successions,
   type DerivePairRecord,
 } from "./ship-sense-derive";
@@ -32,11 +43,11 @@ import {
 const RAW = "https://raw.githubusercontent.com/dkships/ship-sense/main";
 const ROOT = join(import.meta.dirname ?? __dirname, "..");
 
-// Fail-loud expectations for the CURRENT official run. A mismatch means either
-// a new official run (update these from the ship-sense README leaderboard) or
-// a bug in the derivation port (fix it) — never ship the diff without knowing
-// which.
-const EXPECTED = { lineup: 13, generations: 8, pairs: 210 };
+const argv = process.argv.slice(2);
+const dryRun = argv.includes("--dry-run");
+const summaryIndex = argv.indexOf("--summary");
+const summaryPath = summaryIndex === -1 ? null : argv[summaryIndex + 1];
+if (summaryIndex !== -1 && !summaryPath) throw new Error("[sync-ship-sense] --summary needs a path");
 
 interface Score {
   value: number;
@@ -50,6 +61,7 @@ interface RunModel {
   provider: string;
   price_in: number | null;
   price_out: number | null;
+  price_verified?: string | null;
   is_baseline: boolean;
   ranked_eligible?: boolean;
   superseded_by?: string | null;
@@ -172,12 +184,35 @@ async function main() {
     .sort((a, b) => b.score.value - a.score.value);
   const band = leaderBand(current);
 
-  if (current.length !== EXPECTED.lineup)
-    fail(`derived ${current.length} current models, expected ${EXPECTED.lineup} — new run or lineage-port bug (see EXPECTED)`);
-  if (previous.length !== EXPECTED.generations)
-    fail(`derived ${previous.length} succession pairs, expected ${EXPECTED.generations}`);
-  if (pairwise.length !== EXPECTED.pairs)
-    fail(`pairwise has ${pairwise.length} rows, expected ${EXPECTED.pairs}`);
+  // Structural invariants, not pinned counts. The old fail-loud EXPECTED block
+  // pinned lineup/generations/pairs to one official run, which blocked exactly
+  // the case this sync now has to handle unattended: upstream added a model.
+  // These checks still catch a broken derivation port — they just don't
+  // mistake "ship-sense scored a new model" for a bug.
+  if (current.length + previous.length !== rankedModels.length)
+    fail(
+      `lineage split lost models: ${current.length} current + ${previous.length} retired != ${rankedModels.length} ranked`,
+    );
+  if (current.length < 2)
+    fail(`derived only ${current.length} current model(s) — successions() is over-retiring`);
+  for (const [prev, curr] of succ)
+    if (!current.some((m) => m.name === curr))
+      fail(`${prev} retires to ${curr}, which is not in the current lineup`);
+  const bandPrefix = current.findIndex((m) => !band.has(m.name));
+  if (band.size > 0 && bandPrefix !== -1 && current.slice(bandPrefix).some((m) => band.has(m.name)))
+    fail("leader band is not a contiguous prefix of the lineup — leaderBand port bug");
+  for (const m of rankedModels)
+    if (!(m.score.lo <= m.score.value && m.score.value <= m.score.hi))
+      fail(`${m.name} score ${m.score.value} outside its CI [${m.score.lo}, ${m.score.hi}]`);
+
+  // Scoring-date reconstruction — see scoringDates(). Board order so the
+  // generated prose names models the way the page ranks them.
+  const dates = scoringDates([...current, ...previous], run.run_id);
+  if (dates[0]?.date !== run.run_id)
+    fail(`earliest scoring date ${dates[0]?.date} is not the run id ${run.run_id}`);
+  const dated = dates.reduce((n, d) => n + d.labels.length, 0);
+  if (dated !== rankedModels.length)
+    fail(`scoring dates cover ${dated} models, expected ${rankedModels.length}`);
 
   const lineup = current.map((m, i) => {
     const reg = registry.get(m.name) ?? {};
@@ -238,6 +273,7 @@ async function main() {
     naiveFloor: run.naive_floor,
     decisivePairs: pairwise.filter((r) => r.winner !== null).length,
     totalPairs: pairwise.length,
+    scoringDates: dates,
   };
 
   const teaser = lineup.slice(0, 3).map((m) => ({ label: m.label, score: m.score }));
@@ -277,22 +313,71 @@ export const SHIP_SENSE_TEASER_RUN = ${emit({
   })};
 `;
 
-  writeFileSync(join(ROOT, "src/data/ship-sense-snapshot.ts"), snapshot);
-  writeFileSync(join(ROOT, "src/data/ship-sense-teaser.ts"), teaserModule);
-
-  const card = await fetchBinary("docs/card.png");
-  mkdirSync(join(ROOT, "public/benchmark"), { recursive: true });
-  writeFileSync(join(ROOT, "public/benchmark/og.png"), card);
+  const change = await describeChange(runMeta, lineup);
 
   console.log(
     `[sync-ship-sense] run ${runMeta.runId} ${runMeta.version}: ` +
       `${lineup.length} current (band of ${lineup.filter((m) => m.inLeaderBand).length}), ` +
       `${generations.length} generations, ${runMeta.decisivePairs}/${runMeta.totalPairs} decisive pairs, ` +
-      `og.png ${card.length} bytes`,
+      `${dates.length} scoring date(s) ${dates[0].date}–${dates[dates.length - 1].date}`,
   );
-  console.log(
-    "[sync-ship-sense] reminder: if run_id changed, update SHIP_SENSE_SCORED_WINDOW in src/data/ship-sense.ts and EXPECTED in this script.",
-  );
+  console.log(`[sync-ship-sense] ${change.summary}`);
+
+  if (dryRun) {
+    console.log("[sync-ship-sense] --dry-run: no files written");
+  } else {
+    writeFileSync(join(ROOT, "src/data/ship-sense-snapshot.ts"), snapshot);
+    writeFileSync(join(ROOT, "src/data/ship-sense-teaser.ts"), teaserModule);
+    const card = await fetchBinary("docs/card.png");
+    mkdirSync(join(ROOT, "public/benchmark"), { recursive: true });
+    writeFileSync(join(ROOT, "public/benchmark/og.png"), card);
+    console.log(`[sync-ship-sense] wrote snapshot, teaser, og.png (${card.length} bytes)`);
+  }
+
+  if (summaryPath) writeFileSync(summaryPath, `${JSON.stringify(change, null, 2)}\n`);
+}
+
+/**
+ * Compare the freshly derived board against the committed snapshot so an
+ * unattended run can say what actually moved. `runChanged` is the interesting
+ * one: a new run_id or version means ship-sense re-scored the bank, and the
+ * page's method prose deserves a human read — the workflow escalates instead
+ * of pushing.
+ */
+async function describeChange(
+  runMeta: { runId: string; version: string; modelCount: number },
+  lineup: { label: string; score: number }[],
+) {
+  const prior = await import("../src/data/ship-sense-snapshot").catch(() => null);
+  const priorRun = prior?.SHIP_SENSE_RUN;
+  const priorLineup = prior?.SHIP_SENSE_LINEUP ?? [];
+  const priorLabels = new Set(priorLineup.map((m) => m.label));
+  const labels = new Set(lineup.map((m) => m.label));
+  const added = lineup.filter((m) => !priorLabels.has(m.label)).map((m) => m.label);
+  const removed = priorLineup.filter((m) => !labels.has(m.label)).map((m) => m.label);
+  const rescored = lineup.filter((m) => {
+    const was = priorLineup.find((p) => p.label === m.label);
+    return was && was.score !== m.score;
+  }).length;
+  const runChanged = !priorRun || priorRun.runId !== runMeta.runId || priorRun.version !== runMeta.version;
+
+  const parts: string[] = [];
+  if (added.length) parts.push(`+${added.join(", +")}`);
+  if (removed.length) parts.push(`-${removed.join(", -")}`);
+  if (rescored) parts.push(`${rescored} rescored`);
+  if (runChanged && priorRun)
+    parts.push(`run ${priorRun.runId} ${priorRun.version} -> ${runMeta.runId} ${runMeta.version}`);
+
+  return {
+    runId: runMeta.runId,
+    version: runMeta.version,
+    modelCount: runMeta.modelCount,
+    added,
+    removed,
+    rescored,
+    runChanged,
+    summary: parts.length ? parts.join("; ") : "no board movement",
+  };
 }
 
 main().catch((err) => {

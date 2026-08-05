@@ -11,10 +11,59 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.0",
   "runId": "2026-07-10",
   "bankItems": 67,
-  "modelCount": 21,
+  "modelCount": 22,
   "naiveFloor": 39.1,
-  "decisivePairs": 48,
-  "totalPairs": 210
+  "decisivePairs": 49,
+  "totalPairs": 231,
+  "scoringDates": [
+    {
+      "date": "2026-07-10",
+      "labels": [
+        "Muse Spark 1.1",
+        "Grok 4.5",
+        "Claude Fable 5",
+        "GPT-5.6 Sol",
+        "GPT-5.6 Terra",
+        "Gemini 3.1 Pro",
+        "GPT-5.6 Luna",
+        "Claude Haiku 4.5",
+        "Claude Sonnet 5",
+        "GPT-5.5",
+        "Claude Sonnet 4.6",
+        "GPT-5.4 mini",
+        "Claude Opus 4.8",
+        "Grok 4.3",
+        "Gemini 3.5 Flash",
+        "Gemini 3.1 Flash-Lite",
+        "GPT-5.4 nano"
+      ]
+    },
+    {
+      "date": "2026-07-17",
+      "labels": [
+        "Kimi K3"
+      ]
+    },
+    {
+      "date": "2026-07-21",
+      "labels": [
+        "Gemini 3.6 Flash",
+        "Gemini 3.5 Flash-Lite"
+      ]
+    },
+    {
+      "date": "2026-07-24",
+      "labels": [
+        "Claude Opus 5"
+      ]
+    },
+    {
+      "date": "2026-08-03",
+      "labels": [
+        "Qwen 3.8 Max"
+      ]
+    }
+  ]
 };
 
 export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
@@ -216,6 +265,21 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "conviction": 0.72,
     "priceIn": 3,
     "priceOut": 15
+  },
+  {
+    "name": "qwen3.8-max",
+    "label": "Qwen 3.8 Max",
+    "provider": "qwen",
+    "pos": 14,
+    "inLeaderBand": false,
+    "score": 77.1,
+    "lo": 72,
+    "hi": 82.1,
+    "restraint": 0.76,
+    "honesty": 0.79,
+    "conviction": 0.77,
+    "priceIn": 2,
+    "priceOut": 6
   }
 ];
 
