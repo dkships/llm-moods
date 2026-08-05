@@ -282,6 +282,24 @@ export type Database = {
         }
         Relationships: []
       }
+      scheduler_tokens: {
+        Row: {
+          created_at: string
+          id: number
+          token: string
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          token?: string
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          token?: string
+        }
+        Relationships: []
+      }
       scraped_posts: {
         Row: {
           author_followers: number | null
