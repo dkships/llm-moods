@@ -131,6 +131,7 @@ export type Database = {
           error_message: string
           function_name: string
           id: string
+          severity: string
         }
         Insert: {
           context?: string | null
@@ -138,6 +139,7 @@ export type Database = {
           error_message: string
           function_name: string
           id?: string
+          severity?: string
         }
         Update: {
           context?: string | null
@@ -145,6 +147,7 @@ export type Database = {
           error_message?: string
           function_name?: string
           id?: string
+          severity?: string
         }
         Relationships: []
       }
