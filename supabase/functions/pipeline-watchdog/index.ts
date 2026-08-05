@@ -26,6 +26,10 @@ const SCRAPER_STALE_HOURS_BY_SOURCE: Record<string, number> = {
   "scrape-bluesky": 11,
   "scrape-twitter": 11,
   "scrape-mastodon": 11,
+  // Added 2026-07-10, after this watchdog was written, so it went unmonitored:
+  // a silent App Store scraper failure alerted nobody. Same 3×/day windows as
+  // the others (cron '10 4,12,21'), so the same 11h threshold applies.
+  "scrape-appstore": 11,
 };
 // A scraper that runs on schedule but fails/skips every run never trips the
 // started_at check, so also alert when the last success/partial is older than
