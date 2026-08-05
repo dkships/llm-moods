@@ -620,3 +620,63 @@ describe("batch text sanitization", () => {
     expect(body).toContain("Claude is great");
   });
 });
+
+describe("result_count_mismatch singleton fallback", () => {
+  const ok = (sentiment: string) => ({
+    relevant: true,
+    sentiment,
+    complaint_category: sentiment === "negative" ? "general_drop" : null,
+    praise_category: sentiment === "positive" ? "output_quality" : null,
+    confidence: 0.9,
+    language: null,
+    english_translation: null,
+  });
+
+  const reply = (results: unknown[]) =>
+    new Response(JSON.stringify({
+      choices: [{ message: { content: JSON.stringify({ results }) } }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+  // A miscounted batch used to dead-letter every post in it. Twenty rows burned
+  // all five attempts this way, because each retry re-batched the same cohort.
+  it("re-runs a miscounted batch one post at a time instead of failing all of them", async () => {
+    let call = 0;
+    const fetchMock = vi.fn(async () => {
+      call += 1;
+      // First call: 4 results for 3 posts -> alignment untrusted.
+      if (call === 1) return reply([ok("negative"), ok("positive"), ok("neutral"), ok("positive")]);
+      return reply([ok("negative")]);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const results = await classifyBatch(
+      ["Claude broke my build", "Gemini is solid", "Grok is fine"],
+      "test-key",
+      25,
+      vi.fn(async () => {}),
+    );
+
+    expect(results).toHaveLength(3);
+    expect(results.every((r) => r.status === "classified")).toBe(true);
+    expect(results.every(isClassifierFailure)).toBe(false);
+    // 1 poisoned batch call + one call per post.
+    expect(fetchMock).toHaveBeenCalledTimes(4);
+  });
+
+  it("does not retry a single-post batch, so the fallback cannot recurse", async () => {
+    const fetchMock = vi.fn(async () => reply([ok("negative"), ok("positive")]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const results = await classifyBatch(
+      ["Claude broke my build", "Gemini is solid"],
+      "test-key",
+      1,
+      vi.fn(async () => {}),
+    );
+
+    expect(results).toHaveLength(2);
+    // batchSize 1 -> two length-1 descriptors, each mismatching, neither retried.
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(results.every((r) => r.error === "result_count_mismatch")).toBe(true);
+  });
+});

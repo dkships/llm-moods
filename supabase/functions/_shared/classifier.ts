@@ -1129,6 +1129,55 @@ function fillRemainingFromStop(stopResult: ClassifyResult, count: number): Class
 interface BatchDescriptor {
   numbered: string;
   length: number;
+  // Each entry is the same body rendered as a one-post batch, used by the
+  // result_count_mismatch fallback below. Same prompt, same schema — only the
+  // length differs.
+  singles: string[];
+}
+
+const MISMATCH_ERROR = "result_count_mismatch";
+
+function isBatchWideMismatch(results: ClassifyResult[], expected: number): boolean {
+  return results.length === expected
+    && results.every((r) => r.status === "parse_error" && r.error === MISMATCH_ERROR);
+}
+
+// A batch whose results array is longer than the batch is discarded wholesale,
+// because one miscounted post makes every position untrustworthy. Re-running the
+// same posts one at a time isolates the offender: a batch of one cannot be
+// misaligned, so the other N-1 posts classify normally instead of dead-lettering
+// alongside it. Twenty posts sat permanently failed on this, burning all five
+// attempts each, because every retry re-batched the same poisoned cohort.
+//
+// AGENT-REFERENCE.md records the alignment invariant from the 2026-07-30
+// compact-irrelevant incident: any retry needs index-keyed results or a hard
+// length-match guard. Length one IS that guard, and the prompt and schema are
+// untouched, so this does not reopen that failure mode.
+async function runDescriptor(
+  prompt: string,
+  d: BatchDescriptor,
+  apiKey: string,
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
+): Promise<ClassifyResult[]> {
+  const results = await batchClassifyWithPrompt(prompt, d.numbered, d.length, apiKey, logError, options);
+  if (d.length < 2 || !isBatchWideMismatch(results, d.length)) return results;
+
+  if (logError) {
+    await logError(`Batch of ${d.length} returned a count mismatch — retrying one post at a time`, "batch-classify-singleton-retry");
+  }
+
+  const singles: ClassifyResult[] = [];
+  for (const single of d.singles) {
+    try {
+      // Length 1, so this cannot recurse: isBatchWideMismatch is skipped above.
+      const [result] = await batchClassifyWithPrompt(prompt, single, 1, apiKey, logError, options);
+      singles.push(result ?? makeSkippedResult("parse_error", MISMATCH_ERROR));
+    } catch (e) {
+      singles.push(...batchExceptionResults(1, e));
+    }
+  }
+  return singles;
 }
 
 // Post text is interpolated raw into the numbered plain-text batch format, so a
@@ -1185,7 +1234,7 @@ async function runBatchesConcurrent(
       if (idx >= descriptors.length) return;
       const d = descriptors[idx];
       try {
-        out[idx] = await batchClassifyWithPrompt(prompt, d.numbered, d.length, apiKey, logError, options);
+        out[idx] = await runDescriptor(prompt, d, apiKey, logError, options);
       } catch (e) {
         if (logError) await logError(`Batch classify exception: ${e instanceof Error ? e.message : String(e)}`, "batch-classify-exception");
         out[idx] = batchExceptionResults(d.length, e);
@@ -1212,7 +1261,7 @@ async function runBatchesSerial(
   for (const d of descriptors) {
     consumed += d.length;
     try {
-      const results = await batchClassifyWithPrompt(prompt, d.numbered, d.length, apiKey, logError, options);
+      const results = await runDescriptor(prompt, d, apiKey, logError, options);
       allResults.push(...results);
       const stopResult = shouldStopAfterBatch(results);
       if (stopResult && consumed < totalLength) {
@@ -1257,8 +1306,9 @@ export async function classifyBatch(
   const descriptors: BatchDescriptor[] = [];
   for (let i = 0; i < texts.length; i += batchSize) {
     const batch = texts.slice(i, i + batchSize);
-    const numbered = batch.map((t, j) => `Post ${j + 1}: "${sanitizeBatchText(t.slice(0, CLASSIFY_INPUT_MAX_CHARS))}"`).join("\n\n");
-    descriptors.push({ numbered, length: batch.length });
+    const cleaned = batch.map((t) => sanitizeBatchText(t.slice(0, CLASSIFY_INPUT_MAX_CHARS)));
+    const numbered = cleaned.map((t, j) => `Post ${j + 1}: "${t}"`).join("\n\n");
+    descriptors.push({ numbered, length: batch.length, singles: cleaned.map((t) => `Post 1: "${t}"`) });
   }
   return runBatches(BATCH_CLASSIFY_PROMPT, descriptors, texts.length, apiKey, logError, options);
 }
@@ -1275,8 +1325,15 @@ export async function classifyBatchTargeted(
   const descriptors: BatchDescriptor[] = [];
   for (let i = 0; i < items.length; i += batchSize) {
     const batch = items.slice(i, i + batchSize);
-    const numbered = batch.map((item, j) => `Post ${j + 1} [TARGET: ${item.targetModel}]: "${sanitizeBatchText(item.text.slice(0, CLASSIFY_INPUT_MAX_CHARS))}"`).join("\n\n");
-    descriptors.push({ numbered, length: batch.length });
+    const cleaned = batch.map((item) => ({ target: item.targetModel, text: sanitizeBatchText(item.text.slice(0, CLASSIFY_INPUT_MAX_CHARS)) }));
+    const numbered = cleaned.map((c, j) => `Post ${j + 1} [TARGET: ${c.target}]: "${c.text}"`).join("\n\n");
+    descriptors.push({
+      numbered,
+      length: batch.length,
+      // Target is carried through, so a singleton retry keeps per-model
+      // attribution instead of falling back to untargeted classification.
+      singles: cleaned.map((c) => `Post 1 [TARGET: ${c.target}]: "${c.text}"`),
+    });
   }
   return runBatches(BATCH_CLASSIFY_TARGETED_PROMPT, descriptors, items.length, apiKey, logError, options);
 }
