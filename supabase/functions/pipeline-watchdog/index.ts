@@ -177,12 +177,18 @@ Deno.serve(async (req) => {
         // Alert `level` (warn/error) is flattened to severity=critical so
         // get_critical_alerts surfaces everything; the level survives in the
         // message prefix. Post-fix, staleness alerts are rare and genuine.
-        await supabase.from("error_log").insert({
+        const { error: alertError } = await supabase.from("error_log").insert({
           function_name: SOURCE,
           severity: "critical",
           error_message: `[${a.level}] ${a.message}`,
           context: JSON.stringify(a.context),
         });
+        // Discarding this result is what hid the missing error_log.severity
+        // column: every alert insert was rejected and the watchdog reported
+        // healthy anyway. An alerting path must never fail quietly.
+        if (alertError) {
+          console.error(`pipeline-watchdog: could not record alert: ${alertError.message}`);
+        }
       }
     }
 
