@@ -30,7 +30,7 @@ Deno.serve(async (req) => {
   if (
     !isInternalServiceRequest(req)
     && !isRunPipelineTriggerRequest(req)
-    && !await isSchedulerRequest(body, "drain-classifications")
+    && !isSchedulerRequest(body, "drain-classifications")
   ) {
     return internalOnlyResponse(corsHeaders);
   }

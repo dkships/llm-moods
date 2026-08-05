@@ -69,7 +69,7 @@ export async function handleScrapeHackerNews(req: Request): Promise<Response> {
   if (
     !isInternalServiceRequest(req)
     && !isRunPipelineTriggerRequest(req)
-    && !await isSchedulerRequest(body, "scrape-hackernews")
+    && !isSchedulerRequest(body, "scrape-hackernews")
   ) {
     return internalOnlyResponse(corsHeaders);
   }

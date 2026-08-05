@@ -104,7 +104,7 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
   if (
     !isInternalServiceRequest(req)
     && !isRunPipelineTriggerRequest(req)
-    && !await isSchedulerRequest(body, "scrape-bluesky")
+    && !isSchedulerRequest(body, "scrape-bluesky")
   ) {
     return internalOnlyResponse(corsHeaders);
   }

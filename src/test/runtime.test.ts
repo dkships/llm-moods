@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  hasSchedulerBodyShape,
   isMaintenanceRequestAllowed,
+  isSchedulerRequest,
 } from "../../supabase/functions/_shared/runtime";
 
 describe("edge runtime request policy", () => {
@@ -15,11 +15,11 @@ describe("edge runtime request policy", () => {
   });
 
   it("allows explicit pg_cron scheduler payloads for a matching pipeline", () => {
-    expect(hasSchedulerBodyShape({ scheduler: "pg_cron", pipeline: "run-scrapers" }, "run-scrapers")).toBe(true);
-    expect(hasSchedulerBodyShape({ scheduler: "pg_cron", pipeline: "scrape-hackernews" }, "scrape-")).toBe(true);
+    expect(isSchedulerRequest({ scheduler: "pg_cron", pipeline: "run-scrapers" }, "run-scrapers")).toBe(true);
+    expect(isSchedulerRequest({ scheduler: "pg_cron", pipeline: "scrape-hackernews" }, "scrape-")).toBe(true);
   });
 
   it("rejects scheduler payloads with the wrong pipeline", () => {
-    expect(hasSchedulerBodyShape({ scheduler: "pg_cron", pipeline: "cleanup-old-posts" }, "aggregate-vibes")).toBe(false);
+    expect(isSchedulerRequest({ scheduler: "pg_cron", pipeline: "cleanup-old-posts" }, "aggregate-vibes")).toBe(false);
   });
 });

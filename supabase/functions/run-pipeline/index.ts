@@ -8,7 +8,6 @@ import {
   internalOnlyResponse,
   isInternalServiceRequest,
   isRunPipelineTriggerRequest,
-  isSchedulerRequest,
   isUniqueViolation,
   loadScraperConfig,
   readJsonBody,
@@ -84,10 +83,8 @@ Deno.serve(async (req) => {
   const body = await readJsonBody(req);
   const isInternal = isInternalServiceRequest(req);
   const isPipelineTrigger = isRunPipelineTriggerRequest(req);
-  const isScheduler = body.dry_run !== true
-    && body.dryRun !== true
-    && await isSchedulerRequest(body, SOURCE);
-  if (!isInternal && !isPipelineTrigger && !isScheduler) return internalOnlyResponse(corsHeaders);
+  const isSchedulerRequest = body.scheduler === "pg_cron" && body.pipeline === SOURCE && body.dry_run !== true && body.dryRun !== true;
+  if (!isInternal && !isPipelineTrigger && !isSchedulerRequest) return internalOnlyResponse(corsHeaders);
 
   const supabase = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
   const dryRun = body.dry_run === true || body.dryRun === true;

@@ -335,7 +335,7 @@ Deno.serve(async (req) => {
   if (
     !isInternalServiceRequest(req) &&
     !isRunPipelineTriggerRequest(req) &&
-    !await isSchedulerRequest(body, SOURCE)
+    !isSchedulerRequest(body, SOURCE)
   ) {
     return internalOnlyResponse(corsHeaders);
   }

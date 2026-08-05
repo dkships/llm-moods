@@ -338,7 +338,7 @@ Deno.serve(async (req) => {
 
   const body = await readJsonBody(req);
   const isInternal = isInternalServiceRequest(req);
-  const isScheduler = await isSchedulerRequest(body, SOURCE);
+  const isScheduler = isSchedulerRequest(body, SOURCE);
 
   if (!isMaintenanceRequestAllowed(body.maintenance, isInternal)) {
     return internalOnlyResponse(corsHeaders);

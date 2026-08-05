@@ -101,7 +101,7 @@ export async function handleScrapeMastodon(req: Request): Promise<Response> {
   if (
     !isInternalServiceRequest(req)
     && !isRunPipelineTriggerRequest(req)
-    && !await isSchedulerRequest(body, "scrape-mastodon")
+    && !isSchedulerRequest(body, "scrape-mastodon")
   ) {
     return internalOnlyResponse(corsHeaders);
   }
