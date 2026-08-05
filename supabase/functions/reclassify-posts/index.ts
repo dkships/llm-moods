@@ -160,6 +160,13 @@ const TRANSIENT_ERROR_PATTERNS = [
   "JSON",
   "position",
   "unparseable_response",
+  // The classifier marks both of these "retryable parse_error" when a batch's
+  // positional alignment is untrusted, but they were missing here, so
+  // reset_failed?error_pattern=transient silently skipped them and they piled
+  // up in the dead-letter queue. Batch-level, not post-level: a retry re-batches
+  // the rows and usually clears them.
+  "result_count_mismatch",
+  "missing_result_index",
 ];
 
 async function handleResetFailed(

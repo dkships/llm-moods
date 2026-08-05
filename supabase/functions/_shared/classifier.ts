@@ -1033,7 +1033,11 @@ export async function classifyPost(
   const startedAt = performance.now();
   try {
     const singleTokens = options.maxTokensOverride && options.maxTokensOverride > 0 ? options.maxTokensOverride : 700;
-    const res = await callClassifier(CLASSIFY_PROMPT, text.slice(0, CLASSIFY_INPUT_MAX_CHARS), apiKey, singleTokens, "single", logError, options);
+    // Surrogate stripping is transport-level, so it has to happen here too:
+    // classifyBatch short-circuits a single post straight to this function,
+    // which never touches sanitizeBatchText.
+    const singleText = stripLoneSurrogates(text.slice(0, CLASSIFY_INPUT_MAX_CHARS));
+    const res = await callClassifier(CLASSIFY_PROMPT, singleText, apiKey, singleTokens, "single", logError, options);
     if (!(res instanceof Response)) {
       if (logError) await logError(`AI gateway ${res.status}: ${res.error}`, "classify-error");
       return res;
@@ -1133,8 +1137,21 @@ interface BatchDescriptor {
 // wrong sentiment AND wrong model, written as terminal `classified`. Neutralize
 // the framing tokens before interpolation. Occurs organically (people quote the
 // dashboard's own format, tweets containing "Post 2:" patterns), not just adversarially.
+// Scraped text can carry an unpaired UTF-16 surrogate (truncated emoji, bad
+// upstream encoding). JSON.stringify escapes it to a bare \udXXX, which is
+// well-formed per ES2019 but which Anthropic's parser rejects outright:
+// "The request body is not valid JSON: no low surrogate in string". That 400
+// kills the whole batch and is permanent — the same bytes fail every retry, so
+// the rows sit in the dead-letter queue until the text is repaired. Drop the
+// unpaired halves; paired surrogates (real emoji) are untouched.
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+function stripLoneSurrogates(text: string): string {
+  return text.replace(LONE_SURROGATE, "");
+}
+
 function sanitizeBatchText(text: string): string {
-  return text
+  return stripLoneSurrogates(text)
     .replace(/"/g, "'")
     .replace(/\[\s*TARGET\s*:/gi, "(TARGET:")
     .replace(/\b(Post)\s+(\d+)\s*:/gi, "$1 $2 -");

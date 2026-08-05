@@ -572,3 +572,51 @@ describe("batch alignment hardening (2026-07 audit)", () => {
     })).toBe("tweet Claude rocks");
   });
 });
+
+describe("batch text sanitization", () => {
+  // Built with fromCharCode so this source file stays well-formed UTF-16.
+  const LONE_HIGH = String.fromCharCode(0xd83d);
+  const LONE_SURROGATE_RE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+
+  async function captureRequestBody(texts: string[]): Promise<string> {
+    let captured = "";
+    const fetchMock = vi.fn(async (_url: unknown, init?: { body?: unknown }) => {
+      captured = String(init?.body ?? "");
+      return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await classifyBatch(texts, "test-key", 25, vi.fn(async () => {}));
+    return captured;
+  }
+
+  // Anthropic rejects a bare \udXXX escape with "no low surrogate in string",
+  // which 400s the whole request permanently. 14 rows sat failed on this.
+  // Both paths need covering: classifyBatch short-circuits a single post to
+  // classifyPost, which does not go through sanitizeBatchText.
+  it("strips an unpaired surrogate on the single-post path", async () => {
+    const body = await captureRequestBody([`Claude broke${LONE_HIGH} my flow`]);
+
+    expect(body).not.toMatch(LONE_SURROGATE_RE);
+    expect(body.toLowerCase()).not.toContain("\\ud83d");
+    expect(body).toContain("Claude broke");
+  });
+
+  it("strips an unpaired surrogate on the batch path", async () => {
+    const body = await captureRequestBody([
+      `Claude broke${LONE_HIGH} my flow`,
+      "Gemini is fine today",
+    ]);
+
+    expect(body).not.toMatch(LONE_SURROGATE_RE);
+    expect(body.toLowerCase()).not.toContain("\\ud83d");
+    expect(body).toContain("Gemini is fine today");
+  });
+
+  it("keeps valid paired surrogates intact", async () => {
+    const body = await captureRequestBody(["Claude is great \u{1F600} today"]);
+
+    expect(body).not.toMatch(LONE_SURROGATE_RE);
+    expect(JSON.parse(body)).toBeTruthy();
+    expect(body).toContain("Claude is great");
+  });
+});
