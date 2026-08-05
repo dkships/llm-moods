@@ -81,15 +81,79 @@ export function isRunPipelineTriggerRequest(req: Request): boolean {
   return Boolean(triggerSecret && req.headers.get(RUN_PIPELINE_TRIGGER_HEADER) === triggerSecret);
 }
 
-// pg_cron invokes edge functions with the public anon JWT (the only key safe
-// to embed in a public-repo migration). To accept those calls without weakening
-// the service-role gate, we require a body shape that pg_cron sets explicitly.
-export function isSchedulerRequest(body: unknown, expectedPipelinePrefix: string): boolean {
+// pg_cron invokes edge functions with the public anon JWT (the only key safe to
+// embed in a public-repo migration), and these functions run with
+// verify_jwt = false. The body shape is documented in this public repo, so it
+// authenticates nothing on its own — scheduler calls must ALSO carry a secret
+// token that only the database and the service role can read. The token lives
+// in public.scheduler_tokens (RLS on, zero policies) and is injected into every
+// cron body by migration 20260805130000_scheduler_token_auth.sql.
+export function hasSchedulerBodyShape(body: unknown, expectedPipelinePrefix: string): boolean {
   if (!body || typeof body !== "object") return false;
   const candidate = body as { scheduler?: unknown; pipeline?: unknown };
   return candidate.scheduler === "pg_cron"
     && typeof candidate.pipeline === "string"
     && candidate.pipeline.startsWith(expectedPipelinePrefix);
+}
+
+let cachedSchedulerToken: string | null = null;
+
+async function loadSchedulerToken(): Promise<string | null> {
+  if (cachedSchedulerToken) return cachedSchedulerToken;
+  const url = Deno.env.get("SUPABASE_URL");
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url || !serviceRoleKey) {
+    console.error("scheduler token: SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY missing");
+    return null;
+  }
+  try {
+    const response = await fetch(`${url}/rest/v1/scheduler_tokens?id=eq.1&select=token`, {
+      headers: {
+        apikey: serviceRoleKey,
+        Authorization: `Bearer ${serviceRoleKey}`,
+      },
+    });
+    if (!response.ok) {
+      // Fails closed. A 404 here means the migration has not been applied (or
+      // PostgREST has not reloaded its schema cache) — every scheduled job will
+      // 403 until it is, so this needs to be loud.
+      console.error(`scheduler token: lookup failed with ${response.status}`);
+      return null;
+    }
+    const rows = await response.json();
+    const token = Array.isArray(rows) && typeof rows[0]?.token === "string" ? rows[0].token : null;
+    if (!token) {
+      console.error("scheduler token: public.scheduler_tokens has no row id=1");
+      return null;
+    }
+    cachedSchedulerToken = token;
+    return token;
+  } catch (error) {
+    console.error(`scheduler token: lookup threw ${String(error)}`);
+    return null;
+  }
+}
+
+// Length-independent comparison so a mismatch costs the same time regardless of
+// where it diverges.
+function secretsMatch(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) {
+    diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  }
+  return diff === 0;
+}
+
+export async function isSchedulerRequest(
+  body: unknown,
+  expectedPipelinePrefix: string,
+): Promise<boolean> {
+  if (!hasSchedulerBodyShape(body, expectedPipelinePrefix)) return false;
+  const provided = (body as { token?: unknown }).token;
+  if (typeof provided !== "string" || provided.length < 16) return false;
+  const expected = await loadSchedulerToken();
+  return Boolean(expected) && secretsMatch(provided, expected!);
 }
 
 export function internalOnlyResponse(corsHeaders: HeadersInit): Response {
