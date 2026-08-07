@@ -11,15 +11,14 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.0",
   "runId": "2026-07-10",
   "bankItems": 67,
-  "modelCount": 22,
+  "modelCount": 23,
   "naiveFloor": 39.1,
-  "decisivePairs": 49,
-  "totalPairs": 231,
+  "decisivePairs": 58,
+  "totalPairs": 253,
   "scoringDates": [
     {
       "date": "2026-07-10",
       "labels": [
-        "Muse Spark 1.1",
         "Grok 4.5",
         "Claude Fable 5",
         "GPT-5.6 Sol",
@@ -28,6 +27,7 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "GPT-5.6 Luna",
         "Claude Haiku 4.5",
         "Claude Sonnet 5",
+        "Muse Spark 1.1",
         "GPT-5.5",
         "Claude Sonnet 4.6",
         "GPT-5.4 mini",
@@ -62,23 +62,29 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
       "labels": [
         "Qwen 3.8 Max"
       ]
+    },
+    {
+      "date": "2026-08-06",
+      "labels": [
+        "Muse Spark 1.2"
+      ]
     }
   ]
 };
 
 export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
   {
-    "name": "muse-spark-1.1",
-    "label": "Muse Spark 1.1",
+    "name": "muse-spark-1.2",
+    "label": "Muse Spark 1.2",
     "provider": "meta",
     "pos": 1,
     "inLeaderBand": true,
-    "score": 89.9,
-    "lo": 86.5,
-    "hi": 92.8,
+    "score": 89,
+    "lo": 85.6,
+    "hi": 92.1,
     "restraint": 0.85,
-    "honesty": 0.85,
-    "conviction": 1,
+    "honesty": 0.83,
+    "conviction": 0.99,
     "priceIn": 1.25,
     "priceOut": 4.25
   },
@@ -164,7 +170,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "label": "Gemini 3.6 Flash",
     "provider": "google",
     "pos": 7,
-    "inLeaderBand": false,
+    "inLeaderBand": true,
     "score": 81.4,
     "lo": 77,
     "hi": 85.6,
@@ -352,6 +358,16 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "deltaPts": -0.8,
     "loPts": -5,
     "hiPts": 2.9,
+    "verdict": "down"
+  },
+  {
+    "prevLabel": "Muse Spark 1.1",
+    "currLabel": "Muse Spark 1.2",
+    "prevScore": 89.9,
+    "currScore": 89,
+    "deltaPts": -0.9,
+    "loPts": -2.7,
+    "hiPts": 0.8,
     "verdict": "down"
   },
   {
