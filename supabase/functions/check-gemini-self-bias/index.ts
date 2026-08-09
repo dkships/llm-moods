@@ -9,9 +9,10 @@ import {
 import { internalOnlyResponse, isInternalServiceRequest, readJsonBody } from "../_shared/runtime.ts";
 
 // Cross-vendor classifier canary for sentiment model upgrades. Compares candidate
-// models (Gemini and Claude) against either a senior oracle model or the existing
-// stored labels, and never writes to scraped_posts or public scores. Claude
-// candidates use ANTHROPIC_API_KEY; Gemini candidates/oracle use GEMINI_API_KEY.
+// models (Gemini, Claude, or GPT) against either a senior oracle model or the
+// existing stored labels, and never writes to scraped_posts or public scores.
+// Claude candidates use ANTHROPIC_API_KEY, gpt-* candidates use OPENAI_API_KEY,
+// Gemini candidates/oracle use GEMINI_API_KEY.
 
 const SOURCE = "check-gemini-self-bias";
 const DEFAULT_ORACLE = "gemini-2.5-pro";
@@ -52,6 +53,9 @@ const PRICING: Record<string, { input: number; output: number }> = {
   "claude-haiku-4-5": { input: 1.0, output: 5.0 },
   "claude-sonnet-4-6": { input: 3.0, output: 15.0 },
   "claude-opus-4-8": { input: 5.0, output: 25.0 },
+  "gpt-5.6-luna": { input: 0.20, output: 1.20 },
+  "gpt-5.6-terra": { input: 2.0, output: 12.0 },
+  "gpt-5.6-sol": { input: 5.0, output: 30.0 },
 };
 
 // Anthropic prompt-cache read multiplier (vs base input price).
@@ -578,12 +582,14 @@ Deno.serve(async (req) => {
     : undefined;
 
   // Per-provider keys. Gemini candidates/oracle use GEMINI_API_KEY (there is no
-  // separate free-tier key); Claude candidates use ANTHROPIC_API_KEY. Missing keys
-  // don't 500 — the affected models are skipped so a single-vendor run still works.
+  // separate free-tier key); Claude candidates use ANTHROPIC_API_KEY; gpt-*
+  // candidates use OPENAI_API_KEY. Missing keys don't 500 — the affected models
+  // are skipped so a single-vendor run still works.
   const geminiKey = Deno.env.get("GEMINI_API_KEY");
   const anthropicKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!geminiKey && !anthropicKey) {
-    return jsonResponse({ error: "No classifier API key configured (need GEMINI_API_KEY and/or ANTHROPIC_API_KEY)" }, 500);
+  const openaiKey = Deno.env.get("OPENAI_API_KEY");
+  if (!geminiKey && !anthropicKey && !openaiKey) {
+    return jsonResponse({ error: "No classifier API key configured (need GEMINI_API_KEY, ANTHROPIC_API_KEY, and/or OPENAI_API_KEY)" }, 500);
   }
 
   const logError = async (msg: string, ctx?: string) => {
@@ -620,12 +626,14 @@ Deno.serve(async (req) => {
     const runModel = async (model: string) => {
       const usage: UsageSample[] = [];
       const provider = providerForModel(model);
-      const key = provider === "anthropic" ? anthropicKey : geminiKey;
+      const key = provider === "anthropic" ? anthropicKey : provider === "openai" ? openaiKey : geminiKey;
       if (!key) {
-        await logError(
-          `Skipping ${model}: ${provider === "anthropic" ? "ANTHROPIC_API_KEY" : "GEMINI_API_KEY"} not configured`,
-          "model-key-missing",
-        );
+        const keyName = provider === "anthropic"
+          ? "ANTHROPIC_API_KEY"
+          : provider === "openai"
+          ? "OPENAI_API_KEY"
+          : "GEMINI_API_KEY";
+        await logError(`Skipping ${model}: ${keyName} not configured`, "model-key-missing");
         return { results: [] as ClassifyResult[], usage };
       }
       const thinking = isThinkingOnly(model);

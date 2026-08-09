@@ -51,7 +51,7 @@ Every day, thousands of developers share their real experiences with AI models a
 | State | TanStack React Query 5 |
 | Animations | Framer Motion 12 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Sentiment AI | Claude Haiku 4.5 via the Anthropic API (free-tier Gemini fallback) |
+| Sentiment AI | GPT-5.6 Luna via the OpenAI API (Gemini spillover fallback; provider-pluggable via `CLASSIFIER_MODEL`) |
 
 ## Getting Started
 
