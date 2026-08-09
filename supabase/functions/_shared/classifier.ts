@@ -1,6 +1,7 @@
 import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "./taxonomy.ts";
 
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
+const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
 const ANTHROPIC_VERSION = "2023-06-01";
 const DEFAULT_MODEL = "gemini-2.5-flash";
@@ -88,13 +89,17 @@ function classifierModel(options: ClassifyOptions = {}): string {
   return options.model ?? envValue("CLASSIFIER_MODEL", envValue("GEMINI_CLASSIFIER_MODEL", DEFAULT_MODEL));
 }
 
-export type ClassifierProvider = "anthropic" | "gemini";
+export type ClassifierProvider = "anthropic" | "gemini" | "openai";
 
 // Provider is selected by model-id prefix alone, so setting CLASSIFIER_MODEL (or
 // passing options.model) is the only switch needed. claude-* → Anthropic native
-// Messages API; everything else → Gemini's OpenAI-compatible endpoint.
+// Messages API; gpt-* → OpenAI chat completions; everything else → Gemini's
+// OpenAI-compatible endpoint.
 export function providerForModel(model: string): ClassifierProvider {
-  return model.toLowerCase().startsWith("claude") ? "anthropic" : "gemini";
+  const normalized = model.toLowerCase();
+  if (normalized.startsWith("claude")) return "anthropic";
+  if (normalized.startsWith("gpt")) return "openai";
+  return "gemini";
 }
 
 // The active production model (env-driven) unless an explicit model is passed.
@@ -108,7 +113,9 @@ export function resolveClassifierModel(options: ClassifyOptions = {}): string {
 export function getClassifierApiKey(model?: string): string | undefined {
   const provider = providerForModel(model ?? classifierModel());
   const env = (globalThis as DenoGlobal).Deno?.env;
-  return provider === "anthropic" ? env?.get("ANTHROPIC_API_KEY") : env?.get("GEMINI_API_KEY");
+  if (provider === "anthropic") return env?.get("ANTHROPIC_API_KEY");
+  if (provider === "openai") return env?.get("OPENAI_API_KEY");
+  return env?.get("GEMINI_API_KEY");
 }
 
 function quotaKeyFor(model: string, options: ClassifyOptions = {}): string {
@@ -543,17 +550,25 @@ function responseSchema(mode: "single" | "batch") {
 
 function requestBody(prompt: string, maxTokens: number, mode: "single" | "batch", options: ClassifyOptions = {}) {
   const model = classifierModel(options);
+  const provider = providerForModel(model);
   const effort = options.reasoningEffort ?? "none";
   const body: Record<string, unknown> = {
     model,
     messages: [{ role: "user", content: prompt }],
-    max_tokens: maxTokens,
-    temperature: 0,
     response_format: {
       type: "json_schema",
       json_schema: responseSchema(mode),
     },
   };
+  if (provider === "openai") {
+    // GPT-5.x chat completions reject `max_tokens` (use max_completion_tokens)
+    // and reject any non-default `temperature`; forced json_schema output keeps
+    // classification stable without it.
+    body.max_completion_tokens = maxTokens;
+  } else {
+    body.max_tokens = maxTokens;
+    body.temperature = 0;
+  }
   if (effort !== "omit") {
     body.reasoning_effort = effort;
   }
@@ -829,6 +844,78 @@ async function fetchGemini(
   return makeSkippedResult("classifier_error", "retry_exhausted");
 }
 
+// OpenAI path: same request/response dialect as the Gemini path (chat
+// completions + strict json_schema response_format), but no Postgres quota
+// gate — paid-tier OpenAI limits dwarf the pipeline's ~10 calls/pass, so
+// 429/transient backoff is the safety net, mirroring the Anthropic path.
+// readGeminiFailure parses OpenAI's {error:{type,message}} shape fine.
+async function fetchOpenAi(
+  prompt: string,
+  apiKey: string,
+  maxTokens: number,
+  mode: "single" | "batch",
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+  options: ClassifyOptions = {},
+): Promise<Response | ClassifyResult> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    let res: Response | null = null;
+    try {
+      res = await fetch(OPENAI_API_URL, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+        body: requestBody(prompt, maxTokens, mode, options),
+      });
+    } catch (e) {
+      if (attempt === 2) {
+        return makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e));
+      }
+      await new Promise((r) => setTimeout(r, retryDelayMs(null, attempt)));
+      continue;
+    }
+
+    if (res.ok) return res;
+
+    if (res.status === 429) {
+      const details = await readGeminiFailure(res);
+      const requestErrorId = nextRequestErrorId();
+      if (logError) {
+        await logError(`OpenAI 429 (${requestErrorId}): ${details.reason}`, "classify-request-quota");
+      }
+      if (
+        details.retryAfterMs !== null
+        && details.retryAfterMs > 0
+        && details.retryAfterMs <= MAX_REMOTE_429_RETRY_WAIT_MS
+        && attempt < 2
+      ) {
+        await new Promise((r) => setTimeout(r, details.retryAfterMs!));
+        continue;
+      }
+      return makeSkippedResult("quota_deferred", details.reason, {
+        error_type: details.errorType ?? "rate_limit_error",
+        request_error_id: requestErrorId,
+        retry_after_ms: details.retryAfterMs,
+      });
+    }
+
+    if (!TRANSIENT_STATUSES.has(res.status) || attempt === 2) {
+      const details = await readGeminiFailure(res);
+      const requestErrorId = nextRequestErrorId();
+      if (logError) await logError(`OpenAI request failed (${requestErrorId}): ${details.reason}`, "classify-request-error");
+      return makeSkippedResult("classifier_error", details.reason, {
+        error_type: details.errorType,
+        request_error_id: requestErrorId,
+        retry_after_ms: details.retryAfterMs,
+      });
+    }
+
+    const waitMs = retryDelayMs(res, attempt);
+    if (logError) await logError(`OpenAI HTTP ${res.status}, retrying in ${waitMs}ms (attempt ${attempt + 1}/3)`, "classify-retry");
+    await new Promise((r) => setTimeout(r, waitMs));
+  }
+
+  return makeSkippedResult("classifier_error", "retry_exhausted");
+}
+
 // Tool whose input_schema wraps results exactly as the Gemini path returns them
 // ({result} single / {results} batch), so the downstream JSON parser is shared.
 // Forcing this tool guarantees schema-shaped output without prose JSON.
@@ -1007,8 +1094,10 @@ async function fetchAnthropic(
 }
 
 // Single dispatch point: claude-* models go to the Anthropic native path (no
-// Gemini quota gate), everything else to Gemini. Gemini keeps its single
-// concatenated prompt; Anthropic gets the instruction/posts split for caching.
+// Gemini quota gate), gpt-* to OpenAI, everything else to Gemini. Gemini and
+// OpenAI keep the single concatenated prompt (OpenAI's automatic prefix caching
+// picks up the static instruction prefix); Anthropic gets the instruction/posts
+// split for explicit caching.
 function callClassifier(
   instructions: string,
   postsBlock: string,
@@ -1018,8 +1107,12 @@ function callClassifier(
   logError?: (msg: string, ctx?: string) => Promise<void>,
   options: ClassifyOptions = {},
 ): Promise<Response | ClassifyResult> {
-  if (providerForModel(classifierModel(options)) === "anthropic") {
+  const provider = providerForModel(classifierModel(options));
+  if (provider === "anthropic") {
     return fetchAnthropic(instructions, postsBlock, apiKey, maxTokens, mode, logError, options);
+  }
+  if (provider === "openai") {
+    return fetchOpenAi(instructions + postsBlock, apiKey, maxTokens, mode, logError, options);
   }
   return fetchGemini(instructions + postsBlock, apiKey, maxTokens, mode, logError, options);
 }
@@ -1288,9 +1381,11 @@ function runBatches(
   options: ClassifyOptions = {},
 ): Promise<ClassifyResult[]> {
   if (descriptors.length === 0) return Promise.resolve([]);
-  return providerForModel(classifierModel(options)) === "anthropic"
-    ? runBatchesConcurrent(prompt, descriptors, apiKey, logError, options)
-    : runBatchesSerial(prompt, descriptors, totalLength, apiKey, logError, options);
+  // Gemini is the only provider with the free-tier quota gate + pacing needs;
+  // Anthropic and OpenAI both run bounded-concurrency lanes.
+  return providerForModel(classifierModel(options)) === "gemini"
+    ? runBatchesSerial(prompt, descriptors, totalLength, apiKey, logError, options)
+    : runBatchesConcurrent(prompt, descriptors, apiKey, logError, options);
 }
 
 export async function classifyBatch(

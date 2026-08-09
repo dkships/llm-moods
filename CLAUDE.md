@@ -39,7 +39,7 @@ Edge functions that hit paid APIs (Anthropic, Apify, Gemini, etc.) MUST keep the
 ## Classifier & scraper invariants
 
 Read `AGENT-REFERENCE.md` before changing `_shared/classifier.ts` or any scraper. Invariants that must hold:
-- Classifier is Claude Haiku 4.5; a model swap is a pure config flip via `CLASSIFIER_MODEL` — rollback = `CLASSIFIER_MODEL=gemini-2.5-flash` (no redeploy, both providers stay live)
+- Classifier model is a pure config flip via `CLASSIFIER_MODEL` (claude-* → Anthropic, gpt-* → OpenAI, else Gemini; keys `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`). Cutover to `gpt-5.6-luna` initiated 2026-08-08 (smoke-tested against production prompts/schema) — rollback = `CLASSIFIER_MODEL=claude-haiku-4-5-20251001` or `gemini-2.5-flash` (no redeploy, all providers stay live)
 - Strict tool use (`strict:true`) stays OFF — nullable-union schema 400s under the structured-output subset (verified in prod 2026-06-02)
 - Reddit comment ingestion stays disabled (`include_comments=false`) until a comment→parent-post attribution fix exists
 - `maxTotalChargeUsd` is the authoritative Apify cost cap ($29/mo budget; in-code guard in `_shared/apify-budget.ts`)
@@ -73,7 +73,7 @@ Full pattern catalog (vendor events overlay, surface tagging, anomaly detection,
 
 ## Secrets
 
-- Edge-function secret store (verified 2026-06-20) is exactly: `CLASSIFIER_MODEL`, `ANTHROPIC_API_KEY`, `RUN_PIPELINE_TRIGGER_SECRET`, `GEMINI_API_KEY`, `APIFY_API_TOKEN`, `BLUESKY_APP_PASSWORD`, `BLUESKY_HANDLE`, `LOVABLE_API_KEY`. No `MASTODON_*`, `DISCOURSE_*`, `GITHUB_TOKEN`, or `LEMMY_*` — those integrations are inert (Mastodon uses public endpoints).
+- Edge-function secret store (verified 2026-06-20) is exactly: `CLASSIFIER_MODEL`, `ANTHROPIC_API_KEY`, `RUN_PIPELINE_TRIGGER_SECRET`, `GEMINI_API_KEY`, `APIFY_API_TOKEN`, `BLUESKY_APP_PASSWORD`, `BLUESKY_HANDLE`, `LOVABLE_API_KEY`, plus `OPENAI_API_KEY` (added 2026-08-08 for the GPT-5.6 classifier). No `MASTODON_*`, `DISCOURSE_*`, `GITHUB_TOKEN`, or `LEMMY_*` — those integrations are inert (Mastodon uses public endpoints).
 - Frontend `VITE_SUPABASE_URL` / `VITE_SUPABASE_PUBLISHABLE_KEY` are public anon creds, hardcoded as fallbacks in `src/integrations/supabase/client.ts` — safe to expose.
 
 ## Accuracy

@@ -27,9 +27,9 @@ export function currentClassifierVersion(model?: string): string {
 // Back-compat export; equals the env-resolved version at module load.
 export const CURRENT_CLASSIFIER_VERSION = currentClassifierVersion();
 
-// Gemini spillover: when Claude is the active classifier, posts that hit a
-// transient classifier_error are retried through Gemini so a Claude blip doesn't
-// stall the queue. Uses the paid GEMINI_API_KEY (the production setup as of
+// Gemini spillover: when a non-Gemini model (Claude or GPT) is the active
+// classifier, posts that hit a transient classifier_error are retried through
+// Gemini so a primary-provider blip doesn't stall the queue. Uses the paid GEMINI_API_KEY (the production setup as of
 // 2026-06 — owner accepts the small cost; Gemini is cheap; there is no separate
 // free-tier key). Paced via its own quota bucket (defaults 8/min, 200/day) so
 // spillover stays bounded; raise GEMINI_FREE_MINUTE_REQUEST_LIMIT /
@@ -183,8 +183,8 @@ function statusFromUpdate(payload: Record<string, unknown>): ModelMentionClassif
 
 // Mutates `results` in place: retries only the rows that came back as a transient
 // classifier_error through Gemini (GEMINI_API_KEY) and merges any positive
-// recoveries. Returns the count recovered. No-op unless Claude is the active
-// classifier and GEMINI_API_KEY is set.
+// recoveries. Returns the count recovered. No-op unless a non-Gemini model is
+// the active classifier and GEMINI_API_KEY is set.
 //
 // Correctness guards (so a spillover blip can never corrupt good data):
 //   - Only classifier_error indices are retried. quota_deferred is left alone —
@@ -201,7 +201,7 @@ async function applyFreeGeminiSpillover(
   batchSize: number,
   logError?: (msg: string, ctx?: string) => Promise<void>,
 ): Promise<number> {
-  if (providerForModel(resolveClassifierModel()) !== "anthropic") return 0;
+  if (providerForModel(resolveClassifierModel()) === "gemini") return 0;
   const env = (globalThis as DenoGlobal).Deno?.env;
   const geminiKey = env?.get("GEMINI_API_KEY");
   if (!geminiKey) return 0;
@@ -235,7 +235,7 @@ async function applyFreeGeminiSpillover(
   }
   if (recovered > 0 && logError) {
     await logError(
-      `Free-Gemini spillover recovered ${recovered}/${failedIdx.length} Claude classifier errors`,
+      `Free-Gemini spillover recovered ${recovered}/${failedIdx.length} primary classifier errors`,
       "spillover-recovered",
     );
   }
