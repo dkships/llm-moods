@@ -105,7 +105,7 @@ const Index = () => {
                   },
                   {
                     title: "Classify",
-                    body: "Each post sentiment-labeled by GPT-5.6 Luna into 12 complaint categories.",
+                    body: "Each post sentiment-labeled by GPT-5.6 Terra into 12 complaint categories.",
                   },
                   {
                     title: "Score",

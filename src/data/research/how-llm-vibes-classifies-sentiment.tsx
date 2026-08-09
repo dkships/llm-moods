@@ -32,11 +32,10 @@ const HowLlmVibesClassifiesSentimentBody = () => (
     </p>
     <p>
       <em>Update, August 8:</em> since this was published, the production classifier moved from Claude Haiku
-      4.5 to GPT-5.6 Luna — a config flip on the provider-pluggable <code>CLASSIFIER_MODEL</code> described
-      below, with the prompts, schema, and thresholds unchanged. A fresh 284-post canary against an
-      independent Gemini grader put the new model at 88.5% sentiment agreement; the departing Haiku scored
-      83.0% on the same sample, at about 7x the cost. Model names in the body reflect the setup at
-      publication.
+      4.5 to GPT-5.6 Terra — a config flip on the provider-pluggable <code>CLASSIFIER_MODEL</code> described
+      below, with the prompts, schema, and thresholds unchanged. Fresh 284-post canaries against an
+      independent Gemini grader put Terra at 94.7% sentiment agreement; the departing Haiku scored 83.0% on
+      the same protocol, at comparable cost. Model names in the body reflect the setup at publication.
     </p>
 
     <h2>What gets scraped</h2>
