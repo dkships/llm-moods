@@ -37,7 +37,8 @@ Deno.serve(async (req) => {
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   // Key follows the active CLASSIFIER_MODEL: ANTHROPIC_API_KEY for claude-*,
-  // GEMINI_API_KEY otherwise. Avoids sending a Gemini key to the Anthropic API.
+  // OPENAI_API_KEY for gpt-*, GEMINI_API_KEY otherwise — so the key always
+  // matches the provider the model routes to.
   const apiKey = getClassifierApiKey();
   if (!apiKey) {
     await logToErrorLog(supabase, SOURCE, "Classifier API key not configured", "config");

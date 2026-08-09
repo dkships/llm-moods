@@ -334,7 +334,7 @@ function rollupUsage(model: string, samples: UsageSample[], sampleSize: number):
   const completionSum = sumOrNull(completions);
   const totalSum = sumOrNull(totals);
   const cacheReadSum = sumOrNull(cacheReads) ?? 0;
-  const pricing = PRICING[model];
+  const pricing = PRICING[model.split("@")[0]];
   // promptSum is freshly-billed input (uncached); cache reads bill at 0.1x.
   const cost = pricing && promptSum !== null && completionSum !== null
     ? Math.round((
@@ -623,7 +623,11 @@ Deno.serve(async (req) => {
     // regex never matches claude-*, so Claude takes the non-thinking branch.
     const isThinkingOnly = (model: string) => /^gemini-(?:2\.5|3(?:\.\d+)?)-pro/.test(model);
 
-    const runModel = async (model: string) => {
+    // A candidate spec may carry an explicit reasoning-effort suffix
+    // ("gpt-5.6-luna@low") so effort tiers of the same model can compete in one
+    // report. The suffix is report-key only — the API always gets the bare id.
+    const runModel = async (spec: string) => {
+      const [model, effortSuffix] = spec.split("@");
       const usage: UsageSample[] = [];
       const provider = providerForModel(model);
       const key = provider === "anthropic" ? anthropicKey : provider === "openai" ? openaiKey : geminiKey;
@@ -641,6 +645,13 @@ Deno.serve(async (req) => {
       // Non-thinking models (incl. all Claude) also benefit from extra headroom
       // because non-English posts with verbose translations bloat the response.
       // reasoningEffort/quotaScope are ignored on the Anthropic path.
+      const effort = effortSuffix === "low" || effortSuffix === "medium" || effortSuffix === "high" || effortSuffix === "none"
+        ? effortSuffix
+        : thinking
+        ? "low"
+        : "none";
+      // Reasoning tokens share the completion budget, so any non-"none" effort
+      // gets the thinking-tier headroom.
       const batchSize = thinking ? 15 : 25;
       const results = await classifyBatchTargeted(
         targetedItems,
@@ -652,8 +663,8 @@ Deno.serve(async (req) => {
           quotaScope: "eval",
           minuteLimit: evalMinuteLimit,
           dailyLimit: evalDailyLimit,
-          reasoningEffort: thinking ? "low" : "none",
-          maxTokensOverride: thinking ? 12288 : 8192,
+          reasoningEffort: effort,
+          maxTokensOverride: thinking || effort !== "none" ? 12288 : 8192,
           onUsage: (s) => {
             usage.push(s);
           },

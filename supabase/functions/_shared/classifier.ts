@@ -60,8 +60,10 @@ export interface UsageSample {
   promptTokens: number | null;
   completionTokens: number | null;
   totalTokens: number | null;
-  // Anthropic prompt-cache reads, billed at 0.1x input. Null for Gemini.
-  // Lets the eval harness price cached Sonnet runs fairly vs uncached Haiku.
+  // Prompt-cache reads, billed at ~0.1x input on both Anthropic (explicit
+  // cache_control) and OpenAI (automatic prefix caching). Null for Gemini.
+  // promptTokens always means freshly-billed input; cache reads live here so
+  // the eval harness prices cached runs fairly.
   cacheReadTokens?: number | null;
   latencyMs: number;
   mode: "single" | "batch";
@@ -424,12 +426,22 @@ async function emitUsage(
   if (!options.onUsage) return;
   const latencyMs = Math.max(0, Math.round(performance.now() - startedAt));
   const usage = isRecord(responseData) && isRecord(responseData.usage) ? responseData.usage : null;
+  const promptTokens = usage ? readUsageField(usage.prompt_tokens) : null;
+  // Anthropic path: cache reads arrive pre-split via the synthetic envelope.
+  // OpenAI path: automatic prefix-caching reads are INSIDE prompt_tokens
+  // (usage.prompt_tokens_details.cached_tokens, billed ~0.1x) — split them out
+  // so promptTokens uniformly means freshly-billed input across providers.
+  const anthropicCacheRead = usage ? readUsageField(usage.cache_read_input_tokens) : null;
+  const openAiCached = usage && isRecord(usage.prompt_tokens_details)
+    ? readUsageField(usage.prompt_tokens_details.cached_tokens)
+    : null;
+  const splitOpenAiCache = anthropicCacheRead === null && openAiCached !== null && promptTokens !== null;
   const sample: UsageSample = {
     model,
-    promptTokens: usage ? readUsageField(usage.prompt_tokens) : null,
+    promptTokens: splitOpenAiCache ? Math.max(0, promptTokens - openAiCached) : promptTokens,
     completionTokens: usage ? readUsageField(usage.completion_tokens) : null,
     totalTokens: usage ? readUsageField(usage.total_tokens) : null,
-    cacheReadTokens: usage ? readUsageField(usage.cache_read_input_tokens) : null,
+    cacheReadTokens: anthropicCacheRead ?? openAiCached,
     latencyMs,
     mode,
   };
