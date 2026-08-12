@@ -9,17 +9,17 @@ export const SHIP_SENSE_TEASER: ShipSenseTeaserRow[] = [
     "score": 89
   },
   {
-    "label": "Grok 4.5",
-    "score": 87.4
-  },
-  {
     "label": "Claude Fable 5",
     "score": 86.6
+  },
+  {
+    "label": "GPT-5.6 Sol",
+    "score": 86.4
   }
 ];
 
 export const SHIP_SENSE_TEASER_RUN = {
   "version": "v3.0",
   "bankItems": 67,
-  "modelCount": 23
+  "modelCount": 24
 };

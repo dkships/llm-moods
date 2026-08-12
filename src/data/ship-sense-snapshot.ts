@@ -11,15 +11,14 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.0",
   "runId": "2026-07-10",
   "bankItems": 67,
-  "modelCount": 23,
+  "modelCount": 24,
   "naiveFloor": 39.1,
-  "decisivePairs": 58,
-  "totalPairs": 253,
+  "decisivePairs": 60,
+  "totalPairs": 276,
   "scoringDates": [
     {
       "date": "2026-07-10",
       "labels": [
-        "Grok 4.5",
         "Claude Fable 5",
         "GPT-5.6 Sol",
         "GPT-5.6 Terra",
@@ -28,6 +27,7 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "Claude Haiku 4.5",
         "Claude Sonnet 5",
         "Muse Spark 1.1",
+        "Grok 4.5",
         "GPT-5.5",
         "Claude Sonnet 4.6",
         "GPT-5.4 mini",
@@ -68,6 +68,12 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
       "labels": [
         "Muse Spark 1.2"
       ]
+    },
+    {
+      "date": "2026-08-12",
+      "labels": [
+        "Grok 4.6"
+      ]
     }
   ]
 };
@@ -89,25 +95,10 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 4.25
   },
   {
-    "name": "grok-4.5",
-    "label": "Grok 4.5",
-    "provider": "xai",
-    "pos": 2,
-    "inLeaderBand": true,
-    "score": 87.4,
-    "lo": 84,
-    "hi": 90.7,
-    "restraint": 0.83,
-    "honesty": 0.82,
-    "conviction": 0.97,
-    "priceIn": 2,
-    "priceOut": 6
-  },
-  {
     "name": "claude-fable-5",
     "label": "Claude Fable 5",
     "provider": "anthropic",
-    "pos": 3,
+    "pos": 2,
     "inLeaderBand": true,
     "score": 86.6,
     "lo": 82.7,
@@ -122,7 +113,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gpt-5.6-sol",
     "label": "GPT-5.6 Sol",
     "provider": "openai",
-    "pos": 4,
+    "pos": 3,
     "inLeaderBand": true,
     "score": 86.4,
     "lo": 83.1,
@@ -132,6 +123,21 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "conviction": 0.94,
     "priceIn": 5,
     "priceOut": 30
+  },
+  {
+    "name": "grok-4.6",
+    "label": "Grok 4.6",
+    "provider": "xai",
+    "pos": 4,
+    "inLeaderBand": true,
+    "score": 86.3,
+    "lo": 83.2,
+    "hi": 89.3,
+    "restraint": 0.85,
+    "honesty": 0.79,
+    "conviction": 0.95,
+    "priceIn": 2,
+    "priceOut": 6
   },
   {
     "name": "gpt-5.6-terra",
@@ -302,13 +308,13 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
   },
   {
     "prevLabel": "Grok 4.3",
-    "currLabel": "Grok 4.5",
+    "currLabel": "Grok 4.6",
     "prevScore": 80.1,
-    "currScore": 87.4,
-    "deltaPts": 7.3,
-    "loPts": 4.3,
-    "hiPts": 10.5,
-    "verdict": "decisive-up"
+    "currScore": 86.3,
+    "deltaPts": 6.2,
+    "loPts": 3.1,
+    "hiPts": 9.4,
+    "verdict": "suggestive-up"
   },
   {
     "prevLabel": "Gemini 3.1 Flash-Lite",
@@ -368,6 +374,16 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "deltaPts": -0.9,
     "loPts": -2.7,
     "hiPts": 0.8,
+    "verdict": "down"
+  },
+  {
+    "prevLabel": "Grok 4.5",
+    "currLabel": "Grok 4.6",
+    "prevScore": 87.4,
+    "currScore": 86.3,
+    "deltaPts": -1.1,
+    "loPts": -3.3,
+    "hiPts": 0.9,
     "verdict": "down"
   },
   {
