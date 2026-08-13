@@ -11,10 +11,10 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.0",
   "runId": "2026-07-10",
   "bankItems": 67,
-  "modelCount": 24,
+  "modelCount": 25,
   "naiveFloor": 39.1,
   "decisivePairs": 60,
-  "totalPairs": 276,
+  "totalPairs": 300,
   "scoringDates": [
     {
       "date": "2026-07-10",
@@ -73,6 +73,12 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
       "date": "2026-08-12",
       "labels": [
         "Grok 4.6"
+      ]
+    },
+    {
+      "date": "2026-08-13",
+      "labels": [
+        "DeepSeek V4 Pro"
       ]
     }
   ]
@@ -140,10 +146,25 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 6
   },
   {
+    "name": "deepseek-v4-pro",
+    "label": "DeepSeek V4 Pro",
+    "provider": "deepseek",
+    "pos": 5,
+    "inLeaderBand": true,
+    "score": 85.1,
+    "lo": 80.6,
+    "hi": 89.1,
+    "restraint": 0.83,
+    "honesty": 0.83,
+    "conviction": 0.9,
+    "priceIn": 0.435,
+    "priceOut": 0.87
+  },
+  {
     "name": "gpt-5.6-terra",
     "label": "GPT-5.6 Terra",
     "provider": "openai",
-    "pos": 5,
+    "pos": 6,
     "inLeaderBand": true,
     "score": 84.4,
     "lo": 80.3,
@@ -160,7 +181,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "kimi-k3",
     "label": "Kimi K3",
     "provider": "moonshot",
-    "pos": 6,
+    "pos": 7,
     "inLeaderBand": true,
     "score": 82.2,
     "lo": 77,
@@ -175,7 +196,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gemini-3.6-flash",
     "label": "Gemini 3.6 Flash",
     "provider": "google",
-    "pos": 7,
+    "pos": 8,
     "inLeaderBand": true,
     "score": 81.4,
     "lo": 77,
@@ -190,7 +211,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gemini-3.1-pro",
     "label": "Gemini 3.1 Pro",
     "provider": "google",
-    "pos": 8,
+    "pos": 9,
     "inLeaderBand": false,
     "score": 81.2,
     "lo": 76.6,
@@ -205,7 +226,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gpt-5.6-luna",
     "label": "GPT-5.6 Luna",
     "provider": "openai",
-    "pos": 9,
+    "pos": 10,
     "inLeaderBand": false,
     "score": 81,
     "lo": 77.1,
@@ -222,7 +243,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "claude-opus-5",
     "label": "Claude Opus 5",
     "provider": "anthropic",
-    "pos": 10,
+    "pos": 11,
     "inLeaderBand": false,
     "score": 80.9,
     "lo": 75.8,
@@ -237,7 +258,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "claude-haiku-4-5",
     "label": "Claude Haiku 4.5",
     "provider": "anthropic",
-    "pos": 11,
+    "pos": 12,
     "inLeaderBand": false,
     "score": 79,
     "lo": 75.2,
@@ -252,7 +273,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gemini-3.5-flash-lite",
     "label": "Gemini 3.5 Flash-Lite",
     "provider": "google",
-    "pos": 12,
+    "pos": 13,
     "inLeaderBand": false,
     "score": 78.7,
     "lo": 74.5,
@@ -267,7 +288,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "claude-sonnet-5",
     "label": "Claude Sonnet 5",
     "provider": "anthropic",
-    "pos": 13,
+    "pos": 14,
     "inLeaderBand": false,
     "score": 77.7,
     "lo": 72.2,
@@ -275,14 +296,16 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "restraint": 0.76,
     "honesty": 0.84,
     "conviction": 0.72,
-    "priceIn": 3,
-    "priceOut": 15
+    "priceIn": 2,
+    "priceOut": 10,
+    "atTestPriceIn": 3,
+    "atTestPriceOut": 15
   },
   {
     "name": "qwen3.8-max",
     "label": "Qwen 3.8 Max",
     "provider": "qwen",
-    "pos": 14,
+    "pos": 15,
     "inLeaderBand": false,
     "score": 77.1,
     "lo": 72,
