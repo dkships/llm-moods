@@ -845,9 +845,13 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("chatgpt", null, "Bidi")).toBe(true);
     expect(isReleasedVersion("chatgpt", "GPT-Live-1", null)).toBe(true);
     expect(isReleasedVersion("grok", "Grok 4.5", null)).toBe(true);
+    expect(isReleasedVersion("grok", "Grok 4.6", null)).toBe(true);
     expect(isReleasedVersion("grok", "Fable 5", null)).toBe(true); // family-agnostic
     expect(isReleasedVersion("gemini", "Gemini 3.5 Flash Cyber", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Flash Cyber", null)).toBe(true);
+    expect(isReleasedVersion("gemini", "Gemini 3.1 Pro", null)).toBe(true);
+    expect(isReleasedVersion("gemini", "Gemini 3.6 Flash", null)).toBe(true);
+    expect(isReleasedVersion("gemini", "Gemini 3.5 Flash-Lite", null)).toBe(true);
   });
 
   it("keeps unreleased versions (no false positives)", () => {
@@ -855,6 +859,10 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("chatgpt", "GPT-6", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 5", null)).toBe(false);
+    expect(isReleasedVersion("grok", "Grok 4.7", null)).toBe(false);
+    // The shipped 3.5 Flash-Lite must not retire the next one by bare-name match.
+    expect(isReleasedVersion("gemini", "Gemini 3.6 Flash-Lite", null)).toBe(false);
+    expect(isReleasedVersion("gemini", "Flash-Lite", null)).toBe(false);
   });
 
   it("covers every model launch recorded in the vendor event timeline", () => {
@@ -870,8 +878,10 @@ describe("released model catalog", () => {
     const prompt = releasedSetPrompt();
     expect(prompt).toContain("GPT-5.6 (Sol, Terra, Luna) and earlier");
     expect(prompt).toContain("GPT-Live 1 / Bidi");
-    expect(prompt).toContain("Grok 4.5 and earlier");
-    expect(prompt).toContain("Gemini 3.5 Flash");
+    expect(prompt).toContain("Grok 4.6 and earlier");
+    expect(prompt).toContain("Gemini 3.6 Flash");
+    // Superseded snapshots drop their prompt wording; the token still retires.
+    expect(prompt).not.toContain("Grok 4.5 and earlier");
   });
 
   it("extracts known aliases and future numbered labels from release text", () => {

@@ -447,6 +447,14 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releasePrompt: "Gemini 3 Pro",
     },
     {
+      key: "gemini31pro",
+      label: "Gemini 3.1 Pro",
+      codename: null,
+      aliases: ["gemini31pro"],
+      released: true,
+      releasePrompt: "Gemini 3.1 Pro",
+    },
+    {
       key: "gemini3flash",
       label: "Gemini 3 Flash",
       codename: null,
@@ -461,6 +469,25 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       aliases: ["gemini35flash"],
       released: true,
       releasePrompt: "Gemini 3.5 Flash",
+    },
+    {
+      key: "gemini36flash",
+      label: "Gemini 3.6 Flash",
+      codename: null,
+      aliases: ["gemini36flash"],
+      released: true,
+      releasePrompt: "Gemini 3.6 Flash",
+    },
+    {
+      // Exact spelling only — a bare "Flash-Lite" alias would wrongly retire the
+      // next Flash-Lite the way "Flash Cyber" safely can't (that name is unique
+      // to one release).
+      key: "gemini35flashlite",
+      label: "Gemini 3.5 Flash-Lite",
+      codename: null,
+      aliases: ["gemini35flashlite"],
+      released: true,
+      releasePrompt: "Gemini 3.5 Flash-Lite",
     },
     {
       key: "gemini35flashcyber",
@@ -487,7 +514,18 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       codename: null,
       aliases: ["grok45"],
       released: true,
-      releasePrompt: "Grok 4.5 and earlier",
+    },
+    {
+      // xAI publishes no Models API, so the auto-retire layer can only catch a
+      // Grok launch through a credible "generally available" post. 4.6 shipped
+      // without one and sat on the radar as an in-testing rumor — this manual
+      // entry is the documented backstop for exactly that gap.
+      key: "grok46",
+      label: "Grok 4.6",
+      codename: null,
+      aliases: ["grok46"],
+      released: true,
+      releasePrompt: "Grok 4.6 and earlier",
     },
   ],
 };
