@@ -172,6 +172,17 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     url: "https://x.ai/news/grok-4-5",
     notes: "Musk announced July 8; public release July 9 (Cursor users got it a day early).",
   },
+  {
+    id: "xai-grok-4-6-launch",
+    vendor: "xai",
+    modelSlug: "grok",
+    eventDate: "2026-08-12",
+    eventType: "model_launch",
+    title: "Grok 4.6 launch",
+    url: "https://x.ai/news/grok-4-6",
+    notes:
+      "Announced on x.ai August 12, five weeks after 4.5, focused on long-running agents and more ambitious interactive and visual work. Musk's July 25 'two weeks' estimate slipped a few days.",
+  },
 ];
 
 export function getEventsForModel(slug: string | undefined): VendorEvent[] {
