@@ -11,10 +11,10 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.0",
   "runId": "2026-07-10",
   "bankItems": 67,
-  "modelCount": 25,
+  "modelCount": 26,
   "naiveFloor": 39.1,
-  "decisivePairs": 60,
-  "totalPairs": 300,
+  "decisivePairs": 63,
+  "totalPairs": 325,
   "scoringDates": [
     {
       "date": "2026-07-10",
@@ -47,8 +47,8 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
     {
       "date": "2026-07-21",
       "labels": [
-        "Gemini 3.6 Flash",
-        "Gemini 3.5 Flash-Lite"
+        "Gemini 3.5 Flash-Lite",
+        "Gemini 3.6 Flash"
       ]
     },
     {
@@ -78,7 +78,8 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
     {
       "date": "2026-08-13",
       "labels": [
-        "DeepSeek V4 Pro"
+        "DeepSeek V4 Pro",
+        "Gemini 3.7 Flash"
       ]
     }
   ]
@@ -193,25 +194,10 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 15
   },
   {
-    "name": "gemini-3.6-flash",
-    "label": "Gemini 3.6 Flash",
-    "provider": "google",
-    "pos": 8,
-    "inLeaderBand": true,
-    "score": 81.4,
-    "lo": 77,
-    "hi": 85.6,
-    "restraint": 0.84,
-    "honesty": 0.73,
-    "conviction": 0.88,
-    "priceIn": 1.5,
-    "priceOut": 7.5
-  },
-  {
     "name": "gemini-3.1-pro",
     "label": "Gemini 3.1 Pro",
     "provider": "google",
-    "pos": 9,
+    "pos": 8,
     "inLeaderBand": false,
     "score": 81.2,
     "lo": 76.6,
@@ -226,7 +212,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gpt-5.6-luna",
     "label": "GPT-5.6 Luna",
     "provider": "openai",
-    "pos": 10,
+    "pos": 9,
     "inLeaderBand": false,
     "score": 81,
     "lo": 77.1,
@@ -243,7 +229,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "claude-opus-5",
     "label": "Claude Opus 5",
     "provider": "anthropic",
-    "pos": 11,
+    "pos": 10,
     "inLeaderBand": false,
     "score": 80.9,
     "lo": 75.8,
@@ -253,6 +239,21 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "conviction": 0.74,
     "priceIn": 5,
     "priceOut": 25
+  },
+  {
+    "name": "gemini-3.7-flash",
+    "label": "Gemini 3.7 Flash",
+    "provider": "google",
+    "pos": 11,
+    "inLeaderBand": false,
+    "score": 80.6,
+    "lo": 76.2,
+    "hi": 84.8,
+    "restraint": 0.82,
+    "honesty": 0.71,
+    "conviction": 0.89,
+    "priceIn": 0.75,
+    "priceOut": 3.75
   },
   {
     "name": "claude-haiku-4-5",
@@ -350,16 +351,6 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "verdict": "suggestive-up"
   },
   {
-    "prevLabel": "Gemini 3.5 Flash",
-    "currLabel": "Gemini 3.6 Flash",
-    "prevScore": 79.1,
-    "currScore": 81.4,
-    "deltaPts": 2.2,
-    "loPts": -0.2,
-    "hiPts": 4.7,
-    "verdict": "up"
-  },
-  {
     "prevLabel": "GPT-5.4 mini",
     "currLabel": "GPT-5.6 Terra",
     "prevScore": 82.5,
@@ -370,12 +361,32 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "verdict": "up"
   },
   {
+    "prevLabel": "Gemini 3.5 Flash",
+    "currLabel": "Gemini 3.7 Flash",
+    "prevScore": 79.1,
+    "currScore": 80.6,
+    "deltaPts": 1.5,
+    "loPts": -0.7,
+    "hiPts": 3.8,
+    "verdict": "up"
+  },
+  {
     "prevLabel": "GPT-5.5",
     "currLabel": "GPT-5.6 Sol",
     "prevScore": 87,
     "currScore": 86.4,
     "deltaPts": -0.6,
     "loPts": -3,
+    "hiPts": 1.7,
+    "verdict": "down"
+  },
+  {
+    "prevLabel": "Gemini 3.6 Flash",
+    "currLabel": "Gemini 3.7 Flash",
+    "prevScore": 81.4,
+    "currScore": 80.6,
+    "deltaPts": -0.7,
+    "loPts": -3.2,
     "hiPts": 1.7,
     "verdict": "down"
   },
