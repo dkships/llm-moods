@@ -3,6 +3,7 @@ import {
   leaderBand,
   lineage,
   orientPair,
+  parseModelsYaml,
   scoringDates,
   successions,
   type DeriveModel,
@@ -186,6 +187,104 @@ describe("scoringDates", () => {
   });
 });
 
+describe("parseModelsYaml", () => {
+  // Indentation is load-bearing: entries at 2, fields at 4, nested at 6.
+  const yaml = `defaults:
+  timeout_s: 600
+
+models:
+  - name: gemini-3.7-flash
+    provider: google
+    label: "Gemini 3.7 Flash"
+    price_in: 0.75               # introductory, reverts 2027-01-01
+    price_out: 3.75
+    price_pending:
+      effective: "2027-01-01"
+      price_in: 1.5
+      price_out: 7.5
+      source: "https://ai.google.dev/gemini-api/docs/pricing"
+  - name: gpt-5.5
+    label: "GPT-5.5"
+    price_in: 5
+    price_out: 30
+    superseded_by: gpt-5.6-sol
+
+scoring:
+  mde_pp: 15
+`;
+
+  it("reads labels, prices and explicit successions", () => {
+    const registry = parseModelsYaml(yaml);
+    expect(registry.get("gpt-5.5")).toEqual({
+      label: "GPT-5.5",
+      priceIn: 5,
+      priceOut: 30,
+      supersededBy: "gpt-5.6-sol",
+    });
+  });
+
+  it("reads a nested price_pending block", () => {
+    expect(parseModelsYaml(yaml).get("gemini-3.7-flash")?.pending).toEqual({
+      effective: "2027-01-01",
+      priceIn: 1.5,
+      priceOut: 7.5,
+    });
+  });
+
+  it("stops at the end of the models list", () => {
+    const registry = parseModelsYaml(yaml);
+    expect(registry.size).toBe(2);
+    expect(registry.has("mde_pp")).toBe(false);
+  });
+
+  it("does not let a sibling nested block overwrite the model's own price", () => {
+    // The shape ship-sense uses for a model that bills on a clock: the cell
+    // takes the peak rate and off-peak sits in its own block. Its `price_in`
+    // is six-space indented and must never be read as the model's price.
+    const withOffpeak = `models:
+  - name: deepseek-v4-pro
+    label: "DeepSeek V4 Pro"
+    price_in: 1.32
+    price_out: 3.96
+    price_offpeak:
+      price_in: 0.66
+      price_out: 1.98
+      note: "off-peak = half of peak"
+`;
+    expect(parseModelsYaml(withOffpeak).get("deepseek-v4-pro")).toEqual({
+      label: "DeepSeek V4 Pro",
+      priceIn: 1.32,
+      priceOut: 3.96,
+    });
+  });
+
+  it("survives a comment inside the pending block", () => {
+    const commented = `models:
+  - name: a
+    price_in: 1
+    price_out: 2
+    price_pending:
+      effective: "2027-01-01"
+      # the vendor announced this on the pricing page
+      price_in: 3
+      price_out: 4
+`;
+    expect(parseModelsYaml(commented).get("a")?.pending?.priceOut).toBe(4);
+  });
+
+  it("drops a half-filled pending block rather than publishing a bare date", () => {
+    const halfFilled = `models:
+  - name: a
+    price_in: 1
+    price_out: 2
+    price_pending:
+      effective: "2027-01-01"
+      source: "https://example.com"
+`;
+    expect(parseModelsYaml(halfFilled).get("a")?.pending).toBeUndefined();
+  });
+});
+
 describe("run prose", () => {
   const run = (scoringDates: { date: string; labels: string[] }[]): ShipSenseRunMeta => ({
     version: "v3.0",
@@ -291,6 +390,16 @@ describe("committed snapshot invariants", () => {
     expect(SHIP_SENSE_TEASER).toEqual(
       SHIP_SENSE_LINEUP.slice(0, 3).map((m) => ({ label: m.label, score: m.score })),
     );
+  });
+
+  it("carries a complete rate and date on every announced price change", () => {
+    // Asserts shape, not presence: some syncs have no pending change at all,
+    // and the page must never render half a notice.
+    SHIP_SENSE_LINEUP.filter((m) => m.pendingEffective !== undefined).forEach((m) => {
+      expect(m.pendingEffective).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+      expect(typeof m.pendingPriceIn).toBe("number");
+      expect(typeof m.pendingPriceOut).toBe("number");
+    });
   });
 
   it("leader band is a prefix of the lineup", () => {

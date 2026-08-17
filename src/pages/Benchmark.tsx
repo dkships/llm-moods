@@ -85,6 +85,7 @@ const Benchmark = () => {
   const run = SHIP_SENSE_RUN;
   const scoredWindow = scoredWindowLabel(run);
   const anyRepriced = SHIP_SENSE_LINEUP.some((m) => m.atTestPriceIn !== undefined);
+  const anyPending = SHIP_SENSE_LINEUP.some((m) => m.pendingEffective !== undefined);
 
   useHead({
     title: "Ship Sense Benchmark — LLM Vibes",
@@ -197,6 +198,13 @@ const Benchmark = () => {
                   >
                     {price(m.priceIn)} / {price(m.priceOut)} per 1M
                     {m.atTestPriceIn !== undefined ? " †" : ""}
+                    {m.pendingEffective !== undefined ? (
+                      <span
+                        title={`Announced: ${price(m.pendingPriceIn!)} / ${price(m.pendingPriceOut!)} per 1M from ${m.pendingEffective}`}
+                      >
+                        {" ‡"}
+                      </span>
+                    ) : null}
                   </span>
                   <span>
                     R {fmt2(m.restraint)} · H {fmt2(m.honesty)} · C{" "}
@@ -216,7 +224,9 @@ const Benchmark = () => {
               A naive "ship everything, flag nothing, always cave" baseline scores{" "}
               {fmt1(run.naiveFloor)} — below this axis. R / H / C = Restraint,
               Honesty, Conviction (0–1). Prices are current list per 1M
-              input/output tokens{anyRepriced ? "; † cut since the run (at-test price on hover)" : ""}.
+              input/output tokens
+              {anyRepriced ? "; † list price moved since the run (at-test price on hover)" : ""}
+              {anyPending ? "; ‡ announced list price change (new rate and date on hover)" : ""}.
             </p>
             <p>
               Point scores rank; paired tests separate: {run.decisivePairs} of{" "}

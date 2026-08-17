@@ -11,6 +11,112 @@ export interface DeriveScore {
   hi: number;
 }
 
+/** An announced list price that has NOT taken effect yet. Ship Sense records
+ * these deliberately without applying them (its own `price_pending` block):
+ * the price column is what a buyer pays today, and announced changes do get
+ * cancelled. Carried through so the page can say a change is coming instead of
+ * going silently stale on the effective date. */
+export interface RegistryPending {
+  /** ISO date the new price takes effect. */
+  effective: string;
+  priceIn: number;
+  priceOut: number;
+}
+
+export interface RegistryEntry {
+  label?: string;
+  priceIn?: number;
+  priceOut?: number;
+  supersededBy?: string;
+  pending?: RegistryPending;
+}
+
+/**
+ * Minimal scanner for ship-sense models.yaml — two top-level keys, entries at
+ * `  - name:`, scalar fields at 4-space indent, and the one nested block the
+ * board reads (`price_pending:`, fields at 6-space). Optional quotes and
+ * trailing `# comment` on any value. Deliberately no YAML dependency (would
+ * dirty both lockfiles for a script that never runs in CI).
+ *
+ * Nested blocks other than `price_pending` are skipped whole: their 4-space
+ * key parses as an empty value and their 6-space children match no field
+ * pattern. That is what keeps a sibling block like `price_offpeak` from
+ * leaking its `price_in` into the model's own price.
+ */
+export function parseModelsYaml(text: string): Map<string, RegistryEntry> {
+  const registry = new Map<string, RegistryEntry>();
+  let current: RegistryEntry | null = null;
+  let pending: Partial<RegistryPending> | null = null;
+  let inModels = false;
+
+  // A pending block only counts once it carries all three fields — a date with
+  // no prices behind it is worse than no notice at all.
+  const closePending = () => {
+    if (
+      current &&
+      pending?.effective &&
+      pending.priceIn !== undefined &&
+      pending.priceOut !== undefined
+    )
+      current.pending = pending as RegistryPending;
+    pending = null;
+  };
+
+  for (const line of text.split("\n")) {
+    if (/^models:/.test(line)) {
+      inModels = true;
+      continue;
+    }
+    if (inModels && /^[A-Za-z_]/.test(line)) {
+      closePending();
+      inModels = false;
+    }
+    if (!inModels) continue;
+
+    const entry = line.match(/^ {2}- name:\s*(?:"([^"]*)"|([^\s#]+))/);
+    if (entry) {
+      closePending();
+      current = {};
+      registry.set(entry[1] ?? entry[2], current);
+      continue;
+    }
+    if (!current) continue;
+
+    if (pending) {
+      // Blank and comment-only lines don't end the block — a comment between
+      // two of its fields must not truncate it.
+      if (/^\s*(#.*)?$/.test(line)) continue;
+      const sub = line.match(/^ {6}([a-z_]+):\s*(?:"([^"]*)"|([^#]*?))\s*(?:#.*)?$/);
+      if (sub) {
+        const value = (sub[2] ?? sub[3] ?? "").trim();
+        if (value !== "") {
+          if (sub[1] === "effective") pending.effective = value;
+          else if (sub[1] === "price_in") pending.priceIn = Number(value);
+          else if (sub[1] === "price_out") pending.priceOut = Number(value);
+        }
+        continue;
+      }
+      closePending();
+    }
+    if (/^ {4}price_pending:\s*(?:#.*)?$/.test(line)) {
+      pending = {};
+      continue;
+    }
+
+    const field = line.match(/^ {4}([a-z_]+):\s*(?:"([^"]*)"|([^#]*?))\s*(?:#.*)?$/);
+    if (!field) continue;
+    const key = field[1];
+    const value = (field[2] ?? field[3] ?? "").trim();
+    if (value === "") continue;
+    if (key === "label") current.label = value;
+    else if (key === "price_in") current.priceIn = Number(value);
+    else if (key === "price_out") current.priceOut = Number(value);
+    else if (key === "superseded_by") current.supersededBy = value;
+  }
+  closePending();
+  return registry;
+}
+
 export interface DeriveModel {
   name: string;
   label: string;

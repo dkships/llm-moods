@@ -33,6 +33,14 @@ export interface ShipSenseModelRow {
   /** At-test prices, present only when the list price changed since the run. */
   atTestPriceIn?: number;
   atTestPriceOut?: number;
+  /** An announced list price and the date it takes effect (models.yaml
+   * `price_pending`). Never rolled into priceIn/priceOut — the column is what a
+   * buyer pays today, and announced changes do get cancelled. Upstream deletes
+   * the block once it applies the change, so one whose date has already passed
+   * means the registry has not caught up. */
+  pendingPriceIn?: number;
+  pendingPriceOut?: number;
+  pendingEffective?: string;
 }
 
 export type ShipSenseVerdict =

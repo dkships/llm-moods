@@ -159,7 +159,10 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "honesty": 0.83,
     "conviction": 0.9,
     "priceIn": 0.435,
-    "priceOut": 0.87
+    "priceOut": 0.87,
+    "pendingPriceIn": 1.32,
+    "pendingPriceOut": 3.96,
+    "pendingEffective": "2026-08-16"
   },
   {
     "name": "gpt-5.6-terra",
@@ -253,7 +256,10 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "honesty": 0.71,
     "conviction": 0.89,
     "priceIn": 0.75,
-    "priceOut": 3.75
+    "priceOut": 3.75,
+    "pendingPriceIn": 1.5,
+    "pendingPriceOut": 7.5,
+    "pendingEffective": "2027-01-01"
   },
   {
     "name": "claude-haiku-4-5",

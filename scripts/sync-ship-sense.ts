@@ -35,6 +35,7 @@ import { join } from "node:path";
 import {
   leaderBand,
   orientPair,
+  parseModelsYaml,
   scoringDates,
   successions,
   type DerivePairRecord,
@@ -81,13 +82,6 @@ interface PairRecord {
   winner: string | null;
 }
 
-interface RegistryEntry {
-  label?: string;
-  priceIn?: number;
-  priceOut?: number;
-  supersededBy?: string;
-}
-
 const fail = (msg: string): never => {
   throw new Error(`[sync-ship-sense] ${msg}`);
 };
@@ -104,42 +98,6 @@ async function fetchBinary(path: string): Promise<Buffer> {
   return Buffer.from(await res.arrayBuffer());
 }
 
-/** Minimal scanner for ship-sense models.yaml — two top-level keys, entries at
- * `  - name:`, scalar fields at 4-space indent, optional quotes and trailing
- * `# comment`. Deliberately no YAML dependency (would dirty both lockfiles for
- * a script that never runs in CI). */
-function parseModelsYaml(text: string): Map<string, RegistryEntry> {
-  const registry = new Map<string, RegistryEntry>();
-  let current: RegistryEntry | null = null;
-  let inModels = false;
-  for (const line of text.split("\n")) {
-    if (/^models:/.test(line)) {
-      inModels = true;
-      continue;
-    }
-    if (inModels && /^[A-Za-z_]/.test(line)) inModels = false;
-    if (!inModels) continue;
-    const entry = line.match(/^ {2}- name:\s*(?:"([^"]*)"|([^\s#]+))/);
-    if (entry) {
-      current = {};
-      registry.set(entry[1] ?? entry[2], current);
-      continue;
-    }
-    if (!current) continue;
-    const field = line.match(/^ {4}([a-z_]+):\s*(?:"([^"]*)"|([^#]*?))\s*(?:#.*)?$/);
-    if (!field) continue;
-    const key = field[1];
-    const value = (field[2] ?? field[3] ?? "").trim();
-    if (value === "") continue;
-    if (key === "label") current.label = value;
-    else if (key === "price_in") current.priceIn = Number(value);
-    else if (key === "price_out") current.priceOut = Number(value);
-    else if (key === "superseded_by") current.supersededBy = value;
-  }
-  if (registry.size === 0) fail("models.yaml scanner matched no entries");
-  return registry;
-}
-
 const r1 = (x: number) => Number(x.toFixed(1));
 const r2 = (x: number) => Number(x.toFixed(2));
 
@@ -154,6 +112,7 @@ async function main() {
   const run = ledger.runs[ledger.runs.length - 1];
   const models: RunModel[] = run.models;
   const registry = parseModelsYaml(modelsYamlText);
+  if (registry.size === 0) fail("models.yaml scanner matched no entries");
   const pairwise: PairRecord[] = JSON.parse(pairwiseText);
 
   const rankedModels = models.filter(
@@ -222,6 +181,13 @@ async function main() {
       m.price_in !== null &&
       m.price_out !== null &&
       (priceIn !== m.price_in || priceOut !== m.price_out);
+    // Carried through whatever its date, and worded on the page without tense
+    // ("announced ... from <date>"), so the snapshot stays a pure function of
+    // upstream rather than of the day the sync ran. Upstream deletes the block
+    // when it applies the change, so a `price_pending` whose date has already
+    // passed means ship-sense has not caught up yet — exactly the case worth
+    // showing a reader, not hiding.
+    const pending = reg.pending;
     return {
       name: m.name,
       label: m.label,
@@ -237,6 +203,13 @@ async function main() {
       priceIn,
       priceOut,
       ...(repriced ? { atTestPriceIn: m.price_in, atTestPriceOut: m.price_out } : {}),
+      ...(pending
+        ? {
+            pendingPriceIn: pending.priceIn,
+            pendingPriceOut: pending.priceOut,
+            pendingEffective: pending.effective,
+          }
+        : {}),
     };
   });
 
@@ -346,7 +319,15 @@ export const SHIP_SENSE_TEASER_RUN = ${emit({
  */
 async function describeChange(
   runMeta: { runId: string; version: string; modelCount: number },
-  lineup: { label: string; score: number }[],
+  lineup: {
+    label: string;
+    score: number;
+    priceIn: number;
+    priceOut: number;
+    pendingPriceIn?: number;
+    pendingPriceOut?: number;
+    pendingEffective?: string;
+  }[],
 ) {
   const prior = await import("../src/data/ship-sense-snapshot").catch(() => null);
   const priorRun = prior?.SHIP_SENSE_RUN;
@@ -359,12 +340,27 @@ async function describeChange(
     const was = priorLineup.find((p) => p.label === m.label);
     return was && was.score !== m.score;
   }).length;
+  // A price move is the whole change some days — DeepSeek's peak/off-peak
+  // switch moved no score and no row. Counting it keeps the unattended commit
+  // message from saying "no board movement" over a real diff.
+  const repriced = lineup.filter((m) => {
+    const was = priorLineup.find((p) => p.label === m.label);
+    if (!was) return false;
+    return (
+      was.priceIn !== m.priceIn ||
+      was.priceOut !== m.priceOut ||
+      was.pendingPriceIn !== m.pendingPriceIn ||
+      was.pendingPriceOut !== m.pendingPriceOut ||
+      was.pendingEffective !== m.pendingEffective
+    );
+  }).length;
   const runChanged = !priorRun || priorRun.runId !== runMeta.runId || priorRun.version !== runMeta.version;
 
   const parts: string[] = [];
   if (added.length) parts.push(`+${added.join(", +")}`);
   if (removed.length) parts.push(`-${removed.join(", -")}`);
   if (rescored) parts.push(`${rescored} rescored`);
+  if (repriced) parts.push(`${repriced} repriced`);
   if (runChanged && priorRun)
     parts.push(`run ${priorRun.runId} ${priorRun.version} -> ${runMeta.runId} ${runMeta.version}`);
 
@@ -375,6 +371,7 @@ async function describeChange(
     added,
     removed,
     rescored,
+    repriced,
     runChanged,
     summary: parts.length ? parts.join("; ") : "no board movement",
   };
