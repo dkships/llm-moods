@@ -158,11 +158,10 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "restraint": 0.83,
     "honesty": 0.83,
     "conviction": 0.9,
-    "priceIn": 0.435,
-    "priceOut": 0.87,
-    "pendingPriceIn": 1.32,
-    "pendingPriceOut": 3.96,
-    "pendingEffective": "2026-08-16"
+    "priceIn": 1.32,
+    "priceOut": 3.96,
+    "atTestPriceIn": 0.435,
+    "atTestPriceOut": 0.87
   },
   {
     "name": "gpt-5.6-terra",
