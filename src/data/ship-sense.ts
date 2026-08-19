@@ -115,6 +115,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   qwen: "Qwen",
   deepseek: "DeepSeek",
   mistral: "Mistral",
+  zai: "Z.ai",
 };
 
 export const providerLabel = (provider: string): string =>

@@ -11,10 +11,10 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.0",
   "runId": "2026-07-10",
   "bankItems": 67,
-  "modelCount": 26,
+  "modelCount": 27,
   "naiveFloor": 39.1,
   "decisivePairs": 63,
-  "totalPairs": 325,
+  "totalPairs": 351,
   "scoringDates": [
     {
       "date": "2026-07-10",
@@ -80,6 +80,12 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
       "labels": [
         "DeepSeek V4 Pro",
         "Gemini 3.7 Flash"
+      ]
+    },
+    {
+      "date": "2026-08-19",
+      "labels": [
+        "GLM-5.3"
       ]
     }
   ]
@@ -196,10 +202,25 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 15
   },
   {
+    "name": "glm-5.3",
+    "label": "GLM-5.3",
+    "provider": "zai",
+    "pos": 8,
+    "inLeaderBand": true,
+    "score": 81.5,
+    "lo": 76.5,
+    "hi": 86.4,
+    "restraint": 0.83,
+    "honesty": 0.83,
+    "conviction": 0.79,
+    "priceIn": 1.4,
+    "priceOut": 4.4
+  },
+  {
     "name": "gemini-3.1-pro",
     "label": "Gemini 3.1 Pro",
     "provider": "google",
-    "pos": 8,
+    "pos": 9,
     "inLeaderBand": false,
     "score": 81.2,
     "lo": 76.6,
@@ -214,7 +235,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gpt-5.6-luna",
     "label": "GPT-5.6 Luna",
     "provider": "openai",
-    "pos": 9,
+    "pos": 10,
     "inLeaderBand": false,
     "score": 81,
     "lo": 77.1,
@@ -231,7 +252,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "claude-opus-5",
     "label": "Claude Opus 5",
     "provider": "anthropic",
-    "pos": 10,
+    "pos": 11,
     "inLeaderBand": false,
     "score": 80.9,
     "lo": 75.8,
@@ -246,7 +267,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gemini-3.7-flash",
     "label": "Gemini 3.7 Flash",
     "provider": "google",
-    "pos": 11,
+    "pos": 12,
     "inLeaderBand": false,
     "score": 80.6,
     "lo": 76.2,
@@ -264,7 +285,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "claude-haiku-4-5",
     "label": "Claude Haiku 4.5",
     "provider": "anthropic",
-    "pos": 12,
+    "pos": 13,
     "inLeaderBand": false,
     "score": 79,
     "lo": 75.2,
@@ -279,7 +300,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gemini-3.5-flash-lite",
     "label": "Gemini 3.5 Flash-Lite",
     "provider": "google",
-    "pos": 13,
+    "pos": 14,
     "inLeaderBand": false,
     "score": 78.7,
     "lo": 74.5,
@@ -294,7 +315,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "claude-sonnet-5",
     "label": "Claude Sonnet 5",
     "provider": "anthropic",
-    "pos": 14,
+    "pos": 15,
     "inLeaderBand": false,
     "score": 77.7,
     "lo": 72.2,
@@ -311,7 +332,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "qwen3.8-max",
     "label": "Qwen 3.8 Max",
     "provider": "qwen",
-    "pos": 15,
+    "pos": 16,
     "inLeaderBand": false,
     "score": 77.1,
     "lo": 72,
