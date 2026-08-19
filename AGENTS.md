@@ -18,8 +18,8 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 
 ## Working Rules
 - Before direct work on `main`, run `git fetch` and fast-forward when appropriate; Lovable may have pushed changes.
-- Push to `main` triggers Lovable auto-sync for frontend
-- Edge Function deploys may require a Lovable-side trigger
+- Push to `main` triggers Lovable auto-sync for frontend — but syncing is not publishing. Finish the job with the Lovable MCP (`deploy_project`), never with manual instructions for David. See the Lovable Workflow section in CLAUDE.md for the push → confirm-sync → publish → verify-by-hash sequence.
+- Edge Function deploys need a Lovable-side trigger via `mcp__lovable__send_message`; verify the result independently, as that tool has a known stale-response bug
 - Always commit after completing work — don't leave dirty `main`
 - Shared scraper utilities in `supabase/functions/_shared/utils.ts`
 - Use `product-qa-sweep` for dashboard, public route, scraper monitor, or responsive UI verification.

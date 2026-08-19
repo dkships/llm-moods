@@ -7,8 +7,15 @@ Real-time AI sentiment dashboard for 4 LLM models across 5 social platforms; liv
 ## Lovable Workflow
 
 Beyond the AGENTS.md rules:
-- **Push without being asked**: after a change builds (`npm run build`), commit AND push to `main` — Lovable only syncs from `main`, so unpushed work is invisible to David. Tell him it's pushed and whether an edge-function redeploy prompt is needed.
-- Edge Function deploys require a Lovable-side trigger — pushing to `main` syncs code but may not redeploy. Give David a Lovable chat prompt to trigger redeployment.
+- **Finish the job yourself via the Lovable MCP — never hand David manual Lovable steps.** He has standing authorization for the full path: push to `main`, then publish and verify. Do not end a turn with "paste this into Lovable chat" or "click Publish"; that is the failure mode this rule exists to kill.
+- **Push without being asked**: after a change builds (`npm run build`), commit AND push to `main` — Lovable only syncs from `main`, so unpushed work is invisible to David.
+- **Publishing is a separate step from syncing, and a push alone does NOT reach llmvibes.ai.** Sequence:
+  1. Push to `main`.
+  2. Confirm Lovable synced: `mcp__lovable__list_projects` → `latest_screenshot_url` embeds the commit sha (`id-preview-<sha>--...`).
+  3. `mcp__lovable__deploy_project` with **only** `project_id` (`94f104f7-b72c-4dc6-b12d-e84aa593cba4`) — passing `name` rewrites the published slug. Goes live in ~45 s vs ~25-40 min of waiting for auto-deploy.
+  4. Verify by hash equality, not by eyeballing: `curl -s https://llmvibes.ai/ | grep -o '/assets/index-[A-Za-z0-9_-]*\.\(css\|js\)'` must match `ls dist/assets/index-*`. Lovable's build is byte-reproducible against a local `npm run build`. Never verify against `id-preview--<project_id>` — it serves a different, smaller build.
+- **Migrations and ad-hoc SQL go through `mcp__lovable__query_database`** (supports DDL and writes), not a chat prompt. Dry-run reads first; a write against production is permanent.
+- Edge Function deploys still need `mcp__lovable__send_message` — but that tool has a verified stale-response bug (returns a byte-identical cached reply and has falsely claimed success). Never trust its return value: confirm via `list_messages` plus the actual observable state (a `codeVersion` marker in the function response, or `cron.job` rows).
 - Avoid restructuring directories or renaming files Lovable manages. Don't edit `src/components/ui/` (shadcn-managed) or remove the `lovable-tagger` dev dependency.
 - Never enter API keys directly in Lovable — use Supabase Edge Function secrets.
 
