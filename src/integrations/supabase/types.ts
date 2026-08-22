@@ -14,115 +14,38 @@ export type Database = {
   }
   public: {
     Tables: {
-      api_quota_usage: {
+      classifier_usage_daily: {
         Row: {
-          bucket_start: string
-          bucket_type: string
-          provider: string
-          quota_key: string
+          cached_tokens: number
+          calls: number
+          completion_tokens: number
+          day: string
+          model: string
+          prompt_tokens: number
+          service_tier: string
           updated_at: string
-          used_count: number
         }
         Insert: {
-          bucket_start: string
-          bucket_type: string
-          provider: string
-          quota_key: string
+          cached_tokens?: number
+          calls?: number
+          completion_tokens?: number
+          day?: string
+          model: string
+          prompt_tokens?: number
+          service_tier?: string
           updated_at?: string
-          used_count?: number
         }
         Update: {
-          bucket_start?: string
-          bucket_type?: string
-          provider?: string
-          quota_key?: string
+          cached_tokens?: number
+          calls?: number
+          completion_tokens?: number
+          day?: string
+          model?: string
+          prompt_tokens?: number
+          service_tier?: string
           updated_at?: string
-          used_count?: number
         }
         Relationships: []
-      }
-      classification_queue: {
-        Row: {
-          attempt_count: number
-          content: string | null
-          content_type: string
-          created_at: string
-          full_text: string
-          id: string
-          last_attempt_at: string | null
-          last_error: string | null
-          last_error_type: string | null
-          metadata: Json
-          model_id: string
-          model_slug: string
-          next_attempt_at: string
-          posted_at: string
-          request_error_id: string | null
-          score: number
-          scraper_source: string
-          source: string
-          source_url: string
-          status: string
-          title: string | null
-          updated_at: string
-        }
-        Insert: {
-          attempt_count?: number
-          content?: string | null
-          content_type?: string
-          created_at?: string
-          full_text: string
-          id?: string
-          last_attempt_at?: string | null
-          last_error?: string | null
-          last_error_type?: string | null
-          metadata?: Json
-          model_id: string
-          model_slug: string
-          next_attempt_at?: string
-          posted_at: string
-          request_error_id?: string | null
-          score?: number
-          scraper_source: string
-          source: string
-          source_url: string
-          status?: string
-          title?: string | null
-          updated_at?: string
-        }
-        Update: {
-          attempt_count?: number
-          content?: string | null
-          content_type?: string
-          created_at?: string
-          full_text?: string
-          id?: string
-          last_attempt_at?: string | null
-          last_error?: string | null
-          last_error_type?: string | null
-          metadata?: Json
-          model_id?: string
-          model_slug?: string
-          next_attempt_at?: string
-          posted_at?: string
-          request_error_id?: string | null
-          score?: number
-          scraper_source?: string
-          source?: string
-          source_url?: string
-          status?: string
-          title?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "classification_queue_model_id_fkey"
-            columns: ["model_id"]
-            isOneToOne: false
-            referencedRelation: "models"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       error_log: {
         Row: {
@@ -617,20 +540,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      claim_api_quota: {
-        Args: {
-          p_daily_limit: number
-          p_minute_limit: number
-          p_provider: string
-          p_quota_key: string
-        }
-        Returns: {
-          allowed: boolean
-          daily_used: number
-          minute_used: number
-          reason: string
-        }[]
-      }
       get_classification_queue_health: {
         Args: never
         Returns: {
@@ -888,6 +797,17 @@ export type Database = {
       normalize_public_complaint_category: {
         Args: { p_category: string }
         Returns: string
+      }
+      record_classifier_usage: {
+        Args: {
+          p_cached_tokens: number
+          p_calls: number
+          p_completion_tokens: number
+          p_model: string
+          p_prompt_tokens: number
+          p_service_tier: string
+        }
+        Returns: undefined
       }
       release_service_lock: {
         Args: { p_lock_key: string; p_owner: string }
