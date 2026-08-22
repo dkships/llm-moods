@@ -196,6 +196,24 @@ function buildRoutes(): RouteMeta[] {
       },
     },
     {
+      path: "/compare",
+      // Mirrors the useHead call in src/pages/Compare.tsx. Query params
+      // (?a=/?b=) pick the pair client-side; this static shell always uses
+      // the generic title/description since the pair isn't known at build time.
+      title: "Compare AI models — LLM Vibes",
+      description: "Put two tracked AI models side by side: score, 30-day trend, complaints, sentiment mix, and recent chatter, compared like with like.",
+      ogImage: defaultOgImage,
+      ogType: "website",
+      jsonLd: {
+        "@context": "https://schema.org",
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Home", item: `${BASE_URL}/` },
+          { "@type": "ListItem", position: 2, name: "Compare", item: `${BASE_URL}/compare` },
+        ],
+      },
+    },
+    {
       path: "/benchmark",
       // Mirrors the useHead call in src/pages/Benchmark.tsx; the JSON-LD comes
       // from the shared builder in src/data/ship-sense.ts so it can't drift.

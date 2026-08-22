@@ -282,6 +282,38 @@ describe("public app routes", () => {
     expect(await screen.findByText(/no posts in the last 7 days/i)).toBeInTheDocument();
   });
 
+  it("renders the compare route with the default (highest-scoring) pair", async () => {
+    await renderAt("/compare");
+
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: /compare ai models/i })).toBeInTheDocument();
+    });
+    // Default pair = the two highest scores in mockModels: ChatGPT (59), Claude (50).
+    const leftGroup = screen.getByRole("group", { name: /left model/i });
+    const rightGroup = screen.getByRole("group", { name: /right model/i });
+    expect(within(leftGroup).getByRole("button", { name: "ChatGPT" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(rightGroup).getByRole("button", { name: "Claude" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getAllByRole("heading", { name: /30-day trend/i })).toHaveLength(2);
+    expect(screen.getAllByRole("heading", { name: /top complaints/i })).toHaveLength(2);
+    expect(screen.getAllByRole("heading", { name: /sentiment mix/i })).toHaveLength(2);
+    expect(screen.getAllByRole("heading", { name: /recent posts/i })).toHaveLength(2);
+  });
+
+  it("selects models from the ?a=&b= query params", async () => {
+    await renderAt("/compare?a=claude&b=chatgpt");
+
+    await waitFor(() => {
+      const leftGroup = screen.getByRole("group", { name: /left model/i });
+      expect(within(leftGroup).getByRole("button", { name: "Claude" })).toHaveAttribute("aria-pressed", "true");
+    });
+    const rightGroup = screen.getByRole("group", { name: /right model/i });
+    expect(within(rightGroup).getByRole("button", { name: "ChatGPT" })).toHaveAttribute("aria-pressed", "true");
+    // Clicking the model already active on the other side is disabled, so the
+    // two sides can never collapse onto the same model.
+    const leftGroup = screen.getByRole("group", { name: /left model/i });
+    expect(within(leftGroup).getByRole("button", { name: "ChatGPT" })).toBeDisabled();
+  });
+
   it("renders the not found route", async () => {
     await renderAt("/does-not-exist");
 

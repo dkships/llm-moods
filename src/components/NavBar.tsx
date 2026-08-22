@@ -33,6 +33,7 @@ const NavBar = () => {
   const isResearchActive = pathname === "/research" || pathname.startsWith("/research/");
   const isRumorsActive = pathname === "/rumors";
   const isBenchmarkActive = pathname === "/benchmark";
+  const isCompareActive = pathname === "/compare";
   const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/model/");
 
   const navLinkClass = (active: boolean) =>
@@ -52,7 +53,7 @@ const NavBar = () => {
           className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:gap-2"
         >
           <SvgMark />
-          {/* Four nav links leave no room for the wordmark on the narrowest
+          {/* Five nav links leave no room for the wordmark on the narrowest
               screens (320–400px): the mark alone carries the brand there, and
               the aria-label keeps the accessible name. */}
           <span className="hidden whitespace-nowrap text-section text-foreground min-[400px]:inline">
@@ -63,6 +64,9 @@ const NavBar = () => {
         <div className="flex flex-none items-center gap-0.5 sm:gap-3 lg:gap-5">
           <Link to="/dashboard" className={navLinkClass(isDashboardActive)}>
             Dashboard
+          </Link>
+          <Link to="/compare" className={navLinkClass(isCompareActive)}>
+            Compare
           </Link>
           <Link to="/benchmark" className={navLinkClass(isBenchmarkActive)}>
             Benchmark

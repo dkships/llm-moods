@@ -103,6 +103,23 @@ Report: https://claude.ai/code/artifact/d04a18c5-7ecb-41e9-b73b-a7fed79f4736
 - Kept on purpose: `classifyBatch` + `BATCH_CLASSIFY_PROMPT` in
   `_shared/classifier.ts` — no production caller, but 15 provider/retry tests
   exercise the shared path through it.
+- Verified live after redeploy (drain `code_version`
+  `2026-08-22-flex-tier-usage-ledger`): OpenAI echoed `service_tier:"flex"`,
+  40 posts classified (7 relevant / 33 irrelevant, 0 failures), ledger row
+  written. Observation to watch: `cached_tokens` was 0 across the first flex
+  calls — automatic prefix caching may not apply on the flex tier. Flex still
+  wins (output ≈73% of spend); re-check the ledger after a few days.
+- Frontend: 48 of 49 shadcn `ui/` files and 36 packages removed (only
+  `button.tsx` was imported); node_modules 281→226 MB, bundle unchanged (Vite
+  had already tree-shaken them). Hover prefetch debounced 150 ms.
+- New free sources (step 4): `scrape-github-issues` (claude-code / codex /
+  gemini-cli issues, direct attribution, replaces Mastodon's slot) and
+  `scrape-openrouter` (newly-listed tracked-vendor slugs → rumors radar);
+  `@testingcatalog` author feed added to the Bluesky scraper via the shared
+  `considerPost` gate. `.github/workflows/pipeline-alerts.yml` polls
+  `get_critical_alerts` every 6 h and opens/updates one `pipeline-alert`
+  issue — the exit the watchdog never had (its message text is now surfaced
+  for `pipeline-watchdog` rows only). `/compare` page added (side-by-side).
 
 ## 2026-07-17 — Apify cost audit (live-measured, $29/mo Starter budget)
 
