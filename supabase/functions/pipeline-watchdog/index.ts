@@ -18,14 +18,15 @@ const QUEUE_OLDEST_WARN_MIN = 60;
 const AGGREGATION_LAG_WARN_MIN = 90;
 const RECENT_FAILED_WARN = 20;
 // scraper_runs.source holds the function slug (see createRunRecord callers),
-// not a short name. Thresholds are per-source: reddit runs 2×/day (0 4,16 UTC,
-// max happy-path age ~11h17m at the :17 check), the rest 3×/day (max gap ~8h15m).
+// not a short name. Thresholds are per-source (2026-08-22 cadence): reddit runs
+// 1×/day (0 4 UTC, max happy-path age ~24h17m at the :17 check), twitter 2×/day
+// (6 4,16 UTC, ~12h11m), the free scrapers 3×/day (max gap ~8h15m). Mastodon
+// was unscheduled 2026-08-22 (83% irrelevant) and is intentionally absent.
 const SCRAPER_STALE_HOURS_BY_SOURCE: Record<string, number> = {
-  "scrape-reddit-apify": 14,
+  "scrape-reddit-apify": 27,
   "scrape-hackernews": 11,
   "scrape-bluesky": 11,
-  "scrape-twitter": 11,
-  "scrape-mastodon": 11,
+  "scrape-twitter": 14,
   // Added 2026-07-10, after this watchdog was written, so it went unmonitored:
   // a silent App Store scraper failure alerted nobody. Same 3×/day windows as
   // the others (cron '10 4,12,21'), so the same 11h threshold applies.
@@ -33,7 +34,7 @@ const SCRAPER_STALE_HOURS_BY_SOURCE: Record<string, number> = {
 };
 // A scraper that runs on schedule but fails/skips every run never trips the
 // started_at check, so also alert when the last success/partial is older than
-// this (2+ fully missed reddit windows; single failures can't spam).
+// this (one fully missed reddit day, 2+ twitter windows; single failures can't spam).
 const SCRAPER_NO_SUCCESS_HOURS = 30;
 // Runs-query lookback must comfortably exceed the 30h success window or a
 // success row ages out while today's run is still in flight (false alert).

@@ -32,14 +32,16 @@ npm run test   # Vitest
 
 Edge functions that hit paid APIs (Anthropic, Apify, Gemini, etc.) MUST keep their `isInternalServiceRequest` gate. The repo and the anon key are public, so an ungated function is a public quota-burner. Do NOT remove an application-layer gate to work around invocation friction.
 
-- Stay gated: `reclassify-posts` and anything that calls Anthropic/Gemini/Apify or performs unbounded writes. `aggregate-vibes`, `cleanup-old-posts`, `run-scrapers` accept service-role JWT **or** the pg_cron scheduler body `{scheduler:"pg_cron", pipeline:"<source>"}`; `reaggregate-vibes` requires service-role; bare anon gets 403.
+- Stay gated: `reclassify-posts` and anything that calls Anthropic/Gemini/Apify or performs unbounded writes. `aggregate-vibes`, `cleanup-old-posts` accept service-role JWT **or** the pg_cron scheduler body `{scheduler:"pg_cron", pipeline:"<source>"}`; `reaggregate-vibes` requires service-role; bare anon gets 403.
 - Scraper gates accept three callers: service-role JWT, `RUN_PIPELINE_TRIGGER_SECRET` header, or anon JWT with the pg_cron scheduler body (lets pg_cron invoke scrapers without leaking service-role into a public-repo migration).
 - One-shot invocations of gated functions go through a temporary helper edge function, never raw SQL — procedure and gate history in `AGENT-REFERENCE.md`.
 
 ## Pipeline (pg_cron)
 
 - Independent pg_cron rows, no orchestrator, each within its own 400 s edge-function budget. Full cron table: `docs/architecture-reference.md`. Live cron diverges from migration history — check `cron.job` for actual state.
-- `run-pipeline` / `run-scrapers` are unscheduled manual debug tools (the merged pipeline blew the 400 s budget).
+- `run-pipeline` / `run-scrapers` were deleted 2026-08-22 (unscheduled since the merged pipeline blew the 400 s budget). `isRunPipelineTriggerRequest` / `RUN_PIPELINE_TRIGGER_SECRET` remain — they gate every function, not just the old orchestrator.
+- Classifier cost: `classifier_usage_daily` (per day × model × service_tier, written by the drain) is the source of truth — don't quote doc figures. OpenAI runs on the **flex** service tier (50% of standard) via `OPENAI_SERVICE_TIER` (default `flex`; `auto`/`default` to revert, no redeploy); capacity 429s and timeouts fall back to `auto` per request.
+- Mastodon is unscheduled (2026-08-22, 83% irrelevant); Reddit runs 1×/day × 20 posts/sub, Twitter 2×/day — the Apify $29 plan was being exhausted ~day 17.
 - Recover transient classification failures: `reclassify-posts?mode=reset_failed&error_pattern=transient` (confirm with `dry_run=1` first). `reclassify-posts?mode=multi_model` fixes historical multi-model posts; run `reaggregate-vibes` after.
 - Reddit actor is config-driven (`scraper_config.actor_id`), currently `harshmaur/reddit-scraper`. Don't revert to `trudax/reddit-scraper-lite` — it used Reddit's public `.json` API, dead (403) since May 2026.
 

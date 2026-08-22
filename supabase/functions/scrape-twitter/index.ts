@@ -44,24 +44,6 @@ const DEFAULT_SEARCH_TERMS = [
   `("claude" OR "claude ai" OR "claude code" OR anthropic OR "chatgpt" OR "chat gpt" OR "openai gpt" OR openai OR "gemini" OR "google gemini" OR "gemini ai" OR "grok" OR "grok ai" OR "xai grok") lang:en -filter:retweets`,
 ];
 
-const GROK_SEARCH_PROMPT = `Search X/Twitter for recent posts (last 24 hours) about these AI models: Claude, ChatGPT, GPT-4, GPT-4o, Gemini, Grok.
-
-Find posts where users share their direct experience with these models — complaints, praise, comparisons of output quality, etc.
-
-For EACH relevant post found, classify it and return a JSON array. Each element:
-{
-  "text": "the tweet text",
-  "tweet_url": "https://x.com/user/status/123",
-  "model": "claude|chatgpt|gemini|grok",
-  "sentiment": "positive|negative|neutral",
-  "complaint_category": "lazy_responses|hallucinations|refusals|coding_quality|speed|general_drop|pricing_value|censorship|context_window|api_reliability|multimodal_quality|reasoning" or null,
-  "praise_category": "output_quality|coding_quality|speed|reasoning|creativity|value|reliability|context_handling|multimodal_quality|general_improvement" or null,
-  "confidence": 0.0-1.0,
-  "posted_at": "ISO date string"
-}
-
-Skip posts that are just news, funding announcements, tutorials, or opinions about AI in general.
-Return ONLY the JSON array, no other text.`;
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -83,10 +65,10 @@ function extractQuotedStatusId(tweet: any): string | null {
   return null;
 }
 
-function buildTwitterSummary(backend: "apify" | "grok") {
+function buildTwitterSummary() {
   return {
     source: SOURCE,
-    backend,
+    backend: "apify",
     apify_items_fetched: 0,
     posts_found: 0,
     filtered_candidates: 0,
@@ -114,7 +96,7 @@ async function runApifyPath(
   titleKeys: Set<string>,
   config: Record<string, string[]>,
 ) {
-  const summary = buildTwitterSummary("apify");
+  const summary = buildTwitterSummary();
   const searchTerms = getConfigValues(config, "search_term");
   const apifyInput = {
     searchTerms: searchTerms.length > 0 ? searchTerms : DEFAULT_SEARCH_TERMS,
@@ -351,131 +333,6 @@ async function runApifyPath(
   return summary;
 }
 
-async function runGrokPath(
-  supabase: any,
-  xaiApiKey: string,
-  modelMap: Record<string, string>,
-  keywords: KeywordEntry[],
-  existingUrls: Set<string>,
-  titleKeys: Set<string>,
-) {
-  const summary = buildTwitterSummary("grok");
-  const now = new Date();
-  const yesterday = new Date(now.getTime() - 24 * 3600000);
-
-  const res = await fetch("https://api.x.ai/v1/responses", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${xaiApiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "grok-4-1-fast",
-      input: [{ role: "user", content: GROK_SEARCH_PROMPT }],
-      tools: [{
-        type: "x_search",
-        from_date: yesterday.toISOString().split("T")[0],
-        to_date: now.toISOString().split("T")[0],
-      }],
-    }),
-  });
-
-  if (!res.ok) {
-    const errorText = await res.text().catch(() => "unknown");
-    await logToErrorLog(supabase, SOURCE, `Grok API HTTP ${res.status}: ${errorText.slice(0, 500)}`, "grok-error");
-    throw new Error(`Grok API returned ${res.status}`);
-  }
-
-  const data = await res.json();
-  let posts: any[] = [];
-  for (const item of data.output || []) {
-    if (item.type !== "message") continue;
-    for (const content of item.content || []) {
-      if (content.type !== "output_text") continue;
-      const text = content.text || "";
-      const jsonMatch = text.match(/\[[\s\S]*\]/);
-      if (jsonMatch) {
-        try {
-          posts = JSON.parse(jsonMatch[0]);
-        } catch {}
-      }
-    }
-  }
-
-  summary.posts_found = posts.length;
-
-  for (const post of posts) {
-    if (!post.text || !post.tweet_url) continue;
-
-    const text = post.text.slice(0, 2000);
-    const sourceUrl = post.tweet_url;
-    if (existingUrls.has(sourceUrl)) {
-      summary.dedupSkipped++;
-      continue;
-    }
-
-    const matchedSlugs = matchModels(text, keywords);
-    if (matchedSlugs.length === 0 && post.model) {
-      const grokSlug = post.model.toLowerCase();
-      if (modelMap[grokSlug]) matchedSlugs.push(grokSlug);
-    }
-    if (matchedSlugs.length === 0) continue;
-    summary.filtered_candidates++;
-
-    const title = text.slice(0, 500);
-    let allDuped = true;
-    for (const slug of matchedSlugs) {
-      const modelId = modelMap[slug];
-      if (modelId && !isDuplicate(titleKeys, title, modelId)) {
-        allDuped = false;
-        break;
-      }
-    }
-    if (allDuped) {
-      summary.dedupSkipped++;
-      continue;
-    }
-
-    if (!post.posted_at || Number.isNaN(new Date(post.posted_at).getTime())) {
-      summary.contentSkipped++;
-      continue;
-    }
-    const postedAt = new Date(post.posted_at).toISOString();
-
-    for (const slug of matchedSlugs) {
-      const modelId = modelMap[slug];
-      if (!modelId || isDuplicate(titleKeys, title, modelId)) continue;
-
-      const upsertResult = await upsertPendingScrapedPost(supabase, {
-        model_id: modelId,
-        source: "twitter",
-        source_url: sourceUrl,
-        title: title.slice(0, 120),
-        content: text.slice(0, 2000),
-        content_type: "title_only",
-        score: 0,
-        posted_at: postedAt,
-      });
-
-      if (upsertResult.error) {
-        summary.errors.push(`Insert: ${upsertResult.error}`);
-        continue;
-      }
-
-      if (upsertResult.inserted) {
-        summary.net_new_rows++;
-        summary.classificationQueued++;
-        existingUrls.add(sourceUrl);
-        titleKeys.add(`${modelId}:${title.slice(0, 80).toLowerCase()}`);
-      } else {
-        summary.duplicate_conflicts++;
-      }
-    }
-  }
-
-  return summary;
-}
-
 export async function handleScrapeTwitter(req: Request): Promise<Response> {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
   const body = await readJsonBody(req);
@@ -533,12 +390,13 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
     }
     runRecord = startedRun;
 
+    // Apify (apidojo) is the only backend. A Grok-search path existed until
+    // 2026-08-22 but XAI_API_KEY was never in the secret store.
     const apifyToken = Deno.env.get("APIFY_API_TOKEN");
-    const xaiApiKey = Deno.env.get("XAI_API_KEY");
-    if (!apifyToken && !xaiApiKey) {
+    if (!apifyToken) {
       await updateRunRecord(supabase, runRecord!.id, {
         status: "skipped",
-        errors: ["No X credentials (set APIFY_API_TOKEN or XAI_API_KEY)"],
+        errors: ["No X credentials (set APIFY_API_TOKEN)"],
         metadata: { reason: "no_credentials" },
         completed_at: new Date().toISOString(),
       });
@@ -547,7 +405,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
         status: "skipped",
         skipped: true,
         reason: "no_credentials",
-        errors: ["No X credentials (set APIFY_API_TOKEN or XAI_API_KEY)"],
+        errors: ["No X credentials (set APIFY_API_TOKEN)"],
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -570,9 +428,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
     const existingUrls = new Set((existingData || []).map((entry: any) => entry.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
-    const summary = apifyToken
-      ? await runApifyPath(supabase, apifyToken, modelMap, keywords, existingUrls, titleKeys, config)
-      : await runGrokPath(supabase, xaiApiKey!, modelMap, keywords, existingUrls, titleKeys);
+    const summary = await runApifyPath(supabase, apifyToken, modelMap, keywords, existingUrls, titleKeys, config);
 
     const derived = deriveRunMetrics(summary);
     const completedAt = new Date().toISOString();

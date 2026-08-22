@@ -42,6 +42,10 @@ Reference material moved out of `CLAUDE.md` (2026-07-07). Operating rules live i
 | `scraper_runs` | Audit log per scraper execution |
 | `error_log` | Debug error tracking |
 | `model_rumors` | Rumors-radar accumulator: one row per (model_slug, version_key), corroboration counts + hedged ETA + signals |
+| `classifier_usage_daily` | Token ledger: one row per day × model × service_tier, incremented by the drain via `record_classifier_usage` (2026-08-22). Cost source of truth |
+| `scheduler_tokens` / `service_locks` | pg_cron auth token; mutex for drain/score refresh |
+
+`classification_queue` and `api_quota_usage` (+ `claim_api_quota`) were dropped 2026-08-22 — dead since May.
 
 `scraped_posts` also carries `rumor_checked_at` / `rumor_data` (rumor-extraction state).
 
@@ -53,11 +57,11 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 
 | Cron | Schedule (UTC) | PT | Function |
 |---|---|---|---|
-| `scrape-reddit-apify-3x` | `0 4,16 * * *` | 21/09 PT | `scrape-reddit-apify` (now **2×/day** — cost; job name unchanged) |
+| `scrape-reddit-apify-3x` | `0 4 * * *` | 21:00 PT | `scrape-reddit-apify` (**1×/day × 20 posts/sub** since 2026-08-22 — Apify budget; job name unchanged) |
 | `scrape-hackernews-3x` | `2 4,12,21 * * *` | +2 min | `scrape-hackernews` |
 | `scrape-bluesky-3x` | `4 4,12,21 * * *` | +4 min | `scrape-bluesky` |
-| `scrape-twitter-3x` | `6 4,12,21 * * *` | +6 min | `scrape-twitter` |
-| `scrape-mastodon-3x` | `8 4,12,21 * * *` | +8 min | `scrape-mastodon` |
+| `scrape-twitter-3x` | `6 4,16 * * *` | 21/09 PT | `scrape-twitter` (**2×/day** since 2026-08-22 — Apify budget; job name unchanged) |
+| ~~`scrape-mastodon-3x`~~ | — | — | `scrape-mastodon` **unscheduled 2026-08-22** (83% of its posts classified irrelevant; function + config kept, re-schedule via `cron.schedule`) |
 | `scrape-appstore-3x` | `10 4,12,21 * * *` | +10 min | `scrape-appstore` (Apple review RSS, free/keyless; added 2026-07-10) |
 | `drain-classification-queue-2min` | `*/2 * * * *` | every 2 min | `drain-classification-queue` (body: `limit=200`, `batch_size=20` → 10 classifier calls/pass) |
 | `aggregate-vibes-q30` | `20,50 * * * *` | every 30 min, offset | `aggregate-vibes` (refreshes last 7 days; `queued_posts` heals as drain catches up, `failed_posts` only via `reclassify-posts?mode=reset_failed`) |
@@ -70,7 +74,7 @@ Drain capacity: every 2 min at `limit=200`, `batch_size=20` ≈ 6,000 posts/hr. 
 
 ## Scrapers (Edge Functions)
 
-Reddit (Apify), Hacker News (Algolia API — stories + comments since 2026-07-10), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances; hashtag timelines only — unauthenticated phrase search was dead and removed 2026-07-10), App Store reviews (Apple RSS, free/keyless, added 2026-07-10). Lemmy was dropped in Phase 12 (yielded 0.4 posts/run for 18 wasted Gemini calls; mostly Reddit cross-posts). Each scraper runs on its own pg_cron row at the three Pacific-time windows (05:00, 14:00, 21:00 PT), staggered by minute. Scrapers insert posts as `classification_status='pending'`; classification is drained by the separate `drain-classification-queue` cron, and `aggregate-vibes` runs independently to refresh scores.
+Reddit (Apify), Hacker News (Algolia API — stories + comments since 2026-07-10), Bluesky (AT Protocol), Twitter/X (Apify), Mastodon (public API, 5 instances; hashtag timelines only — unauthenticated phrase search was dead and removed 2026-07-10), App Store reviews (Apple RSS, free/keyless, added 2026-07-10). Lemmy was dropped in Phase 12 (yielded 0.4 posts/run for 18 wasted Gemini calls; mostly Reddit cross-posts). Free scrapers run on their own pg_cron rows at the three Pacific-time windows (05:00, 14:00, 21:00 PT), staggered by minute; the paid Apify scrapers run less often (Reddit 1×/day, Twitter 2×/day) so the $29/mo plan lasts the month — it was exhausted around day 17 before 2026-08-22. Mastodon is unscheduled (2026-08-22). Scrapers insert posts as `classification_status='pending'`; classification is drained by the separate `drain-classification-queue` cron, and `aggregate-vibes` runs independently to refresh scores.
 
 **Tracked models:** Claude, ChatGPT, Gemini, Grok (DeepSeek and Perplexity were removed 2026-03-21).
 

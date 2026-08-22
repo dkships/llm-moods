@@ -61,6 +61,19 @@ export interface ClassificationStateOptions {
   now?: Date;
 }
 
+// Per-pass token ledger, summed from the classifier's UsageSample hook and
+// persisted to classifier_usage_daily (see record_classifier_usage). Before
+// 2026-08-22 production threw this away, so real spend was only measurable by
+// the manual canary harness.
+export interface ClassifierUsageTotals {
+  model: string;
+  service_tier: string;
+  calls: number;
+  prompt_tokens: number;
+  cached_tokens: number;
+  completion_tokens: number;
+}
+
 export interface PendingClassificationSummary {
   selected: number;
   processed: number;
@@ -70,6 +83,7 @@ export interface PendingClassificationSummary {
   failed: number;
   dry_run: boolean;
   errors: string[];
+  usage?: ClassifierUsageTotals[];
 }
 
 interface PendingClassificationQueryBuilder {
@@ -242,6 +256,32 @@ async function applyFreeGeminiSpillover(
   return recovered;
 }
 
+// Best-effort daily rollup (one row per day x model x tier). The test client
+// has no rpc(); production's supabase-js does. Never fails the pass.
+async function recordClassifierUsage(
+  supabase: PendingClassificationClient,
+  usage: ClassifierUsageTotals[],
+  logError?: (msg: string, ctx?: string) => Promise<void>,
+): Promise<void> {
+  const rpc = (supabase as { rpc?: (fn: string, args: Record<string, unknown>) => PromiseLike<{ error: { message: string } | null }> }).rpc;
+  if (typeof rpc !== "function") return;
+  for (const u of usage) {
+    try {
+      const { error } = await rpc.call(supabase, "record_classifier_usage", {
+        p_model: u.model,
+        p_service_tier: u.service_tier,
+        p_calls: u.calls,
+        p_prompt_tokens: u.prompt_tokens,
+        p_cached_tokens: u.cached_tokens,
+        p_completion_tokens: u.completion_tokens,
+      });
+      if (error && logError) await logError(`record_classifier_usage failed: ${error.message}`, "usage-ledger");
+    } catch (e) {
+      if (logError) await logError(`record_classifier_usage threw: ${e instanceof Error ? e.message : String(e)}`, "usage-ledger");
+    }
+  }
+}
+
 export async function processPendingClassifications(
   supabase: PendingClassificationClient,
   apiKey: string,
@@ -285,7 +325,30 @@ export async function processPendingClassifications(
   if (rows.length === 0 || dryRun) return summary;
 
   const items = rows.map((row) => ({ text: modelMentionText(row), targetModel: targetModelLabel(row) }));
-  const results = await classifyBatchTargeted(items, apiKey, batchSize, options.logError);
+  const usageByKey = new Map<string, ClassifierUsageTotals>();
+  const results = await classifyBatchTargeted(items, apiKey, batchSize, options.logError, {
+    onUsage: (sample) => {
+      const tier = sample.serviceTier ?? "default";
+      const key = `${sample.model}|${tier}`;
+      const totals = usageByKey.get(key) ?? {
+        model: sample.model,
+        service_tier: tier,
+        calls: 0,
+        prompt_tokens: 0,
+        cached_tokens: 0,
+        completion_tokens: 0,
+      };
+      totals.calls += 1;
+      totals.prompt_tokens += sample.promptTokens ?? 0;
+      totals.cached_tokens += sample.cacheReadTokens ?? 0;
+      totals.completion_tokens += sample.completionTokens ?? 0;
+      usageByKey.set(key, totals);
+    },
+  });
+  if (usageByKey.size > 0) {
+    summary.usage = [...usageByKey.values()];
+    await recordClassifierUsage(supabase, summary.usage, options.logError);
+  }
 
   // Recover transient Claude errors via free-tier Gemini before writing, so each
   // row is written exactly once with its final (possibly recovered) result.

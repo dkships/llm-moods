@@ -68,6 +68,42 @@ after the 2026-07-10 App Store + HN-comment source additions). Output tokens
   with an `error_pattern` matching "usage limits" (NOT `transient` — the
   pattern list won't match a 400), then `reaggregate-vibes`.
 
+## 2026-08-22 — Cost & simplicity audit (Fable 5 + 4 Sonnet readers, live-DB verified)
+
+Report: https://claude.ai/code/artifact/d04a18c5-7ecb-41e9-b73b-a7fed79f4736
+
+- **Apify plan exhausted ~day 17.** `scraper_runs` showed 28 consecutive Reddit
+  and 42 consecutive Twitter `skipped: apify_monthly_budget_exceeded` runs
+  (Aug 6–19), recovering Aug 20 on cycle reset — two of five platforms dark for
+  two weeks; watchdog criticals went unread. Reddit yielded 4.4 net-new
+  posts/run. Applied: Reddit 1×/day × 20 posts/sub (`0 4 * * *`), Twitter
+  2×/day (`6 4,16 * * *`), Mastodon unscheduled (83% of its classified posts
+  irrelevant; 456 scored of 2,831 in 30d). Watchdog stale thresholds updated.
+- **Classifier spend was ≈$28/mo, not the $8 on record** — 28,182 posts
+  classified in 30d (~940/day) at the canary's $0.99/1k; 59% came back
+  irrelevant (Mastodon 83%, Bluesky 72%, Twitter 62%, HN 50%, App Store 17%).
+  Output tokens ≈73% of the bill. Anthropic spend (rumor extractor, 1,169
+  posts/30d on Haiku) is under $1/mo.
+- **OpenAI flex service tier** (`service_tier:"flex"`, 50% of standard; terra
+  listed as supported) added as the production default via
+  `OPENAI_SERVICE_TIER` (env, no redeploy to revert). Not in the rejected-ideas
+  ledger: Batch API was rejected for needing a two-phase drain; flex needs
+  none. Capacity 429 (`resource_unavailable`) and the 120 s flex timeout fall
+  back to `service_tier:"auto"` for that request. NOT canary-validated with
+  `json_schema` first — the fallback bounds the risk; verify via
+  `classifier_usage_daily.service_tier='flex'` rows after deploy.
+- **Token ledger**: `classifier_usage_daily` + `record_classifier_usage` RPC,
+  written by the drain after every pass (prompt / cached / completion tokens
+  per day × model × tier). The drain parsed this before and threw it away.
+- Deleted: `run-pipeline`, `run-scrapers` (829 LOC, unscheduled), the Twitter
+  `runGrokPath` (XAI_API_KEY never existed), `reclassify-posts` implicit
+  "neutral" default mode (now 400 without `?mode=`), `classification_queue`
+  (1,771 rows queued since May 7), `api_quota_usage` + `claim_api_quota`, 20
+  orphan `scraper_config` rows with `scraper='reddit'`.
+- Kept on purpose: `classifyBatch` + `BATCH_CLASSIFY_PROMPT` in
+  `_shared/classifier.ts` — no production caller, but 15 provider/retry tests
+  exercise the shared path through it.
+
 ## 2026-07-17 — Apify cost audit (live-measured, $29/mo Starter budget)
 
 Trigger: suspected Reddit-actor price increase. Verdict: **no price increase** —

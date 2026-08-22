@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatch, classifyBatchTargeted, getClassifierApiKey, isClassifierFailure } from "../_shared/classifier.ts";
+import { classifyBatchTargeted, getClassifierApiKey, isClassifierFailure } from "../_shared/classifier.ts";
 import { isInternalServiceRequest, internalOnlyResponse } from "../_shared/runtime.ts";
 
 const corsHeaders = {
@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const mode = url.searchParams.get("mode") || "neutral";
+    const mode = url.searchParams.get("mode") || "";
     const batchSize = Math.max(1, Math.min(parseInt(url.searchParams.get("batch_size") || "25", 10) || 25, 50));
     const offset = Math.max(0, parseInt(url.searchParams.get("offset") || "0", 10) || 0);
     const postedAfter = url.searchParams.get("posted_after");
@@ -60,71 +60,13 @@ Deno.serve(async (req) => {
       return await handleResetFailed(supabase, errorPattern, sinceDays, limit, dryRun, logError);
     }
 
-    // Default mode: reclassify low-confidence neutral posts
-    const { data: posts, error: fetchErr } = await supabase
-      .from("scraped_posts")
-      .select("id, title, content")
-      .eq("sentiment", "neutral")
-      .eq("confidence", 0.5)
-      .gte("posted_at", "2026-03-10")
-      .limit(batchSize);
-
-    if (fetchErr) throw fetchErr;
-    if (!posts || posts.length === 0) {
-      return new Response(JSON.stringify({ message: "No posts to reclassify", remaining: 0 }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    let classified = 0, irrelevant = 0, errors = 0;
-
-    const candidates: { id: string; text: string }[] = [];
-    for (const post of posts) {
-      const text = `${post.title || ""} ${post.content || ""}`.trim();
-      if (!text) { errors++; continue; }
-      candidates.push({ id: post.id, text });
-    }
-
-    const classifications = await classifyBatch(candidates.map(c => c.text), apiKey, undefined, logError);
-
-    for (let i = 0; i < candidates.length; i++) {
-      const result = classifications[i];
-      const c = candidates[i];
-
-      if (isClassifierFailure(result)) {
-        errors++;
-        continue;
-      }
-
-      if (!result.relevant) {
-        irrelevant++;
-        continue;
-      } else {
-        await supabase.from("scraped_posts").update({
-          sentiment: result.sentiment,
-          complaint_category: result.complaint_category,
-          praise_category: result.praise_category,
-          confidence: result.confidence,
-          original_language: result.language || null,
-          translated_content: result.english_translation || null,
-        }).eq("id", c.id);
-        classified++;
-      }
-    }
-
-    const { count } = await supabase
-      .from("scraped_posts")
-      .select("id", { count: "exact", head: true })
-      .eq("sentiment", "neutral")
-      .eq("confidence", 0.5)
-      .gte("posted_at", "2026-03-10");
-
+    // No implicit default. The old "neutral" mode ran an untargeted legacy
+    // prompt over a hardcoded 2026-03-10 backfill window whenever a caller
+    // forgot ?mode=, i.e. an accidental full paid-LLM pass. Removed 2026-08-22.
     return new Response(JSON.stringify({
-      mode: "neutral",
-      classified, irrelevant, errors,
-      remaining: count || 0,
-      message: (count || 0) > 0 ? "Call again to process more" : "All done!",
-    }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      error: `Unknown or missing mode "${mode}"`,
+      modes: ["multi_model", "recent_targeted", "reset_failed"],
+    }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   } catch (e) {
     return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown" }), {

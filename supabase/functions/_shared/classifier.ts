@@ -65,9 +65,14 @@ export interface UsageSample {
   // promptTokens always means freshly-billed input; cache reads live here so
   // the eval harness prices cached runs fairly.
   cacheReadTokens?: number | null;
+  // OpenAI echoes the tier that actually served the request ("flex" bills at
+  // 50% of standard; "default" when a flex call fell back). Null elsewhere.
+  serviceTier?: string | null;
   latencyMs: number;
   mode: "single" | "batch";
 }
+
+export type OpenAiServiceTier = "flex" | "auto" | "default";
 
 export interface ClassifyOptions {
   model?: string;
@@ -83,6 +88,20 @@ export interface ClassifyOptions {
   // Override max_tokens for the underlying request. Useful for thinking-only
   // models where the default 4096-token batch budget gets eaten by reasoning.
   maxTokensOverride?: number;
+  // OpenAI only. "flex" (production default, env OPENAI_SERVICE_TIER) bills at
+  // Batch rates with no batching rework; capacity 429s / timeouts fall back to
+  // "auto" for that request. "default" forces standard pricing.
+  serviceTier?: OpenAiServiceTier;
+}
+
+const OPENAI_SERVICE_TIERS = new Set<OpenAiServiceTier>(["flex", "auto", "default"]);
+// Flex requests are slower and may hang; bound them so one call can't eat the
+// drain's 240 s lock (a 20-post batch normally completes in well under 60 s).
+const OPENAI_FLEX_TIMEOUT_MS = Number(envValue("OPENAI_FLEX_TIMEOUT_MS", "120000"));
+
+export function openAiServiceTier(options: ClassifyOptions = {}): OpenAiServiceTier {
+  const raw = (options.serviceTier ?? envValue("OPENAI_SERVICE_TIER", "flex")).toLowerCase();
+  return OPENAI_SERVICE_TIERS.has(raw as OpenAiServiceTier) ? raw as OpenAiServiceTier : "flex";
 }
 
 function classifierModel(options: ClassifyOptions = {}): string {
@@ -442,6 +461,7 @@ async function emitUsage(
     completionTokens: usage ? readUsageField(usage.completion_tokens) : null,
     totalTokens: usage ? readUsageField(usage.total_tokens) : null,
     cacheReadTokens: anthropicCacheRead ?? openAiCached,
+    serviceTier: isRecord(responseData) && typeof responseData.service_tier === "string" ? responseData.service_tier : null,
     latencyMs,
     mode,
   };
@@ -560,7 +580,13 @@ function responseSchema(mode: "single" | "batch") {
     };
 }
 
-function requestBody(prompt: string, maxTokens: number, mode: "single" | "batch", options: ClassifyOptions = {}) {
+function requestBody(
+  prompt: string,
+  maxTokens: number,
+  mode: "single" | "batch",
+  options: ClassifyOptions = {},
+  tierOverride?: OpenAiServiceTier,
+) {
   const model = classifierModel(options);
   const provider = providerForModel(model);
   const effort = options.reasoningEffort ?? "none";
@@ -577,6 +603,8 @@ function requestBody(prompt: string, maxTokens: number, mode: "single" | "batch"
     // and reject any non-default `temperature`; forced json_schema output keeps
     // classification stable without it.
     body.max_completion_tokens = maxTokens;
+    const tier = tierOverride ?? openAiServiceTier(options);
+    if (tier !== "default") body.service_tier = tier;
   } else {
     body.max_tokens = maxTokens;
     body.temperature = 0;
@@ -869,17 +897,27 @@ async function fetchOpenAi(
   logError?: (msg: string, ctx?: string) => Promise<void>,
   options: ClassifyOptions = {},
 ): Promise<Response | ClassifyResult> {
+  let tier = openAiServiceTier(options);
   for (let attempt = 0; attempt < 3; attempt++) {
     let res: Response | null = null;
     try {
       res = await fetch(OPENAI_API_URL, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-        body: requestBody(prompt, maxTokens, mode, options),
+        body: requestBody(prompt, maxTokens, mode, options, tier),
+        signal: tier === "flex" ? AbortSignal.timeout(OPENAI_FLEX_TIMEOUT_MS) : undefined,
       });
     } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      if (tier === "flex") {
+        // A hung flex request (timeout) is the documented failure mode; retry
+        // the same payload at standard priority rather than burning attempts.
+        if (logError) await logError(`OpenAI flex request failed (${message}); retrying with service_tier=auto`, "classify-flex-fallback");
+        tier = "auto";
+        continue;
+      }
       if (attempt === 2) {
-        return makeSkippedResult("classifier_error", e instanceof Error ? e.message : String(e));
+        return makeSkippedResult("classifier_error", message);
       }
       await new Promise((r) => setTimeout(r, retryDelayMs(null, attempt)));
       continue;
@@ -889,6 +927,14 @@ async function fetchOpenAi(
 
     if (res.status === 429) {
       const details = await readGeminiFailure(res);
+      // Flex capacity exhaustion is a 429 with type/code "resource_unavailable"
+      // (not billed). Fall back to standard priority for this request instead
+      // of deferring the batch on the quota path.
+      if (tier === "flex" && /resource_unavailable/i.test(details.reason)) {
+        if (logError) await logError(`OpenAI flex capacity unavailable; retrying with service_tier=auto`, "classify-flex-fallback");
+        tier = "auto";
+        continue;
+      }
       const requestErrorId = nextRequestErrorId();
       if (logError) {
         await logError(`OpenAI 429 (${requestErrorId}): ${details.reason}`, "classify-request-quota");
