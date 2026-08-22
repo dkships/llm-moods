@@ -63,6 +63,8 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 | `scrape-twitter-3x` | `6 4,16 * * *` | 21/09 PT | `scrape-twitter` (**2×/day** since 2026-08-22 — Apify budget; job name unchanged) |
 | ~~`scrape-mastodon-3x`~~ | — | — | `scrape-mastodon` **unscheduled 2026-08-22** (83% of its posts classified irrelevant; function + config kept, re-schedule via `cron.schedule`) |
 | `scrape-appstore-3x` | `10 4,12,21 * * *` | +10 min | `scrape-appstore` (Apple review RSS, free/keyless; added 2026-07-10) |
+| `scrape-github-issues-3x` | `12 4,12,21 * * *` | +12 min | `scrape-github-issues` (issues on claude-code / codex / gemini-cli, free REST; added 2026-08-22) |
+| `scrape-openrouter-3x` | `14 4,12,21 * * *` | +14 min | `scrape-openrouter` (newly-listed tracked-vendor models → rumors radar; added 2026-08-22) |
 | `drain-classification-queue-2min` | `*/2 * * * *` | every 2 min | `drain-classification-queue` (body: `limit=200`, `batch_size=20` → 10 classifier calls/pass) |
 | `aggregate-vibes-q30` | `20,50 * * * *` | every 30 min, offset | `aggregate-vibes` (refreshes last 7 days; `queued_posts` heals as drain catches up, `failed_posts` only via `reclassify-posts?mode=reset_failed`) |
 | `pipeline-watchdog-1h` | `17 * * * *` | hourly at :17 | `pipeline-watchdog` |

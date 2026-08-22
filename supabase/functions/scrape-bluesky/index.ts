@@ -46,6 +46,13 @@ const SEARCH_TERMS = [
   "Grok 5",
 ];
 
+// Accounts whose whole timeline is worth reading, not just keyword hits —
+// pulled via the public AppView (no auth) and run through the same keyword /
+// dedupe gate as search results. testingcatalog.com is the best-known AI
+// leak/early-feature aggregator (2026-08-22 audit); its posts about the four
+// tracked models feed the rumors radar.
+const AUTHOR_FEEDS = ["testingcatalog.com"];
+
 interface BlueskyQuoteView {
   embed?: {
     record?: { uri?: unknown; record?: { uri?: unknown } };
@@ -195,6 +202,63 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
     }[] = [];
     const candidateUrls = new Set<string>();
 
+    // One gate for search hits and author-feed posts alike: recency, length,
+    // non-experience filter, keyword match, URL + title dedupe.
+    const considerPost = (post: any) => {
+      const text = post.record?.text || "";
+      const createdAt = post.record?.createdAt ? new Date(post.record.createdAt) : null;
+      if (!createdAt || Number.isNaN(createdAt.getTime()) || createdAt < cutoff) return;
+
+      if (!meetsMinLength(text, "")) {
+        summary.contentSkipped++;
+        return;
+      }
+      if (
+        isLikelyNonExperienceShare(text, "") &&
+        !isRumorOrReleaseCandidate(text, "")
+      ) {
+        summary.contentSkipped++;
+        return;
+      }
+
+      const matchedSlugs = matchModels(text, keywords);
+      if (matchedSlugs.length === 0) return;
+      summary.filtered_candidates++;
+
+      const handle = post.author?.handle || "";
+      const uriParts = (post.uri || "").split("/");
+      const rkey = uriParts[uriParts.length - 1];
+      const sourceUrl = `https://bsky.app/profile/${handle}/post/${rkey}`;
+      if (existingUrls.has(sourceUrl) || candidateUrls.has(sourceUrl)) {
+        summary.dedupSkipped++;
+        return;
+      }
+
+      let allDuped = true;
+      for (const slug of matchedSlugs) {
+        const modelId = modelMap[slug];
+        if (modelId && !isDuplicate(titleKeys, text.slice(0, 120), modelId)) {
+          allDuped = false;
+          break;
+        }
+      }
+      if (allDuped) {
+        summary.dedupSkipped++;
+        return;
+      }
+
+      candidates.push({
+        text,
+        matchedSlugs,
+        sourceUrl,
+        createdAt: createdAt.toISOString(),
+        score: post.likeCount || 0,
+        authorHandle: handle || null,
+        quotedStatusId: quotedPostId(post),
+      });
+      candidateUrls.add(sourceUrl);
+    };
+
     for (let i = 0; i < SEARCH_TERMS.length; i++) {
       const term = SEARCH_TERMS[i];
       if (i > 0) await delay(1000);
@@ -214,62 +278,28 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
         const posts = json.posts || [];
         summary.posts_found += posts.length;
 
-        for (const post of posts) {
-          const text = post.record?.text || "";
-          const createdAt = post.record?.createdAt ? new Date(post.record.createdAt) : null;
-          if (!createdAt || Number.isNaN(createdAt.getTime()) || createdAt < cutoff) continue;
-
-          if (!meetsMinLength(text, "")) {
-            summary.contentSkipped++;
-            continue;
-          }
-          if (
-            isLikelyNonExperienceShare(text, "") &&
-            !isRumorOrReleaseCandidate(text, "")
-          ) {
-            summary.contentSkipped++;
-            continue;
-          }
-
-          const matchedSlugs = matchModels(text, keywords);
-          if (matchedSlugs.length === 0) continue;
-          summary.filtered_candidates++;
-
-          const handle = post.author?.handle || "";
-          const uriParts = (post.uri || "").split("/");
-          const rkey = uriParts[uriParts.length - 1];
-          const sourceUrl = `https://bsky.app/profile/${handle}/post/${rkey}`;
-          if (existingUrls.has(sourceUrl) || candidateUrls.has(sourceUrl)) {
-            summary.dedupSkipped++;
-            continue;
-          }
-
-          let allDuped = true;
-          for (const slug of matchedSlugs) {
-            const modelId = modelMap[slug];
-            if (modelId && !isDuplicate(titleKeys, text.slice(0, 120), modelId)) {
-              allDuped = false;
-              break;
-            }
-          }
-          if (allDuped) {
-            summary.dedupSkipped++;
-            continue;
-          }
-
-          candidates.push({
-            text,
-            matchedSlugs,
-            sourceUrl,
-            createdAt: createdAt.toISOString(),
-            score: post.likeCount || 0,
-            authorHandle: handle || null,
-            quotedStatusId: quotedPostId(post),
-          });
-          candidateUrls.add(sourceUrl);
-        }
+        for (const post of posts) considerPost(post);
       } catch (error) {
         summary.errors.push(`"${term}": ${error instanceof Error ? error.message : String(error)}`);
+      }
+    }
+
+    for (const actor of AUTHOR_FEEDS) {
+      await delay(1000);
+      try {
+        const url = `https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed?actor=${encodeURIComponent(actor)}&limit=30&filter=posts_no_replies`;
+        const res = await fetchWithTimeout(url, { headers: { Accept: "application/json" } });
+        if (!res.ok) {
+          const text = await res.text();
+          summary.errors.push(`@${actor}: HTTP ${res.status} - ${text.slice(0, 100)}`);
+          continue;
+        }
+        const json = await res.json();
+        const feedPosts = (json.feed || []).map((item: any) => item?.post).filter(Boolean);
+        summary.posts_found += feedPosts.length;
+        for (const post of feedPosts) considerPost(post);
+      } catch (error) {
+        summary.errors.push(`@${actor}: ${error instanceof Error ? error.message : String(error)}`);
       }
     }
 

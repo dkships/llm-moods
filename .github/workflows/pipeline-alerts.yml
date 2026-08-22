@@ -1,0 +1,76 @@
+name: Pipeline alerts
+
+# The pipeline watchdog (pg_cron, hourly) writes severity=critical rows into
+# error_log — and nobody reads error_log. In Aug 2026 the Apify budget guard
+# skipped every Reddit and Twitter run for 14 days while the watchdog dutifully
+# logged ">72h no success" criticals to a table. This job is the missing exit:
+# every 6 hours it asks the public `get_critical_alerts` RPC (anon-callable,
+# returns only function name + short context + time — messages are redacted
+# server-side) and opens or updates ONE issue labelled `pipeline-alert` when
+# anything fired. Close the issue when handled; the next firing reopens it.
+
+on:
+  schedule:
+    # Every 6h at :23 — off the hour because GitHub queues :00 cron jobs.
+    - cron: "23 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: pipeline-alerts
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Query critical alerts (last 6h)
+        id: alerts
+        run: |
+          set -euo pipefail
+          # The anon key is public by design (it is hardcoded in the shipped
+          # bundle); read it from the client so this workflow has no secret.
+          ANON=$(grep -o 'eyJ[A-Za-z0-9_.-]*' src/integrations/supabase/client.ts | head -1)
+          URL=$(grep -o 'https://[a-z]*\.supabase\.co' src/integrations/supabase/client.ts | head -1)
+          test -n "$ANON" && test -n "$URL"
+          curl -sf -m 30 -X POST "$URL/rest/v1/rpc/get_critical_alerts" \
+            -H "apikey: $ANON" -H "Authorization: Bearer $ANON" \
+            -H "Content-Type: application/json" \
+            -d '{"hours_back": 6}' > alerts.json
+          COUNT=$(jq 'length' alerts.json)
+          echo "count=$COUNT" >> "$GITHUB_OUTPUT"
+          {
+            echo "body<<EOF"
+            echo "The pipeline watchdog recorded **$COUNT critical alert(s)** in the last 6 hours (checked $(date -u +'%Y-%m-%d %H:%M UTC'))."
+            echo
+            echo "| When (UTC) | Function | Alert |"
+            echo "|---|---|---|"
+            jq -r '.[] | "| \(.created_at | sub("\\.[0-9]+"; "") | sub("\\+00:00$"; "")) | `\(.function_name)` | \(.error_message) |"' alerts.json
+            echo
+            echo "Non-watchdog messages are redacted in the public RPC — read the full rows with:"
+            echo '```sql'
+            echo "select function_name, context, error_message, created_at from error_log where severity='critical' and created_at > now() - interval '24 hours' order by created_at desc;"
+            echo '```'
+            echo "Usual suspects: Apify budget exhausted (\`scraper_runs.status='skipped'\`), classifier key/quota (\`last_classification_error\`), a scraper that stopped running. Close this issue once handled; it reopens on the next firing."
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Open or update the alert issue
+        if: steps.alerts.outputs.count != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BODY: ${{ steps.alerts.outputs.body }}
+        run: |
+          set -euo pipefail
+          gh label create pipeline-alert --color B60205 --description "Watchdog critical alerts" --force >/dev/null 2>&1 || true
+          EXISTING=$(gh issue list --label pipeline-alert --state open --json number --jq '.[0].number // empty')
+          if [ -n "$EXISTING" ]; then
+            gh issue comment "$EXISTING" --body "$BODY"
+          else
+            gh issue create --title "Pipeline watchdog: critical alerts" --label pipeline-alert --body "$BODY"
+          fi

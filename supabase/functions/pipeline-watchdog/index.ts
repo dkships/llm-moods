@@ -31,6 +31,9 @@ const SCRAPER_STALE_HOURS_BY_SOURCE: Record<string, number> = {
   // a silent App Store scraper failure alerted nobody. Same 3×/day windows as
   // the others (cron '10 4,12,21'), so the same 11h threshold applies.
   "scrape-appstore": 11,
+  // Added 2026-08-22 (cost audit): free sources on the same 3×/day windows.
+  "scrape-github-issues": 11,
+  "scrape-openrouter": 11,
 };
 // A scraper that runs on schedule but fails/skips every run never trips the
 // started_at check, so also alert when the last success/partial is older than

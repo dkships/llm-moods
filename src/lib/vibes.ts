@@ -31,6 +31,7 @@ export const SOURCE_LABELS: Record<string, string> = {
   github: "GitHub",
   twitter: "𝕏",
   appstore: "App Store",
+  openrouter: "OpenRouter",
 };
 
 export function getVibeStatus(score: number) {
@@ -84,6 +85,7 @@ export function formatSourceDisplay(source: string): { emoji: string; label: str
   if (source === "github") return { emoji: "🐙", label: "GitHub" };
   if (source === "twitter") return { emoji: "⚪", label: "𝕏" };
   if (source === "appstore") return { emoji: "🍎", label: "App Store" };
+  if (source === "openrouter") return { emoji: "🔀", label: "OpenRouter" };
   return { emoji: "⚪", label: source };
 }
 
