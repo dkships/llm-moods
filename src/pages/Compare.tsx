@@ -273,8 +273,8 @@ const Compare = () => {
                 adjacent sections stay comparable while scrolling instead of
                 requiring a scroll back up to compare. */}
             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-x-6 md:gap-y-6">
-              <ModelCard m={modelA} />
-              <ModelCard m={modelB} />
+              <ModelCard m={modelA} showSparkline />
+              <ModelCard m={modelB} showSparkline />
 
               <ChartCell model={modelA} />
               <ChartCell model={modelB} />
