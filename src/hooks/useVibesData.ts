@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizePublicComplaintCategory } from "@/shared/public-taxonomy";
 import { getPacificDayWindowSince } from "@/lib/pacific-day";
@@ -510,57 +510,80 @@ export function useModelPosts(modelId: string | undefined, limit = 25, enabled =
   });
 }
 
+// Hover-intent delay: react-query's prefetchQuery already skips refetching a
+// query that's still within its own staleTime (all four calls below pass
+// QUERY_STALE_TIME), so a single slug is never re-fetched within 10 minutes.
+// What that alone doesn't bound is a fast mouse pass over many model cards —
+// each onMouseEnter fires immediately, so scrubbing across N cards fires N×4
+// prefetch calls. Debouncing on the callback (reset the pending timer on every
+// invocation, same as a mouseenter/mouseleave pair would) collapses that fan-out
+// to the one slug the pointer actually settles on.
+const HOVER_INTENT_DEBOUNCE_MS = 150;
+
 /** Prefetch model detail data on hover */
 export function usePrefetchModelDetail() {
   const queryClient = useQueryClient();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    };
+  }, []);
 
   return useCallback((slug: string, modelId: string) => {
-    // Coarse cache-warmer with a tighter limit than useVibesHistory (90 vs 120
-    // rows, no range filters). Don't try to share queryFn — they're intentionally
-    // different shapes; the cached row set will be replaced on actual page load.
-    queryClient.prefetchQuery({
-      queryKey: ["vibes-history", modelId, "daily", "30d"],
-      staleTime: QUERY_STALE_TIME,
-      queryFn: async () => {
-        const sinceISO = getPacificDayWindowSince(29);
-        const { data } = await publicRpc.rpc("get_public_vibes_history", {
-          p_model_id: modelId,
-          p_period: "daily",
-          p_since: sinceISO,
-          p_until: null,
-          p_limit: 90,
-        });
-        return data || [];
-      },
-    });
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
 
-    queryClient.prefetchQuery({
-      queryKey: ["complaint-breakdown", modelId],
-      staleTime: QUERY_STALE_TIME,
-      queryFn: () => fetchComplaintBreakdown(modelId),
-    });
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
 
-    queryClient.prefetchQuery({
-      queryKey: ["source-breakdown", modelId],
-      staleTime: QUERY_STALE_TIME,
-      queryFn: () => fetchSourceBreakdown(modelId),
-    });
+      // Coarse cache-warmer with a tighter limit than useVibesHistory (90 vs 120
+      // rows, no range filters). Don't try to share queryFn — they're intentionally
+      // different shapes; the cached row set will be replaced on actual page load.
+      queryClient.prefetchQuery({
+        queryKey: ["vibes-history", modelId, "daily", "30d"],
+        staleTime: QUERY_STALE_TIME,
+        queryFn: async () => {
+          const sinceISO = getPacificDayWindowSince(29);
+          const { data } = await publicRpc.rpc("get_public_vibes_history", {
+            p_model_id: modelId,
+            p_period: "daily",
+            p_since: sinceISO,
+            p_until: null,
+            p_limit: 90,
+          });
+          return data || [];
+        },
+      });
 
-    queryClient.prefetchQuery({
-      queryKey: ["model-posts", modelId, 25],
-      staleTime: QUERY_STALE_TIME,
-      queryFn: async () => {
-        const sinceISO = new Date(Date.now() - RECENT_POSTS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
-        const { data } = await publicRpc.rpc("get_public_model_posts", {
-          p_model_id: modelId,
-          p_since: sinceISO,
-          p_limit: 25,
-        });
-        return (data || []).map((row) => ({
-          ...row,
-          classification_status: "classified",
-        })) as ScrapedPostRow[];
-      },
-    });
+      queryClient.prefetchQuery({
+        queryKey: ["complaint-breakdown", modelId],
+        staleTime: QUERY_STALE_TIME,
+        queryFn: () => fetchComplaintBreakdown(modelId),
+      });
+
+      queryClient.prefetchQuery({
+        queryKey: ["source-breakdown", modelId],
+        staleTime: QUERY_STALE_TIME,
+        queryFn: () => fetchSourceBreakdown(modelId),
+      });
+
+      queryClient.prefetchQuery({
+        queryKey: ["model-posts", modelId, 25],
+        staleTime: QUERY_STALE_TIME,
+        queryFn: async () => {
+          const sinceISO = new Date(Date.now() - RECENT_POSTS_WINDOW_DAYS * 24 * 60 * 60 * 1000).toISOString();
+          const { data } = await publicRpc.rpc("get_public_model_posts", {
+            p_model_id: modelId,
+            p_since: sinceISO,
+            p_limit: 25,
+          });
+          return (data || []).map((row) => ({
+            ...row,
+            classification_status: "classified",
+          })) as ScrapedPostRow[];
+        },
+      });
+    }, HOVER_INTENT_DEBOUNCE_MS);
   }, [queryClient]);
 }

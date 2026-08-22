@@ -905,7 +905,9 @@ async function fetchOpenAi(
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
         body: requestBody(prompt, maxTokens, mode, options, tier),
-        signal: tier === "flex" ? AbortSignal.timeout(OPENAI_FLEX_TIMEOUT_MS) : undefined,
+        signal: tier === "flex" && typeof AbortSignal.timeout === "function"
+          ? AbortSignal.timeout(OPENAI_FLEX_TIMEOUT_MS)
+          : undefined,
       });
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

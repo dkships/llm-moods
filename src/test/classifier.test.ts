@@ -514,6 +514,59 @@ describe("free-Gemini spillover", () => {
     expect(summary.retry).toBe(2);
     expect(updates.every((u) => u.values.classification_status === "retry")).toBe(true);
   });
+
+  it("requests the OpenAI flex tier and records token usage through record_classifier_usage", async () => {
+    vi.stubGlobal("Deno", {
+      env: {
+        get: (k: string) => (({
+          CLASSIFIER_MODEL: "gpt-5.6-terra",
+          OPENAI_API_KEY: "ok",
+          GEMINI_API_KEY: "gk",
+        } as Record<string, string>)[k]),
+      },
+    });
+    const bodies: Record<string, unknown>[] = [];
+    const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
+      bodies.push(JSON.parse(String(init?.body)));
+      return new Response(JSON.stringify({
+        service_tier: "flex",
+        choices: [{ message: { content: JSON.stringify({ results: [
+          { relevant: true, sentiment: "positive", complaint_category: null, praise_category: "output_quality", confidence: 0.9, language: null, english_translation: null },
+          { relevant: true, sentiment: "negative", complaint_category: "hallucinations", praise_category: null, confidence: 0.85, language: null, english_translation: null },
+        ] }) } }],
+        usage: { prompt_tokens: 2100, completion_tokens: 90, total_tokens: 2190, prompt_tokens_details: { cached_tokens: 1900 } },
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    const updates: MockUpdate[] = [];
+    const client = mockSupabase(claudeRows, updates) as unknown as { rpc: ReturnType<typeof vi.fn> };
+    client.rpc = vi.fn(async () => ({ error: null }));
+    const summary = await processPendingClassifications(client as never, "ok", {
+      limit: 10,
+      batchSize: 20,
+      logError: vi.fn(async () => {}),
+    });
+
+    expect(summary.classified).toBe(2);
+    expect(bodies[0].service_tier).toBe("flex");
+    expect(summary.usage).toEqual([{
+      model: "gpt-5.6-terra",
+      service_tier: "flex",
+      calls: 1,
+      prompt_tokens: 200,
+      cached_tokens: 1900,
+      completion_tokens: 90,
+    }]);
+    expect(client.rpc).toHaveBeenCalledWith("record_classifier_usage", {
+      p_model: "gpt-5.6-terra",
+      p_service_tier: "flex",
+      p_calls: 1,
+      p_prompt_tokens: 200,
+      p_cached_tokens: 1900,
+      p_completion_tokens: 90,
+    });
+  });
 });
 
 describe("batch alignment hardening (2026-07 audit)", () => {
