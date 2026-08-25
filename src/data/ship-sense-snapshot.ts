@@ -134,8 +134,13 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "restraint": 0.88,
     "honesty": 0.77,
     "conviction": 0.94,
-    "priceIn": 5,
-    "priceOut": 30
+    "priceIn": 4,
+    "priceOut": 20,
+    "atTestPriceIn": 5,
+    "atTestPriceOut": 30,
+    "pendingPriceIn": 5,
+    "pendingPriceOut": 30,
+    "pendingEffective": "2026-11-22"
   },
   {
     "name": "grok-4.6",
