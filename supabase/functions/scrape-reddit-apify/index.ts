@@ -210,13 +210,22 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     const actorTimeoutSecs = Math.min(getConfigNumber(config, "actor_timeout_secs", APIFY_ACTOR_TIMEOUT_SECS), 180);
     const pollTimeoutSecs = Math.min(getConfigNumber(config, "poll_timeout_secs", APIFY_POLL_TIMEOUT_SECS), 170);
     const concurrency = Math.min(getConfigNumber(config, "actor_concurrency", 4), 8);
+    // `subredditUrls` is the actor's "full subreddit scrape": it ignores
+    // `searchSort` (keyword searches only) and returned 105-144 of 160 items
+    // older than 72h on 2026-09-01. `startUrls` accepts listing pages, so
+    // "new_page" mode feeds each subreddit's /new/ URL instead. Config flip,
+    // no redeploy: scraper_config key `listing_mode` = new_page | subreddit.
+    const listingMode = getConfigValue(config, "listing_mode", "subreddit");
 
     const runForSubreddits = async (subs: string[]): Promise<{ items: any[]; status: string; usageUsd: number; error?: string }> => {
       const label = subs.length === 1 ? `r/${subs[0]}` : `${subs.length} subreddits`;
       const runMaxItems = Math.max(perRunMaxItems, maxPostsPerSub * subs.length);
       try {
+        const listingInput = listingMode === "new_page"
+          ? { startUrls: subs.map((s) => ({ url: `https://www.reddit.com/r/${s}/new/` })) }
+          : { subredditUrls: subs.map((s) => `r/${s}`) };
         const input = {
-          subredditUrls: subs.map((s) => `r/${s}`),
+          ...listingInput,
           searchSort: "new",
           // maxPostsCount is a TOTAL cap across all subredditUrls (per the
           // actor's input schema), so scale it by the subreddit count.
@@ -306,7 +315,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       const community = String(item?.communityName ?? item?.parsedCommunityName ?? "unknown").replace(/^r\//i, "");
       perSubItems[community] = (perSubItems[community] ?? 0) + 1;
     }
-    const apifyUsageSummary = { actor: actorId, mode: singleRunMode ? "single_run" : "fan_out", subreddits: subreddits.length, per_subreddit_status: perSubStatus, per_subreddit_items: perSubItems, total_usage_usd: Number(totalUsageUsd.toFixed(4)) };
+    const apifyUsageSummary = { actor: actorId, mode: singleRunMode ? "single_run" : "fan_out", listing_mode: listingMode, subreddits: subreddits.length, per_subreddit_status: perSubStatus, per_subreddit_items: perSubItems, total_usage_usd: Number(totalUsageUsd.toFixed(4)) };
     apifyRunMetadata = apifyUsageSummary;
 
     const posts = items.filter((item: any) => item.dataType === "post");
