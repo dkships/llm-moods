@@ -36,6 +36,7 @@ const APIFY_ACTOR_TIMEOUT_SECS = 120;
 const APIFY_POLL_TIMEOUT_SECS = 105;
 const APIFY_POLL_INTERVAL_MS = 10_000;
 const APIFY_MAX_TOTAL_CHARGE_USD = 0.35;
+const REDDIT_MAX_AGE_HOURS = 72;
 
 const DEFAULT_START_URLS = [
   "https://www.reddit.com/r/ClaudeAI/new/",
@@ -318,7 +319,11 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     const existingUrls = new Set((existingData || []).map((entry: any) => entry.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
-    const cutoff = new Date(Date.now() - 24 * 3600000);
+    // 72h, not 24h: the actor does not return newest-first (2026-09-01 run:
+    // 144 of 160 items were older than 24h, 10 candidates for $0.45), and URL
+    // dedup already stops re-inserts. A 1-3 day old post still lands in its
+    // own day's score inside the 7-day refresh window.
+    const cutoff = new Date(Date.now() - REDDIT_MAX_AGE_HOURS * 3600000);
     const summary = {
       source: SOURCE,
       backend: "apify",
