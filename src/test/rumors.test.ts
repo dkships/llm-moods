@@ -884,6 +884,7 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("gemini", "Gemini 3.7 Flash", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 3.7", null)).toBe(true); // bare, no Pro pending
     expect(isReleasedVersion("gemini", "Gemini 3.8 Flash", null)).toBe(true);
+    expect(isReleasedVersion("gemini", null, "Skimaki")).toBe(true); // shipped as 3.8 Flash
     expect(isReleasedVersion("chatgpt", "GPT-5", null)).toBe(true);
     expect(isReleasedVersion("chatgpt", "GPT-5.5", null)).toBe(true);
     expect(isReleasedVersion("chatgpt", "GPT-5.5-Cyber", null)).toBe(true);

@@ -535,9 +535,12 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       key: "gemini38flash",
       label: "Gemini 3.8 Flash",
       codename: null,
-      aliases: ["gemini38flash", "gemini38"],
+      // "Skimaki" was the pre-launch codename; it shipped as 3.8 Flash, so the
+      // codename-only rows retire with it.
+      aliases: ["gemini38flash", "gemini38", "skimaki"],
       released: true,
       releasePrompt: "Gemini 3.8 Flash",
+      releaseAliases: ["skimaki"],
     },
     {
       // Exact spelling only — a bare "Flash-Lite" alias would wrongly retire the
