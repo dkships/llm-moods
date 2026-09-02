@@ -259,3 +259,52 @@ describe("2026-07 accuracy-audit scoring fixes", () => {
     expect(viral.score).toBe(atCap.score);
   });
 });
+
+describe("2026-09 source-mix fixes", () => {
+  const post = (
+    sentiment: "positive" | "negative" | "neutral",
+    source: string,
+  ) => ({
+    sentiment,
+    complaint_category: sentiment === "negative" ? "coding_quality" : null,
+    confidence: 1,
+    score: 0,
+    content_type: "full_content",
+    source,
+  });
+
+  it("excludes bug-tracker sources from the score and its counts", () => {
+    // GitHub issues can only ever be negative or irrelevant, so they add
+    // negative weight with no positive counterpart.
+    const posts = [
+      ...Array.from({ length: 10 }, () => post("positive", "hackernews")),
+      ...Array.from({ length: 10 }, () => post("negative", "hackernews")),
+      ...Array.from({ length: 30 }, () => post("negative", "github")),
+    ];
+
+    const result = computeScore(posts);
+
+    expect(result.score).toBe(50);
+    expect(result.negative_count).toBe(10);
+    expect(result.total_posts).toBe(20);
+    expect(result.eligible_posts).toBe(20);
+    expect(result.top_complaint).toBe("coding_quality");
+  });
+
+  it("caps App Store reviews at a lower share than community sources", () => {
+    // 100 positive reviews vs 30 negative HN posts: under the uniform 50% cap
+    // this day scores 50; with App Store capped at 35% it scores 35.
+    const posts = [
+      ...Array.from({ length: 100 }, () => post("positive", "appstore")),
+      ...Array.from({ length: 30 }, () => post("negative", "hackernews")),
+    ];
+
+    expect(computeScore(posts).score).toBe(35);
+  });
+
+  it("still lets a lone App Store day count in full", () => {
+    const posts = Array.from({ length: 12 }, () => post("positive", "appstore"));
+
+    expect(computeScore(posts).score).toBe(100);
+  });
+});

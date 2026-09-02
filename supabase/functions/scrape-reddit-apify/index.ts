@@ -163,7 +163,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     }
 
     await logToErrorLog(supabase, SOURCE, "Reddit Apify scraper started", "health-check");
-    const budget = await checkApifyBudget(apifyToken, APIFY_MAX_TOTAL_CHARGE_USD);
+    const budget = await checkApifyBudget(supabase, APIFY_MAX_TOTAL_CHARGE_USD);
     if (!budget.allowed) {
       const skipped = {
         source: SOURCE,
@@ -338,6 +338,10 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       duplicateSkipped: 0,
       dedupSkipped: 0,
       contentSkipped: 0,
+      // Items the actor returned that were older than the 24h cutoff (or had
+      // an unparseable date). 160 fetched → ~30 candidates/day with nothing
+      // counted in between; this shows whether `searchSort: "new"` is honored.
+      staleSkipped: 0,
       errors: [] as string[],
       apifyUsage: apifyUsageSummary,
       apifyBudget: budget.usage,
@@ -356,7 +360,10 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
 
     for (const post of posts) {
       const createdAt = new Date(post.createdAt);
-      if (Number.isNaN(createdAt.getTime()) || createdAt < cutoff) continue;
+      if (Number.isNaN(createdAt.getTime()) || createdAt < cutoff) {
+        summary.staleSkipped++;
+        continue;
+      }
 
       const title = post.title || "";
       const bodyText = post.body || "";
@@ -529,6 +536,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
         dedup_skipped: summary.dedupSkipped,
         comments_found: summary.comments_found,
         content_skipped: summary.contentSkipped,
+        stale_skipped: summary.staleSkipped,
         irrelevant: summary.irrelevant,
         classifier_errors: summary.classifierErrors,
         classifier_request_errors: summary.classifierRequestErrors,
@@ -544,7 +552,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     await logToErrorLog(
       supabase,
       SOURCE,
-      `Completed: posts=${summary.posts_found} comments=${summary.comments_found} filtered=${summary.filtered_candidates} inserted=${summary.net_new_rows} duplicateConflicts=${summary.duplicate_conflicts}`,
+      `Completed: posts=${summary.posts_found} comments=${summary.comments_found} stale=${summary.staleSkipped} filtered=${summary.filtered_candidates} inserted=${summary.net_new_rows} duplicateConflicts=${summary.duplicate_conflicts}`,
       "summary",
     );
     await logZeroDataWarning(supabase, SOURCE, summary.posts_found);

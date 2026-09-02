@@ -18,6 +18,27 @@ function envNumber(name: string, fallback: number): number {
 const DAILY_SPEND_LIMIT_USD = envNumber("APIFY_DAILY_SPEND_LIMIT_USD", 0.80);
 const MONTHLY_SPEND_LIMIT_USD = envNumber("APIFY_MONTHLY_SPEND_LIMIT_USD", 24);
 
+// The Apify account is shared with unrelated actors, so account-wide usage
+// (`/users/me/usage/monthly`) is the wrong thing to gate on: other work drove
+// it to $111 in Aug 2026 and locked LLM Vibes out of Reddit and Twitter for a
+// week while its own runs had cost $5. The guard now sums the per-run cost
+// this pipeline records in `scraper_runs.metadata.apify_usage` over a rolling
+// window, so the limits below describe LLM Vibes' spend and nothing else.
+export const APIFY_LEDGER_SOURCES = ["scrape-reddit-apify", "scrape-twitter"];
+const LEDGER_WINDOW_DAYS = 30;
+const HOUR_MS = 3600000;
+const DAY_MS = 24 * HOUR_MS;
+
+export interface LedgerRunRow {
+  started_at: string;
+  metadata: unknown;
+}
+
+export interface LedgerSpend {
+  monthlyUsd: number;
+  dailyUsd: number;
+}
+
 function numericFrom(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
@@ -40,111 +61,74 @@ function pathValue(payload: unknown, path: string[]): unknown {
   return current;
 }
 
-function findUsageUsd(payload: unknown): number | null {
-  const candidates = [
-    ["data", "totalUsageCreditsUsdAfterVolumeDiscount"],
-    ["data", "totalUsageCreditsUsdBeforeVolumeDiscount"],
-    ["data", "current", "monthlyUsageUsd"],
-    ["data", "usageTotalUsd"],
-    ["data", "totalUsd"],
-    ["data", "totalUsageUsd"],
-    ["data", "currentUsageUsd"],
-    ["current", "monthlyUsageUsd"],
-    ["usageTotalUsd"],
-    ["totalUsd"],
-  ];
-  for (const path of candidates) {
-    const parsed = numericFrom(pathValue(payload, path));
-    if (parsed !== null) return parsed;
+// Reddit fans out one actor run per subreddit and records the sum as
+// `total_usage_usd`; Twitter records the scrubbed run's `usageTotalUsd`.
+function runUsageUsd(metadata: unknown): number {
+  return numericFrom(pathValue(metadata, ["apify_usage", "total_usage_usd"]))
+    ?? numericFrom(pathValue(metadata, ["apify_usage", "usageTotalUsd"]))
+    ?? 0;
+}
+
+export function sumLedgerSpend(rows: LedgerRunRow[], now: Date = new Date()): LedgerSpend {
+  const windowStart = now.getTime() - (LEDGER_WINDOW_DAYS * DAY_MS);
+  const dayStart = now.getTime() - DAY_MS;
+  let monthlyUsd = 0;
+  let dailyUsd = 0;
+
+  for (const row of rows) {
+    const startedMs = new Date(row.started_at).getTime();
+    if (!Number.isFinite(startedMs) || startedMs < windowStart) continue;
+
+    const usd = runUsageUsd(row.metadata);
+    monthlyUsd += usd;
+    if (startedMs >= dayStart) dailyUsd += usd;
   }
-  return null;
+
+  return { monthlyUsd, dailyUsd };
 }
 
-function findTodayUsageUsd(monthly: unknown): number | null {
-  const daily = pathValue(monthly, ["data", "dailyServiceUsages"]);
-  if (!Array.isArray(daily) || daily.length === 0) return null;
-
-  const today = new Date().toISOString().slice(0, 10);
-  const exact = daily.find(
-    (entry) => isRecord(entry) && typeof entry.date === "string" && entry.date.slice(0, 10) === today,
-  );
-  const latest = exact ?? daily[daily.length - 1];
-  return numericFrom(pathValue(latest, ["totalUsageCreditsUsd"]));
+async function fetchLedgerRows(supabase: any): Promise<LedgerRunRow[] | null> {
+  const since = new Date(Date.now() - (LEDGER_WINDOW_DAYS * DAY_MS)).toISOString();
+  const { data, error } = await supabase
+    .from("scraper_runs")
+    .select("started_at, metadata")
+    .in("source", APIFY_LEDGER_SOURCES)
+    .gte("started_at", since);
+  if (error) return null;
+  return (data ?? []) as LedgerRunRow[];
 }
 
-async function fetchJson(url: string): Promise<unknown | null> {
-  const res = await fetch(url);
-  if (!res.ok) return null;
-  return await res.json().catch(() => null);
-}
-
-export async function checkApifyBudget(token: string, plannedMaxChargeUsd = 0): Promise<ApifyBudgetResult> {
+export async function checkApifyBudget(supabase: any, plannedMaxChargeUsd = 0): Promise<ApifyBudgetResult> {
   const planned = Math.max(0, plannedMaxChargeUsd);
-  const encodedToken = encodeURIComponent(token);
-  const monthly = await fetchJson(`https://api.apify.com/v2/users/me/usage/monthly?token=${encodedToken}`);
-  const limits = await fetchJson(`https://api.apify.com/v2/users/me/limits?token=${encodedToken}`);
-  if (!monthly && !limits) {
-    return {
-      allowed: false,
-      reason: "apify_budget_unknown",
-      usage: { monthly_limit_usd: MONTHLY_SPEND_LIMIT_USD, daily_limit_usd: DAILY_SPEND_LIMIT_USD },
-    };
-  }
-
-  const monthlyUsageUsd = findUsageUsd(monthly) ?? findUsageUsd(limits);
-  if (monthlyUsageUsd === null) {
-    return {
-      allowed: false,
-      reason: "apify_budget_unreadable",
-      usage: {
-        monthly_limit_usd: MONTHLY_SPEND_LIMIT_USD,
-        daily_limit_usd: DAILY_SPEND_LIMIT_USD,
-        monthly_available: Boolean(monthly),
-        limits_available: Boolean(limits),
-      },
-    };
-  }
-
-  if (monthlyUsageUsd !== null && monthlyUsageUsd + planned > MONTHLY_SPEND_LIMIT_USD) {
-    return {
-      allowed: false,
-      reason: "apify_monthly_budget_exceeded",
-      usage: {
-        monthly_usage_usd: monthlyUsageUsd,
-        planned_max_charge_usd: planned,
-        projected_monthly_usage_usd: monthlyUsageUsd + planned,
-        monthly_limit_usd: MONTHLY_SPEND_LIMIT_USD,
-      },
-    };
-  }
-
-  const todayUsageUsd = findTodayUsageUsd(monthly);
-  if (todayUsageUsd !== null && todayUsageUsd + planned > DAILY_SPEND_LIMIT_USD) {
-    return {
-      allowed: false,
-      reason: "apify_daily_budget_exceeded",
-      usage: {
-        daily_usage_usd: todayUsageUsd,
-        planned_max_charge_usd: planned,
-        projected_daily_usage_usd: todayUsageUsd + planned,
-        daily_limit_usd: DAILY_SPEND_LIMIT_USD,
-      },
-    };
-  }
-
-  return {
-    allowed: true,
-    usage: {
-      monthly_usage_usd: monthlyUsageUsd,
-      monthly_limit_usd: MONTHLY_SPEND_LIMIT_USD,
-      daily_usage_usd: todayUsageUsd,
-      daily_limit_usd: DAILY_SPEND_LIMIT_USD,
-      planned_max_charge_usd: planned,
-      projected_monthly_usage_usd: monthlyUsageUsd + planned,
-      projected_daily_usage_usd: todayUsageUsd === null ? null : todayUsageUsd + planned,
-      limits_available: Boolean(limits),
-    },
+  const limits = {
+    scope: "llm_vibes_runs",
+    window_days: LEDGER_WINDOW_DAYS,
+    monthly_limit_usd: MONTHLY_SPEND_LIMIT_USD,
+    daily_limit_usd: DAILY_SPEND_LIMIT_USD,
+    planned_max_charge_usd: planned,
   };
+
+  const rows = await fetchLedgerRows(supabase);
+  if (!rows) {
+    return { allowed: false, reason: "apify_budget_unknown", usage: limits };
+  }
+
+  const spend = sumLedgerSpend(rows);
+  const usage = {
+    ...limits,
+    monthly_usage_usd: spend.monthlyUsd,
+    daily_usage_usd: spend.dailyUsd,
+    projected_monthly_usage_usd: spend.monthlyUsd + planned,
+    projected_daily_usage_usd: spend.dailyUsd + planned,
+  };
+
+  if (spend.monthlyUsd + planned > MONTHLY_SPEND_LIMIT_USD) {
+    return { allowed: false, reason: "apify_monthly_budget_exceeded", usage };
+  }
+  if (spend.dailyUsd + planned > DAILY_SPEND_LIMIT_USD) {
+    return { allowed: false, reason: "apify_daily_budget_exceeded", usage };
+  }
+  return { allowed: true, usage };
 }
 
 export function apifyRunUrl(actorId: string, token: string, maxItems: number, options: ApifyRunOptions = {}): string {

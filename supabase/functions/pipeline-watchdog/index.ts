@@ -32,7 +32,8 @@ const SCRAPER_STALE_HOURS_BY_SOURCE: Record<string, number> = {
   // the others (cron '10 4,12,21'), so the same 11h threshold applies.
   "scrape-appstore": 11,
   // Added 2026-08-22 (cost audit): free sources on the same 3×/day windows.
-  "scrape-github-issues": 11,
+  // scrape-github-issues was unscheduled 2026-09-01 (39% of classifier volume,
+  // 73% irrelevant, excluded from scoring) and is intentionally absent.
   "scrape-openrouter": 11,
 };
 // A scraper that runs on schedule but fails/skips every run never trips the

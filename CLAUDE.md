@@ -42,6 +42,8 @@ Edge functions that hit paid APIs (Anthropic, Apify, Gemini, etc.) MUST keep the
 - `run-pipeline` / `run-scrapers` were deleted 2026-08-22 (unscheduled since the merged pipeline blew the 400 s budget). `isRunPipelineTriggerRequest` / `RUN_PIPELINE_TRIGGER_SECRET` remain — they gate every function, not just the old orchestrator.
 - Classifier cost: `classifier_usage_daily` (per day × model × service_tier, written by the drain) is the source of truth — don't quote doc figures. OpenAI runs on the **flex** service tier (50% of standard) via `OPENAI_SERVICE_TIER` (default `flex`; `auto`/`default` to revert, no redeploy); capacity 429s and timeouts fall back to `auto` per request.
 - Mastodon is unscheduled (2026-08-22, 83% irrelevant); Reddit runs 1×/day × 20 posts/sub, Twitter 2×/day — the Apify $29 plan was being exhausted ~day 17.
+- GitHub issues (`scrape-github-issues`) is unscheduled (2026-09-01): 39% of classifier volume, 73% irrelevant, and bug reports can only score negative, so `SCORE_EXCLUDED_SOURCES` in `_shared/vibes-scoring.ts` also keeps `github` rows out of the score. Re-schedule via `cron.schedule` if it ever earns its cost; the rows still feed the complaints/sources panels.
+- App Store reviews are capped at 35% of a day's scoring weight (`SOURCE_SHARE_CAPS`); every other source keeps the 50% cap. Consumer star ratings were 55-80% of Gemini's and Grok's relevant volume.
 - Recover transient classification failures: `reclassify-posts?mode=reset_failed&error_pattern=transient` (confirm with `dry_run=1` first). `reclassify-posts?mode=multi_model` fixes historical multi-model posts; run `reaggregate-vibes` after.
 - Reddit actor is config-driven (`scraper_config.actor_id`), currently `harshmaur/reddit-scraper`. Don't revert to `trudax/reddit-scraper-lite` — it used Reddit's public `.json` API, dead (403) since May 2026.
 
@@ -51,7 +53,7 @@ Read `AGENT-REFERENCE.md` before changing `_shared/classifier.ts` or any scraper
 - Classifier model is a pure config flip via `CLASSIFIER_MODEL` (claude-* → Anthropic, gpt-* → OpenAI, else Gemini; keys `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`). Production model is `gpt-5.6-terra` as of 2026-08-08 (canary: 94.7% sentiment agreement vs Gemini oracle; Luna ran briefly first) — rollback = `CLASSIFIER_MODEL=claude-haiku-4-5-20251001` or `gemini-2.5-flash` (no redeploy, all providers stay live)
 - Strict tool use (`strict:true`) stays OFF — nullable-union schema 400s under the structured-output subset (verified in prod 2026-06-02)
 - Reddit comment ingestion stays disabled (`include_comments=false`) until a comment→parent-post attribution fix exists
-- `maxTotalChargeUsd` is the authoritative Apify cost cap ($29/mo budget; in-code guard in `_shared/apify-budget.ts`)
+- `maxTotalChargeUsd` is the authoritative Apify per-run cost cap. The guard in `_shared/apify-budget.ts` sums **this pipeline's own runs** from `scraper_runs.metadata.apify_usage` (rolling 30d / 24h) — never account-wide Apify usage, which is shared with unrelated actors and blocked LLM Vibes for a week in Aug 2026.
 - There is no `GEMINI_FREE_API_KEY` — spillover and the self-bias oracle use the paid `GEMINI_API_KEY` (billing must stay active)
 
 ## Rumors radar (`/rumors`)

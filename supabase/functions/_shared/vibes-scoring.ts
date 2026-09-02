@@ -35,6 +35,26 @@ export interface TimeZoneDayWindow {
 export const DEFAULT_MIN_POSTS = 5;
 export const PACIFIC_TIMEZONE = "America/Los_Angeles";
 
+// Sources that never enter the sentiment score. GitHub issues are bug reports:
+// they can only be negative or irrelevant, so they add negative weight with no
+// positive counterpart, and their volume tracks repo activity (claude-code
+// files ~5x codex, ~60x gemini-cli), not user mood. 2026-08-22 → 09-01 they
+// pulled Claude down ~10-13 points/day. Rows stay in scraped_posts for the
+// complaints and sources panels; only scoring ignores them.
+export const SCORE_EXCLUDED_SOURCES: ReadonlySet<string> = new Set(["github"]);
+
+// Max share of a day's final scoring weight one source may hold once alternate
+// evidence is sufficient (see ALTERNATE_SOURCE_WEIGHT_FOR_HARD_CAP). App Store
+// reviews are consumer star ratings of the app shell ("cool app for image
+// editing"), ~90% positive for Gemini/Grok, and were 55-80% of those models'
+// relevant volume — a "community vibes" score shouldn't be mostly that.
+export const DEFAULT_MAX_SOURCE_SHARE = 0.5;
+export const SOURCE_SHARE_CAPS: Readonly<Record<string, number>> = { appstore: 0.35 };
+
+export function sourceShareCap(source: string): number {
+  return SOURCE_SHARE_CAPS[source] ?? DEFAULT_MAX_SOURCE_SHARE;
+}
+
 const PARTS_CACHE = new Map<string, Intl.DateTimeFormat>();
 
 function pad2(value: number): string {
@@ -241,99 +261,89 @@ export function applyScoreSmoothing(
   return Math.round((currentWeight * score) + (previousWeight * previousScore));
 }
 
-function getEffectiveSourceShareCap(
+// How far the hard per-source caps are relaxed toward 1.0 when the
+// non-dominant sources carry little weight: 0 = fully relaxed, 1 = hard caps.
+function alternateEvidenceProgress(
   sourceRawWeights: Record<string, number>,
-  hardMaxShare: number,
   alternateWeightForHardCap: number,
 ): number {
   const weights = Object.values(sourceRawWeights).filter((weight) => weight > 0);
   if (weights.length <= 1 || alternateWeightForHardCap <= 0) {
-    return hardMaxShare;
+    return 1;
   }
 
   const totalWeight = weights.reduce((sum, weight) => sum + weight, 0);
   const dominantWeight = Math.max(...weights);
   const alternateWeight = totalWeight - dominantWeight;
-  if (alternateWeight >= alternateWeightForHardCap) {
-    return hardMaxShare;
-  }
-
-  const alternateProgress = Math.max(0, alternateWeight) / alternateWeightForHardCap;
-  return hardMaxShare + ((1 - hardMaxShare) * (1 - alternateProgress));
+  return Math.min(1, Math.max(0, alternateWeight) / alternateWeightForHardCap);
 }
 
 function computeSourceScale(
   sourceRawWeights: Record<string, number>,
-  maxShare: number,
   alternateWeightForHardCap: number,
 ): Record<string, number> {
   const entries = Object.entries(sourceRawWeights).filter(([, weight]) => weight > 0);
   const scales: Record<string, number> = {};
   for (const [source] of entries) scales[source] = 1.0;
 
-  const effectiveMaxShare = getEffectiveSourceShareCap(
-    sourceRawWeights,
-    maxShare,
-    alternateWeightForHardCap,
-  );
+  const progress = alternateEvidenceProgress(sourceRawWeights, alternateWeightForHardCap);
+  const capFor = (source: string): number => {
+    const hardCap = sourceShareCap(source);
+    return hardCap + ((1 - hardCap) * (1 - progress));
+  };
 
-  if (entries.length <= 1 || effectiveMaxShare <= 0 || effectiveMaxShare >= 1) {
+  if (entries.length <= 1 || progress <= 0) {
     return scales;
   }
 
+  // Water-fill dominant sources so each cap applies to final scaled weight,
+  // not just to the source's share of the pre-scaled raw total. Capped sources
+  // together hold Σcap of the final total, so the uncapped remainder is
+  // (1 - Σcap) of it. Caps only bound sources relative to *uncapped* ones: if
+  // every remaining source would exceed its cap (Σcap < 1 makes that possible
+  // with asymmetric caps) they stay uncapped and absorb the remainder.
   const cappedSources = new Set<string>();
   let remainingWeight = entries.reduce((sum, [, weight]) => sum + weight, 0);
+  let cappedShare = 0;
 
-  // Water-fill dominant sources so the cap applies to final scaled weight,
-  // not just to each source's share of the pre-scaled raw total.
-  while (remainingWeight > 0) {
-    const denominator = 1 - (cappedSources.size * effectiveMaxShare);
-    if (denominator <= 0) break;
-
-    const finalTotal = remainingWeight / denominator;
-    const maxAllowed = finalTotal * effectiveMaxShare;
-    const nextCapped = entries
-      .filter(([source]) => !cappedSources.has(source))
-      .filter(([, weight]) => weight > maxAllowed);
-
-    if (nextCapped.length === 0) {
-      for (const [source, weight] of entries) {
-        if (cappedSources.has(source)) {
-          scales[source] = Math.min(1, maxAllowed / weight);
-        }
-      }
-      return scales;
+  while (cappedShare < 1) {
+    const finalTotal = remainingWeight / (1 - cappedShare);
+    const uncapped = entries.filter(([source]) => !cappedSources.has(source));
+    const nextCapped = uncapped.filter(([source, weight]) => weight > finalTotal * capFor(source));
+    if (nextCapped.length === 0 || nextCapped.length === uncapped.length) {
+      break;
     }
 
     for (const [source, weight] of nextCapped) {
       cappedSources.add(source);
+      cappedShare += capFor(source);
       remainingWeight -= weight;
     }
   }
 
-  if (cappedSources.size === 0) {
+  if (cappedSources.size === 0 || cappedShare >= 1) {
     return scales;
   }
 
-  const denominator = 1 - (cappedSources.size * effectiveMaxShare);
-  if (denominator <= 0) {
-    return scales;
-  }
-
-  const maxAllowed = (remainingWeight / denominator) * effectiveMaxShare;
+  const finalTotal = remainingWeight / (1 - cappedShare);
   for (const [source, weight] of entries) {
     if (cappedSources.has(source)) {
-      scales[source] = Math.min(1, maxAllowed / weight);
+      scales[source] = Math.min(1, (finalTotal * capFor(source)) / weight);
     }
   }
 
   return scales;
 }
 
-export function computeScore(posts: ScoreInputPost[]): ScoreResult {
+export function isScoredSource(source: string | null | undefined): boolean {
+  return !SCORE_EXCLUDED_SOURCES.has(source || "unknown");
+}
+
+export function computeScore(allPosts: ScoreInputPost[]): ScoreResult {
   const MIN_CONFIDENCE = 0.65;
-  const MAX_SOURCE_SHARE = 0.5;
   const ALTERNATE_SOURCE_WEIGHT_FOR_HARD_CAP = 3.0;
+
+  const posts = allPosts.filter((post) => isScoredSource(post.source));
 
   const sourceRawWeights: Record<string, number> = {};
   const eligible: {
@@ -374,7 +384,6 @@ export function computeScore(posts: ScoreInputPost[]): ScoreResult {
 
   const sourceScale = computeSourceScale(
     sourceRawWeights,
-    MAX_SOURCE_SHARE,
     ALTERNATE_SOURCE_WEIGHT_FOR_HARD_CAP,
   );
 

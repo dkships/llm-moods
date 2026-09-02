@@ -103,7 +103,7 @@ async function runApifyPath(
     sort: getConfigValue(config, "sort_mode", "Latest"),
     maxItems: getConfigNumber(config, "max_items", 50),
   };
-  const budget = await checkApifyBudget(apifyToken, APIFY_MAX_TOTAL_CHARGE_USD);
+  const budget = await checkApifyBudget(supabase, APIFY_MAX_TOTAL_CHARGE_USD);
   if (!budget.allowed) {
     return {
       ...summary,

@@ -4,6 +4,7 @@ import {
   DEFAULT_MIN_POSTS,
   getLocalDateLabel,
   getPacificDayWindow,
+  isScoredSource,
   PACIFIC_TIMEZONE,
   type ScoreInputPost,
   type ScoreResult,
@@ -300,7 +301,10 @@ export async function refreshScores(
       now.getUTCHours() + 1,
     )).toISOString()
     : dailyRangeEnd;
-  const posts = await fetchPostsInRange(supabase, rangeStart, rangeEnd);
+  // Excluded sources (bug trackers) never count toward the score, its
+  // counts, or classification coverage.
+  const posts = (await fetchPostsInRange(supabase, rangeStart, rangeEnd))
+    .filter((post) => isScoredSource(post.source));
   const computedAt = new Date().toISOString();
   const postsByDay = new Map<string, ScrapedScorePost[]>();
   const rows: ScoreUpsertRow[] = [];

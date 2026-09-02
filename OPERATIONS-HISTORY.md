@@ -4,6 +4,18 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-09-01 — Scoring-quality + sourcing check (Fable 5.1 + 3 Sonnet readers, live-DB verified)
+
+Trigger: Grok card stale, scores felt off after the 2026-08-22 changes. Findings (14-day window unless noted):
+
+- **Apify guard locked out Reddit + Twitter from 2026-08-25** on account-wide usage ($111 vs $28 cap) that belonged to unrelated actors; LLM Vibes' own runs cost $5.31 in August ($22 in July at 3×/day). Grok's only remaining relevant source was App Store reviews (397 of 490 relevant posts); Sep 1 had zero relevant Grok posts, so no daily row → `is_stale`. Fix: guard now sums this pipeline's `scraper_runs` ledger (rolling 30d / 24h).
+- **GitHub issues were a negative-only source landing on Claude**: 324 neg / 2 pos (ChatGPT 125/1, Gemini 8/1), 25-44 negatives/day; removing it moves a typical Claude day from 28 → ~41. It was also 39% of classifier prompt characters at 73% irrelevant. Fix: `github` excluded from scoring; cron `scrape-github-issues-3x` unscheduled.
+- **App Store dominated Gemini/Grok**: appstore = 58% of Gemini's and 81% of Grok's relevant volume, ~90% positive ("cool app for image editing"). Fix: per-source cap 35% for appstore (others stay 50%), caps relax as before when alternate evidence is thin.
+- Classifier irrelevant share: bluesky 76%, github 73%, twitter 71%, HN 52%, appstore 12%; 62% overall. Rejected prefilter: "drop non-English Bluesky" — 27% of Bluesky's *relevant* posts are Japanese (classifier sets `original_language` only on relevant results, so the irrelevant pool's language is unknown).
+- Reddit: 160 items fetched → 11-31 candidates with the drop uncounted; added `stale_skipped` to the run summary to test whether the actor honors `searchSort: "new"`. `r/ClaudeAI/new/.rss` returns 200 from a residential IP (the `.json` API is 403) — untested from the edge runtime.
+- Not changed: `score_confidence` thresholds (no UI consumer reads them), Bluesky "Grok AI" term (13 relevant / ~520 classified, ~2% of volume), HN comment min length.
+- Alerting worked: watchdog fired hourly for 7 days and the alerts workflow opened issue #72.
+
 ## 2026-07-30 — Anthropic spend audit + compact-irrelevant output trim
 
 Trigger: "are we overspending on Anthropic?" Estimated total Anthropic spend
