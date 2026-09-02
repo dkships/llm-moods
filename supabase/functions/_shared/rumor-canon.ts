@@ -4,7 +4,7 @@
 // frontend (display-time, via `useRumors`). Pure logic — unit-tested in
 // `src/test/rumors.test.ts`.
 //
-// EPHEMERAL DATA: `FAMILY_ALIASES`, `COMPETITOR_DENY`, and
+// EPHEMERAL DATA: `FAMILY_ALIASES`, `COMPETITOR_DENY`, `NON_MODEL_DENY`, and
 // `TRACKED_LEAKER_HANDLES` are refreshed each model cycle alongside the codename
 // `model_keywords` rows. `releasedSetPrompt()` derives the extractor's released
 // list from this catalog so the write path and display filter cannot drift.
@@ -396,8 +396,16 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       codename: "Mythos",
       aliases: ["fable", "mythos", "fable5", "mythos5"],
       released: true,
-      releasePrompt: "Fable 5 / Mythos 5",
       releaseAliases: ["fable", "mythos", "fable5", "mythos5"],
+    },
+    {
+      key: "fable51",
+      label: "Fable 5.1",
+      codename: null,
+      aliases: ["fable51", "mythos51", "claudefable51"],
+      released: true,
+      releasePrompt: "Fable 5.1 / Mythos 5.1 and earlier",
+      releaseAliases: ["fable51", "mythos51"],
     },
     {
       key: "sonnet5",
@@ -420,6 +428,29 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
   ],
   chatgpt: [
     {
+      // Superseded snapshots: no releasePrompt, since the GPT-5.6 entry's
+      // "and earlier" wording already covers them. The tokens still retire.
+      key: "gpt5",
+      label: "GPT-5",
+      codename: null,
+      aliases: ["gpt5"],
+      released: true,
+    },
+    {
+      key: "gpt55",
+      label: "GPT-5.5",
+      codename: null,
+      aliases: ["gpt55"],
+      released: true,
+    },
+    {
+      key: "gpt55cyber",
+      label: "GPT-5.5-Cyber",
+      codename: null,
+      aliases: ["gpt55cyber"],
+      released: true,
+    },
+    {
       key: "gpt56",
       label: "GPT-5.6",
       codename: null,
@@ -435,6 +466,18 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       released: true,
       releasePrompt: "GPT-Live 1 / Bidi",
       releaseAliases: ["bidi", "gptbidi", "gptbidi1", "gptlive", "gptlive1"],
+    },
+    {
+      // Unreleased. Astra is the codename for the next numbered generation, so
+      // codename-only Astra rows collapse into the GPT-6 card instead of
+      // surfacing twice. "Sol"/"Terra"/"Luna" stay out of the alias list on
+      // purpose — they are variant suffixes reused across generations.
+      key: "gpt6",
+      label: "GPT-6",
+      // No canonical codename: the generation collects both Astra and the
+      // variant suffixes (Sol/Terra/Luna), so each row keeps the one it stated.
+      codename: null,
+      aliases: ["gpt6", "astra", "gpt6astra"],
     },
   ],
   gemini: [
@@ -477,6 +520,24 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       aliases: ["gemini36flash"],
       released: true,
       releasePrompt: "Gemini 3.6 Flash",
+    },
+    {
+      key: "gemini37flash",
+      label: "Gemini 3.7 Flash",
+      codename: null,
+      // Bare "Gemini 3.7" folds in here: unlike 3.5 (where Pro is still
+      // pending), no 3.7 Pro is rumored, so bare 3.7 chatter means Flash.
+      aliases: ["gemini37flash", "gemini37"],
+      released: true,
+      releasePrompt: "Gemini 3.7 Flash",
+    },
+    {
+      key: "gemini38flash",
+      label: "Gemini 3.8 Flash",
+      codename: null,
+      aliases: ["gemini38flash", "gemini38"],
+      released: true,
+      releasePrompt: "Gemini 3.8 Flash",
     },
     {
       // Exact spelling only — a bare "Flash-Lite" alias would wrongly retire the
@@ -579,6 +640,20 @@ const COMPETITOR_DENY: string[] = [
 // whole squashed string; longer ones match as substrings ("Qwen3" → "qwen3").
 const DENY_SUBSTR = COMPETITOR_DENY.filter((d) => d.length >= 4);
 const DENY_EXACT = COMPETITOR_DENY.filter((d) => d.length < 4);
+
+// Names that surface in leak chatter from the right vendor but aren't a next
+// model version: product surfaces and feature flags ("Claude Code",
+// CLAUDE_CODE_BASALT_COVE) and image-generation checkpoints (the GPT-Image
+// Mona-Lisa / Luna-Lisa arena names). The radar tracks LLM versions, so these
+// are dropped rather than shown as unreleased models. Matched as substrings,
+// which also collapses checkpoint suffixes ("luna-lisa-alpha").
+const NON_MODEL_DENY: string[] = [
+  "claudecode",
+  "basaltcove",
+  "lunalisa",
+  "monalisa",
+  "gptimage",
+];
 
 // Tokens that make a stated version_label "look like" each family. Tested against
 // the squashed label, so "GPT-5.6" → "gpt56" still matches /gpt/.
@@ -793,6 +868,12 @@ function hitsDeny(s: string | null | undefined): boolean {
   return DENY_SUBSTR.some((d) => q.includes(d));
 }
 
+function hitsNonModelDeny(s: string | null | undefined): boolean {
+  const q = squash(s);
+  if (!q) return false;
+  return NON_MODEL_DENY.some((d) => q.includes(d));
+}
+
 /**
  * Does a stated version_label look like it belongs to `family`? Accepts a bare
  * version number, a family product keyword, or a known alias codename for that
@@ -824,6 +905,7 @@ export function isNonFrontierLabel(
   codename: string | null | undefined,
 ): boolean {
   if (hitsDeny(label) || hitsDeny(codename)) return true;
+  if (hitsNonModelDeny(label) || hitsNonModelDeny(codename)) return true;
   const l = cleanStr(label);
   if (l && !isFamilyConsistentLabel(family, l)) return true;
   return false;

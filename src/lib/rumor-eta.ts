@@ -112,6 +112,29 @@ function monthDateFromText(lower: string, reference: Date): Date | null {
   return utcDate(yearForMonth(reference, month, match[3]), month, day);
 }
 
+/**
+ * A stated day range ("September 11-12", "August 12–14"). Leak ETAs often pair
+ * an anchor with the real target — "10 days from September 2, September 11-12" —
+ * and `monthDateFromText` returns the first match, which is the anchor. The
+ * range is the target, so it takes precedence.
+ */
+function monthRangeFromText(lower: string, reference: Date): string | null {
+  const match = lower.match(
+    new RegExp(`\\b(${MONTH_PATTERN})\\.?\\s+(\\d{1,2})\\s*[-\u2013\u2014]\\s*(\\d{1,2})\\b`, "i"),
+  );
+  if (!match) return null;
+  const month = monthIndex(match[1]);
+  const start = Number(match[2]);
+  const end = Number(match[3]);
+  if (month === null || start < 1 || start > 31 || end <= start || end > 31) return null;
+  const year = yearForMonth(reference, month);
+  const monthLabel = new Intl.DateTimeFormat("en-US", {
+    timeZone: "UTC",
+    month: "short",
+  }).format(utcDate(year, month, start));
+  return `${monthLabel} ${start}\u2013${end}, ${year}`;
+}
+
 function monthWindowFromText(lower: string, reference: Date): string | null {
   const match = lower.match(new RegExp(`\\b(early|mid|late)[-\\s]+(${MONTH_PATTERN})\\b`, "i"));
   if (!match) return null;
@@ -178,6 +201,9 @@ export function formatRumorEta(eta: RumorEtaInput): string | null {
   if (lower.includes("this month")) {
     return formatMonthYear(reference);
   }
+
+  const monthRange = monthRangeFromText(lower, reference);
+  if (monthRange) return monthRange;
 
   if (explicitDate) return formatDate(explicitDate);
   return titleRaw(raw);

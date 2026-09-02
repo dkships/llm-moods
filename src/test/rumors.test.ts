@@ -755,6 +755,11 @@ describe("canonicalVersionKey", () => {
     }
   });
 
+  it("folds the Astra codename into the GPT-6 generation", () => {
+    expect(canonicalVersionKey("chatgpt", null, "Astra").key).toBe("gpt6");
+    expect(canonicalVersionKey("chatgpt", "GPT-6", "Astra").key).toBe("gpt6");
+  });
+
   it("collapses every Bidi/GPT Bidi spelling to one canonical identity", () => {
     for (const [label, codename] of [
       [null, "Bidi"],
@@ -825,6 +830,14 @@ describe("isFamilyConsistentLabel / isNonFrontierLabel", () => {
     expect(isNonFrontierLabel("gemini", null, "Orionmist")).toBe(false);
   });
 
+  it("drops product surfaces and image checkpoints that aren't model versions", () => {
+    expect(isNonFrontierLabel("claude", null, "BASALT_COVE")).toBe(true); // feature flag
+    expect(isNonFrontierLabel("claude", null, "Claude Code")).toBe(true); // product, not a version
+    expect(isNonFrontierLabel("chatgpt", null, "Luna-Lisa")).toBe(true); // image checkpoint
+    expect(isNonFrontierLabel("chatgpt", null, "luna-lisa-alpha")).toBe(true);
+    expect(isNonFrontierLabel("claude", "Opus 5.1", "Marshmallow")).toBe(false); // real leak stays
+  });
+
   it("drops competitor names and non-family labels", () => {
     expect(isNonFrontierLabel("gemini", "DeepSeek V3", null)).toBe(true); // competitor
     expect(isNonFrontierLabel("chatgpt", "Qwen 3", null)).toBe(true); // competitor substring
@@ -863,6 +876,22 @@ describe("isReleasedVersion", () => {
     // The shipped 3.5 Flash-Lite must not retire the next one by bare-name match.
     expect(isReleasedVersion("gemini", "Gemini 3.6 Flash-Lite", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Flash-Lite", null)).toBe(false);
+  });
+
+  it("retires versions that shipped since the last catalog refresh", () => {
+    expect(isReleasedVersion("claude", "Fable 5.1", null)).toBe(true);
+    expect(isReleasedVersion("claude", "Mythos 5.1", null)).toBe(true); // codename spelling
+    expect(isReleasedVersion("gemini", "Gemini 3.7 Flash", null)).toBe(true);
+    expect(isReleasedVersion("gemini", "Gemini 3.7", null)).toBe(true); // bare, no Pro pending
+    expect(isReleasedVersion("gemini", "Gemini 3.8 Flash", null)).toBe(true);
+    expect(isReleasedVersion("chatgpt", "GPT-5", null)).toBe(true);
+    expect(isReleasedVersion("chatgpt", "GPT-5.5", null)).toBe(true);
+    expect(isReleasedVersion("chatgpt", "GPT-5.5-Cyber", null)).toBe(true);
+    // Still pending, and must not be swept up by the entries above.
+    expect(isReleasedVersion("claude", "Mythos 6", null)).toBe(false);
+    expect(isReleasedVersion("claude", "Opus 5.1", null)).toBe(false);
+    expect(isReleasedVersion("chatgpt", "GPT-6", "Astra")).toBe(false);
+    expect(isReleasedVersion("gemini", "Gemini 3.7 Pro", null)).toBe(false);
   });
 
   it("covers every model launch recorded in the vendor event timeline", () => {
@@ -1284,6 +1313,19 @@ describe("formatRumorEta", () => {
       "July 2026",
     );
     expect(formatRumorEta({ eta_text: "Q3", last_seen_at: "2026-06-24T03:00:00Z" })).toBe("Q3 2026");
+  });
+
+  it("renders a stated day range instead of a leading anchor date", () => {
+    // "10 days from September 2" is the anchor, not the target: the range wins.
+    expect(
+      formatRumorEta({
+        eta_text: "10 days from September 2, September 11-12",
+        last_seen_at: "2026-09-02T12:00:00Z",
+      }),
+    ).toBe("Sep 11–12, 2026");
+    expect(formatRumorEta({ eta_text: "August 12–14", last_seen_at: "2026-08-04T12:00:00Z" })).toBe(
+      "Aug 12–14, 2026",
+    );
   });
 
   it("uses exact dates only when the source gives an exact anchor", () => {
