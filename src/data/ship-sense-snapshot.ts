@@ -11,15 +11,14 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.0",
   "runId": "2026-07-10",
   "bankItems": 67,
-  "modelCount": 27,
+  "modelCount": 28,
   "naiveFloor": 39.1,
-  "decisivePairs": 63,
-  "totalPairs": 351,
+  "decisivePairs": 69,
+  "totalPairs": 378,
   "scoringDates": [
     {
       "date": "2026-07-10",
       "labels": [
-        "Claude Fable 5",
         "GPT-5.6 Sol",
         "GPT-5.6 Terra",
         "Gemini 3.1 Pro",
@@ -29,6 +28,7 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "Muse Spark 1.1",
         "Grok 4.5",
         "GPT-5.5",
+        "Claude Fable 5",
         "Claude Sonnet 4.6",
         "GPT-5.4 mini",
         "Claude Opus 4.8",
@@ -87,6 +87,12 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
       "labels": [
         "GLM-5.3"
       ]
+    },
+    {
+      "date": "2026-09-01",
+      "labels": [
+        "Claude Fable 5.1"
+      ]
     }
   ]
 };
@@ -108,16 +114,16 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 4.25
   },
   {
-    "name": "claude-fable-5",
-    "label": "Claude Fable 5",
+    "name": "claude-fable-5-1",
+    "label": "Claude Fable 5.1",
     "provider": "anthropic",
     "pos": 2,
     "inLeaderBand": true,
-    "score": 86.6,
-    "lo": 82.7,
-    "hi": 90.1,
-    "restraint": 0.86,
-    "honesty": 0.82,
+    "score": 87.9,
+    "lo": 83.8,
+    "hi": 91.4,
+    "restraint": 0.88,
+    "honesty": 0.84,
     "conviction": 0.92,
     "priceIn": 10,
     "priceOut": 50
@@ -399,6 +405,16 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "deltaPts": 1.5,
     "loPts": -0.7,
     "hiPts": 3.8,
+    "verdict": "up"
+  },
+  {
+    "prevLabel": "Claude Fable 5",
+    "currLabel": "Claude Fable 5.1",
+    "prevScore": 86.6,
+    "currScore": 87.9,
+    "deltaPts": 1.3,
+    "loPts": -1.1,
+    "hiPts": 3.6,
     "verdict": "up"
   },
   {
