@@ -15,6 +15,7 @@ Trigger: Grok card stale, scores felt off after the 2026-08-22 changes. Findings
 - Reddit: 160 items fetched → 11-31 candidates with the drop uncounted; added `stale_skipped` to the run summary to test whether the actor honors `searchSort: "new"`. `r/ClaudeAI/new/.rss` returns 200 from a residential IP (the `.json` API is 403) — untested from the edge runtime.
 - Not changed: `score_confidence` thresholds (no UI consumer reads them), Bluesky "Grok AI" term (13 relevant / ~520 classified, ~2% of volume), HN comment min length.
 - Alerting worked: watchdog fired hourly for 7 days and the alerts workflow opened issue #72.
+- **Same-session follow-ups (live-tested):** Reddit `listing_mode=new_page` — subredditUrls mode ignores sort (72h window still left 105/160 stale); `/new/` startUrls gave stale=0, 124 candidates, 110 net-new for $0.34. Twitter lanes restored to the documented 5 (the ChatGPT lane had become a superset of the merged lane). Grok: "@grok" removed from context words, product keywords added (grok 4.6 / supergrok / grok imagine / grok heavy) — 53/53 Grok tweets on Sep 1 were "@grok" summons. Sep 1 (PT) had zero relevant Grok posts across all sources before the fixes; Grok's user community is App Store + r/grok + product-term tweets, not Bluesky/HN.
 
 ## 2026-07-30 — Anthropic spend audit + compact-irrelevant output trim
 

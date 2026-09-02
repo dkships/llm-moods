@@ -45,7 +45,8 @@ Edge functions that hit paid APIs (Anthropic, Apify, Gemini, etc.) MUST keep the
 - GitHub issues (`scrape-github-issues`) is unscheduled (2026-09-01): 39% of classifier volume, 73% irrelevant, and bug reports can only score negative, so `SCORE_EXCLUDED_SOURCES` in `_shared/vibes-scoring.ts` also keeps `github` rows out of the score. Re-schedule via `cron.schedule` if it ever earns its cost; the rows still feed the complaints/sources panels.
 - App Store reviews are capped at 35% of a day's scoring weight (`SOURCE_SHARE_CAPS`); every other source keeps the 50% cap. Consumer star ratings were 55-80% of Gemini's and Grok's relevant volume.
 - Recover transient classification failures: `reclassify-posts?mode=reset_failed&error_pattern=transient` (confirm with `dry_run=1` first). `reclassify-posts?mode=multi_model` fixes historical multi-model posts; run `reaggregate-vibes` after.
-- Reddit actor is config-driven (`scraper_config.actor_id`), currently `harshmaur/reddit-scraper`. Don't revert to `trudax/reddit-scraper-lite` — it used Reddit's public `.json` API, dead (403) since May 2026.
+- Reddit actor is config-driven (`scraper_config.actor_id`), currently `harshmaur/reddit-scraper`. Don't revert to `trudax/reddit-scraper-lite` — it used Reddit's public `.json` API, dead (403) since May 2026. Keep `scraper_config.listing_mode=new_page` (2026-09-01): the actor's `subredditUrls` mode ignores sort and returned mostly days-old posts (10-24 candidates/run); `/new/` listing pages via `startUrls` give 0 stale and ~120 candidates for the same $0.34-0.45. Watch `stale_skipped` in run metadata.
+- Twitter lanes are the documented 5 (ChatGPT isolated; merged Claude/Gemini/Grok; rumor; leaker; press). Bare `grok` is out of the merged lane and `@grok` is out of the `grok` keyword's context words — both matched bot summons ("@grok is this true?"), 100% irrelevant.
 
 ## Classifier & scraper invariants
 
