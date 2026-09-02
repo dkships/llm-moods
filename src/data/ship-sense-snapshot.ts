@@ -11,10 +11,10 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.0",
   "runId": "2026-07-10",
   "bankItems": 67,
-  "modelCount": 28,
+  "modelCount": 29,
   "naiveFloor": 39.1,
-  "decisivePairs": 69,
-  "totalPairs": 378,
+  "decisivePairs": 72,
+  "totalPairs": 406,
   "scoringDates": [
     {
       "date": "2026-07-10",
@@ -92,6 +92,12 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
       "date": "2026-09-01",
       "labels": [
         "Claude Fable 5.1"
+      ]
+    },
+    {
+      "date": "2026-09-02",
+      "labels": [
+        "Gemini 3.8 Flash"
       ]
     }
   ]
@@ -275,17 +281,17 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 25
   },
   {
-    "name": "gemini-3.7-flash",
-    "label": "Gemini 3.7 Flash",
+    "name": "gemini-3.8-flash",
+    "label": "Gemini 3.8 Flash",
     "provider": "google",
     "pos": 12,
     "inLeaderBand": false,
-    "score": 80.6,
-    "lo": 76.2,
-    "hi": 84.8,
-    "restraint": 0.82,
+    "score": 80.5,
+    "lo": 75.9,
+    "hi": 84.7,
+    "restraint": 0.81,
     "honesty": 0.71,
-    "conviction": 0.89,
+    "conviction": 0.9,
     "priceIn": 0.75,
     "priceOut": 3.75,
     "pendingPriceIn": 1.5,
@@ -398,16 +404,6 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "verdict": "up"
   },
   {
-    "prevLabel": "Gemini 3.5 Flash",
-    "currLabel": "Gemini 3.7 Flash",
-    "prevScore": 79.1,
-    "currScore": 80.6,
-    "deltaPts": 1.5,
-    "loPts": -0.7,
-    "hiPts": 3.8,
-    "verdict": "up"
-  },
-  {
     "prevLabel": "Claude Fable 5",
     "currLabel": "Claude Fable 5.1",
     "prevScore": 86.6,
@@ -418,22 +414,32 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "verdict": "up"
   },
   {
+    "prevLabel": "Gemini 3.5 Flash",
+    "currLabel": "Gemini 3.8 Flash",
+    "prevScore": 79.1,
+    "currScore": 80.5,
+    "deltaPts": 1.3,
+    "loPts": -0.9,
+    "hiPts": 3.5,
+    "verdict": "up"
+  },
+  {
+    "prevLabel": "Gemini 3.7 Flash",
+    "currLabel": "Gemini 3.8 Flash",
+    "prevScore": 80.6,
+    "currScore": 80.5,
+    "deltaPts": -0.2,
+    "loPts": -1.9,
+    "hiPts": 1.6,
+    "verdict": "down"
+  },
+  {
     "prevLabel": "GPT-5.5",
     "currLabel": "GPT-5.6 Sol",
     "prevScore": 87,
     "currScore": 86.4,
     "deltaPts": -0.6,
     "loPts": -3,
-    "hiPts": 1.7,
-    "verdict": "down"
-  },
-  {
-    "prevLabel": "Gemini 3.6 Flash",
-    "currLabel": "Gemini 3.7 Flash",
-    "prevScore": 81.4,
-    "currScore": 80.6,
-    "deltaPts": -0.7,
-    "loPts": -3.2,
     "hiPts": 1.7,
     "verdict": "down"
   },
@@ -455,6 +461,16 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "deltaPts": -0.9,
     "loPts": -2.7,
     "hiPts": 0.8,
+    "verdict": "down"
+  },
+  {
+    "prevLabel": "Gemini 3.6 Flash",
+    "currLabel": "Gemini 3.8 Flash",
+    "prevScore": 81.4,
+    "currScore": 80.5,
+    "deltaPts": -0.9,
+    "loPts": -3.2,
+    "hiPts": 1.4,
     "verdict": "down"
   },
   {
