@@ -4,6 +4,47 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-09-02 — Rumors radar cleanup (live-verified)
+
+Trigger: "check /rumors for released models, or any that can be combined or are old."
+Ship Sense had just synced Fable 5.1 and Gemini 3.8 Flash. The auto-retire layer had
+already caught both (`fable51`, `gemini38flash` flagged from the Models APIs), so the
+residue was elsewhere. The page went from 10 cards to 7.
+
+- **One model, two cards**: `lunalisa` + `lunalisaalpha` were the same GPT-Image arena
+  checkpoint from the same author 3 days apart. Both are image-gen, not an LLM version.
+- **Not a model**: `basaltcove` is the Claude Code feature flag `CLAUDE_CODE_BASALT_COVE`,
+  off a Hacker News comment. `claudecode` likewise. Fix: `NON_MODEL_DENY` in
+  `_shared/rumor-canon.ts`, substring-matched so checkpoint suffixes collapse too.
+- **ETA showed the anchor, not the target**: Grok 4.7's `eta_text` was "10 days from
+  September 2, September 11-12" and `monthDateFromText` returns the first month+day match,
+  so the card advertised a launch date that had already passed. Fix: a stated day range now
+  wins (`monthRangeFromText`), which also repairs "August 12–14" and "July 20-21" rows.
+- **Retired 5 shipped rows** the Models APIs can't derive: `mythos51` (Mythos is Fable's
+  codename), bare `gemini37` (no 3.7 Pro pending, so bare 3.7 means Flash), `gpt5`, `gpt55`,
+  `gpt55cyber`. Confirmed live: `released_rows_flagged` 0 → 5 on the first post-deploy run.
+- **`astra` folded into `gpt6`** so the codename stops surfacing a second card. The entry
+  carries no canonical codename — Sol/Terra/Luna are variant suffixes reused across
+  generations, and forcing "Astra" onto every GPT-6 row overwrote them (caught by an
+  existing merge test).
+- **Deliberately NOT retired**: bare `sol` — it is a variant suffix, and
+  `canonicalVersionKey("chatgpt", "GPT-6 Sol", "Sol")` must stay `gpt6`, so retiring it would
+  misfile the next Sol. `honeycomb` — shipped as Opus 5 and already retired via `opus5`, and
+  it is the fixture for the learned version/codename bridge test.
+- **Gemini 3.5 Pro kept** (73 days pending, oldest live card): verified still absent from the
+  Models APIs, so it is a real delay story, not a stale row.
+- Shared-module fan-out: `aggregate-rumors` is the only edge function importing
+  `rumor-canon.ts`. Redeployed and verified by a `CODE_VERSION` marker in the run summary,
+  not by the deploy tool's return value.
+
+**Still outstanding:** the codename half of the cycle ritual. `model_keywords` has no rows for
+the currently-rumored codenames (Marshmallow, Melon, Spark, Astra) or versions (Opus 5.1,
+Sonnet 5.1, Grok 4.7, Gemini 4). r/singularity and r/LocalLLaMA are deliberately absent from
+`SUBREDDIT_MODEL_MAP` and attribute *only* via these rows, so leak posts there are being
+dropped. Not applied here: these keywords feed attribution for the whole scoring pipeline, and
+"melon" / "spark" / "marshmallow" as bare high-tier terms would inject noise into the vibes
+scores — they need `context_words`, and that is a scoring decision, not a rumors one.
+
 ## 2026-09-01 — Scoring-quality + sourcing check (Fable 5.1 + 3 Sonnet readers, live-DB verified)
 
 Trigger: Grok card stale, scores felt off after the 2026-08-22 changes. Findings (14-day window unless noted):

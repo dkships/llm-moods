@@ -59,7 +59,7 @@ Read `AGENT-REFERENCE.md` before changing `_shared/classifier.ts` or any scraper
 
 ## Rumors radar (`/rumors`)
 
-Pipeline detail is in `AGENT-REFERENCE.md`; read it before touching anything rumor-related. Recurring manual touch: refresh the codename/next-version `model_keywords` rows and the `FAMILY_ALIASES` + `COMPETITOR_DENY` seeds in `_shared/rumor-canon.ts` each cycle. The extractor's released-set prompt is generated from `FAMILY_ALIASES`. To hide a just-launched model instantly with zero backend deploy, set `released: true` on its alias entry. ETAs are always framed as unconfirmed community estimates, never forecasts.
+Pipeline detail is in `AGENT-REFERENCE.md`; read it before touching anything rumor-related. Recurring manual touch: refresh the codename/next-version `model_keywords` rows and the `FAMILY_ALIASES` + `COMPETITOR_DENY` + `NON_MODEL_DENY` seeds in `_shared/rumor-canon.ts` each cycle. `NON_MODEL_DENY` drops right-vendor names that aren't model versions (product surfaces, feature flags, image-gen checkpoints). The extractor's released-set prompt is generated from `FAMILY_ALIASES`. To hide a just-launched model instantly with zero backend deploy, set `released: true` on its alias entry — that covers display only; `aggregate-rumors` needs a redeploy before the extractor prompt and the write-time filters see a catalog edit (it is the sole edge function importing `rumor-canon.ts`). ETAs are always framed as unconfirmed community estimates, never forecasts.
 
 ## Ship Sense benchmark (`/benchmark`)
 
