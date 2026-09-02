@@ -29,6 +29,11 @@ import {
 import { deriveReleasedTokens, openAiReleasedTokensFromRss } from "../_shared/released-models.ts";
 import { isCredibleReleaseSource, isReleaseAnnouncement } from "../_shared/release-detect.ts";
 
+// Bump CODE_VERSION whenever this file or the rumor-canon catalog it bundles
+// changes — Lovable deploys can silently ship stale code, and this field in
+// the run summary (response body + error_log context) is the only external
+// deploy check.
+const CODE_VERSION = "2026-09-02.1";
 const SOURCE = "aggregate-rumors";
 const LOCK_KEY = "rumor-aggregate";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -541,6 +546,7 @@ Deno.serve(async (req) => {
 
     const summary = {
       status: "complete",
+      code_version: CODE_VERSION,
       candidates: candidates.length,
       checked_posts: checkedPosts,
       contributions: contributions.length,
