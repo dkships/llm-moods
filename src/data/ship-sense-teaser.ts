@@ -5,8 +5,8 @@ import type { ShipSenseTeaserRow } from "./ship-sense";
 
 export const SHIP_SENSE_TEASER: ShipSenseTeaserRow[] = [
   {
-    "label": "Muse Spark 1.2",
-    "score": 89
+    "label": "Muse Spark 1.3",
+    "score": 89.1
   },
   {
     "label": "Claude Fable 5.1",
@@ -21,5 +21,5 @@ export const SHIP_SENSE_TEASER: ShipSenseTeaserRow[] = [
 export const SHIP_SENSE_TEASER_RUN = {
   "version": "v3.0",
   "bankItems": 67,
-  "modelCount": 29
+  "modelCount": 30
 };

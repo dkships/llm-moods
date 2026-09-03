@@ -11,10 +11,10 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.0",
   "runId": "2026-07-10",
   "bankItems": 67,
-  "modelCount": 29,
+  "modelCount": 30,
   "naiveFloor": 39.1,
-  "decisivePairs": 72,
-  "totalPairs": 406,
+  "decisivePairs": 83,
+  "totalPairs": 435,
   "scoringDates": [
     {
       "date": "2026-07-10",
@@ -97,6 +97,7 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
     {
       "date": "2026-09-02",
       "labels": [
+        "Muse Spark 1.3",
         "Gemini 3.8 Flash"
       ]
     }
@@ -105,16 +106,16 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
 
 export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
   {
-    "name": "muse-spark-1.2",
-    "label": "Muse Spark 1.2",
+    "name": "muse-spark-1.3",
+    "label": "Muse Spark 1.3",
     "provider": "meta",
     "pos": 1,
     "inLeaderBand": true,
-    "score": 89,
-    "lo": 85.6,
-    "hi": 92.1,
-    "restraint": 0.85,
-    "honesty": 0.83,
+    "score": 89.1,
+    "lo": 86,
+    "hi": 92,
+    "restraint": 0.88,
+    "honesty": 0.8,
     "conviction": 0.99,
     "priceIn": 1.25,
     "priceOut": 4.25
@@ -424,6 +425,16 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "verdict": "up"
   },
   {
+    "prevLabel": "Muse Spark 1.2",
+    "currLabel": "Muse Spark 1.3",
+    "prevScore": 89,
+    "currScore": 89.1,
+    "deltaPts": 0.1,
+    "loPts": -1.5,
+    "hiPts": 1.7,
+    "verdict": "up"
+  },
+  {
     "prevLabel": "Gemini 3.7 Flash",
     "currLabel": "Gemini 3.8 Flash",
     "prevScore": 80.6,
@@ -444,6 +455,16 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "verdict": "down"
   },
   {
+    "prevLabel": "Muse Spark 1.1",
+    "currLabel": "Muse Spark 1.3",
+    "prevScore": 89.9,
+    "currScore": 89.1,
+    "deltaPts": -0.8,
+    "loPts": -2.4,
+    "hiPts": 0.9,
+    "verdict": "down"
+  },
+  {
     "prevLabel": "Claude Opus 4.8",
     "currLabel": "Claude Opus 5",
     "prevScore": 81.8,
@@ -451,16 +472,6 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "deltaPts": -0.8,
     "loPts": -5,
     "hiPts": 2.9,
-    "verdict": "down"
-  },
-  {
-    "prevLabel": "Muse Spark 1.1",
-    "currLabel": "Muse Spark 1.2",
-    "prevScore": 89.9,
-    "currScore": 89,
-    "deltaPts": -0.9,
-    "loPts": -2.7,
-    "hiPts": 0.8,
     "verdict": "down"
   },
   {
