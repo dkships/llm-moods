@@ -468,16 +468,18 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releaseAliases: ["bidi", "gptbidi", "gptbidi1", "gptlive", "gptlive1"],
     },
     {
-      // Unreleased. Astra is the codename for the next numbered generation, so
-      // codename-only Astra rows collapse into the GPT-6 card instead of
-      // surfacing twice. "Sol"/"Terra"/"Luna" stay out of the alias list on
-      // purpose — they are variant suffixes reused across generations.
+      // Shipped 2026-09-04 as GPT-6 Astra, so the codename retires with the
+      // generation. "Sol"/"Terra"/"Luna" stay out of the alias list on purpose
+      // — they are variant suffixes reused across generations.
       key: "gpt6",
       label: "GPT-6",
       // No canonical codename: the generation collects both Astra and the
       // variant suffixes (Sol/Terra/Luna), so each row keeps the one it stated.
       codename: null,
       aliases: ["gpt6", "astra", "gpt6astra"],
+      released: true,
+      releasePrompt: "GPT-6 (Astra) and earlier",
+      releaseAliases: ["astra", "gpt6astra"],
     },
   ],
   gemini: [

@@ -251,13 +251,13 @@ describe("buildContribution", () => {
     const raw: RawClaim = {
       is_rumor: true,
       target_family: "chatgpt",
-      version_label: "GPT-6 Sol",
+      version_label: "GPT-6.1 Sol",
       codename: "Sol",
       is_unreleased: true,
     };
-    const c = buildContribution(raw, source, "GPT-6 Sol was spotted in testing");
-    expect(c?.versionKey).toBe("gpt6");
-    expect(c?.versionLabel).toBe("GPT-6");
+    const c = buildContribution(raw, source, "GPT-6.1 Sol was spotted in testing");
+    expect(c?.versionKey).toBe("gpt61");
+    expect(c?.versionLabel).toBe("GPT-6.1");
     expect(c?.codename).toBe("Sol");
   });
 
@@ -869,7 +869,7 @@ describe("isReleasedVersion", () => {
 
   it("keeps unreleased versions (no false positives)", () => {
     expect(isReleasedVersion("claude", "Opus 5", null)).toBe(false);
-    expect(isReleasedVersion("chatgpt", "GPT-6", null)).toBe(false);
+    expect(isReleasedVersion("chatgpt", "GPT-6.1", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 5", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 4.7", null)).toBe(false);
@@ -888,10 +888,12 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("chatgpt", "GPT-5", null)).toBe(true);
     expect(isReleasedVersion("chatgpt", "GPT-5.5", null)).toBe(true);
     expect(isReleasedVersion("chatgpt", "GPT-5.5-Cyber", null)).toBe(true);
+    expect(isReleasedVersion("chatgpt", "GPT-6", "Astra")).toBe(true);
+    expect(isReleasedVersion("chatgpt", null, "Astra")).toBe(true); // shipped as GPT-6 Astra
     // Still pending, and must not be swept up by the entries above.
     expect(isReleasedVersion("claude", "Mythos 6", null)).toBe(false);
     expect(isReleasedVersion("claude", "Opus 5.1", null)).toBe(false);
-    expect(isReleasedVersion("chatgpt", "GPT-6", "Astra")).toBe(false);
+    expect(isReleasedVersion("chatgpt", "GPT-6.1", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.7 Pro", null)).toBe(false);
   });
 
@@ -907,6 +909,7 @@ describe("released model catalog", () => {
   it("generates the extractor prompt from the shared release entries", () => {
     const prompt = releasedSetPrompt();
     expect(prompt).toContain("GPT-5.6 (Sol, Terra, Luna) and earlier");
+    expect(prompt).toContain("GPT-6 (Astra) and earlier");
     expect(prompt).toContain("GPT-Live 1 / Bidi");
     expect(prompt).toContain("Grok 4.6 and earlier");
     expect(prompt).toContain("Gemini 3.6 Flash");
@@ -1063,13 +1066,13 @@ describe("mergeRumorRows", () => {
     const out = mergeRumorRows([
       rrow({
         model_slug: "chatgpt",
-        version_label: "GPT-6",
+        version_label: "GPT-6.1",
         codename: "Sol, Terra, Luna",
         representative_sources: [{ url: "x", platform: "twitter" }],
       }),
       rrow({
         model_slug: "chatgpt",
-        version_label: "GPT-6 Sol",
+        version_label: "GPT-6.1 Sol",
         codename: "Sol",
         last_seen_at: "2026-06-24",
         representative_sources: [{ url: "b", platform: "bluesky" }],
@@ -1077,7 +1080,7 @@ describe("mergeRumorRows", () => {
     ]);
 
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("GPT-6");
+    expect(out[0].version_label).toBe("GPT-6.1");
     expect(out[0].codename).toBe("Sol, Terra, Luna");
     expect(out[0].mention_count).toBe(2);
     expect(out[0].platform_count).toBe(2);
@@ -1218,7 +1221,7 @@ describe("mergeRumorRows", () => {
     const repeated = mergeRumorRows([
       rrow({
         model_slug: "chatgpt",
-        version_label: "GPT-6",
+        version_label: "GPT-6.1",
         mention_count: 2,
         platform_count: 1,
         representative_sources: [
