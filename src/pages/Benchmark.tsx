@@ -315,15 +315,17 @@ const Benchmark = () => {
           </p>
           <p>
             This is one product leader's documented judgment, not an industry
-            standard: the keys have no independent human rater yet, and the bank
-            measures three behaviors — not discovery, design judgment, rollout, or
-            organizational leadership. Grading detail is in{" "}
+            standard: the keys have no independent human rater yet (the September
+            2026 source audit was an automated second reading, not a second human),
+            and the bank measures three behaviors — not discovery, design judgment,
+            rollout, or organizational leadership. Grading detail is in{" "}
             <BenchmarkDocLink path="RUBRICS.md" />, design and limitations in{" "}
-            <BenchmarkDocLink path="METHODOLOGY.md" />, and the correction log —
-            two grader bugs, a wrong key, a dropped-generation bug, a paired-test
-            weighting error, each caught by re-deriving from saved outputs — in{" "}
-            <BenchmarkDocLink path="FINDINGS.md" />. The full win/loss matrix is on
-            the{" "}
+            <BenchmarkDocLink path="METHODOLOGY.md" />, the correction log — seven
+            harness defects, four of them grading bugs, each caught by re-deriving
+            from saved outputs — in <BenchmarkDocLink path="FINDINGS.md" />, and
+            the September 2026 source audit of the bank itself in{" "}
+            <BenchmarkDocLink path="CORRECTIONS.md" />. The full win/loss matrix is
+            on the{" "}
             <a
               href={`${SHIP_SENSE_BOARD_URL}#headtohead`}
               target="_blank"

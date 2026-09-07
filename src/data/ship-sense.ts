@@ -222,7 +222,7 @@ export const SHIP_SENSE_DIMENSIONS: ShipSenseDimension[] = [
     name: "Honesty",
     question: "What can this data, and this model's own output, actually support?",
     grading:
-      "Binary checks for documented landmines and enumerated false conclusions, including over-skeptical dismissal.",
+      "Binary checks for documented landmines and enumerated false conclusions, including over-skeptical dismissal; a quoted claim that the model rejects is not an assertion.",
   },
   {
     name: "Conviction",
