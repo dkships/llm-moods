@@ -29,3 +29,4 @@ dist-ssr
 
 # Local agent / Claude Code session state
 .claude/
+.env
