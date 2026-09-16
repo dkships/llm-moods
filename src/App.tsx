@@ -13,6 +13,7 @@ const Benchmark = lazy(() => import("./pages/Benchmark"));
 const ResearchIndex = lazy(() => import("./pages/ResearchIndex"));
 const ResearchPost = lazy(() => import("./pages/ResearchPost"));
 const Rumors = lazy(() => import("./pages/Rumors"));
+const Feedback = lazy(() => import("./pages/Feedback"));
 const Privacy = lazy(() => import("./pages/Privacy"));
 
 // Admin / generator pages are dev-only — production bundles physically exclude
@@ -81,6 +82,7 @@ const AnimatedRoutes = () => {
           <Route path="research" element={<ResearchIndex />} />
           <Route path="research/:slug" element={<ResearchPost />} />
           <Route path="rumors" element={<Rumors />} />
+          <Route path="feedback" element={<Feedback />} />
           <Route path="privacy" element={<Privacy />} />
           <Route path="*" element={<NotFound />} />
         </Route>

@@ -32,6 +32,7 @@ const NavBar = () => {
   const showResearchLink = RESEARCH_POSTS.length > 0;
   const isResearchActive = pathname === "/research" || pathname.startsWith("/research/");
   const isRumorsActive = pathname === "/rumors";
+  const isFeedbackActive = pathname === "/feedback";
   const isBenchmarkActive = pathname === "/benchmark";
   const isCompareActive = pathname === "/compare";
   const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/model/");
@@ -78,6 +79,9 @@ const NavBar = () => {
           )}
           <Link to="/rumors" className={navLinkClass(isRumorsActive)}>
             Rumors
+          </Link>
+          <Link to="/feedback" className={navLinkClass(isFeedbackActive)}>
+            Feedback
           </Link>
           <a
             href="https://github.com/dkships/llm-moods"
