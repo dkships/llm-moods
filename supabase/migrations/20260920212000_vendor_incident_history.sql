@@ -165,7 +165,7 @@ BEGIN
                headers := jsonb_build_object('Content-Type','application/json','Authorization',%L),
                body := jsonb_build_object('vendor', v)
              ), v
-      FROM unnest(ARRAY['anthropic','openai','google']) AS v;
+      FROM unnest(ARRAY['anthropic','openai','google','xai']) AS v;
     $cmd$,
     base || 'fetch-vendor-status',
     'Bearer ' || anon
