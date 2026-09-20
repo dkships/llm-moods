@@ -117,19 +117,19 @@ const Benchmark = () => {
               href={SHIP_SENSE_REPO_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className={controlPill()}
+              className={controlPill("group")}
             >
               GitHub
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              <ExternalLink className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </a>
             <a
               href={SHIP_SENSE_BOARD_URL}
               target="_blank"
               rel="noopener noreferrer"
-              className={controlPill()}
+              className={controlPill("group")}
             >
               Live board
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              <ExternalLink className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
             </a>
           </div>
         </div>

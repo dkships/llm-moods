@@ -183,6 +183,46 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     notes:
       "Announced on x.ai August 12, five weeks after 4.5, focused on long-running agents and more ambitious interactive and visual work. Musk's July 25 'two weeks' estimate slipped a few days.",
   },
+  {
+    id: "google-gemini-3-7-flash-launch",
+    vendor: "google",
+    modelSlug: "gemini",
+    eventDate: "2026-08-13",
+    eventType: "model_launch",
+    title: "Gemini 3.7 Flash launch",
+    url: "https://9to5google.com/2026/08/13/gemini-3-7-flash-launch/",
+    notes: "Second Flash release in the summer cadence; superseded three weeks later by 3.8 Flash.",
+  },
+  {
+    id: "anthropic-fable-5-1-launch",
+    vendor: "anthropic",
+    modelSlug: "claude",
+    eventDate: "2026-09-01",
+    eventType: "model_launch",
+    title: "Claude Fable 5.1 launch",
+    url: "https://www.macrumors.com/2026/09/01/anthropic-claude-fable-5-1/",
+    notes: "API id claude-fable-5-1 went live the same day, alongside the restricted-access Claude Mythos 5.1 sibling.",
+  },
+  {
+    id: "google-gemini-3-8-flash-launch",
+    vendor: "google",
+    modelSlug: "gemini",
+    eventDate: "2026-09-02",
+    eventType: "model_launch",
+    title: "Gemini 3.8 Flash launch",
+    url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/3-8-flash-and-3-8-flash-cyber/",
+    notes: "Third Flash release in six weeks, with a 3.8 Flash Cyber variant. Introductory pricing $0.75 / $3.75 per million tokens.",
+  },
+  {
+    id: "openai-gpt-6-astra-launch",
+    vendor: "openai",
+    modelSlug: "chatgpt",
+    eventDate: "2026-09-03",
+    eventType: "model_launch",
+    title: "GPT-6 Astra launch",
+    url: "https://www.cnbc.com/2026/09/03/open-ai-astra-gpt-6-cyber.html",
+    notes: "Approved-user rollout September 3, general availability the next day. Computer-use headline feature; API priced at 2.5x GPT-5.6 Sol.",
+  },
 ];
 
 export function getEventsForModel(slug: string | undefined): VendorEvent[] {

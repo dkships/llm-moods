@@ -157,10 +157,10 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct, className }: RumorCa
               // bg-secondary/40) so /rumors doesn't introduce a third pill
               // style. Deliberately text-meta rather than Tag's text-mono-cap:
               // these carry @handles, and uppercasing a username misrepresents
-              // an identifier. min-h-8 + py-1.5 lifts the tap target off ~26px;
-              // these are real links out to third-party posts.
+              // an identifier. min-h-10 + py-2 lifts the tap target to a real
+              // 40px touch target; these are real links out to third-party posts.
               const chipClasses =
-                "inline-flex min-h-8 max-w-full items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-2.5 py-1.5 text-meta text-text-secondary transition-colors";
+                "inline-flex min-h-10 max-w-full items-center gap-1.5 rounded-full border border-border bg-secondary/40 px-2.5 py-2 text-meta text-text-secondary transition-colors";
               const inner = (
                 <>
                   <span className="truncate">{handle}</span>
@@ -185,12 +185,13 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct, className }: RumorCa
                       target="_blank"
                       rel="noopener noreferrer"
                       title={title}
+                      aria-label={title}
                       className={`${chipClasses} hover:border-foreground/30 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background`}
                     >
                       {inner}
                     </a>
                   ) : (
-                    <span className={chipClasses}>{inner}</span>
+                    <span className={chipClasses} aria-label={title}>{inner}</span>
                   )}
                 </li>
               );

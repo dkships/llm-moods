@@ -127,7 +127,7 @@ const FeedbackPage = () => {
                 aria-pressed={sentiment === "positive"}
                 onClick={() => handleSentimentSelect("positive")}
                 className={[
-                  "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border-2 transition-all",
+                  "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border-2 transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   sentiment === "positive"
                     ? "border-primary bg-primary/15 text-primary"
@@ -142,7 +142,7 @@ const FeedbackPage = () => {
                 aria-pressed={sentiment === "negative"}
                 onClick={() => handleSentimentSelect("negative")}
                 className={[
-                  "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border-2 transition-all",
+                  "flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border-2 transition-colors",
                   "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                   sentiment === "negative"
                     ? "border-destructive bg-destructive/15 text-destructive-text"
@@ -190,9 +190,9 @@ const FeedbackPage = () => {
               rows={4}
               placeholder="Share what stood out — good or bad..."
               className={[
-                "w-full resize-none rounded-lg border border-input bg-background p-3",
+                "w-full resize-none rounded-md border border-input bg-background p-3",
                 "text-body text-foreground placeholder:text-text-tertiary",
-                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               ].join(" ")}
               aria-label="Optional comment"
             />
@@ -208,7 +208,7 @@ const FeedbackPage = () => {
               disabled={!effectiveSlug || !sentiment || submitMutation.isPending}
               onClick={handleSubmit}
               className={[
-                "flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 transition-all",
+                "flex min-h-11 items-center justify-center gap-2 rounded-md px-4 transition-colors",
                 "text-mono-cap focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
                 effectiveSlug && sentiment && !submitMutation.isPending
                   ? "bg-primary text-primary-foreground hover:bg-primary/90"
@@ -259,19 +259,16 @@ const FeedbackPage = () => {
           ) : (
             <ul className="flex-1 space-y-3">
               {recentFeedback.map((fb) => (
-                <li
-                  key={fb.id}
-                  className="rounded-lg border border-border bg-background/50 p-3"
-                >
+                <Surface as="li" key={fb.id} size="compact">
                   <div className="flex items-start gap-3">
                     {fb.sentiment === "positive" ? (
                       <ThumbsUp
-                        className="mt-0.5 h-4 w-4 shrink-0 text-primary"
+                        className="mt-0.5 h-4 w-4 shrink-0 text-text-secondary"
                         aria-hidden="true"
                       />
                     ) : (
                       <ThumbsDown
-                        className="mt-0.5 h-4 w-4 shrink-0 text-destructive-text"
+                        className="mt-0.5 h-4 w-4 shrink-0 text-text-secondary"
                         aria-hidden="true"
                       />
                     )}
@@ -299,7 +296,7 @@ const FeedbackPage = () => {
                       )}
                     </div>
                   </div>
-                </li>
+                </Surface>
               ))}
             </ul>
           )}

@@ -194,6 +194,11 @@
       transform: translateY(-2px);
     }
   }
+  .surface-lift:active {
+    transform: translateY(0);
+    box-shadow: var(--shadow-card);
+    transition-duration: 75ms;
+  }
   /* Keyboard-focus equivalent of the hover lift above, kept outside the
      hover media query so tabbing to a card's interactive content gets the
      same affordance regardless of pointer capability. The second selector
@@ -231,6 +236,10 @@
 
   .prose a:focus-visible {
     @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background rounded-sm;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
   }
 }
 

@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { getPacificDateLabel } from "@/lib/pacific-day";
 import { useCallback, useEffect, useRef } from "react";
 import type { Database } from "@/integrations/supabase/types";
 import { normalizePublicComplaintCategory } from "@/shared/public-taxonomy";
@@ -251,7 +252,15 @@ export function useModelsWithLatestVibes() {
           classification_coverage?: number | null;
         }>
       >();
+      // Mirrors get_landing_vibes: today's row is provisional while it is
+      // still thin, so the card's sparkline ends on the same day as its
+      // headline instead of dipping to a one-post reading at noon.
+      const todayPacific = getPacificDateLabel(new Date());
       for (const row of sparkRows || []) {
+        const isThinToday =
+          row.score_basis_status === "thin_sample"
+          && getPacificDateLabel(new Date(row.period_start)) === todayPacific;
+        if (isThinToday) continue;
         const arr = sparkByModel.get(row.model_id) ?? [];
         arr.push({
           score: row.score,

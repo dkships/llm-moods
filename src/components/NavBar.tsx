@@ -1,4 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
+import { useEffect, useRef } from "react";
 import { RESEARCH_POSTS } from "@/data/research-posts";
 
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -27,6 +28,9 @@ const SvgMark = () => (
   </svg>
 );
 
+// Tailwind `sm` breakpoint minus one: the nav row scrolls below this width.
+const NAV_SCROLL_MAX_WIDTH_PX = 639;
+
 const NavBar = () => {
   const { pathname } = useLocation();
   const showResearchLink = RESEARCH_POSTS.length > 0;
@@ -37,8 +41,16 @@ const NavBar = () => {
   const isCompareActive = pathname === "/compare";
   const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/model/");
 
+  const activeLinkRef = useRef<HTMLAnchorElement>(null);
+  useEffect(() => {
+    // Only the scrolling (phone) layout needs this; on wider screens every
+    // link is already visible and scrollIntoView would nudge the page.
+    if (!window.matchMedia(`(max-width: ${NAV_SCROLL_MAX_WIDTH_PX}px)`).matches) return;
+    activeLinkRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+  }, [pathname]);
+
   const navLinkClass = (active: boolean) =>
-    `inline-flex min-h-11 items-center rounded-md px-1 text-mono-cap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:px-2 sm:py-1 ${
+    `inline-flex min-h-11 shrink-0 snap-start items-center rounded-md px-1.5 text-mono-cap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:px-2 sm:py-1 ${
       active ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-foreground"
     }`;
 
@@ -62,25 +74,32 @@ const NavBar = () => {
             <span className="text-primary">Vibes</span>
           </span>
         </Link>
-        <div className="flex flex-none items-center gap-0.5 sm:gap-3 lg:gap-5">
-          <Link to="/dashboard" className={navLinkClass(isDashboardActive)}>
+        {/* Six links overflow a phone-width bar. Below `sm` the row scrolls
+            sideways (scrollbar hidden, right-edge fade as the affordance)
+            and the active link scrolls itself into view on route change. */}
+        <div className="relative min-w-0 flex-1 sm:flex-none">
+          <nav
+            aria-label="Primary"
+            className="flex items-center gap-1 overflow-x-auto snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-3 sm:overflow-visible lg:gap-5"
+          >
+          <Link to="/dashboard" className={navLinkClass(isDashboardActive)} ref={isDashboardActive ? activeLinkRef : undefined}>
             Dashboard
           </Link>
-          <Link to="/compare" className={navLinkClass(isCompareActive)}>
+          <Link to="/compare" className={navLinkClass(isCompareActive)} ref={isCompareActive ? activeLinkRef : undefined}>
             Compare
           </Link>
-          <Link to="/benchmark" className={navLinkClass(isBenchmarkActive)}>
+          <Link to="/benchmark" className={navLinkClass(isBenchmarkActive)} ref={isBenchmarkActive ? activeLinkRef : undefined}>
             Benchmark
           </Link>
           {showResearchLink && (
-            <Link to="/research" className={navLinkClass(isResearchActive)}>
+            <Link to="/research" className={navLinkClass(isResearchActive)} ref={isResearchActive ? activeLinkRef : undefined}>
               Research
             </Link>
           )}
-          <Link to="/rumors" className={navLinkClass(isRumorsActive)}>
+          <Link to="/rumors" className={navLinkClass(isRumorsActive)} ref={isRumorsActive ? activeLinkRef : undefined}>
             Rumors
           </Link>
-          <Link to="/feedback" className={navLinkClass(isFeedbackActive)}>
+          <Link to="/feedback" className={navLinkClass(isFeedbackActive)} ref={isFeedbackActive ? activeLinkRef : undefined}>
             Feedback
           </Link>
           <a
@@ -92,6 +111,11 @@ const NavBar = () => {
           >
             <GitHubIcon className="h-5 w-5" />
           </a>
+          </nav>
+          <div
+            className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent sm:hidden"
+            aria-hidden="true"
+          />
         </div>
       </div>
     </header>

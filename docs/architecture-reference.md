@@ -44,12 +44,13 @@ Reference material moved out of `CLAUDE.md` (2026-07-07). Operating rules live i
 | `model_rumors` | Rumors-radar accumulator: one row per (model_slug, version_key), corroboration counts + hedged ETA + signals |
 | `classifier_usage_daily` | Token ledger: one row per day × model × service_tier, incremented by the drain via `record_classifier_usage` (2026-08-22). Cost source of truth |
 | `scheduler_tokens` / `service_locks` | pg_cron auth token; mutex for drain/score refresh |
+| `vendor_incidents` / `vendor_status_snapshots` | Official status-page incidents snapshotted every 6 h from `fetch-vendor-status` via pg_net (2026-09-20); pending-request bookkeeping. Public read: `get_public_vendor_incidents` |
 
 `classification_queue` and `api_quota_usage` (+ `claim_api_quota`) were dropped 2026-08-22 — dead since May.
 
 `scraped_posts` also carries `rumor_checked_at` / `rumor_data` (rumor-extraction state).
 
-**RPC Functions:** `get_landing_vibes()`, `get_complaint_breakdown()`, `get_source_breakdown()`, `get_trending_complaints()`, `get_public_rumors()` (public read), `get_rumor_candidates()` (service-role only)
+**RPC Functions:** `get_landing_vibes()` (headline skips a thin current day since 2026-09-20), `get_complaint_breakdown()`, `get_source_breakdown()`, `get_trending_complaints()`, `get_public_rumors()`, `get_public_vendor_incidents()` (public read), `get_rumor_candidates()` (service-role only)
 
 ## Cron architecture (May 2026)
 
@@ -71,6 +72,7 @@ The pipeline runs as independent pg_cron rows, each within its own 400 s edge-fu
 | `cleanup-stuck-scraper-runs` | `*/30 * * * *` | every 30 min | (SQL only — marks runs >30 min as failed) |
 | `cleanup-old-posts-weekly` | `0 8 * * 0` | Sun 01:00 PT | `cleanup-old-posts` |
 | `aggregate-rumors-hourly` | `40 * * * *` | hourly at :40 | `aggregate-rumors` (rumors radar; hourly fast lane since `20260711210000_rumor_discovery_fast_lane.sql` — replaced the 2×/day `aggregate-rumors-2x` row) |
+| `vendor-status-request-6h` / `vendor-status-ingest-6h` | `5 */6 * * *` / `10 */6 * * *` | every 6 h | SQL only: pg_net POST to `fetch-vendor-status` per vendor, then `ingest_vendor_status_snapshots()` upserts `vendor_incidents` (added 2026-09-20) |
 
 Drain capacity: every 2 min at `limit=200`, `batch_size=20` ≈ 6,000 posts/hr. The watchdog writes `severity='critical'` rows into `error_log`. Drain/queue mechanics, failed-vs-queued semantics, and watchdog thresholds: `AGENT-REFERENCE.md`.
 

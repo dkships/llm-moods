@@ -19,7 +19,10 @@ import { detectProductSurface } from "@/lib/product-surface";
 import StatusCard from "@/components/StatusCard";
 import BarList from "@/components/BarList";
 import Tag from "@/components/Tag";
-import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
+import { useDailyChartData, useChartEvents, useStatusIncidentMarkers } from "@/lib/use-chart-data";
+import { useVendorStatus } from "@/hooks/useVendorStatus";
+import { VENDOR_BY_MODEL, type ModelSlug } from "@/data/vendor-events";
+import { eventGlyph } from "@/components/VibesChart";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS, sentimentAlpha,
 } from "@/lib/vibes";
@@ -139,7 +142,16 @@ const ModelDetail = () => {
   // satisfy the rules of hooks. The values are unused on the loading/not-found
   // paths but the calls themselves still have to happen each render.
   const dailyChart = useDailyChartData(vibesHistory, timeRange === "7d" ? 7 : 30);
-  const dailyEvents = useChartEvents(slug ?? "", dailyChart.dateLabels);
+  const timelineEvents = useChartEvents(slug ?? "", dailyChart.dateLabels);
+  // Official status incidents ride the same chart as the hand-kept timeline,
+  // so downtime lines up with the score without anyone editing a file. The
+  // StatusCard below issues the same query; React Query serves both from one
+  // fetch. An unknown slug falls back to Anthropic's feed and is discarded
+  // with the rest of the page by the NotFound branch.
+  const vendor = VENDOR_BY_MODEL[(slug ?? "") as ModelSlug] ?? "anthropic";
+  const { data: vendorStatus } = useVendorStatus(vendor);
+  const incidentEvents = useStatusIncidentMarkers(vendorStatus?.events, dailyChart.dateLabels);
+  const dailyEvents = [...timelineEvents, ...incidentEvents];
 
   if ((!model && (modelLoading || landingLoading)) || (model && !enriched && landingLoading)) {
     return (
@@ -391,18 +403,16 @@ const ModelDetail = () => {
                           <p className="mb-2 text-meta text-text-tertiary">Known events on this chart</p>
                           <ul className="space-y-2">
                             {chartEvents.map((evt, i) => (
-                              <li key={`legend-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta">
+                              <li key={`legend-${i}`} className="flex flex-wrap items-baseline gap-x-2 gap-y-1 text-meta">
                                 <span
-                                  className={
-                                    evt.endLabel
-                                      ? "inline-block h-2 w-3 shrink-0 rounded-sm"
-                                      : "inline-block h-3 w-1 shrink-0 rounded-sm"
-                                  }
-                                  style={{ background: evt.color, opacity: 0.7 }}
+                                  className="w-3 shrink-0 text-center font-mono"
+                                  style={{ color: evt.color }}
                                   aria-hidden="true"
-                                />
+                                >
+                                  {evt.endLabel ? "▬" : eventGlyph(evt.kind)}
+                                </span>
                                 <span className="text-text-secondary">{evt.title}</span>
-                                <span className="font-mono text-text-tertiary">
+                                <span className="font-mono tabular-nums text-text-tertiary">
                                   {evt.startLabel}{evt.endLabel ? ` → ${evt.endLabel}` : ""}
                                 </span>
                               </li>
@@ -484,13 +494,14 @@ const ModelDetail = () => {
             {availableSurfaceLabels.length > 0 && (
               <div className="relative mb-6 -mx-4 sm:mx-0">
                 <div
-                  className="flex gap-2 overflow-x-auto px-4 pb-1 sm:flex-wrap sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
+                  className="flex snap-x snap-proximity gap-2 overflow-x-auto px-4 pb-1 sm:flex-wrap sm:px-0 sm:pb-0 [&::-webkit-scrollbar]:hidden [scrollbar-width:none]"
                   role="group"
                   aria-label="Filter recent posts by product surface"
                 >
                   <FilterChip
                     pressed={surfaceFilter === "all"}
                     onClick={() => setSurfaceFilter("all")}
+                    className="snap-start"
                   >
                     All ({postsWithSurface.length})
                   </FilterChip>
@@ -499,6 +510,7 @@ const ModelDetail = () => {
                       key={label}
                       pressed={surfaceFilter === label}
                       onClick={() => setSurfaceFilter(label)}
+                      className="snap-start"
                     >
                       {label} ({surfaceCounts.get(label) ?? 0})
                     </FilterChip>

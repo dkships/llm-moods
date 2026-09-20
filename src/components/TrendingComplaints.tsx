@@ -163,7 +163,7 @@ const TrendingComplaints = () => {
                 </div>
 
                 <span
-                  className="text-right text-mono-cap text-text-secondary"
+                  className="tabular-nums text-right text-mono-cap text-text-secondary"
                   aria-label={`${item.this_week.toLocaleString()} mentions this week`}
                 >
                   {item.this_week.toLocaleString()}
@@ -174,13 +174,13 @@ const TrendingComplaints = () => {
                   aria-hidden="true"
                 >
                   <div
-                    className="h-full rounded-full bg-foreground/60"
+                    className="h-full rounded-full bg-foreground/60 transition-[width] duration-500 ease-out"
                     style={{ width: `${widthPct}%` }}
                   />
                 </div>
 
                 <span
-                  className={`text-right text-meta font-semibold ${changeToneClass(pct)}`}
+                  className={`tabular-nums text-right text-meta font-semibold ${changeToneClass(pct)}`}
                   aria-label={`${pct >= 0 ? "up" : "down"} ${Math.abs(pct)} percent`}
                 >
                   {sign}{pct}%

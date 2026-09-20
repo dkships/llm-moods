@@ -45,7 +45,7 @@ const BarList = ({ items, max, accent, ramp = false, secondaryLayout = "inline" 
             </div>
             <div className="h-1 w-full overflow-hidden rounded-full bg-track">
               <div
-                className="h-full rounded-full"
+                className="h-full rounded-full transition-[width] duration-500 ease-out"
                 style={{ width: `${pct}%`, background: accent, opacity }}
               />
             </div>

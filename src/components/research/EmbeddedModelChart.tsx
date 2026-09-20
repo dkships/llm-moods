@@ -2,7 +2,9 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import Surface from "@/components/Surface";
 import { useModelDetail, useVibesHistory } from "@/hooks/useVibesData";
-import { useDailyChartData, useChartEvents } from "@/lib/use-chart-data";
+import { useDailyChartData, useChartEvents, useStatusIncidentMarkers } from "@/lib/use-chart-data";
+import { useVendorIncidents } from "@/hooks/useVendorIncidents";
+import { VENDOR_BY_MODEL, type ModelSlug } from "@/data/vendor-events";
 import { getUtcInstantForPacificMidnight } from "@/lib/pacific-day";
 
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
@@ -39,6 +41,8 @@ function daysBetweenInclusive(startLabel: string, endLabel: string): number {
  * Pass startDate + endDate to pin the window to a specific historical period.
  * Otherwise the chart shows the trailing `daysBack` days from today.
  */
+const DAY_MS = 24 * 60 * 60 * 1000;
+
 const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, caption }: EmbeddedModelChartProps) => {
   const isPinned = Boolean(startDate && endDate);
   const days = isPinned ? daysBetweenInclusive(startDate!, endDate!) : (daysBack ?? 30);
@@ -57,7 +61,17 @@ const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, ca
   const accent = model?.accent_color || "#888";
 
   const { chartData, dateLabels } = useDailyChartData(vibesHistory, days, anchorDate);
-  const chartEvents = useChartEvents(modelSlug, dateLabels);
+  const timelineEvents = useChartEvents(modelSlug, dateLabels);
+  // Pinned windows are historical, so incident markers come from the
+  // persisted status history rather than the live 30-day feed. Trailing
+  // windows skip the lookup; the model page covers the live case.
+  const vendor = VENDOR_BY_MODEL[modelSlug as ModelSlug] ?? "anthropic";
+  const untilExclusiveISO = untilISO
+    ? new Date(new Date(untilISO).getTime() + DAY_MS).toISOString()
+    : undefined;
+  const { data: incidents } = useVendorIncidents(vendor, sinceISO, untilExclusiveISO);
+  const incidentEvents = useStatusIncidentMarkers(incidents, dateLabels);
+  const chartEvents = [...timelineEvents, ...incidentEvents];
 
   if (isError) {
     return (

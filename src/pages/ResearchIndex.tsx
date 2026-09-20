@@ -63,10 +63,10 @@ const ResearchIndex = () => {
               </div>
               <a
                 href="/research/feed.xml"
-                className={controlPill("shrink-0")}
+                className={controlPill("group shrink-0")}
                 aria-label="Subscribe to the LLM Vibes Research RSS feed"
               >
-                <Rss className="h-3.5 w-3.5" aria-hidden="true" />
+                <Rss className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" aria-hidden="true" />
                 RSS
               </a>
             </div>

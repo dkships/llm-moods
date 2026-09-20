@@ -39,7 +39,7 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
         {/* Sentiment cue: 3px top bar on >=sm (grid layouts), 2px left rail on mobile
             stacks so four cards don't read as a barcode of stacked color bars. */}
         <div
-          className={`absolute inset-y-0 left-0 w-[3px] sm:inset-x-0 sm:bottom-auto sm:h-1.5 sm:w-auto ${m.isStale ? "opacity-60" : ""}`}
+          className={`absolute inset-y-0 left-0 w-[3px] transition-colors duration-300 sm:inset-x-0 sm:bottom-auto sm:h-1.5 sm:w-auto ${m.isStale ? "opacity-60" : ""}`}
           style={{ background: vibe.color }}
           aria-hidden="true"
         />
@@ -51,7 +51,7 @@ const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) =
               <p className="truncate text-section text-foreground">{m.name}</p>
             </div>
             <p
-              className={`shrink-0 text-score ${m.isStale ? "opacity-60" : ""}`}
+              className={`shrink-0 tabular-nums text-score transition-colors duration-300 ${m.isStale ? "opacity-60" : ""}`}
               style={{ color: vibe.color }}
             >
               {m.latestScore}
