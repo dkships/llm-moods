@@ -233,14 +233,6 @@ function buildRoutes(): RouteMeta[] {
       ogType: "website",
     },
     {
-      path: "/feedback",
-      title: "Share Your Feedback — LLM Vibes",
-      description:
-        "Rate your experience with Claude, ChatGPT, Gemini, or Grok. Your thumbs-up or thumbs-down feeds directly into the community sentiment score.",
-      ogImage: defaultOgImage,
-      ogType: "website",
-    },
-    {
       path: "/privacy",
       // Mirrors the useHead call in src/pages/Privacy.tsx.
       title: "Privacy & data practices — LLM Vibes",

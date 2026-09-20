@@ -36,7 +36,6 @@ const NavBar = () => {
   const showResearchLink = RESEARCH_POSTS.length > 0;
   const isResearchActive = pathname === "/research" || pathname.startsWith("/research/");
   const isRumorsActive = pathname === "/rumors";
-  const isFeedbackActive = pathname === "/feedback";
   const isBenchmarkActive = pathname === "/benchmark";
   const isCompareActive = pathname === "/compare";
   const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/model/");
@@ -74,7 +73,7 @@ const NavBar = () => {
             <span className="text-primary">Vibes</span>
           </span>
         </Link>
-        {/* Six links overflow a phone-width bar. Below `sm` the row scrolls
+        {/* Five links plus the mark crowd a phone-width bar. Below `sm` the row scrolls
             sideways (scrollbar hidden, right-edge fade as the affordance)
             and the active link scrolls itself into view on route change. */}
         <div className="relative min-w-0 flex-1 sm:flex-none">
@@ -98,9 +97,6 @@ const NavBar = () => {
           )}
           <Link to="/rumors" className={navLinkClass(isRumorsActive)} ref={isRumorsActive ? activeLinkRef : undefined}>
             Rumors
-          </Link>
-          <Link to="/feedback" className={navLinkClass(isFeedbackActive)} ref={isFeedbackActive ? activeLinkRef : undefined}>
-            Feedback
           </Link>
           <a
             href="https://github.com/dkships/llm-moods"

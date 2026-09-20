@@ -90,11 +90,6 @@
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://llmvibes.ai/feedback</loc>
-    <changefreq>daily</changefreq>
-    <priority>0.7</priority>
-  </url>
-  <url>
     <loc>https://llmvibes.ai/privacy</loc>
     <changefreq>yearly</changefreq>
     <priority>0.3</priority>
