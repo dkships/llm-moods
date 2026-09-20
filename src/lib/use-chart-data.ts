@@ -201,24 +201,33 @@ export function useStatusIncidentMarkers(
 ): ChartEventMarker[] {
   return useMemo(() => {
     if (!statusEvents?.length) return [];
-    const markers: ChartEventMarker[] = [];
-    const seenDays = new Set<string>();
+    // Status pages file one incident per affected component ("[Grok (iOS)]
+    // Models outage", "[API (us-east-1)] Models outage" …), so a single
+    // outage can arrive as eight rows. Group by day + title with the
+    // component prefix stripped, and say how many surfaces were hit.
+    const grouped = new Map<string, { label: string; title: string; surfaces: number }>();
     for (const incident of statusEvents) {
       if (!CHARTED_STATUS_SEVERITIES.has(incident.severity)) continue;
       const iso = getPacificDateLabel(new Date(incident.updatedAt));
       const label = dateLabels[iso];
       if (!label) continue;
-      // Several updates of one incident land on the same day; one marker is enough.
-      const dedupeKey = `${iso}|${incident.title}`;
-      if (seenDays.has(dedupeKey)) continue;
-      seenDays.add(dedupeKey);
-      markers.push({
-        startLabel: label,
-        color: INCIDENT_MARKER_COLOR,
-        title: incident.title,
-        kind: "incident",
-      });
+      const title = incident.title.replace(COMPONENT_PREFIX, "").trim() || incident.title;
+      const key = `${iso}|${title.toLowerCase()}`;
+      const existing = grouped.get(key);
+      if (existing) {
+        existing.surfaces += 1;
+        continue;
+      }
+      grouped.set(key, { label, title, surfaces: 1 });
     }
-    return markers;
+    return Array.from(grouped.values()).map((group) => ({
+      startLabel: group.label,
+      color: INCIDENT_MARKER_COLOR,
+      title: group.surfaces > 1 ? `${group.title} · ${group.surfaces} surfaces` : group.title,
+      kind: "incident" as const,
+    }));
   }, [statusEvents, dateLabels]);
 }
+
+// "[Grok (Office/Workspace Plugins)] Models outage" → "Models outage".
+const COMPONENT_PREFIX = /^\[[^\]]*\]\s*/;

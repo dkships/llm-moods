@@ -1,6 +1,6 @@
 import { renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useDailyChartData } from "@/lib/use-chart-data";
+import { useDailyChartData, useStatusIncidentMarkers } from "@/lib/use-chart-data";
 
 const row = (isoDay: string, score: number) => ({
   period_start: `${isoDay}T07:00:00Z`, // Pacific-midnight bucket as stored by the aggregator
@@ -73,5 +73,39 @@ describe("useDailyChartData live-anchor grid", () => {
     expect(points[0].score).toBe(40);
     expect(points[1].score).toBe(41);
     expect(points[1].day).not.toBe("Today");
+  });
+});
+
+describe("useStatusIncidentMarkers", () => {
+  const dateLabels = { "2026-09-02": "Sep 2", "2026-09-03": "Sep 3", "2026-09-04": "Sep 4" };
+  const incident = (title: string, severity: string, updatedAt = "2026-09-03T18:00:00Z") => ({
+    id: `${title}-${updatedAt}`,
+    title,
+    updatedAt,
+    summary: null,
+    url: null,
+    severity: severity as "critical" | "major" | "minor" | "maintenance" | "unknown",
+  });
+
+  it("collapses one outage filed per component into a single marker with a surface count", () => {
+    const events = [
+      incident("[Grok (iOS)] Models outage", "major"),
+      incident("[Grok (Web)] Models outage", "major"),
+      incident("[API (us-east-1.api.x.ai)] Models outage", "critical"),
+    ];
+    const { result } = renderHook(() => useStatusIncidentMarkers(events, dateLabels));
+    expect(result.current).toEqual([
+      { startLabel: "Sep 3", color: expect.any(String), title: "Models outage · 3 surfaces", kind: "incident" },
+    ]);
+  });
+
+  it("skips minor and maintenance events and days outside the window", () => {
+    const events = [
+      incident("[Claude] Elevated errors", "minor"),
+      incident("Scheduled maintenance", "maintenance"),
+      incident("Outage", "major", "2026-08-01T12:00:00Z"),
+    ];
+    const { result } = renderHook(() => useStatusIncidentMarkers(events, dateLabels));
+    expect(result.current).toEqual([]);
   });
 });
