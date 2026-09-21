@@ -776,6 +776,15 @@ describe("canonicalVersionKey", () => {
     }
   });
 
+  it("folds Gemini 4 Pro into the Gemini 4 generation card", () => {
+    for (const label of ["Gemini 4", "Gemini 4 Pro", "Gemini-4-Pro", "4 Pro"]) {
+      const c = canonicalVersionKey("gemini", label, null);
+      expect(c.key).toBe("gemini4");
+      expect(c.label).toBe("Gemini 4");
+    }
+    expect(canonicalVersionKey("gemini", null, "Gemini 4 Pro").key).toBe("gemini4");
+  });
+
   it("collapses Gemini 3.5 Pro spelling variants to one canonical identity", () => {
     for (const label of ["3.5 Pro", "Gemini 3.5 Pro", "Gemini-3.5-Pro", "Gemini 3.5", "3.5"]) {
       const c = canonicalVersionKey("gemini", label, null);
@@ -872,7 +881,7 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("chatgpt", "GPT-6.1", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 5", null)).toBe(false);
-    expect(isReleasedVersion("grok", "Grok 4.7", null)).toBe(false);
+    expect(isReleasedVersion("grok", "Grok 4.8", null)).toBe(false);
     // The shipped 3.5 Flash-Lite must not retire the next one by bare-name match.
     expect(isReleasedVersion("gemini", "Gemini 3.6 Flash-Lite", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Flash-Lite", null)).toBe(false);
@@ -883,6 +892,7 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("claude", "Mythos 5.1", null)).toBe(true); // codename spelling
     expect(isReleasedVersion("gemini", "Gemini 3.7 Flash", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 3.7", null)).toBe(true); // bare, no Pro pending
+    expect(isReleasedVersion("grok", "Grok 4.7", null)).toBe(true); // shipped 2026-09-21
     expect(isReleasedVersion("gemini", "Gemini 3.8 Flash", null)).toBe(true);
     expect(isReleasedVersion("gemini", null, "Skimaki")).toBe(true); // shipped as 3.8 Flash
     expect(isReleasedVersion("chatgpt", "GPT-5", null)).toBe(true);
@@ -911,10 +921,10 @@ describe("released model catalog", () => {
     expect(prompt).toContain("GPT-5.6 (Sol, Terra, Luna) and earlier");
     expect(prompt).toContain("GPT-6 (Astra) and earlier");
     expect(prompt).toContain("GPT-Live 1 / Bidi");
-    expect(prompt).toContain("Grok 4.6 and earlier");
+    expect(prompt).toContain("Grok 4.7 and earlier");
     expect(prompt).toContain("Gemini 3.6 Flash");
     // Superseded snapshots drop their prompt wording; the token still retires.
-    expect(prompt).not.toContain("Grok 4.5 and earlier");
+    expect(prompt).not.toContain("Grok 4.6 and earlier");
   });
 
   it("extracts known aliases and future numbered labels from release text", () => {

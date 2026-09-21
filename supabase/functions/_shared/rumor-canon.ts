@@ -572,6 +572,15 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       // shipped), so fold it in rather than surfacing a duplicate card.
       aliases: ["35", "gemini35", "35pro", "gemini35pro"],
     },
+    {
+      key: "gemini4",
+      label: "Gemini 4",
+      codename: null,
+      // The generation is the rumor: "Gemini 4" and "Gemini 4 Pro" chatter
+      // describe the same pending launch, so both land on one card. A "Gemini 4
+      // Flash" leak stays separate — only the Pro spelling folds in.
+      aliases: ["gemini4", "gemini4pro", "4pro"],
+    },
   ],
   grok: [
     {
@@ -591,7 +600,15 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       codename: null,
       aliases: ["grok46"],
       released: true,
-      releasePrompt: "Grok 4.6 and earlier",
+    },
+    {
+      // Shipped 2026-09-21 (Ship Sense v3.6 board); same no-Models-API backstop.
+      key: "grok47",
+      label: "Grok 4.7",
+      codename: null,
+      aliases: ["grok47"],
+      released: true,
+      releasePrompt: "Grok 4.7 and earlier",
     },
   ],
 };
