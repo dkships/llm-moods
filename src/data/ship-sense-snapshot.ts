@@ -11,10 +11,10 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.6",
   "runId": "2026-09-07-v3.6",
   "bankItems": 67,
-  "modelCount": 31,
+  "modelCount": 32,
   "naiveFloor": 39.2,
-  "decisivePairs": 108,
-  "totalPairs": 465,
+  "decisivePairs": 110,
+  "totalPairs": 496,
   "scoringDates": [
     {
       "date": "2026-09-07-v3.6",
@@ -23,7 +23,6 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "Claude Fable 5.1",
         "GPT-5.6 Sol",
         "GPT-6 Astra",
-        "Grok 4.6",
         "DeepSeek V4 Pro",
         "GPT-5.6 Terra",
         "GLM-5.3",
@@ -41,6 +40,7 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "GPT-5.5",
         "Claude Fable 5",
         "Grok 4.5",
+        "Grok 4.6",
         "Claude Sonnet 4.6",
         "GPT-5.4 mini",
         "Claude Opus 4.8",
@@ -50,6 +50,12 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "Grok 4.3",
         "Gemini 3.1 Flash-Lite",
         "GPT-5.4 nano"
+      ]
+    },
+    {
+      "date": "2026-09-21",
+      "labels": [
+        "Grok 4.7"
       ]
     }
   ]
@@ -120,25 +126,10 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 50
   },
   {
-    "name": "grok-4.6",
-    "label": "Grok 4.6",
-    "provider": "xai",
-    "pos": 5,
-    "inLeaderBand": true,
-    "score": 87.6,
-    "lo": 84.5,
-    "hi": 90.5,
-    "restraint": 0.86,
-    "honesty": 0.82,
-    "conviction": 0.95,
-    "priceIn": 2,
-    "priceOut": 6
-  },
-  {
     "name": "deepseek-v4-pro",
     "label": "DeepSeek V4 Pro",
     "provider": "deepseek",
-    "pos": 6,
+    "pos": 5,
     "inLeaderBand": true,
     "score": 87.3,
     "lo": 83.3,
@@ -148,6 +139,21 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "conviction": 0.9,
     "priceIn": 1.32,
     "priceOut": 3.96
+  },
+  {
+    "name": "grok-4.7",
+    "label": "Grok 4.7",
+    "provider": "xai",
+    "pos": 6,
+    "inLeaderBand": true,
+    "score": 86.5,
+    "lo": 82.4,
+    "hi": 90.5,
+    "restraint": 0.83,
+    "honesty": 0.86,
+    "conviction": 0.91,
+    "priceIn": 2,
+    "priceOut": 6
   },
   {
     "name": "gpt-5.6-terra",
@@ -332,13 +338,13 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
   },
   {
     "prevLabel": "Grok 4.3",
-    "currLabel": "Grok 4.6",
+    "currLabel": "Grok 4.7",
     "prevScore": 80.3,
-    "currScore": 87.6,
-    "deltaPts": 7.3,
-    "loPts": 4.1,
-    "hiPts": 10.6,
-    "verdict": "decisive-up"
+    "currScore": 86.5,
+    "deltaPts": 6.2,
+    "loPts": 2.2,
+    "hiPts": 10.2,
+    "verdict": "suggestive-up"
   },
   {
     "prevLabel": "Gemini 3.1 Flash-Lite",
@@ -441,13 +447,23 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "verdict": "down"
   },
   {
+    "prevLabel": "Grok 4.6",
+    "currLabel": "Grok 4.7",
+    "prevScore": 87.6,
+    "currScore": 86.5,
+    "deltaPts": -1.1,
+    "loPts": -4.3,
+    "hiPts": 1.6,
+    "verdict": "down"
+  },
+  {
     "prevLabel": "Grok 4.5",
-    "currLabel": "Grok 4.6",
+    "currLabel": "Grok 4.7",
     "prevScore": 88.5,
-    "currScore": 87.6,
-    "deltaPts": -0.9,
-    "loPts": -3.1,
-    "hiPts": 1.1,
+    "currScore": 86.5,
+    "deltaPts": -2,
+    "loPts": -5.5,
+    "hiPts": 1,
     "verdict": "down"
   },
   {
