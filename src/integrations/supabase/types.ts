@@ -449,6 +449,69 @@ export type Database = {
         }
         Relationships: []
       }
+      vendor_incidents: {
+        Row: {
+          external_id: string
+          first_seen_at: string
+          last_seen_at: string
+          severity: string
+          summary: string | null
+          title: string
+          updated_at: string
+          url: string | null
+          vendor: string
+        }
+        Insert: {
+          external_id: string
+          first_seen_at?: string
+          last_seen_at?: string
+          severity: string
+          summary?: string | null
+          title: string
+          updated_at: string
+          url?: string | null
+          vendor: string
+        }
+        Update: {
+          external_id?: string
+          first_seen_at?: string
+          last_seen_at?: string
+          severity?: string
+          summary?: string | null
+          title?: string
+          updated_at?: string
+          url?: string | null
+          vendor?: string
+        }
+        Relationships: []
+      }
+      vendor_status_snapshots: {
+        Row: {
+          events_seen: number | null
+          processed_at: string | null
+          request_id: number
+          requested_at: string
+          status_code: number | null
+          vendor: string
+        }
+        Insert: {
+          events_seen?: number | null
+          processed_at?: string | null
+          request_id: number
+          requested_at?: string
+          status_code?: number | null
+          vendor: string
+        }
+        Update: {
+          events_seen?: number | null
+          processed_at?: string | null
+          request_id?: number
+          requested_at?: string
+          status_code?: number | null
+          vendor?: string
+        }
+        Relationships: []
+      }
       vibes_scores: {
         Row: {
           carried_from_period_start: string | null
@@ -691,6 +754,17 @@ export type Database = {
           total_posts: number
         }[]
       }
+      get_public_vendor_incidents: {
+        Args: { p_since: string; p_until?: string; p_vendor: string }
+        Returns: {
+          external_id: string
+          severity: string
+          summary: string
+          title: string
+          updated_at: string
+          url: string
+        }[]
+      }
       get_public_vibes_history: {
         Args: {
           p_limit?: number
@@ -794,6 +868,7 @@ export type Database = {
           this_week: number
         }[]
       }
+      ingest_vendor_status_snapshots: { Args: never; Returns: number }
       normalize_public_complaint_category: {
         Args: { p_category: string }
         Returns: string
