@@ -13,13 +13,13 @@ export const SHIP_SENSE_TEASER: ShipSenseTeaserRow[] = [
     "score": 89.7
   },
   {
-    "label": "GPT-5.6 Sol",
-    "score": 88.4
+    "label": "Claude Opus 5.5",
+    "score": 88.6
   }
 ];
 
 export const SHIP_SENSE_TEASER_RUN = {
   "version": "v3.6",
   "bankItems": 67,
-  "modelCount": 32
+  "modelCount": 33
 };

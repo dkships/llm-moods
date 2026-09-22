@@ -11,10 +11,10 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "version": "v3.6",
   "runId": "2026-09-07-v3.6",
   "bankItems": 67,
-  "modelCount": 32,
+  "modelCount": 33,
   "naiveFloor": 39.2,
-  "decisivePairs": 110,
-  "totalPairs": 496,
+  "decisivePairs": 109,
+  "totalPairs": 528,
   "scoringDates": [
     {
       "date": "2026-09-07-v3.6",
@@ -27,7 +27,6 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "GPT-5.6 Terra",
         "GLM-5.3",
         "Kimi K3",
-        "Claude Opus 5",
         "GPT-5.6 Luna",
         "Gemini 3.1 Pro",
         "Gemini 3.8 Flash",
@@ -44,6 +43,7 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "Claude Sonnet 4.6",
         "GPT-5.4 mini",
         "Claude Opus 4.8",
+        "Claude Opus 5",
         "Gemini 3.6 Flash",
         "Gemini 3.7 Flash",
         "Gemini 3.5 Flash",
@@ -56,6 +56,12 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
       "date": "2026-09-21",
       "labels": [
         "Grok 4.7"
+      ]
+    },
+    {
+      "date": "2026-09-22",
+      "labels": [
+        "Claude Opus 5.5"
       ]
     }
   ]
@@ -93,10 +99,25 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 50
   },
   {
+    "name": "claude-opus-5-5",
+    "label": "Claude Opus 5.5",
+    "provider": "anthropic",
+    "pos": 3,
+    "inLeaderBand": true,
+    "score": 88.6,
+    "lo": 83.5,
+    "hi": 93.1,
+    "restraint": 0.9,
+    "honesty": 0.89,
+    "conviction": 0.87,
+    "priceIn": 4,
+    "priceOut": 20
+  },
+  {
     "name": "gpt-5.6-sol",
     "label": "GPT-5.6 Sol",
     "provider": "openai",
-    "pos": 3,
+    "pos": 4,
     "inLeaderBand": true,
     "score": 88.4,
     "lo": 85.2,
@@ -114,7 +135,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gpt-6-astra",
     "label": "GPT-6 Astra",
     "provider": "openai",
-    "pos": 4,
+    "pos": 5,
     "inLeaderBand": true,
     "score": 88.2,
     "lo": 85,
@@ -129,7 +150,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "deepseek-v4-pro",
     "label": "DeepSeek V4 Pro",
     "provider": "deepseek",
-    "pos": 5,
+    "pos": 6,
     "inLeaderBand": true,
     "score": 87.3,
     "lo": 83.3,
@@ -144,7 +165,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "grok-4.7",
     "label": "Grok 4.7",
     "provider": "xai",
-    "pos": 6,
+    "pos": 7,
     "inLeaderBand": true,
     "score": 86.5,
     "lo": 82.4,
@@ -159,7 +180,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gpt-5.6-terra",
     "label": "GPT-5.6 Terra",
     "provider": "openai",
-    "pos": 7,
+    "pos": 8,
     "inLeaderBand": true,
     "score": 86.1,
     "lo": 82.1,
@@ -174,7 +195,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "glm-5.3",
     "label": "GLM-5.3",
     "provider": "zai",
-    "pos": 8,
+    "pos": 9,
     "inLeaderBand": true,
     "score": 83.6,
     "lo": 78.7,
@@ -189,7 +210,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "kimi-k3",
     "label": "Kimi K3",
     "provider": "moonshot",
-    "pos": 9,
+    "pos": 10,
     "inLeaderBand": true,
     "score": 83.5,
     "lo": 78.3,
@@ -199,21 +220,6 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "conviction": 0.81,
     "priceIn": 3,
     "priceOut": 15
-  },
-  {
-    "name": "claude-opus-5",
-    "label": "Claude Opus 5",
-    "provider": "anthropic",
-    "pos": 10,
-    "inLeaderBand": true,
-    "score": 83.1,
-    "lo": 78.3,
-    "hi": 87.8,
-    "restraint": 0.86,
-    "honesty": 0.89,
-    "conviction": 0.74,
-    "priceIn": 5,
-    "priceOut": 25
   },
   {
     "name": "gpt-5.6-luna",
@@ -357,6 +363,26 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "verdict": "suggestive-up"
   },
   {
+    "prevLabel": "Claude Opus 5",
+    "currLabel": "Claude Opus 5.5",
+    "prevScore": 83.1,
+    "currScore": 88.6,
+    "deltaPts": 5.5,
+    "loPts": 2.2,
+    "hiPts": 9.1,
+    "verdict": "suggestive-up"
+  },
+  {
+    "prevLabel": "Claude Opus 4.8",
+    "currLabel": "Claude Opus 5.5",
+    "prevScore": 83.6,
+    "currScore": 88.6,
+    "deltaPts": 5.1,
+    "loPts": 1.4,
+    "hiPts": 8.9,
+    "verdict": "suggestive-up"
+  },
+  {
     "prevLabel": "GPT-5.4 mini",
     "currLabel": "GPT-5.6 Terra",
     "prevScore": 83.8,
@@ -394,16 +420,6 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "deltaPts": -0.2,
     "loPts": -1.8,
     "hiPts": 1.4,
-    "verdict": "down"
-  },
-  {
-    "prevLabel": "Claude Opus 4.8",
-    "currLabel": "Claude Opus 5",
-    "prevScore": 83.6,
-    "currScore": 83.1,
-    "deltaPts": -0.4,
-    "loPts": -4.4,
-    "hiPts": 3.3,
     "verdict": "down"
   },
   {
