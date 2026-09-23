@@ -4,6 +4,34 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-09-23 — Classifier cutover: gpt-5.6-terra → gpt-6-sol (live-verified)
+
+Eval (run from ~/dev, not in this repo): 200 real posts from `get_public_model_posts`,
+50 per tracked model, run through `classifyBatchTargeted` with a model override on the flex
+tier, twice per model, against `gpt-5.6-sol` at reasoning effort medium as the reference.
+
+| model | full label | sentiment | neg. complaint category | wrongly dropped / wrongly kept | re-run consistency | $ / 1k posts |
+|---|---|---|---|---|---|---|
+| gpt-5.6-terra (previous) | 80.8% | 93.1% | 67.5% | 8 / 20 | 87% | $0.46 |
+| gpt-6-sol (chosen) | 84.0% | 93.7% | 82.1% | 18 / 6 | 87% | $0.41 |
+| gpt-6-luna (rejected) | 80.2% | 93.3% | 52.7% | 10 / 20 | 81.5% | $0.04 |
+
+- **Why Sol:** complaint categories +14.6 pts and ~11% cheaper. Known tradeoff: stricter
+  relevance (18 wrongly dropped vs Terra's 8).
+- **Why not Luna:** weak categories and a recurring "26 results for 25 posts" count mismatch.
+- **claude-opus-5-5** can't run on the Anthropic path (HTTP 400, forced `tool_choice`
+  unsupported); recorded in AGENT-REFERENCE.md.
+- **Flip:** `CLASSIFIER_MODEL=gpt-6-sol` set via Lovable (delete + recreate, since the secret
+  store won't overwrite). No redeploy: `classifierModel()` reads the env per call.
+- **Verified live:** `classifier_usage_daily` gained a `gpt-6-sol` / flex row, and the first
+  post-flip rows (an off-schedule HN scrape) carry `targeted-gpt-6-sol-2026-06-01`: 84 posts,
+  0 failed/retry. HN irrelevant share 72.6% (61/84) vs Terra's 55.8% (140/251) over the prior
+  28 h, which matches the eval's predicted ~+12 pts within small-sample noise. A 20-post spot check
+  of Sol's drops found 2-3 debatable (e.g. a "just lost a subscriber" ChatGPT post).
+- **Rollback:** `CLASSIFIER_MODEL=gpt-5.6-terra`, no redeploy.
+- **Watch:** irrelevant share across all sources over the next few days (Terra baseline 65.4%
+  for all sources on 09-22/23) and per-model eligible volume, especially Grok, which was already thin.
+
 ## 2026-09-02 — Rumors radar cleanup (live-verified)
 
 Trigger: "check /rumors for released models, or any that can be combined or are old."

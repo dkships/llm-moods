@@ -56,6 +56,8 @@ const PRICING: Record<string, { input: number; output: number }> = {
   "gpt-5.6-luna": { input: 0.20, output: 1.20 },
   "gpt-5.6-terra": { input: 2.0, output: 12.0 },
   "gpt-5.6-sol": { input: 5.0, output: 30.0 },
+  "gpt-6-luna": { input: 0.10, output: 0.50 },
+  "gpt-6-sol": { input: 2.0, output: 10.0 },
 };
 
 // Anthropic prompt-cache read multiplier (vs base input price).

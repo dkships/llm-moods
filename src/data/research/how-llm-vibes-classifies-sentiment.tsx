@@ -35,7 +35,14 @@ const HowLlmVibesClassifiesSentimentBody = () => (
       4.5 to GPT-5.6 Terra — a config flip on the provider-pluggable <code>CLASSIFIER_MODEL</code> described
       below, with the prompts, schema, and thresholds unchanged. Fresh 284-post canaries against an
       independent Gemini grader put Terra at 94.7% sentiment agreement; the departing Haiku scored 83.0% on
-      the same protocol, at comparable cost. Model names in the body reflect the setup at publication.
+      the same protocol, at comparable cost.
+    </p>
+    <p>
+      <em>Update, September 23:</em> the classifier moved again, from GPT-5.6 Terra to GPT-6 Sol, through the same
+      config flip. On a 200-post eval against a stronger reference grader, Sol matched the reference complaint
+      category on 82% of negative posts to Terra's 68%, at about 11% lower cost. The tradeoff is that Sol is
+      stricter about relevance and drops more borderline posts. Model names in the body reflect the setup at
+      publication.
     </p>
 
     <h2>What gets scraped</h2>
