@@ -75,6 +75,15 @@ export interface ShipSenseGeneration {
    * pre-registered family (successions, vendor claims); exploratory = BH
    * q ≤ .05; legacy = one Holm family over all pairs (≤ v3.6). */
   family: "confirmatory" | "exploratory" | "legacy";
+  /** Ship Sense version this succession was measured on ("tested on vX"). */
+  bench: string;
+  /** True when this succession comes from an OLDER bench version's own board
+   * (leaderboard._prior_gen_pairs), not the latest run's. Kept so a
+   * succession an earlier version retired doesn't vanish from view when a
+   * new bench version only re-runs the current lineup — its successor may
+   * hold no rank on today's board, and its score is comparable only against
+   * other rows measured on `bench`, never against the latest run's scores. */
+  earlier: boolean;
 }
 
 export interface ShipSenseScoringDate {

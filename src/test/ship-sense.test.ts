@@ -2,17 +2,20 @@ import { describe, expect, it } from "vitest";
 import {
   decisiveRule,
   floorValue,
+  generationPairsFromSuccessions,
   holmAdjust,
   lineage,
   matrixWinner,
   orientPair,
   parsePairwise,
   parseModelsYaml,
+  previousBenchSnapshot,
   rankSets,
   scoringDates,
   successions,
   type DeriveModel,
   type DerivePairRecord,
+  type LedgerRun,
 } from "../../scripts/ship-sense-derive";
 import {
   describeScoringDates,
@@ -256,6 +259,60 @@ describe("orientPair", () => {
   });
 });
 
+describe("previousBenchSnapshot", () => {
+  const run = (version: string): LedgerRun => ({ run_id: version, version, models: [] });
+
+  it("picks the newest run whose version differs from the latest run's", () => {
+    const runs = [run("v3.0"), run("v3.6"), run("v3.6"), run("v4.0")];
+    expect(previousBenchSnapshot(runs)?.version).toBe("v3.6");
+  });
+
+  it("returns null when every earlier run shares the latest version", () => {
+    expect(previousBenchSnapshot([run("v4.0"), run("v4.0")])).toBeNull();
+  });
+
+  it("returns null with no earlier run at all", () => {
+    expect(previousBenchSnapshot([run("v1.0")])).toBeNull();
+    expect(previousBenchSnapshot([])).toBeNull();
+  });
+});
+
+describe("generationPairsFromSuccessions", () => {
+  const rec = (a: string, b: string, delta: number, winner: string | null): DerivePairRecord => ({
+    a,
+    b,
+    delta,
+    lo: delta - 0.02,
+    hi: delta + 0.02,
+    holm_p: winner ? 0.001 : 1,
+    winner,
+  });
+
+  it("builds one entry per succession with a published record, sorted by delta desc", () => {
+    const models = [
+      model("a-1", "A 1", 80, 76, 84),
+      model("a-2", "A 2", 88, 84, 92),
+      model("b-1", "B 1", 70, 66, 74),
+      model("b-2", "B 2", 71, 67, 75),
+    ];
+    const succ = new Map([
+      ["a-1", "a-2"],
+      ["b-1", "b-2"],
+    ]);
+    const records = [rec("a-2", "a-1", 0.08, "a-2"), rec("b-2", "b-1", 0.01, null)];
+    const pairs = generationPairsFromSuccessions(models, succ, records);
+    expect(pairs).toHaveLength(2);
+    expect(pairs[0]).toMatchObject({ prevLabel: "A 1", currLabel: "A 2", verdict: "decisive-up" });
+    expect(pairs[1]).toMatchObject({ prevLabel: "B 1", currLabel: "B 2", verdict: "up" });
+  });
+
+  it("drops a succession with no published record instead of failing", () => {
+    const models = [model("a-1", "A 1", 80, 76, 84), model("a-2", "A 2", 88, 84, 92)];
+    const pairs = generationPairsFromSuccessions(models, new Map([["a-1", "a-2"]]), []);
+    expect(pairs).toEqual([]);
+  });
+});
+
 describe("scoringDates", () => {
   const m = (label: string, price_verified: string | null) => ({ label, price_verified });
 
@@ -494,9 +551,11 @@ describe("committed snapshot invariants", () => {
   // failure. These assert internal consistency instead — the things that only
   // break if the derivation port breaks.
   it("splits every ranked model into exactly one of lineup or generations", () => {
-    expect(SHIP_SENSE_LINEUP.length + SHIP_SENSE_GENERATIONS.length).toBe(
-      SHIP_SENSE_RUN.modelCount,
-    );
+    // Only the latest run's own successions count toward its model count —
+    // an earlier bench version's kept-alive successions (g.earlier) describe
+    // a different run entirely and are not part of this one's roster.
+    const latest = SHIP_SENSE_GENERATIONS.filter((g) => !g.earlier);
+    expect(SHIP_SENSE_LINEUP.length + latest.length).toBe(SHIP_SENSE_RUN.modelCount);
     expect(SHIP_SENSE_LINEUP.length).toBeGreaterThan(1);
   });
 
@@ -513,11 +572,21 @@ describe("committed snapshot invariants", () => {
     });
   });
 
-  it("retires each previous generation to a model still in the lineup", () => {
+  it("retires each latest-bench generation to a model still in the lineup", () => {
+    // An earlier bench's successor need not hold a rank on today's board (it
+    // may itself have been retired since) — this invariant is about the
+    // latest run's own successions only.
     const current = new Set(SHIP_SENSE_LINEUP.map((m) => m.label));
-    SHIP_SENSE_GENERATIONS.forEach((g) => {
+    SHIP_SENSE_GENERATIONS.filter((g) => !g.earlier).forEach((g) => {
       expect(current.has(g.currLabel)).toBe(true);
       expect(current.has(g.prevLabel)).toBe(false);
+    });
+  });
+
+  it("tags every generation with the bench version that measured it", () => {
+    SHIP_SENSE_GENERATIONS.forEach((g) => {
+      expect(g.bench).toMatch(/^v\d/);
+      expect(g.earlier).toBe(g.bench !== SHIP_SENSE_RUN.version);
     });
   });
 

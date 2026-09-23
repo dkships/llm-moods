@@ -45,14 +45,17 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   decisiveRule,
   floorValue,
+  generationPairsFromSuccessions,
   matrixWinner,
   orientPair,
   parseModelsYaml,
   parsePairwise,
+  previousBenchSnapshot,
   rankSets,
   scoringDates,
   successions,
   type FloorRow,
+  type LedgerRun,
 } from "./ship-sense-derive";
 
 const GITHUB_RAW = "https://raw.githubusercontent.com/dkships/ship-sense/main";
@@ -116,6 +119,22 @@ async function fetchBinary(path: string): Promise<Buffer> {
   const res = await fetch(`${RAW}/${path}`);
   if (!res.ok) fail(`GET ${path} -> ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
+}
+
+/** Like fetchText, but missing is not fatal: null on a 404/network failure.
+ * Used for the archived earlier-bench pairwise file, which may not exist yet
+ * (a just-cut version whose docs build hasn't published it) or ever (a repo
+ * predating the earlier-bench feature). */
+async function fetchOptionalText(path: string): Promise<string | null> {
+  try {
+    if (LOCAL_ROOT) {
+      return readFileSync(join(LOCAL_ROOT, path), "utf8");
+    }
+    const res = await fetch(`${RAW}/${path}`);
+    return res.ok ? await res.text() : null;
+  } catch {
+    return null;
+  }
 }
 
 const r1 = (x: number) => Number(x.toFixed(1));
@@ -281,9 +300,45 @@ async function main() {
       hiPts: r1(oriented.hiPts),
       verdict: oriented.verdict,
       family: oriented.family,
+      bench: run.version as string,
+      earlier: false as boolean,
     };
   });
   generations.sort((a, b) => b.deltaPts - a.deltaPts);
+
+  // Earlier-bench successions (leaderboard._prior_gen_pairs): the newest run
+  // scored on a DIFFERENT version than this one, so a succession that older
+  // bench retired doesn't vanish from view when the new version only re-runs
+  // the current lineup. Best-effort: an unpublished or missing archive just
+  // leaves this empty rather than failing the sync (upstream may not have
+  // published docs/history/<version>/docs/pairwise.json yet).
+  const priorRun = previousBenchSnapshot(ledger.runs as LedgerRun[]);
+  const priorGenerations: typeof generations = [];
+  if (priorRun && priorRun.version) {
+    const archivedText = await fetchOptionalText(
+      `docs/history/${priorRun.version}/docs/pairwise.json`,
+    );
+    if (archivedText) {
+      const { records: priorPairwise } = parsePairwise(JSON.parse(archivedText));
+      const priorModels = priorRun.models as RunModel[];
+      // That snapshot's own successions, from its own models and its own
+      // declared list (renamed lines carry `superseded_by` on the ledger row
+      // itself, same as the latest run — see successions()'s docstring).
+      const priorSucc = successions(priorModels, declared);
+      // A pair the latest run already re-measured is shown once, on the
+      // latest bench — drop it here rather than duplicate the succession.
+      const seen = new Set([...succ].map(([p, c]) => `${p}>>>${c}`));
+      for (const [p, c] of [...priorSucc]) if (seen.has(`${p}>>>${c}`)) priorSucc.delete(p);
+      priorGenerations.push(
+        ...generationPairsFromSuccessions(priorModels, priorSucc, priorPairwise, r1).map((g) => ({
+          ...g,
+          bench: priorRun.version as string,
+          earlier: true,
+        })),
+      );
+    }
+  }
+  const allGenerations = [...generations, ...priorGenerations];
 
   const floor = floorValue(run);
   if (floor.value === null) fail(`run ${run.run_id} carries neither an adversarial nor a naive floor`);
@@ -331,7 +386,7 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = ${emit(runMeta)};
 
 export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = ${emit(lineup)};
 
-export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = ${emit(generations)};
+export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = ${emit(allGenerations)};
 `;
 
   // The teaser ships in its OWN module: src/pages/Index.tsx is in the entry
@@ -357,7 +412,9 @@ export const SHIP_SENSE_TEASER_RUN = ${emit({
   console.log(
     `[sync-ship-sense] run ${runMeta.runId} ${runMeta.version}: ` +
       `${lineup.length} current (${hasRankSets ? `${contenders} with #1 in rank range` : "no rank sets"}), ` +
-      `${generations.length} generations, ${runMeta.decisivePairs}/${runMeta.totalPairs} decisive pairs (${rule}), ` +
+      `${generations.length} generations` +
+      `${priorGenerations.length ? ` (+${priorGenerations.length} earlier-bench)` : ""}, ` +
+      `${runMeta.decisivePairs}/${runMeta.totalPairs} decisive pairs (${rule}), ` +
       `${floor.kind} floor ${runMeta.floor}, ` +
       `${dates.length} scoring date(s) ${dates[0].date}–${dates[dates.length - 1].date}`,
   );

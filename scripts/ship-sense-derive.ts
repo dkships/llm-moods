@@ -442,3 +442,80 @@ export function orientPair(
     verdict,
   };
 }
+
+export interface LedgerRun {
+  run_id: string;
+  version?: string | null;
+  models: DeriveModel[];
+}
+
+/**
+ * leaderboard._previous_snapshot: the newest run (before the latest) whose
+ * version differs from the latest run's version, or null when every earlier
+ * run shares it (or there is no earlier run). Used to find the most recent
+ * prior bench version whose successions should still be shown alongside the
+ * latest run's.
+ */
+export function previousBenchSnapshot(runs: LedgerRun[]): LedgerRun | null {
+  if (runs.length === 0) return null;
+  const latestVersion = runs[runs.length - 1].version;
+  for (let i = runs.length - 2; i >= 0; i--) {
+    const run = runs[i];
+    if (run.version && run.version !== latestVersion) return run;
+  }
+  return null;
+}
+
+export interface GenerationPair {
+  prevLabel: string;
+  currLabel: string;
+  prevScore: number;
+  currScore: number;
+  deltaPts: number;
+  loPts: number;
+  hiPts: number;
+  verdict: OrientedPair["verdict"];
+  family: OrientedPair["family"];
+}
+
+/**
+ * leaderboard._generation_pairs, given an already-computed successions map:
+ * one entry per succession that has a published head-to-head record, sorted
+ * by paired delta descending. A pair with no record in `records` is dropped
+ * rather than failing — needed for an older bench snapshot, whose successions
+ * must not block the sync just because one predecessor's pairwise row is
+ * missing from its archived file.
+ */
+export function generationPairsFromSuccessions(
+  models: DeriveModel[],
+  succ: Map<string, string>,
+  records: DerivePairRecord[],
+  round: (n: number) => number = (n) => n,
+): GenerationPair[] {
+  const byName = new Map(models.map((m) => [m.name, m]));
+  const pairs: GenerationPair[] = [];
+  for (const [prevName, currName] of succ) {
+    const prev = byName.get(prevName);
+    const curr = byName.get(currName);
+    if (!prev || !curr) continue;
+    const rec = records.find(
+      (r) => (r.a === currName && r.b === prevName) || (r.a === prevName && r.b === currName),
+    );
+    if (!rec) continue;
+    const oriented = orientPair(rec, prevName, currName);
+    if (!oriented) continue;
+    pairs.push({
+      prevLabel: prev.label,
+      currLabel: curr.label,
+      prevScore: round(prev.score.value),
+      currScore: round(curr.score.value),
+      deltaPts: round(oriented.deltaPts),
+      loPts: round(oriented.loPts),
+      hiPts: round(oriented.hiPts),
+      verdict: oriented.verdict,
+      family: oriented.family,
+    });
+  }
+  pairs.sort((a, b) => b.deltaPts - a.deltaPts);
+  return pairs;
+}

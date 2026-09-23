@@ -70,6 +70,12 @@ const VERDICT_GLYPH: Record<ShipSenseVerdict, string> = {
 const HAS_RANK_SETS = SHIP_SENSE_LINEUP.some((m) => m.rankLo !== undefined);
 const VALUE_CALLOUT = valueCalloutText(SHIP_SENSE_LINEUP);
 
+// The current run's own successions, and — kept RTINGS-style below them — any
+// prior bench version's successions the current run didn't re-measure. See
+// ShipSenseGeneration.earlier.
+const CURRENT_GENERATIONS = SHIP_SENSE_GENERATIONS.filter((g) => !g.earlier);
+const EARLIER_GENERATIONS = SHIP_SENSE_GENERATIONS.filter((g) => g.earlier);
+
 /** The floor sentence: every adversarial policy on v4.0+, else the naive
  * baseline of older runs. */
 const floorText = (run: ShipSenseRunMeta): string => {
@@ -118,6 +124,33 @@ const IntervalStrip = ({ lo, hi, score }: { lo: number; hi: number; score: numbe
     />
   </div>
 );
+
+/** One succession row, shared by the current-bench list and the earlier-bench
+ * list below it. `showBench` appends "tested on vX" — redundant on the
+ * current list (the page header already names the run's version), needed on
+ * the earlier one so each row still says which bench it was measured on once
+ * it's out from under its own group label. */
+const GenerationRow = ({ g, showBench }: { g: ShipSenseGeneration; showBench?: boolean }) => {
+  const decisive = g.verdict === "decisive-up" || g.verdict === "decisive-down";
+  return (
+    <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3">
+      <p className="text-body text-text-secondary">
+        {g.prevLabel} {fmt1(g.prevScore)}
+        <span className="mx-2 text-text-tertiary">→</span>
+        <span className="text-foreground">
+          {g.currLabel} {fmt1(g.currScore)}
+        </span>
+      </p>
+      <p className="text-meta text-text-tertiary">
+        <span className={decisive ? "font-semibold text-foreground" : undefined}>
+          {VERDICT_GLYPH[g.verdict]} {signed1(g.deltaPts)}
+        </span>{" "}
+        [{signed1(g.loPts)}, {signed1(g.hiPts)}] · {SHIP_SENSE_VERDICT_TEXT[g.verdict]}
+        {showBench ? ` · tested on ${g.bench}` : ""}
+      </p>
+    </li>
+  );
+};
 
 const Benchmark = () => {
   const run = SHIP_SENSE_RUN;
@@ -308,33 +341,27 @@ const Benchmark = () => {
         />
         <Surface>
           <ul className="divide-y divide-border">
-            {SHIP_SENSE_GENERATIONS.map((g) => {
-              const decisive = g.verdict === "decisive-up" || g.verdict === "decisive-down";
-              return (
-                <li
-                  key={`${g.prevLabel}-${g.currLabel}`}
-                  className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3"
-                >
-                  <p className="text-body text-text-secondary">
-                    {g.prevLabel} {fmt1(g.prevScore)}
-                    <span className="mx-2 text-text-tertiary">→</span>
-                    <span className="text-foreground">
-                      {g.currLabel} {fmt1(g.currScore)}
-                    </span>
-                  </p>
-                  <p className="text-meta text-text-tertiary">
-                    <span
-                      className={decisive ? "font-semibold text-foreground" : undefined}
-                    >
-                      {VERDICT_GLYPH[g.verdict]} {signed1(g.deltaPts)}
-                    </span>{" "}
-                    [{signed1(g.loPts)}, {signed1(g.hiPts)}] ·{" "}
-                    {SHIP_SENSE_VERDICT_TEXT[g.verdict]}
-                  </p>
-                </li>
-              );
-            })}
+            {CURRENT_GENERATIONS.map((g) => (
+              <GenerationRow key={`${g.prevLabel}-${g.currLabel}`} g={g} />
+            ))}
           </ul>
+          {EARLIER_GENERATIONS.length > 0 ? (
+            <div className="mt-4 border-t border-border pt-4">
+              <p className="text-mono-cap text-text-tertiary">
+                Earlier bench ({EARLIER_GENERATIONS[0].bench})
+              </p>
+              <ul className="mt-2 divide-y divide-border">
+                {EARLIER_GENERATIONS.map((g) => (
+                  <GenerationRow key={`${g.prevLabel}-${g.currLabel}`} g={g} showBench />
+                ))}
+              </ul>
+              <p className="mt-2 text-meta text-text-tertiary">
+                Scores are comparable only within a bench version: {EARLIER_GENERATIONS[0].bench}{" "}
+                used a different bank and grader than {run.version}, so a {EARLIER_GENERATIONS[0].bench}{" "}
+                score is never set against a {run.version} score.
+              </p>
+            </div>
+          ) : null}
           <p className="mt-4 border-t border-border pt-4 text-meta text-text-tertiary">
             Δ = paired score difference in board points (current − previous) on the
             same items. Decisive ={" "}
