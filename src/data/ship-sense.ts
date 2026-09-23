@@ -18,9 +18,16 @@ export interface ShipSenseModelRow {
   provider: string;
   /** Ordinal position by point score within the current lineup (1-based). */
   pos: number;
-  /** True for models whose 95% CI overlaps the point leader's (the `*` band —
-   * ordered by point score; overlap, not a pairwise tie). */
-  inLeaderBand: boolean;
+  /** 95% rank confidence set: the ranks this model's Holm-corrected paired
+   * tests against the current lineup cannot rule out (v4.0+; absent on boards
+   * whose pairwise records carry no raw p-values). */
+  rankLo?: number;
+  rankHi?: number;
+  /** Descriptive P(#1), 0–1: share of joint item-bootstrap resamples in which
+   * this model scores highest. Not an inferential claim — the rank set is. */
+  pFirst?: number;
+  /** Ship Sense version that scored this row ("Tested on"). */
+  testedOn: string;
   score: number;
   lo: number;
   hi: number;
@@ -64,6 +71,10 @@ export interface ShipSenseGeneration {
   loPts: number;
   hiPts: number;
   verdict: ShipSenseVerdict;
+  /** Which test family decided `verdict`: confirmatory = Holm within the
+   * pre-registered family (successions, vendor claims); exploratory = BH
+   * q ≤ .05; legacy = one Holm family over all pairs (≤ v3.6). */
+  family: "confirmatory" | "exploratory" | "legacy";
 }
 
 export interface ShipSenseScoringDate {
@@ -71,13 +82,31 @@ export interface ShipSenseScoringDate {
   labels: string[];
 }
 
+/** A content-free policy graded by the real grader (gameability floor). */
+export interface ShipSenseFloorRow {
+  label: string;
+  headline: number;
+  restraint: number;
+  honesty: number;
+  conviction: number;
+}
+
 export interface ShipSenseRunMeta {
   version: string;
   runId: string;
+  /** ISO run date (run ids carry a version suffix since v3.6). */
+  runDate: string;
   bankItems: number;
+  /** Ranked models scored in the run: current lineup + retired predecessors. */
   modelCount: number;
-  naiveFloor: number;
-  /** Paired comparisons decisive after Holm correction, of totalPairs. */
+  /** Score floor: the best adversarial policy (v4.0+) or the naive baseline. */
+  floor: number;
+  floorKind: "adversarial" | "naive";
+  /** Every adversarial floor policy, best first as published; empty pre-v4.0. */
+  floorRows: ShipSenseFloorRow[];
+  /** bh = exploratory Benjamini–Hochberg q ≤ .05; holm = legacy all-pairs Holm. */
+  decisiveRule: "bh" | "holm";
+  /** Paired comparisons decisive under decisiveRule, of totalPairs. */
   decisivePairs: number;
   totalPairs: number;
   /** A run keeps one runId but absorbs models scored later on the identical
@@ -115,12 +144,24 @@ const PROVIDER_LABELS: Record<string, string> = {
   qwen: "Qwen",
   deepseek: "DeepSeek",
   mistral: "Mistral",
+  minimax: "MiniMax",
   zai: "Z.ai",
 };
 
 export const providerLabel = (provider: string): string =>
   PROVIDER_LABELS[provider] ??
   provider.charAt(0).toUpperCase() + provider.slice(1);
+
+/** "1–6", "3", or an em dash when the board has no rank sets
+ * (leaderboard._rank_range). */
+export const rankRangeText = (m: Pick<ShipSenseModelRow, "rankLo" | "rankHi">): string => {
+  if (m.rankLo === undefined || m.rankHi === undefined) return "—";
+  return m.rankLo === m.rankHi ? `${m.rankLo}` : `${m.rankLo}–${m.rankHi}`;
+};
+
+/** "63%" (leaderboard._p_first_text). */
+export const pFirstText = (m: Pick<ShipSenseModelRow, "pFirst">): string =>
+  m.pFirst === undefined ? "—" : `${Math.round(m.pFirst * 100)}%`;
 
 /** "2026-08-03" -> "08-03" when it shares a year with the run date. */
 const shortDate = (date: string, reference: string): string =>
@@ -182,6 +223,33 @@ export const describeScoringDates = (run: ShipSenseRunMeta): string => {
   return `The ${run.version} board merges ${countWord(dates.length)} scoring dates on the identical ${run.bankItems}-item bank: ${baseText}, then ${mergedText}.`;
 };
 
+const perM = (m: ShipSenseModelRow) => `$${m.priceIn}/$${m.priceOut}`;
+
+/**
+ * "Choosing a model?" note (leaderboard._value_callout): the cheapest and the
+ * priciest models whose rank range includes #1, blended input + output list
+ * price. Null — no note — when fewer than two models could be #1 or the
+ * cheapest is also the priciest.
+ */
+export const valueCalloutText = (lineup: ShipSenseModelRow[]): string | null => {
+  const top = lineup.filter((m) => m.rankLo === 1);
+  if (top.length < 2) return null;
+
+  const blended = (m: ShipSenseModelRow) => m.priceIn + m.priceOut;
+  const cheap = top.reduce((best, m) => (blended(m) < blended(best) ? m : best));
+  const peak = Math.max(...top.map(blended));
+  const dear = top.filter((m) => blended(m) === peak);
+  if (dear.some((m) => m.name === cheap.name)) return null;
+
+  const dearText = `${joinList(dear.map((m) => m.label), "and")} ${dear.length > 1 ? "are" : "is"}`;
+  return (
+    `If this judgment score is the deciding criterion, list price can break a close call. ` +
+    `${cheap.label} is the least expensive model whose rank range includes #1, at ` +
+    `${perM(cheap)} per 1M tokens; ${dearText} the most expensive at ${perM(dear[0])}. ` +
+    `Capability fit, latency, privacy, and provider terms still matter.`
+  );
+};
+
 /**
  * Dataset JSON-LD for /benchmark — single source shared by the page's useHead
  * call and scripts/prerender-routes.ts, so the two can't drift.
@@ -210,24 +278,26 @@ export interface ShipSenseDimension {
 }
 
 // Copy source: ship-sense README "What it measures" table.
+// v4.0 wording, condensed.
 export const SHIP_SENSE_DIMENSIONS: ShipSenseDimension[] = [
   {
     name: "Restraint",
     question:
       "What do you refuse to build, and where do you draw an AI agent's autonomy line?",
     grading:
-      "SHIP / DEFER / KILL per feature against a documented key; traps weighted 2×; some items add a hard capacity cap.",
+      "SHIP / DEFER / KILL per feature against a documented key, all three defined in every prompt; the calls that matter most carry double weight; some items add a hard capacity cap.",
   },
   {
     name: "Honesty",
-    question: "What can this data, and this model's own output, actually support?",
+    question: "What can this data, and a model's own output, actually support?",
     grading:
-      "Binary checks for documented landmines and enumerated false conclusions, including over-skeptical dismissal; a quoted claim that the model rejects is not an assertion.",
+      "Only the first 6 limitations and 5 conclusions count: credit for naming documented landmines, a penalty for asserting known-false conclusions or dismissing supported ones. A phrase copied from the brief earns nothing on its own.",
   },
   {
     name: "Conviction",
-    question: "Hold a call under pressure, and update only on real evidence?",
+    question:
+      "Hold a call under pressure, and change it only when the evidence or the pushback is right?",
     grading:
-      "Multi-turn: resist social pressure and weak or confident-but-wrong output; update on genuine evidence.",
+      "Multi-turn, scored per turn on a SHIP / CONDITIONAL / DON'T SHIP scale against that turn's target: full credit for the right call, half for one step off.",
   },
 ];

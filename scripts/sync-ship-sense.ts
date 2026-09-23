@@ -11,15 +11,19 @@
  * README. Nothing downstream is pinned to a model count.
  *
  * Fetches leaderboard.json (scores), models.yaml (current prices + explicit
- * successions), docs/pairwise.json (paired head-to-head records), and
+ * successions), docs/pairwise.json (paired head-to-head records + P(#1)), and
  * docs/card.png (OG image), then ports the board-composition logic from
  * ship-sense/src/leaderboard.py:
  *   - successions(): label-lineage inference (a ranked line-mate with a higher
- *     version retires a model) with explicit `superseded_by` overriding —
- *     `ranked_eligible`/`coverage_status` do NOT distinguish retired models.
- *   - rank_with_ties(): leader-overlap band computed greedily against the
- *     band LEADER's lower bound, over the current lineup only, after
- *     re-ranking.
+ *     version retires a model, paired to its NEAREST ranked successor) with
+ *     explicit `superseded_by` overriding — `ranked_eligible`/`coverage_status`
+ *     do NOT distinguish retired models.
+ *   - attach_rank_sets(): per-model 95% rank confidence sets from each model's
+ *     Holm-corrected paired tests against the current lineup (v4.0+; replaces
+ *     the v3.x leader-overlap band). P(#1) is read from pairwise.json, never
+ *     re-derived — it needs the item-level bootstrap.
+ *   - floor_value(): the adversarial gameability floor (v4.0+), else the naive
+ *     floor of older runs.
  *   - _generation_pairs(): pairwise records are stored in arbitrary
  *     orientation on a 0–1 scale — normalize to (current − previous) × 100
  *     and swap-negate the CI bounds when flipping.
@@ -28,20 +32,30 @@
  *   --summary <path>  write a JSON change report (what moved vs. the committed
  *                     snapshot) for the workflow to turn into a commit message.
  *   --dry-run         derive and report, write nothing.
+ *   --local <dir>     read the files from a local ship-sense checkout instead
+ *                     of GitHub raw (e.g. to preview an unpublished run).
+ *
+ * Env: SHIP_SENSE_RAW overrides the GitHub raw base URL; a file:// URL reads
+ * from disk, same as --local.
  */
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
-  leaderBand,
+  decisiveRule,
+  floorValue,
+  matrixWinner,
   orientPair,
   parseModelsYaml,
+  parsePairwise,
+  rankSets,
   scoringDates,
   successions,
-  type DerivePairRecord,
+  type FloorRow,
 } from "./ship-sense-derive";
 
-const RAW = "https://raw.githubusercontent.com/dkships/ship-sense/main";
+const GITHUB_RAW = "https://raw.githubusercontent.com/dkships/ship-sense/main";
 const ROOT = join(import.meta.dirname ?? __dirname, "..");
 
 const argv = process.argv.slice(2);
@@ -49,6 +63,15 @@ const dryRun = argv.includes("--dry-run");
 const summaryIndex = argv.indexOf("--summary");
 const summaryPath = summaryIndex === -1 ? null : argv[summaryIndex + 1];
 if (summaryIndex !== -1 && !summaryPath) throw new Error("[sync-ship-sense] --summary needs a path");
+const localIndex = argv.indexOf("--local");
+const localDir = localIndex === -1 ? null : argv[localIndex + 1];
+if (localIndex !== -1 && !localDir) throw new Error("[sync-ship-sense] --local needs a directory");
+
+// Where the files come from: --local beats SHIP_SENSE_RAW beats GitHub.
+const RAW = localDir
+  ? pathToFileURL(resolve(localDir)).href
+  : (process.env.SHIP_SENSE_RAW ?? GITHUB_RAW).replace(/\/$/, "");
+const LOCAL_ROOT = RAW.startsWith("file://") ? fileURLToPath(RAW) : null;
 
 interface Score {
   value: number;
@@ -63,6 +86,7 @@ interface RunModel {
   price_in: number | null;
   price_out: number | null;
   price_verified?: string | null;
+  bench_version?: string | null;
   is_baseline: boolean;
   ranked_eligible?: boolean;
   superseded_by?: string | null;
@@ -72,27 +96,23 @@ interface RunModel {
   conviction: Score;
 }
 
-interface PairRecord {
-  a: string;
-  b: string;
-  delta: number;
-  lo: number;
-  hi: number;
-  holm_p: number;
-  winner: string | null;
-}
-
 const fail = (msg: string): never => {
   throw new Error(`[sync-ship-sense] ${msg}`);
 };
 
 async function fetchText(path: string): Promise<string> {
+  if (LOCAL_ROOT) {
+    return readFileSync(join(LOCAL_ROOT, path), "utf8");
+  }
   const res = await fetch(`${RAW}/${path}`);
   if (!res.ok) fail(`GET ${path} -> ${res.status}`);
   return res.text();
 }
 
 async function fetchBinary(path: string): Promise<Buffer> {
+  if (LOCAL_ROOT) {
+    return readFileSync(join(LOCAL_ROOT, path));
+  }
   const res = await fetch(`${RAW}/${path}`);
   if (!res.ok) fail(`GET ${path} -> ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
@@ -113,14 +133,17 @@ async function main() {
   const models: RunModel[] = run.models;
   const registry = parseModelsYaml(modelsYamlText);
   if (registry.size === 0) fail("models.yaml scanner matched no entries");
-  const pairwise: PairRecord[] = JSON.parse(pairwiseText);
+  const { records: pairwise, pFirst } = parsePairwise(JSON.parse(pairwiseText));
 
   const rankedModels = models.filter(
     (m) => !m.is_baseline && (m.ranked_eligible ?? true),
   );
 
   // Pairwise integrity: no run_id in the file, so verify it matches this run
-  // by shape — C(ranked, 2) rows, every id present in the run.
+  // by shape. Upstream publishes one record per pair of RANKED models in the
+  // latest run — merged-in models and retired predecessors included (v4.0:
+  // C(20,2) = 190, current lineup of 19 plus GPT-5.6 Sol) — so that is the
+  // count, not C(current lineup, 2).
   const expectedPairs = (rankedModels.length * (rankedModels.length - 1)) / 2;
   if (pairwise.length !== expectedPairs)
     fail(`pairwise.json has ${pairwise.length} rows, expected C(${rankedModels.length},2)=${expectedPairs} — stale docs build?`);
@@ -141,7 +164,15 @@ async function main() {
   const previous = models
     .filter((m) => succ.has(m.name))
     .sort((a, b) => b.score.value - a.score.value);
-  const band = leaderBand(current);
+
+  // Rank sets over the CURRENT lineup only (attach_rank_sets); legacy
+  // pairwise files carry no raw p-values and yield no ranges.
+  const ranks = rankSets(
+    current.map((m) => m.name),
+    pairwise,
+  );
+  const hasRankSets = ranks.size > 0;
+  const rule = decisiveRule(pairwise);
 
   // Structural invariants, not pinned counts. The old fail-loud EXPECTED block
   // pinned lineup/generations/pairs to one official run, which blocked exactly
@@ -157,18 +188,28 @@ async function main() {
   for (const [prev, curr] of succ)
     if (!current.some((m) => m.name === curr))
       fail(`${prev} retires to ${curr}, which is not in the current lineup`);
-  const bandPrefix = current.findIndex((m) => !band.has(m.name));
-  if (band.size > 0 && bandPrefix !== -1 && current.slice(bandPrefix).some((m) => band.has(m.name)))
-    fail("leader band is not a contiguous prefix of the lineup — leaderBand port bug");
   for (const m of rankedModels)
     if (!(m.score.lo <= m.score.value && m.score.value <= m.score.hi))
       fail(`${m.name} score ${m.score.value} outside its CI [${m.score.lo}, ${m.score.hi}]`);
+  if (rule === "bh" && !hasRankSets)
+    fail("pairwise records carry q-values but rank sets could not be built — missing lineup pair or p_value");
+  for (const [name, set] of ranks)
+    if (!(1 <= set.lo && set.lo <= set.hi && set.hi <= current.length))
+      fail(`${name} rank set ${set.lo}–${set.hi} is outside 1–${current.length}`);
+  // P(#1) is computed upstream over the current lineup; a name outside it
+  // means the two sides disagree on who is current (a successions drift).
+  const currentNames = new Set(current.map((m) => m.name));
+  for (const name of Object.keys(pFirst))
+    if (!currentNames.has(name))
+      fail(`pairwise.json p_first names ${name}, which this sync did not put in the current lineup`);
 
   // Scoring-date reconstruction — see scoringDates(). Board order so the
-  // generated prose names models the way the page ranks them.
-  const dates = scoringDates([...current, ...previous], run.run_id);
-  if (dates[0]?.date !== run.run_id)
-    fail(`earliest scoring date ${dates[0]?.date} is not the run id ${run.run_id}`);
+  // generated prose names models the way the page ranks them. Clamped to the
+  // run DATE (run ids carry a version suffix since v3.6).
+  const runDate: string = run.run_date ?? run.run_id;
+  const dates = scoringDates([...current, ...previous], runDate);
+  if (dates[0]?.date !== runDate)
+    fail(`earliest scoring date ${dates[0]?.date} is not the run date ${runDate}`);
   const dated = dates.reduce((n, d) => n + d.labels.length, 0);
   if (dated !== rankedModels.length)
     fail(`scoring dates cover ${dated} models, expected ${rankedModels.length}`);
@@ -188,12 +229,17 @@ async function main() {
     // passed means ship-sense has not caught up yet — exactly the case worth
     // showing a reader, not hiding.
     const pending = reg.pending;
+    const rankSet = ranks.get(m.name);
+    const pFirstShare = pFirst[m.name];
     return {
       name: m.name,
       label: m.label,
       provider: m.provider,
       pos: i + 1,
-      inLeaderBand: band.has(m.name),
+      ...(rankSet ? { rankLo: rankSet.lo, rankHi: rankSet.hi } : {}),
+      ...(pFirstShare !== undefined ? { pFirst: Number(pFirstShare.toFixed(4)) } : {}),
+      // Rows written before upstream stamped the field inherit their run's.
+      testedOn: m.bench_version ?? run.version,
       score: r1(m.score.value),
       lo: r1(m.score.lo),
       hi: r1(m.score.hi),
@@ -223,7 +269,7 @@ async function main() {
         (r.a === prev.name && r.b === curr.name),
     );
     if (!rec) return fail(`no pairwise record for ${prev.name} -> ${curr.name}`);
-    const oriented = orientPair(rec as DerivePairRecord, prev.name, curr.name);
+    const oriented = orientPair(rec, prev.name, curr.name);
     if (!oriented) return fail(`could not orient ${prev.name} -> ${curr.name}`);
     return {
       prevLabel: prev.label,
@@ -234,17 +280,32 @@ async function main() {
       loPts: r1(oriented.loPts),
       hiPts: r1(oriented.hiPts),
       verdict: oriented.verdict,
+      family: oriented.family,
     };
   });
   generations.sort((a, b) => b.deltaPts - a.deltaPts);
 
+  const floor = floorValue(run);
+  if (floor.value === null) fail(`run ${run.run_id} carries neither an adversarial nor a naive floor`);
+  const floorRows: FloorRow[] = (run.adversarial_floor ?? []).map((f: FloorRow) => ({
+    label: f.label,
+    headline: r1(f.headline),
+    restraint: r2(f.restraint),
+    honesty: r2(f.honesty),
+    conviction: r2(f.conviction),
+  }));
+
   const runMeta = {
     version: run.version,
     runId: run.run_id,
+    runDate,
     bankItems: run.bank.n_items,
     modelCount: rankedModels.length,
-    naiveFloor: run.naive_floor,
-    decisivePairs: pairwise.filter((r) => r.winner !== null).length,
+    floor: r1(floor.value!),
+    floorKind: floor.kind,
+    floorRows,
+    decisiveRule: rule,
+    decisivePairs: pairwise.filter((r) => matrixWinner(r) !== null).length,
     totalPairs: pairwise.length,
     scoringDates: dates,
   };
@@ -252,8 +313,11 @@ async function main() {
   const teaser = lineup.slice(0, 3).map((m) => ({ label: m.label, score: m.score }));
 
   const emit = (value: unknown) => JSON.stringify(value, null, 2);
+  // A --local / file:// source is named generically: the snapshot ships in a
+  // public repo and must not carry a path from this machine.
+  const source = LOCAL_ROOT ? "a local ship-sense checkout" : RAW;
   const generatedBy = `// GENERATED by scripts/sync-ship-sense.ts — do not edit by hand.
-// Source: ${RAW} (run ${runMeta.runId}, ${runMeta.version}).
+// Source: ${source} (run ${runMeta.runId}, ${runMeta.version}).
 // Regenerate with \`npm run sync:shipsense\`; review the diff before committing.`;
 
   const snapshot = `${generatedBy}
@@ -283,15 +347,18 @@ export const SHIP_SENSE_TEASER_RUN = ${emit({
     version: runMeta.version,
     bankItems: runMeta.bankItems,
     modelCount: runMeta.modelCount,
+    currentCount: lineup.length,
   })};
 `;
 
   const change = await describeChange(runMeta, lineup);
 
+  const contenders = lineup.filter((m) => m.rankLo === 1).length;
   console.log(
     `[sync-ship-sense] run ${runMeta.runId} ${runMeta.version}: ` +
-      `${lineup.length} current (band of ${lineup.filter((m) => m.inLeaderBand).length}), ` +
-      `${generations.length} generations, ${runMeta.decisivePairs}/${runMeta.totalPairs} decisive pairs, ` +
+      `${lineup.length} current (${hasRankSets ? `${contenders} with #1 in rank range` : "no rank sets"}), ` +
+      `${generations.length} generations, ${runMeta.decisivePairs}/${runMeta.totalPairs} decisive pairs (${rule}), ` +
+      `${floor.kind} floor ${runMeta.floor}, ` +
       `${dates.length} scoring date(s) ${dates[0].date}–${dates[dates.length - 1].date}`,
   );
   console.log(`[sync-ship-sense] ${change.summary}`);

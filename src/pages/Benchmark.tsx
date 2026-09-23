@@ -11,8 +11,13 @@ import {
   SHIP_SENSE_VERDICT_TEXT,
   buildShipSenseJsonLd,
   describeScoringDates,
+  pFirstText,
   providerLabel,
+  rankRangeText,
   scoredWindowLabel,
+  valueCalloutText,
+  type ShipSenseGeneration,
+  type ShipSenseRunMeta,
   type ShipSenseVerdict,
 } from "@/data/ship-sense";
 import {
@@ -25,9 +30,10 @@ import {
 // canonical board's field plot. It only ever WIDENS, in 5-point steps, so a
 // model the daily sync pulls in below 70 or above 95 still lands on the lane
 // instead of overflowing it; the usual board keeps the exact ticks it had.
-// The naive floor (39.1) is deliberately OFF this axis: stretching to include
-// it would compress every interval into the right third and erase the
-// differences the strips exist to show.
+// The score floor (v4.0: 52.8 for the best content-free policy) is
+// deliberately OFF this axis: stretching to include it would compress every
+// interval into the right third and erase the differences the strips exist
+// to show.
 const axisFor = (rows: { lo: number; hi: number }[]) => {
   const lo = Math.min(70, ...rows.map((m) => m.lo));
   const hi = Math.max(95, ...rows.map((m) => m.hi));
@@ -59,6 +65,38 @@ const VERDICT_GLYPH: Record<ShipSenseVerdict, string> = {
   down: "▽",
   "suggestive-down": "▽",
   "decisive-down": "▼",
+};
+
+const HAS_RANK_SETS = SHIP_SENSE_LINEUP.some((m) => m.rankLo !== undefined);
+const VALUE_CALLOUT = valueCalloutText(SHIP_SENSE_LINEUP);
+
+/** The floor sentence: every adversarial policy on v4.0+, else the naive
+ * baseline of older runs. */
+const floorText = (run: ShipSenseRunMeta): string => {
+  if (run.floorKind === "naive" || run.floorRows.length === 0) {
+    return `A naive "ship everything, flag nothing, always cave" baseline scores ${fmt1(run.floor)} — below this axis.`;
+  }
+  const others = run.floorRows
+    .filter((f) => f.headline !== run.floor)
+    .map((f) => `${f.label.toLowerCase()} ${fmt1(f.headline)}`);
+  return (
+    `Gameability floor: the best content-free answering policy, graded by the same grader, scores ${fmt1(run.floor)}` +
+    `${others.length ? ` (${others.join(", ")})` : ""} — below this axis; a model near it is not exercising judgment.`
+  );
+};
+
+/** How the decisive count was called, named by its test. */
+const DECISIVE_RULE_TEXT: Record<ShipSenseRunMeta["decisiveRule"], string> = {
+  bh: "at an exploratory Benjamini–Hochberg q ≤ 0.05",
+  holm: "after Holm correction",
+};
+
+/** What made a succession verdict decisive, by its test family. */
+const GENERATION_FAMILY_TEXT: Record<ShipSenseGeneration["family"], string> = {
+  confirmatory:
+    "significant after Holm correction within the pre-registered confirmatory family (successions and named vendor claims)",
+  exploratory: "an exploratory Benjamini–Hochberg q ≤ 0.05",
+  legacy: "significant after Holm correction across all pairs",
 };
 
 // Module-level so the JSON-LD object identity is stable and useHead's effect
@@ -101,7 +139,7 @@ const Benchmark = () => {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-mono-cap text-text-tertiary">
-              {run.version} · {run.bankItems}-item bank · {run.modelCount} models ·{" "}
+              {run.version} · {run.bankItems}-item bank · {SHIP_SENSE_LINEUP.length} current models ·{" "}
               {scoredWindow}
             </p>
             <h1 className="mt-2 text-page text-foreground">Ship Sense</h1>
@@ -173,7 +211,6 @@ const Benchmark = () => {
                   <p className="min-w-0 truncate text-body text-foreground">
                     <span className="mr-2 inline-block w-6 text-meta text-text-tertiary">
                       {m.pos}
-                      {m.inLeaderBand ? "*" : ""}
                     </span>
                     {m.label}
                   </p>
@@ -188,7 +225,14 @@ const Benchmark = () => {
                   <IntervalStrip lo={m.lo} hi={m.hi} score={m.score} />
                 </div>
                 <p className="ml-8 mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-meta text-text-tertiary">
-                  <span>{providerLabel(m.provider)}</span>
+                  <span>
+                    {providerLabel(m.provider)} · tested on {m.testedOn}
+                  </span>
+                  {HAS_RANK_SETS ? (
+                    <span title="95% rank confidence set from the paired tests; P(#1) = share of joint item-bootstrap resamples in which this model scores highest">
+                      Rank range {rankRangeText(m)} · P(#1) {pFirstText(m)}
+                    </span>
+                  ) : null}
                   <span
                     title={
                       m.atTestPriceIn !== undefined
@@ -216,23 +260,29 @@ const Benchmark = () => {
           </ul>
           <div className="mt-4 space-y-1 border-t border-border pt-4 text-meta text-text-tertiary">
             <p>
-              * 95% CI overlaps the point leader's — a descriptive band ordered by
-              point score, not a pairwise test. Band and tick: 95% confidence
-              interval and point score from an item-clustered bootstrap.
+              # = order by point score. Band and tick: 95% confidence interval and
+              point score from an item-clustered bootstrap.
+              {HAS_RANK_SETS
+                ? " Rank range = the ranks a model's Holm-corrected paired tests against the current lineup cannot rule out (95%). P(#1) = share of item resamples in which it scores highest — descriptive, not a test."
+                : ""}
             </p>
             <p>
-              A naive "ship everything, flag nothing, always cave" baseline scores{" "}
-              {fmt1(run.naiveFloor)} — below this axis. R / H / C = Restraint,
-              Honesty, Conviction (0–1). Prices are current list per 1M
-              input/output tokens
+              {floorText(run)} R / H / C = Restraint, Honesty, Conviction (0–1).
+              Prices are current list per 1M input/output tokens
               {anyRepriced ? "; † list price moved since the run (at-test price on hover)" : ""}
               {anyPending ? "; ‡ announced list price change (new rate and date on hover)" : ""}.
             </p>
             <p>
               Point scores rank; paired tests separate: {run.decisivePairs} of{" "}
-              {run.totalPairs} paired comparisons are decisive after Holm
-              correction.
+              {run.totalPairs} paired comparisons (current and previous generations)
+              are decisive {DECISIVE_RULE_TEXT[run.decisiveRule]}.
             </p>
+            {VALUE_CALLOUT ? (
+              <p>
+                <span className="font-semibold text-text-secondary">Choosing a model?</span>{" "}
+                {VALUE_CALLOUT}
+              </p>
+            ) : null}
           </div>
         </Surface>
       </section>
@@ -287,9 +337,11 @@ const Benchmark = () => {
           </ul>
           <p className="mt-4 border-t border-border pt-4 text-meta text-text-tertiary">
             Δ = paired score difference in board points (current − previous) on the
-            same items. When a lab ships a direct successor, the outgoing model
-            retires here automatically — the upgrade claim is decided by the paired
-            test, not the launch post.
+            same items. Decisive ={" "}
+            {joinFamilies(SHIP_SENSE_GENERATIONS)}; slight = which way a
+            not-significant gap leans. When a lab ships a direct successor, the
+            outgoing model retires here automatically — the upgrade claim is
+            decided by the paired test, not the launch post.
           </p>
         </Surface>
       </section>
@@ -311,20 +363,26 @@ const Benchmark = () => {
           <p>
             {describeScoringDates(run)} The Ship Sense Score is the equal-weight
             mean of the three dimensions, with a 95% confidence interval from an
-            item-clustered bootstrap.
+            item-clustered bootstrap. Grading is deterministic key-matching, not
+            an LLM judge, and every model runs at its shipped API defaults.
+            Successions and named launch claims form a small confirmatory family
+            registered before any answer was collected and Holm-corrected within
+            itself; every other pair is exploratory, reported with a
+            Benjamini–Hochberg q-value. Every row names the Ship Sense version
+            that scored it, and scores compare only within a version.
           </p>
           <p>
             This is one product leader's documented judgment, not an industry
             standard: the keys have no independent human rater yet (the September
-            2026 source audit was an automated second reading, not a second human),
-            and the bank measures three behaviors — not discovery, design judgment,
+            2026 audits were automated second readings, not a second human), and
+            the bank measures three behaviors — not discovery, design judgment,
             rollout, or organizational leadership. Grading detail is in{" "}
             <BenchmarkDocLink path="RUBRICS.md" />, design and limitations in{" "}
-            <BenchmarkDocLink path="METHODOLOGY.md" />, the correction log — seven
-            harness defects, four of them grading bugs, each caught by re-deriving
-            from saved outputs — in <BenchmarkDocLink path="FINDINGS.md" />, and
-            the September 2026 source audit of the bank itself in{" "}
-            <BenchmarkDocLink path="CORRECTIONS.md" />. The full win/loss matrix is
+            <BenchmarkDocLink path="METHODOLOGY.md" />, every defect the
+            self-audits have found and what each one moved in{" "}
+            <BenchmarkDocLink path="FINDINGS.md" />, and the September 2026 audits
+            behind v4.0 in <BenchmarkDocLink path="CORRECTIONS.md" />. The full
+            win/loss matrix is
             on the{" "}
             <a
               href={`${SHIP_SENSE_BOARD_URL}#headtohead`}
@@ -341,6 +399,10 @@ const Benchmark = () => {
     </>
   );
 };
+
+/** Decisive-rule wording for every family present in the table, in order. */
+const joinFamilies = (gens: ShipSenseGeneration[]): string =>
+  [...new Set(gens.map((g) => g.family))].map((f) => GENERATION_FAMILY_TEXT[f]).join("; or ");
 
 const BenchmarkDocLink = ({ path }: { path: string }) => (
   <a

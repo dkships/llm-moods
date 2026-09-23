@@ -143,7 +143,7 @@ const Index = () => {
           <div className="mb-5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
             <h2 className="text-section text-foreground">Ship Sense benchmark</h2>
             <span className="text-mono-cap text-text-tertiary">
-              {SHIP_SENSE_TEASER_RUN.version} · {SHIP_SENSE_TEASER_RUN.modelCount} models
+              {SHIP_SENSE_TEASER_RUN.version} · {SHIP_SENSE_TEASER_RUN.currentCount} current models
             </span>
           </div>
           <p className="max-w-2xl text-body text-text-secondary">

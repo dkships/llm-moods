@@ -1,17 +1,27 @@
 import { describe, expect, it } from "vitest";
 import {
-  leaderBand,
+  decisiveRule,
+  floorValue,
+  holmAdjust,
   lineage,
+  matrixWinner,
   orientPair,
+  parsePairwise,
   parseModelsYaml,
+  rankSets,
   scoringDates,
   successions,
   type DeriveModel,
+  type DerivePairRecord,
 } from "../../scripts/ship-sense-derive";
 import {
   describeScoringDates,
+  pFirstText,
   providerLabel,
+  rankRangeText,
   scoredWindowLabel,
+  valueCalloutText,
+  type ShipSenseModelRow,
   type ShipSenseRunMeta,
 } from "@/data/ship-sense";
 import {
@@ -41,6 +51,8 @@ describe("lineage", () => {
     expect(lineage("Claude Sonnet 4.6")).toEqual({ family: "claude sonnet", version: [4, 6] });
     expect(lineage("Claude Sonnet 5")).toEqual({ family: "claude sonnet", version: [5] });
     expect(lineage("Kimi K3")).toEqual({ family: "kimi", version: [3] });
+    expect(lineage("MiniMax M3")).toEqual({ family: "minimax", version: [3] });
+    expect(lineage("DeepSeek V4 Pro")).toEqual({ family: "deepseek pro", version: [4] });
     expect(lineage("Gemini 3.5 Flash-Lite")).toEqual({ family: "gemini flash lite", version: [3, 5] });
   });
 
@@ -82,6 +94,17 @@ describe("successions", () => {
     expect(successions(models, declared).get("gpt-5.5")).toBe("gpt-5.6-sol");
   });
 
+  it("pairs a retired model with its NEAREST ranked successor", () => {
+    const models = [
+      model("grok-4.3", "Grok 4.3", 80, 75, 85),
+      model("grok-4.5", "Grok 4.5", 82, 77, 87),
+      model("grok-4.6", "Grok 4.6", 83, 78, 88),
+    ];
+    const succ = successions(models, new Map());
+    expect(succ.get("grok-4.3")).toBe("grok-4.5");
+    expect(succ.get("grok-4.5")).toBe("grok-4.6");
+  });
+
   it("never retires on the strength of an unranked successor", () => {
     const models = [
       model("a-1", "Thing 1", 80, 75, 85),
@@ -91,31 +114,98 @@ describe("successions", () => {
   });
 });
 
-describe("leaderBand", () => {
-  it("compares against the band leader, not the adjacent row", () => {
-    // b overlaps leader; c overlaps b but NOT the leader's lo — a chain of
-    // overlaps must not extend the band.
-    const sorted = [
-      model("a", "A 1", 90, 87, 93),
-      model("b", "B 1", 88, 86, 91),
-      model("c", "C 1", 86, 84, 89),
-    ];
-    // c.hi (89) >= a.lo (87) so c IS in the leader band; move c down.
-    const sorted2 = [
-      model("a", "A 1", 90, 88, 93),
-      model("b", "B 1", 89, 85, 92),
-      model("c", "C 1", 84, 80, 87.9),
-    ];
-    expect([...leaderBand(sorted)]).toEqual(["a", "b", "c"]);
-    expect([...leaderBand(sorted2)]).toEqual(["a", "b"]);
+describe("rank sets", () => {
+  const rec = (a: string, b: string, delta: number, p_value: number): DerivePairRecord => ({
+    a,
+    b,
+    delta,
+    lo: 0,
+    hi: 0,
+    holm_p: null,
+    winner: null,
+    p_value,
+    q_value: p_value,
+    family: "exploratory",
   });
 
-  it("a band of one is no band", () => {
-    const sorted = [
-      model("a", "A 1", 90, 88, 93),
-      model("b", "B 1", 80, 78, 83),
+  it("holmAdjust matches stats.holm_adjust (step-down, monotone, capped at 1)", () => {
+    expect(holmAdjust([0.01, 0.04, 0.03])).toEqual([0.03, 0.06, 0.06]);
+    expect(holmAdjust([0.5, 0.6])).toEqual([1, 1]);
+  });
+
+  it("builds [1 + beaten by, N − beats] from each model's own Holm family", () => {
+    // a beats c decisively (0.001 × 2 = 0.002); everything else is noise.
+    const sets = rankSets(
+      ["a", "b", "c"],
+      [rec("a", "b", 0.01, 0.4), rec("a", "c", 0.05, 0.001), rec("c", "b", -0.01, 0.5)],
+    );
+    expect(sets.get("a")).toEqual({ lo: 1, hi: 2 });
+    expect(sets.get("b")).toEqual({ lo: 1, hi: 3 });
+    expect(sets.get("c")).toEqual({ lo: 2, hi: 3 });
+  });
+
+  it("ignores pairs outside the lineup (retired predecessors)", () => {
+    const sets = rankSets(
+      ["a", "b"],
+      [rec("a", "b", 0.01, 0.4), rec("a", "old", 0.2, 0.0001)],
+    );
+    expect(sets.get("a")).toEqual({ lo: 1, hi: 2 });
+  });
+
+  it("returns no ranges when a lineup pair or raw p-value is missing", () => {
+    expect(rankSets(["a", "b", "c"], [rec("a", "b", 0.01, 0.4)]).size).toBe(0);
+    const legacy = { a: "a", b: "b", delta: 0.1, lo: 0, hi: 0.2, holm_p: 0.01, winner: "a" };
+    expect(rankSets(["a", "b"], [legacy]).size).toBe(0);
+  });
+});
+
+describe("pairwise bundle", () => {
+  const legacy = { a: "x", b: "y", delta: 0.1, lo: 0.02, hi: 0.2, holm_p: 0.01, winner: "x" };
+
+  it("accepts the pre-v4.0 bare list", () => {
+    const bundle = parsePairwise([legacy]);
+    expect(bundle.records).toHaveLength(1);
+    expect(bundle.pFirst).toEqual({});
+    expect(decisiveRule(bundle.records)).toBe("holm");
+    expect(matrixWinner(bundle.records[0])).toBe("x");
+  });
+
+  it("accepts the v4.0 {record_schema, records, p_first} shape", () => {
+    const record = {
+      ...legacy,
+      holm_p: null,
+      winner: "x",
+      winner_exploratory: null,
+      p_value: 0.04,
+      q_value: 0.2,
+      family: "exploratory",
+    };
+    const bundle = parsePairwise({ record_schema: 2, records: [record], p_first: { x: 0.7 } });
+    expect(bundle.pFirst).toEqual({ x: 0.7 });
+    expect(decisiveRule(bundle.records)).toBe("bh");
+    // The matrix calls decisive on the BH verdict, not the family winner.
+    expect(matrixWinner(bundle.records[0])).toBeNull();
+  });
+
+  it("rejects anything else", () => {
+    expect(() => parsePairwise({ comparisons: [] })).toThrow();
+  });
+});
+
+describe("floorValue", () => {
+  it("prefers the best adversarial policy when the run carries one", () => {
+    const rows = [
+      { label: "Best adversarial policy", headline: 52.7671, restraint: 0.45, honesty: 0.49, conviction: 0.65 },
+      { label: "Random policy", headline: 43.41, restraint: 0.34, honesty: 0.42, conviction: 0.55 },
     ];
-    expect(leaderBand(sorted).size).toBe(0);
+    expect(floorValue({ naive_floor: null, adversarial_floor: rows })).toEqual({
+      value: 52.7671,
+      kind: "adversarial",
+    });
+  });
+
+  it("falls back to the naive floor on older runs", () => {
+    expect(floorValue({ naive_floor: 39.2 })).toEqual({ value: 39.2, kind: "naive" });
   });
 });
 
@@ -146,6 +236,14 @@ describe("orientPair", () => {
     )!;
     expect(out.deltaPts).toBeCloseTo(5.2, 5);
     expect(out.verdict).toBe("suggestive-up");
+  });
+
+  it("carries the record's family (legacy when absent)", () => {
+    expect(orientPair(rec, "claude-sonnet-4-6", "claude-sonnet-5")!.family).toBe("legacy");
+    expect(
+      orientPair({ ...rec, family: "confirmatory" }, "claude-sonnet-4-6", "claude-sonnet-5")!
+        .family,
+    ).toBe("confirmatory");
   });
 
   it("a published Holm winner is decisive regardless of CI", () => {
@@ -289,9 +387,13 @@ describe("run prose", () => {
   const run = (scoringDates: { date: string; labels: string[] }[]): ShipSenseRunMeta => ({
     version: "v3.0",
     runId: scoringDates[0].date,
+    runDate: scoringDates[0].date,
     bankItems: 67,
     modelCount: scoringDates.reduce((n, d) => n + d.labels.length, 0),
-    naiveFloor: 39.1,
+    floor: 39.1,
+    floorKind: "naive",
+    floorRows: [],
+    decisiveRule: "holm",
     decisivePairs: 1,
     totalPairs: 3,
     scoringDates,
@@ -332,6 +434,57 @@ describe("run prose", () => {
     expect(providerLabel("qwen")).toBe("Qwen");
     expect(providerLabel("xai")).toBe("xAI");
     expect(providerLabel("newlab")).toBe("Newlab");
+    expect(providerLabel("minimax")).toBe("MiniMax");
+  });
+});
+
+describe("rank range and value callout", () => {
+  const row = (
+    name: string,
+    priceIn: number,
+    priceOut: number,
+    rankLo?: number,
+  ): ShipSenseModelRow => ({
+    name,
+    label: name.toUpperCase(),
+    provider: "x",
+    pos: 1,
+    rankLo,
+    rankHi: rankLo === undefined ? undefined : 6,
+    testedOn: "v4.0",
+    score: 80,
+    lo: 78,
+    hi: 82,
+    restraint: 0.8,
+    honesty: 0.8,
+    conviction: 0.8,
+    priceIn,
+    priceOut,
+  });
+
+  it("formats rank ranges and P(#1) like the upstream board", () => {
+    expect(rankRangeText({ rankLo: 1, rankHi: 6 })).toBe("1–6");
+    expect(rankRangeText({ rankLo: 3, rankHi: 3 })).toBe("3");
+    expect(rankRangeText({})).toBe("—");
+    expect(pFirstText({ pFirst: 0.6298 })).toBe("63%");
+    expect(pFirstText({})).toBe("—");
+  });
+
+  it("names the cheapest and every tied priciest #1 contender", () => {
+    const text = valueCalloutText([
+      row("a", 4, 20, 1),
+      row("b", 10, 50, 1),
+      row("c", 1.25, 4.25, 1),
+      row("d", 10, 50, 1),
+      row("e", 0.1, 0.5, 6),
+    ]);
+    expect(text).toContain("C is the least expensive model whose rank range includes #1, at $1.25/$4.25");
+    expect(text).toContain("B and D are the most expensive at $10/$50");
+  });
+
+  it("stays silent with fewer than two contenders or no rank sets", () => {
+    expect(valueCalloutText([row("a", 4, 20, 1), row("b", 1, 2, 2)])).toBeNull();
+    expect(valueCalloutText([row("a", 4, 20), row("b", 1, 2)])).toBeNull();
   });
 });
 
@@ -369,8 +522,8 @@ describe("committed snapshot invariants", () => {
   });
 
   it("covers every ranked model with exactly one scoring date, starting at the run", () => {
-    const { scoringDates, runId, modelCount } = SHIP_SENSE_RUN;
-    expect(scoringDates[0].date).toBe(runId);
+    const { scoringDates, runDate, modelCount } = SHIP_SENSE_RUN;
+    expect(scoringDates[0].date).toBe(runDate);
     const labels = scoringDates.flatMap((d) => d.labels);
     expect(labels).toHaveLength(modelCount);
     expect(new Set(labels).size).toBe(modelCount);
@@ -402,10 +555,25 @@ describe("committed snapshot invariants", () => {
     });
   });
 
-  it("leader band is a prefix of the lineup", () => {
-    const lastInBand = SHIP_SENSE_LINEUP.filter((m) => m.inLeaderBand).length;
-    SHIP_SENSE_LINEUP.forEach((m, i) => {
-      expect(m.inLeaderBand).toBe(i < lastInBand);
+  it("keeps every rank range inside the lineup and around its own position's reach", () => {
+    const n = SHIP_SENSE_LINEUP.length;
+    SHIP_SENSE_LINEUP.filter((m) => m.rankLo !== undefined).forEach((m) => {
+      expect(m.rankLo).toBeGreaterThanOrEqual(1);
+      expect(m.rankLo!).toBeLessThanOrEqual(m.rankHi!);
+      expect(m.rankHi).toBeLessThanOrEqual(n);
     });
+    // The point leader can always still be #1.
+    if (SHIP_SENSE_LINEUP[0].rankLo !== undefined) expect(SHIP_SENSE_LINEUP[0].rankLo).toBe(1);
+  });
+
+  it("keeps P(#1) a share that sums to about one over the lineup", () => {
+    const shares = SHIP_SENSE_LINEUP.map((m) => m.pFirst).filter((p) => p !== undefined);
+    if (shares.length === 0) return;
+    expect(shares.reduce((a, b) => a + b!, 0)).toBeCloseTo(1, 2);
+  });
+
+  it("names the version that scored every row and a floor under the lineup", () => {
+    SHIP_SENSE_LINEUP.forEach((m) => expect(m.testedOn).toMatch(/^v\d/));
+    expect(SHIP_SENSE_RUN.floor).toBeLessThan(SHIP_SENSE_LINEUP[SHIP_SENSE_LINEUP.length - 1].score);
   });
 });

@@ -1,6 +1,7 @@
 import React from "react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { SHIP_SENSE_LINEUP } from "@/data/ship-sense-snapshot";
 
 const stripMotionProps = ({
   animate,
@@ -226,8 +227,9 @@ describe("public app routes", () => {
       expect(screen.getByRole("heading", { name: /^ship sense$/i })).toBeInTheDocument();
     });
     // Static snapshot data, no hooks to mock: the board leader and a
-    // generations verdict row should both be present.
-    expect(screen.getByText(/muse spark 1\.1/i)).toBeInTheDocument();
+    // generations verdict row should both be present. Read from the snapshot
+    // so the daily sync can change the leader without failing this test.
+    expect(screen.getAllByText(SHIP_SENSE_LINEUP[0].label).length).toBeGreaterThan(0);
     expect(screen.getByRole("heading", { name: /current vs\. previous generations/i })).toBeInTheDocument();
     // Both the Footer ("GitHub" -> llm-moods) and the page header pill are
     // links named "GitHub"; the pill is the one pointing at the benchmark repo.

@@ -1,7 +1,8 @@
 /**
  * Pure board-composition logic for the Ship Sense sync, ported from
- * ship-sense/src/leaderboard.py (successions / rank_with_ties /
- * _generation_pairs). Kept separate from sync-ship-sense.ts so the port is
+ * ship-sense/src/leaderboard.py (successions / _pairwise_bundle /
+ * attach_rank_sets / floor_value / _generation_pairs) and src/stats.py
+ * (holm_adjust / rank_sets). Kept separate from sync-ship-sense.ts so the port is
  * unit-testable (src/test/ship-sense.test.ts) without network access.
  */
 
@@ -130,19 +131,31 @@ export interface DeriveModel {
   score: DeriveScore;
 }
 
+/** One head-to-head record from docs/pairwise.json, 0–1 scale, a − b.
+ * Since v4.0 (record_schema 2) each record also carries its raw p-value, the
+ * exploratory BH q-value and its test family. `winner` is the verdict of the
+ * record's own family (Holm within the confirmatory family, BH q ≤ .05 for
+ * exploratory); `winner_exploratory` is the BH verdict for every record. */
 export interface DerivePairRecord {
   a: string;
   b: string;
   delta: number;
   lo: number;
   hi: number;
-  holm_p: number;
+  holm_p: number | null;
   winner: string | null;
+  p_value?: number;
+  q_value?: number;
+  family?: PairFamily;
+  winner_exploratory?: string | null;
 }
 
-// One version token per label ("4.6", "5", Moonshot's "K3"), guarded on both
-// sides so "Flash-Lite" and "GPT-5.6" never half-match.
-const VERSION_TOKEN = /(?<![a-z0-9.])k?(\d+(?:\.\d+)*)(?![a-z0-9.])/i;
+export type PairFamily = "confirmatory" | "exploratory";
+
+// One version token per label ("4.6", "5", Moonshot's "K3", DeepSeek's "V4",
+// MiniMax's "M3"), guarded on both sides so "Flash-Lite" and "GPT-5.6" never
+// half-match. Mirrors upstream _VERSION_TOKEN's [kmv]? prefix.
+const VERSION_TOKEN = /(?<![a-z0-9.])[kmv]?(\d+(?:\.\d+)*)(?![a-z0-9.])/i;
 
 export function lineage(label: string): {
   family: string;
@@ -167,7 +180,8 @@ export function versionCompare(a: number[], b: number[]): number {
 }
 
 /**
- * Superseded model name -> its ranked successor's name. A model retires the
+ * Superseded model name -> its NEAREST ranked successor's name (upstream
+ * ruling 2026-08-12: Grok 4.3 pairs with 4.5, not 4.6). A model retires the
  * moment a RANKED model in the same label lineage carries a higher version;
  * explicit declarations (run field or registry `superseded_by`) beat
  * inference and exist only for renamed lines the labels cannot see
@@ -203,30 +217,138 @@ export function successions(
       (e) => e.name !== m.name && versionCompare(e.version, version) > 0,
     );
     if (newer.length > 0) {
+      // Python min() over (version, name) tuples.
       newer.sort(
-        (x, y) => versionCompare(x.version, y.version) || x.name.localeCompare(y.name),
+        (x, y) => versionCompare(x.version, y.version) || (x.name < y.name ? -1 : x.name > y.name ? 1 : 0),
       );
-      out.set(m.name, newer[newer.length - 1].name);
+      out.set(m.name, newer[0].name);
     }
   }
   return out;
 }
 
+const RANK_SET_ALPHA = 0.05;
+
+/** stats.holm_adjust: Holm step-down adjusted p-values, original order. */
+export function holmAdjust(pValues: number[]): number[] {
+  const order = pValues.map((_, i) => i).sort((x, y) => pValues[x] - pValues[y]);
+  const adjusted = pValues.map(() => 1);
+  let running = 0;
+  order.forEach((idx, rank) => {
+    running = Math.max(running, (pValues.length - rank) * pValues[idx]);
+    adjusted[idx] = Math.min(1, running);
+  });
+  return adjusted;
+}
+
+export interface RankSet {
+  lo: number;
+  hi: number;
+}
+
 /**
- * Leader-overlap band over the current lineup, already sorted by score
- * descending: greedy from the top against the band LEADER's lower bound (not
- * the adjacent row — a chain of overlaps must not collapse the field). A
- * "band" of one model is no band at all.
+ * Marginal 95% rank confidence set per model (stats.rank_sets, gated the way
+ * leaderboard.attach_rank_sets gates it). For each model, Holm-correct its own
+ * N−1 raw p-values against the lineup; its set is [1 + #models that
+ * significantly beat it, N − #models it significantly beats]. Needs every
+ * lineup pair WITH a raw p-value — legacy records have none, and a board
+ * missing a pair gets no ranges rather than wrong ones (empty map).
  */
-export function leaderBand(sortedDesc: DeriveModel[]): Set<string> {
-  const band = new Set<string>();
-  let leaderLo: number | null = null;
-  for (const m of sortedDesc) {
-    if (leaderLo === null) leaderLo = m.score.lo;
-    else if (m.score.hi < leaderLo) break;
-    band.add(m.name);
+export function rankSets(names: string[], records: DerivePairRecord[]): Map<string, RankSet> {
+  const lineup = new Set(names);
+  const inLineup = records.filter((r) => lineup.has(r.a) && lineup.has(r.b));
+  const pairsNeeded = (names.length * (names.length - 1)) / 2;
+  const usable =
+    names.length > 0 &&
+    inLineup.length === pairsNeeded &&
+    inLineup.every((r) => typeof r.p_value === "number");
+  if (!usable) return new Map();
+
+  const mine = new Map<string, { p: number; diff: number }[]>(names.map((n) => [n, []]));
+  for (const r of inLineup) {
+    mine.get(r.a)!.push({ p: r.p_value!, diff: r.delta });
+    mine.get(r.b)!.push({ p: r.p_value!, diff: -r.delta });
   }
-  return band.size > 1 ? band : new Set();
+
+  const out = new Map<string, RankSet>();
+  for (const name of names) {
+    const rows = mine.get(name)!;
+    const adjusted = holmAdjust(rows.map((r) => r.p));
+    let beatenBy = 0;
+    let beats = 0;
+    rows.forEach((r, i) => {
+      if (adjusted[i] > RANK_SET_ALPHA) {
+        return;
+      }
+      if (r.diff < 0) {
+        beatenBy++;
+      } else if (r.diff > 0) {
+        beats++;
+      }
+    });
+    out.set(name, { lo: 1 + beatenBy, hi: names.length - beats });
+  }
+  return out;
+}
+
+export interface PairwiseBundle {
+  records: DerivePairRecord[];
+  /** Descriptive bootstrap P(#1) per current-lineup model; {} on legacy files. */
+  pFirst: Record<string, number>;
+}
+
+/** leaderboard._pairwise_bundle for docs/pairwise.json: a bare list (≤ v3.6)
+ * or {record_schema, records, p_first} (v4.0+). */
+export function parsePairwise(data: unknown): PairwiseBundle {
+  if (Array.isArray(data)) {
+    return { records: data as DerivePairRecord[], pFirst: {} };
+  }
+  if (data && typeof data === "object" && Array.isArray((data as { records?: unknown }).records)) {
+    const d = data as { records: DerivePairRecord[]; p_first?: Record<string, number> | null };
+    return { records: d.records, pFirst: d.p_first ?? {} };
+  }
+  throw new Error("[ship-sense-derive] pairwise.json is neither a list nor a {records} bundle");
+}
+
+/** How the head-to-head matrix calls a pair decisive: the exploratory BH
+ * q-value when records carry one, else the legacy all-pairs Holm test. */
+export type DecisiveRule = "bh" | "holm";
+
+export const decisiveRule = (records: DerivePairRecord[]): DecisiveRule =>
+  records.some((r) => r.q_value !== undefined) ? "bh" : "holm";
+
+/** The matrix's decisive winner (leaderboard._cell_state): winner_exploratory
+ * on q-value records — a present-but-null value means "not decisive", exactly
+ * like Python's dict.get(key, default) — else the legacy winner. */
+export const matrixWinner = (r: DerivePairRecord): string | null => {
+  if (r.q_value === undefined || r.winner_exploratory === undefined) {
+    return r.winner;
+  }
+  return r.winner_exploratory;
+};
+
+export interface FloorRow {
+  label: string;
+  /** 0–100 on the Ship Sense Score scale. */
+  headline: number;
+  restraint: number;
+  honesty: number;
+  conviction: number;
+}
+
+export type FloorKind = "adversarial" | "naive";
+
+/** leaderboard.floor_value: the best adversarial headline when the run carries
+ * one (v4.0+), else the legacy naive floor. */
+export function floorValue(run: {
+  naive_floor?: number | null;
+  adversarial_floor?: FloorRow[] | null;
+}): { value: number | null; kind: FloorKind } {
+  const rows = run.adversarial_floor ?? [];
+  if (rows.length > 0) {
+    return { value: Math.max(...rows.map((r) => r.headline)), kind: "adversarial" };
+  }
+  return { value: run.naive_floor ?? null, kind: "naive" };
 }
 
 export interface ScoringDateGroup {
@@ -270,6 +392,8 @@ export function scoringDates(
 }
 
 export interface OrientedPair {
+  /** Test family that decided the verdict; legacy records are one Holm family. */
+  family: PairFamily | "legacy";
   deltaPts: number;
   loPts: number;
   hiPts: number;
@@ -286,8 +410,9 @@ export interface OrientedPair {
 /**
  * Orient a pairwise record as (current − previous) in board points (×100).
  * Records are stored in arbitrary a/b order on a 0–1 scale; when flipping,
- * the CI bounds swap AND negate (lo,hi -> -hi,-lo). Decisive = the published
- * Holm-corrected winner; suggestive = the oriented CI clears zero without
+ * the CI bounds swap AND negate (lo,hi -> -hi,-lo). Decisive = the record's
+ * published `winner` (upstream _generation_pairs reads that field, so a
+ * confirmatory succession is decided by Holm within its family); suggestive = the oriented CI clears zero without
  * surviving correction.
  */
 export function orientPair(
@@ -310,6 +435,7 @@ export function orientPair(
   else if (delta < 0) verdict = "down";
   else verdict = "even";
   return {
+    family: rec.family ?? "legacy",
     deltaPts: delta * 100,
     loPts: lo * 100,
     hiPts: hi * 100,
