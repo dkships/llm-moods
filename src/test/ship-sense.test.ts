@@ -10,6 +10,7 @@ import {
   parsePairwise,
   parseModelsYaml,
   previousBenchSnapshot,
+  previousBenchSnapshots,
   rankSets,
   scoringDates,
   successions,
@@ -274,6 +275,20 @@ describe("previousBenchSnapshot", () => {
   it("returns null with no earlier run at all", () => {
     expect(previousBenchSnapshot([run("v1.0")])).toBeNull();
     expect(previousBenchSnapshot([])).toBeNull();
+  });
+});
+
+describe("previousBenchSnapshots", () => {
+  const run = (version: string, id = version): LedgerRun => ({ run_id: id, version, models: [] });
+
+  it("lists the newest run of every earlier version, newest version first", () => {
+    const runs = [run("v3.0"), run("v3.6", "a"), run("v3.6", "b"), run("v4.0"), run("v4.1")];
+    expect(previousBenchSnapshots(runs).map((r) => r.run_id)).toEqual(["v4.0", "b", "v3.0"]);
+  });
+
+  it("is empty when there is no earlier version", () => {
+    expect(previousBenchSnapshots([run("v1.0"), run("v1.0")])).toEqual([]);
+    expect(previousBenchSnapshots([])).toEqual([]);
   });
 });
 

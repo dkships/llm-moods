@@ -456,6 +456,21 @@ export interface LedgerRun {
  * prior bench version whose successions should still be shown alongside the
  * latest run's.
  */
+/** The newest run of each bench version older than the latest run's, newest
+ * version first (leaderboard._previous_snapshots). */
+export function previousBenchSnapshots(runs: LedgerRun[]): LedgerRun[] {
+  if (runs.length === 0) return [];
+  const versions = new Set([runs[runs.length - 1].version]);
+  const out: LedgerRun[] = [];
+  for (let i = runs.length - 2; i >= 0; i--) {
+    const run = runs[i];
+    if (!run.version || versions.has(run.version)) continue;
+    versions.add(run.version);
+    out.push(run);
+  }
+  return out;
+}
+
 export function previousBenchSnapshot(runs: LedgerRun[]): LedgerRun | null {
   if (runs.length === 0) return null;
   const latestVersion = runs[runs.length - 1].version;

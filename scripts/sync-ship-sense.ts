@@ -50,7 +50,7 @@ import {
   orientPair,
   parseModelsYaml,
   parsePairwise,
-  previousBenchSnapshot,
+  previousBenchSnapshots,
   rankSets,
   scoringDates,
   successions,
@@ -312,31 +312,32 @@ async function main() {
   // the current lineup. Best-effort: an unpublished or missing archive just
   // leaves this empty rather than failing the sync (upstream may not have
   // published docs/history/<version>/docs/pairwise.json yet).
-  const priorRun = previousBenchSnapshot(ledger.runs as LedgerRun[]);
+  // Every earlier bench, newest first: a pair shows once, from the newest
+  // bench that measured it (leaderboard._prior_gen_pairs).
   const priorGenerations: typeof generations = [];
-  if (priorRun && priorRun.version) {
+  const seen = new Set([...succ].map(([p, c]) => `${p}>>>${c}`));
+  for (const priorRun of previousBenchSnapshots(ledger.runs as LedgerRun[])) {
+    if (!priorRun.version) continue;
     const archivedText = await fetchOptionalText(
       `docs/history/${priorRun.version}/docs/pairwise.json`,
     );
-    if (archivedText) {
-      const { records: priorPairwise } = parsePairwise(JSON.parse(archivedText));
-      const priorModels = priorRun.models as RunModel[];
-      // That snapshot's own successions, from its own models and its own
-      // declared list (renamed lines carry `superseded_by` on the ledger row
-      // itself, same as the latest run — see successions()'s docstring).
-      const priorSucc = successions(priorModels, declared);
-      // A pair the latest run already re-measured is shown once, on the
-      // latest bench — drop it here rather than duplicate the succession.
-      const seen = new Set([...succ].map(([p, c]) => `${p}>>>${c}`));
-      for (const [p, c] of [...priorSucc]) if (seen.has(`${p}>>>${c}`)) priorSucc.delete(p);
-      priorGenerations.push(
-        ...generationPairsFromSuccessions(priorModels, priorSucc, priorPairwise, r1).map((g) => ({
-          ...g,
-          bench: priorRun.version as string,
-          earlier: true,
-        })),
-      );
+    if (!archivedText) continue;
+    const { records: priorPairwise } = parsePairwise(JSON.parse(archivedText));
+    const priorModels = priorRun.models as RunModel[];
+    // That snapshot's own successions, from its own models and its own
+    // declared list (renamed lines carry `superseded_by` on the ledger row).
+    const priorSucc = successions(priorModels, declared);
+    for (const [p, c] of [...priorSucc]) {
+      if (seen.has(`${p}>>>${c}`)) priorSucc.delete(p);
+      else seen.add(`${p}>>>${c}`);
     }
+    priorGenerations.push(
+      ...generationPairsFromSuccessions(priorModels, priorSucc, priorPairwise, r1).map((g) => ({
+        ...g,
+        bench: priorRun.version as string,
+        earlier: true,
+      })),
+    );
   }
   const allGenerations = [...generations, ...priorGenerations];
 
