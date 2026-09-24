@@ -15,8 +15,8 @@ const CrossModelDeltasBody = () => (
       How a model's score recovers after a known fix tells you more than the depth of the original drop. In
       the <a href="/research/claude-april-2026">March–April 2026 Claude incident</a>, ChatGPT drifted back
       toward its baseline once Anthropic's fix shipped. Gemini stayed roughly flat. Claude kept falling, the
-      deepest of the four. That post-fix divergence is what singled Claude out as actually broken, not its
-      bug-window delta, and definitely not its absolute score in any single day.
+      deepest of the four. That post-fix divergence is what singled Claude out. Not its bug-window drop.
+      Definitely not its score on any single day.
     </p>
     <p>
       The most common misread of a multi-model dashboard like LLM Vibes is comparing two scores at a single
@@ -109,8 +109,7 @@ const CrossModelDeltasBody = () => (
     <p>
       The signal was in the post-fix shape. ChatGPT recovered toward its baseline (32 → 46) after Anthropic
       confirmed the fix on April 10. Gemini drifted slightly down (38 → 36). Claude kept sliding the deepest
-      of the four (48 → 36). That recovery divergence is what identifies Claude as the actually-broken model,
-      not the depth of any single number or the delta-from-baseline during the breakage.
+      of the four (48 → 36).
     </p>
 
     <h2>Why the recovery shape matters more than the bug-window delta</h2>
@@ -132,9 +131,8 @@ const CrossModelDeltasBody = () => (
     </p>
     <p>
       Vendor-wide trends. When all four models drop together during the same week, that's industry sentiment,
-      not a single model's quality. The cross-vendor median delta during the bug window was about −30. Claude's
-      −23 is the smallest of the four. The bug-window deltas alone do not single Claude out. Only the recovery
-      column does.
+      not a single model's quality. The cross-vendor median delta during the bug window was about −30.
+      Claude's −23 was the smallest of the three high-volume models. Only the recovery column singles it out.
     </p>
 
     <h2>Caveats</h2>
@@ -145,8 +143,9 @@ const CrossModelDeltasBody = () => (
       to the underlying data; the baselines themselves are the weakest part of the table.
     </p>
     <p>
-      The classifier is Claude Haiku 4.5, which scores all four models including itself, so the risk to watch
-      is a pro-Claude tilt. The validation check samples recent low-confidence or incomplete posts, reruns them
+      During this window the classifier was Claude Haiku 4.5, which scored all four models including itself,
+      so the risk to watch was a pro-Claude tilt. (Production has since moved to OpenAI's GPT-6 Sol, which
+      flips the risk toward ChatGPT.) The validation check samples recent low-confidence or incomplete posts, reruns them
       through an independent Gemini grader, and compares its sentiment and complaint labels against
       the stored Claude labels without writing public scores. We run it around classifier changes, not as an
       always-on monitor. It does not remove self-bias risk, but it keeps a cutover auditable against a
@@ -157,7 +156,7 @@ const CrossModelDeltasBody = () => (
     </p>
 
     <h2>How to read the dashboard</h2>
-    <p>Three rules worth committing to memory.</p>
+    <p>Three rules.</p>
     <ol>
       <li>
         Compare a model to itself across time, not to other models on the same day. Each model card on{" "}
@@ -179,16 +178,12 @@ const CrossModelDeltasBody = () => (
 
     <h2>What this means for the next incident</h2>
     <p>
-      When the next Claude, GPT, Gemini, or Grok regression happens (and it will), the early signal will not
-      be a single model's drop and probably won't even be its delta from baseline. Industry-wide news cycles
-      pull every visible model down at the same time. The signal that one model is actually still degraded
-      (as opposed to absorbing a press wave) is post-recovery divergence: most models climb back; one doesn't.
+      The next regression will happen. News cycles pull every visible model down at once, so the tell won't
+      be the drop. It'll be the week after: most models climb back, one doesn't.
     </p>
     <p>
-      That comparison currently requires eyeballing four charts side by side. The next iteration of LLM Vibes
-      should compute it explicitly: a "post-fix recovery shape" metric per model that flags when a vendor's
-      score continues to fall while peers recover. That's not built yet. If you want to read the data yourself
-      in the meantime, the{" "}
+      Today that still means eyeballing four charts side by side. A per-model recovery-shape metric would do
+      it automatically, and it isn't built yet. To read the data yourself, the{" "}
       <a href="/research/claude-april-2026/data.csv">public CSV</a> for the Claude case study has the raw
       scores; the other three models' histories are queryable via the public <code>get_public_vibes_history</code>{" "}
       RPC defined in the repository's migrations.

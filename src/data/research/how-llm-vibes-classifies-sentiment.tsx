@@ -263,8 +263,9 @@ score = round((effective_positive / total_weight) × 100)`}</code>
       directly comparable to anything in the live dashboard.
     </p>
     <p>
-      The classifier vendor is one of the tracked models. Claude Haiku 4.5 now grades all four models,
-      including Claude itself, so pro-Claude bias is the measurement risk. An April 2026 comparison between the
+      The classifier vendor is one of the tracked models. At publication Claude Haiku 4.5 graded all four
+      models, including Claude itself, so pro-Claude bias was the measurement risk. Since September 23 the
+      grader is OpenAI's GPT-6 Sol, which points the same risk at ChatGPT. An April 2026 comparison between the
       Gemini and Claude classifiers found about 92% agreement on sentiment, and a June 2026 run on the live
       Claude Haiku 4.5 classifier put agreement with an independent Gemini grader at 88.9%, which suggests
       vendor identity isn't the main driver of scores, but neither is a substitute for an ongoing cross-vendor

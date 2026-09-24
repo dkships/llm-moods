@@ -162,11 +162,8 @@ const SurfaceSegmentationBody = () => (
     </p>
     <p>
       Second, for Gemini and Grok, almost no posts name a surface at all. The detector matched 126 Gemini
-      posts (5.6%) and 10 Grok posts (0.5%) across the whole window, every one in a cell too thin to chart. We don't think that's because Gemini and Grok users only use one surface.
-      We think it's a mix of two things: the detector has blind spots (no patterns for "Gemini Code Assist,"
-      "Google AI Studio" matches but its users may call it something else), and the social conversation about
-      those two vendors runs at the brand level rather than the surface level. Either way, we can't
-      surface-segment them at this volume. We'll come back to that in the methodology section.
+      posts (5.6%) and 10 Grok posts (0.5%) across the whole window, every one in a cell too thin to chart.
+      Why is its own section below.
     </p>
 
     <h2 id="claude-during-the-cache-bug">Claude during the cache bug</h2>
@@ -329,7 +326,8 @@ const SurfaceSegmentationBody = () => (
       window totals computed from the CSV reflect chartable volume, not raw scrape volume.
     </p>
     <p>
-      Sentiment runs through Claude Haiku 4.5 via the Anthropic API, classifying posts about its competitors.
+      During this window, sentiment ran through Claude Haiku 4.5 via the Anthropic API, classifying posts
+      about its competitors.
       <sup id="ref-1">
         <a href="#note-1" className="inline-flex min-h-6 min-w-6 items-center justify-center" aria-label="[1] See footnote 1">
           [1]
@@ -349,10 +347,9 @@ const SurfaceSegmentationBody = () => (
     </p>
     <p>
       See the <a href="/model/claude">live Claude chart</a> and{" "}
-      <a href="/model/chatgpt">live ChatGPT chart</a>. The dashboard still shows aggregate per-model scores;
-      the next iteration will widen the surface detector (Gemini and Grok need real coverage before they're
-      useful here) and promote per-surface scoring to a first-class metric on the model pages. The repo is
-      open. PRs welcome.
+      <a href="/model/chatgpt">live ChatGPT chart</a>. The dashboard still shows one score per model. Widening
+      the surface detector (Gemini and Grok need real coverage first) and putting per-surface scores on the
+      model pages are both still open. The repo is open too. PRs welcome.
     </p>
 
     <h2 id="notes">Notes</h2>
@@ -364,8 +361,8 @@ const SurfaceSegmentationBody = () => (
       >
         [1]
       </a>{" "}
-      Classifier self-bias risk. Claude Haiku 4.5 classifies posts about its three competitors and itself, so
-      the risk to watch is a pro-Claude tilt. We cross-check a sample of recent uncertain posts against an
+      Classifier self-bias risk. Claude Haiku 4.5 classified posts about its three competitors and itself, so
+      the risk to watch was a pro-Claude tilt. We cross-check a sample of recent uncertain posts against an
       independent Gemini grader around classifier changes. The cross-check doesn't prove neutrality,
       and the surface-coverage numbers are a separate axis: Gemini's low surface-coverage rate could look like
       classifier sandbagging if you squint at it. It isn't. Posts simply don't name Gemini's surfaces in plain

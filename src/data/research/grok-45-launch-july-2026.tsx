@@ -52,7 +52,7 @@ const Grok45LaunchBody = () => (
     </p>
     <p>
       The sentiment story is shorter. Grok's daily score averaged 29.6 over the thirty days before launch. On
-      launch day it hit 57 — tied for its best day since early June — and held an average of 55.5 through July
+      launch day it hit 57, tied for its best day since early June, and held an average of 55.5 through July
       11. Then it faded: 42.5 across July 13–16. The pop lasted about five days. The audience it pulled in
       didn't leave.
     </p>
@@ -94,10 +94,10 @@ const Grok45LaunchBody = () => (
     </p>
     <p>
       Two things make me trust this series across a messy week (more on the messiness below). The climb
-      starts July 8–9, two days before our own pipeline changed. And share of voice is a ratio — a pipeline
+      starts July 8–9, two days before our own pipeline changed. And share of voice is a ratio: a pipeline
       change that ingests more posts for every model doesn't move it much. Attention is roughly zero-sum,
       and the week after launch the loser was ChatGPT: its share of our corpus went from 40% the week of June
-      22 to 26% the week of July 13. Claude held 42% — the Fable 5 access drama was its own attention magnet
+      22 to 26% the week of July 13. Claude held 42%. The Fable 5 access drama was its own attention magnet
       that same week.
     </p>
 
@@ -130,7 +130,7 @@ const Grok45LaunchBody = () => (
     />
     <p>
       That pair is the launch reception in miniature: solid, fast, cheap, and second place on quality. The
-      negative posts weren't about the model either — they were about capacity. Day-one complaints in our
+      negative posts weren't about the model either. They were about capacity. Day-one complaints in our
       sample were rate limits ("
       <ExternalLink href="https://x.com/HO8M21319/status/2074827326550925592">
         impossible to even chat with Grok without hitting the weekly limit
@@ -142,13 +142,13 @@ const Grok45LaunchBody = () => (
     <p>
       The tech-press framing of this launch was defection: users abandoning Claude and ChatGPT for the
       cheaper model. Our passive corpus barely shows it. Across 16,724 unique posts in 90 days, explicit
-      switching statements — "switched to Grok," "cancelled my Claude subscription," "moved to Grok," and a
-      dozen pattern variants — matched <strong>three posts</strong>.
+      switching statements ("switched to Grok," "cancelled my Claude subscription," "moved to Grok," and a
+      dozen pattern variants) matched <strong>three posts</strong>.
     </p>
     <p>
       A negative result from a passive sample is weak evidence, so we tested it: a targeted Top-sorted
       search of X for those exact phrases, run July 17 through the same Apify actor our pipeline uses. That
-      search found the current our broad-term sampling missed — roughly a dozen post-launch Grok-bound
+      search found what our broad-term sampling missed: roughly a dozen post-launch Grok-bound
       defection statements among 80 returned tweets, including two with four-digit like counts inside 72
       hours of launch.
     </p>
@@ -169,23 +169,24 @@ const Grok45LaunchBody = () => (
       archivedHref="https://web.archive.org/web/2026/https://x.com/Grummz/status/2075980632694616398"
     />
     <p>
-      So the switching current is real. Three things shrink it back to size. The volume is modest — a dozen
+      So the switching current is real. Three things shrink it back to size. The volume is modest. A dozen
       declarations, not a wave, concentrated July 10–13. The stated reasons are Claude's pricing and limits
-      at least as often as Grok's quality — both quotes above are complaints about Anthropic wearing a Grok
+      at least as often as Grok's quality. Both quotes above are complaints about Anthropic wearing a Grok
       hat. And the same phrase search returns parallel cancel-for-Codex and cancel-for-GPT streams running
       since April; public churn-posting is a genre, and Grok 4.5 is its newest destination, not its cause.
     </p>
     <p>
       What the corpus has in volume instead of switching is <em>comparison</em>: nearly half the posts that
-      name Grok 4.5 were classified under a different model, because they're side-by-side posts —
+      name Grok 4.5 were classified under a different model, because they're side-by-side posts:
       build-offs, benchmark threads, "which one for my stack" questions. The pattern is remarkably
       consistent: Fable 5 holds the quality crown, Grok 4.5 wins on price, and the poster keeps both
       opinions in the same breath.
     </p>
     <p>
-      The timing caveat still matters most: the Fable 5 free-access window (extended to July 19 as I write
-      this) means the cancel-or-keep moment for a lot of Claude users hasn't arrived. If a defection wave
-      shows up, my money is on the week after that deadline, not launch week.
+      When I wrote this, the Fable 5 free-access window ran to July 19, and I expected the real
+      cancel-or-keep moment to land the week after. It never came. On July 20 Anthropic made Fable 5
+      permanent on Max and Team Premium (the <a href="/research/fable-5-lifecycle-june-july-2026">Fable 5
+      piece</a> has the details), which took the deadline off the table.
     </p>
 
     <h2 id="the-worst-measurement-week">Untangling the worst possible measurement week</h2>
@@ -275,8 +276,8 @@ const Grok45LaunchBody = () => (
     <p>
       LLM Vibes scrapes posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across six sources:
       Reddit and Twitter/X via Apify, Hacker News stories and comments via Algolia, Bluesky, Mastodon, and
-      App Store reviews. Each post is classified for per-model sentiment and complaint category by Claude
-      Haiku 4.5 via the Anthropic API. The daily 0–100 score is confidence- and engagement-weighted; the full
+      App Store reviews. At the time, each post was classified for per-model sentiment and complaint
+      category by Claude Haiku 4.5 via the Anthropic API. The daily 0–100 score is confidence- and engagement-weighted; the full
       scoring code is public in <code>supabase/functions/_shared/vibes-scoring.ts</code>.
     </p>
     <p>
@@ -293,7 +294,7 @@ const Grok45LaunchBody = () => (
       ceiling of the switching narrative, not its base rate.
     </p>
     <p>
-      The classifier is a Claude model scoring posts about Claude's competitors, including this article's
+      The classifier was a Claude model scoring posts about Claude's competitors, including this article's
       subject. The self-bias check we run against an independent Gemini grader (88.9% sentiment agreement on
       the June run of the live classifier) is described in{" "}
       <a href="/research/how-llm-vibes-classifies-sentiment">How LLM Vibes classifies sentiment</a>.
@@ -301,9 +302,8 @@ const Grok45LaunchBody = () => (
 
     <h2 id="what-you-can-do-next">What you can do next</h2>
     <p>
-      Watch the <a href="/model/grok">live Grok chart</a> — the launch window in this article is marked, and
-      the next few weeks answer the retention question. The July 19 Fable 5 deadline is the other date to
-      watch; if the switching wave exists, that's when it becomes measurable.
+      Watch the <a href="/model/grok">live Grok chart</a>. The launch window in this article is marked, and
+      every Grok release since sits on the same timeline.
     </p>
     <p>
       Download the <a href="/research/grok-45-launch-july-2026/data.csv">dataset</a> (daily scores, volumes,

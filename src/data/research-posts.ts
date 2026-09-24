@@ -107,6 +107,7 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     slug: "grok-45-launch-july-2026",
     title: "Grok 4.5's launch pop faded in five days. The audience it pulled in stayed.",
     publishedAt: "2026-07-17",
+    updatedAt: "2026-09-24",
     summary:
       "What survives the messiest measurement week in our dataset: a tripled share of voice, a five-day sentiment pop, a feed that flipped from Musk-chatter to product-chatter, and a switching story that's real but smaller and more price-driven than the headlines.",
     metaDescription:
@@ -144,9 +145,9 @@ export const RESEARCH_POSTS: ResearchPost[] = [
   },
   {
     slug: "claude-april-2026",
-    title: "We Caught Claude's March Slide 28 Days Before Anthropic Confirmed It",
+    title: "We caught Claude's March slide 28 days before Anthropic confirmed it",
     publishedAt: "2026-04-25",
-    updatedAt: "2026-04-26",
+    updatedAt: "2026-09-24",
     summary:
       "Independent sentiment data caught Claude Code grumbling on March 26, the day Anthropic shipped the cache bug. 28 days before the postmortem.",
     author: "David Kelly",
@@ -164,9 +165,9 @@ export const RESEARCH_POSTS: ResearchPost[] = [
   },
   {
     slug: "how-llm-vibes-classifies-sentiment",
-    title: "How LLM Vibes Classifies Sentiment",
+    title: "How LLM Vibes classifies sentiment",
     publishedAt: "2026-04-25",
-    updatedAt: "2026-07-17",
+    updatedAt: "2026-09-24",
     summary:
       "The full pipeline from scraper to score. Six sources, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we've documented but not yet solved.",
     metaDescription:
@@ -177,9 +178,9 @@ export const RESEARCH_POSTS: ResearchPost[] = [
   },
   {
     slug: "cross-model-deltas-march-april-2026",
-    title: "When One AI Cracks: Cross-Model Sentiment, March–April 2026",
+    title: "Every model dropped during the cache bug. Only Claude kept falling after the fix.",
     publishedAt: "2026-04-25",
-    updatedAt: "2026-04-26",
+    updatedAt: "2026-09-24",
     summary:
       "Comparing absolute scores or even bug-window deltas across LLM Vibes models can mislead you. What actually caught Claude's March 2026 regression was the post-fix recovery shape: ChatGPT recovered, Gemini stayed flat, Claude kept sliding.",
     metaDescription:

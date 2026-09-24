@@ -19,10 +19,13 @@ LLM Vibes is 100% automated — there are no user-submitted reports or votes. Se
 
 ## Research
 
+- [Opus 5.5 got the warmest Claude launch we've measured](https://llmvibes.ai/research/opus-5-5-vs-opus-5-launch-sentiment-2026): Launch-window sentiment for Opus 5.5 vs Opus 5 and Fable 5.1, and why launch week is the least informative week.
+- [Fable 5's launch took 17% of tracked AI chatter](https://llmvibes.ai/research/fable-5-lifecycle-june-july-2026): Five weeks of daily data across Fable 5's launch, government suspension, redeploy and farewell that was called off.
+- [Grok 4.5's launch pop faded in five days](https://llmvibes.ai/research/grok-45-launch-july-2026): A tripled share of voice, a five-day score pop, and a switching story smaller than the headlines.
 - [Claude Code lost 19 points during the cache bug](https://llmvibes.ai/research/surface-segmentation-march-may-2026): Per-product-surface sentiment shows the same model's scores diverge sharply by surface during a regression.
-- [We Caught Claude's March Slide 28 Days Before Anthropic Confirmed It](https://llmvibes.ai/research/claude-april-2026): Independent sentiment data caught Claude Code's regression the day Anthropic shipped the cache bug.
-- [How LLM Vibes Classifies Sentiment](https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment): The full pipeline from scraper to score, including documented failure modes.
-- [When One AI Cracks: Cross-Model Sentiment, March–April 2026](https://llmvibes.ai/research/cross-model-deltas-march-april-2026): Why cross-model score deltas mislead, and what the post-fix recovery shape reveals.
+- [We caught Claude's March slide 28 days before Anthropic confirmed it](https://llmvibes.ai/research/claude-april-2026): Independent sentiment data caught Claude Code's regression the day Anthropic shipped the cache bug.
+- [How LLM Vibes classifies sentiment](https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment): The full pipeline from scraper to score, including documented failure modes.
+- [Every model dropped during the cache bug. Only Claude kept falling after the fix.](https://llmvibes.ai/research/cross-model-deltas-march-april-2026): Why cross-model score deltas mislead, and what the post-fix recovery shape reveals.
 
 ## Optional
 

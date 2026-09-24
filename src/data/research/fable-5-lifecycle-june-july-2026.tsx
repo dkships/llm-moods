@@ -202,7 +202,7 @@ const FableLifecycleBody = () => (
     </p>
     <p>
       The suspension shows up as a real dip: 43.2 average June 13–18, down 11 points from the pre-launch
-      week, with June 13 (36) the single worst day. Then something odd — the score recovered to the low 50s
+      week, with June 13 (36) the single worst day. Then something odd: the score recovered to the low 50s
       by June 20, <em>while the model was still off</em>. Once the outrage cycle about the directive burned
       out, what remained was anticipation, and anticipation reads positive.
     </p>
@@ -238,17 +238,17 @@ const FableLifecycleBody = () => (
       </em>
     </p>
     <p>
-      Launch week tripled it, with the raw single-day peak — 8% on June 10 — landing 48 hours after release.
+      Launch week tripled it, and the raw single-day peak (8% on June 10) landed 48 hours after release.
       The classifier's own labels agree, and put the spike even higher: posts our classifier tagged with a{" "}
       <code>refusals</code> or <code>censorship</code> complaint were 1.9% of Claude posts the week before
       launch, 11.2% launch week, and 6.7–7.3% in the two weeks after the redeploy. (The classifier series
-      doesn't go quiet during the suspension the way the text proxy does — it counts refusal complaints
+      doesn't go quiet during the suspension the way the text proxy does; it counts refusal complaints
       about any Claude model, including the Opus 4.8 everyone fell back to.) The first refusal complaint in
       our corpus is titled "
       <ExternalLink href="https://www.reddit.com/r/ClaudeAI/comments/1u1hhhu/fable_5_blocking_all_my_security_audits/">
         Fable 5 blocking all my security audits
       </ExternalLink>
-      " and is timestamped nine hours after launch. During the suspension the series falls to 0.2% — nobody
+      " and is timestamped nine hours after launch. During the suspension the series falls to 0.2%. Nobody
       gets refused by a model they can't reach. After the redeploy it settles at 2–3% and stays there
       through press time: roughly double the launch-era baseline, sustained for two-plus weeks.
     </p>
@@ -282,7 +282,7 @@ const FableLifecycleBody = () => (
     />
     <p>
       Capability earned the trust and the classifier spent it, inside a single session, from a user paying
-      the top subscription price. Both halves of that sentence show up in the aggregate data — the
+      the top subscription price. Both halves of that sentence show up in the aggregate data: the
       capability half in the July honeymoon scores, the classifier half in the refusal series that won't
       come back down.
     </p>
@@ -312,7 +312,7 @@ const FableLifecycleBody = () => (
     />
     <p>
       That second post is the sharpest strategic read in the corpus: the pricing turns Fable from a daily
-      driver into a director role — plan with the expensive model, execute with the cheap one. The r/ClaudeAI
+      driver into a director role. Plan with the expensive model, execute with the cheap one. The r/ClaudeAI
       thread "
       <ExternalLink href="https://www.reddit.com/r/ClaudeAI/comments/1uowzrv/what_was_the_point_of_the_fable_5_free_trial/">
         What was the point of the Fable 5 free trial?
@@ -332,10 +332,10 @@ const FableLifecycleBody = () => (
       added as sources, and a scoring change that rescored neutral posts.
     </p>
     <p>
-      So: raw mention <em>counts</em> jump after July 10 partly because our net widened — that's why every
+      So: raw mention <em>counts</em> jump after July 10 partly because our net widened. That's why every
       series in this article is a share, not a count. Mention share is computed within each day's corpus, so
       a bigger net mostly cancels out. The refusal proxy is a text match, so it doesn't care what our
-      sentiment classifier thinks. Score comparisons across July 10 are the casualty — we measured the
+      sentiment classifier thinks. Score comparisons across July 10 are the casualty. We measured the
       scoring-formula change itself at only ~1 point on average, but the same deploy changed which posts get
       ingested, and there's no clean way to separate a real shift from a different sample. Every score claim
       above stays inside one side of that boundary; the June suspension dip and the July 1–7 honeymoon both
@@ -372,7 +372,7 @@ const FableLifecycleBody = () => (
     <h2 id="methodology">Methodology</h2>
     <p>
       LLM Vibes scrapes posts about four LLM models across six sources: Reddit and Twitter/X via Apify,
-      Hacker News via Algolia, Bluesky, Mastodon, and App Store reviews. Posts are classified for per-model
+      Hacker News via Algolia, Bluesky, Mastodon, and App Store reviews. At the time, posts were classified for per-model
       sentiment by Claude Haiku 4.5 via the Anthropic API; the daily 0–100 score is confidence- and
       engagement-weighted (<code>supabase/functions/_shared/vibes-scoring.ts</code> in the public repo).
     </p>
@@ -386,7 +386,7 @@ const FableLifecycleBody = () => (
       July 10 pipeline change; raw counts for every series are in the downloadable CSV.
     </p>
     <p>
-      Two disclosures. Our sentiment classifier is itself a Claude model classifying posts about Claude — the
+      Two disclosures. Our sentiment classifier was itself a Claude model classifying posts about Claude. The
       self-bias check against an independent Gemini grader (88.9% sentiment agreement on the June run of the
       live classifier) is described in{" "}
       <a href="/research/how-llm-vibes-classifies-sentiment">How LLM Vibes classifies sentiment</a>. And this
@@ -402,7 +402,7 @@ const FableLifecycleBody = () => (
       Fable 5 is permanently included in Max and Team Premium plans at 50% of usage limits, with Pro and
       Team Standard keeping usage-credit access plus a one-time $100 credit. That settles the churn
       question this article originally closed on. What's left to watch is whether the 16% mention share
-      holds once no countdown is feeding it — the <a href="/model/claude">live Claude chart</a> has the
+      holds once no countdown is feeding it. The <a href="/model/claude">live Claude chart</a> has the
       suspension band and the July 20 announcement marked.
     </p>
     <p>

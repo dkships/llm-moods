@@ -53,7 +53,7 @@
       <category>chatgpt</category>
     </item>
     <item>
-      <title>We Caught Claude&apos;s March Slide 28 Days Before Anthropic Confirmed It</title>
+      <title>We caught Claude&apos;s March slide 28 days before Anthropic confirmed it</title>
       <link>https://llmvibes.ai/research/claude-april-2026</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/claude-april-2026</guid>
       <description>Independent sentiment data caught Claude Code grumbling on March 26, the day Anthropic shipped the cache bug. 28 days before the postmortem.</description>
@@ -65,7 +65,7 @@
       <category>case-study</category>
     </item>
     <item>
-      <title>How LLM Vibes Classifies Sentiment</title>
+      <title>How LLM Vibes classifies sentiment</title>
       <link>https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</guid>
       <description>The full pipeline from scraper to score. Six sources, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we&apos;ve documented but not yet solved.</description>
@@ -73,7 +73,7 @@
       <category>methodology</category>
     </item>
     <item>
-      <title>When One AI Cracks: Cross-Model Sentiment, March–April 2026</title>
+      <title>Every model dropped during the cache bug. Only Claude kept falling after the fix.</title>
       <link>https://llmvibes.ai/research/cross-model-deltas-march-april-2026</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/cross-model-deltas-march-april-2026</guid>
       <description>Comparing absolute scores or even bug-window deltas across LLM Vibes models can mislead you. What actually caught Claude&apos;s March 2026 regression was the post-fix recovery shape: ChatGPT recovered, Gemini stayed flat, Claude kept sliding.</description>

@@ -175,8 +175,7 @@ const ClaudeApril2026Body = () => (
       April 11 and April 15, ChatGPT moved back toward its baseline (32 → 46), Gemini drifted slightly down
       (38 → 36), and Claude fell another 12 points to 36, then kept going. (Grok also slid on much thinner
       post volume; Claude's drop is the only one with high-volume support.) That post-fix divergence is the
-      strongest evidence we have that the underlying issue was Claude-specific rather than the press cycle
-      hitting every model.
+      strongest evidence we have that the problem was Claude's, not a press cycle hitting every model.
     </p>
 
     <h2 id="what-we-got-wrong">What we got wrong</h2>
@@ -197,9 +196,9 @@ const ClaudeApril2026Body = () => (
       but ran on manual triggers only; the hourly cron schedule landed April 22. After a May 2026
       reclassification pass that recovered previously-failed posts, the gap is smaller than our April
       retrospective reported, but the "Feb 15–18 baseline" still stands on only four days of meaningful data,
-      not a solid statistical floor. The operational miss was less expensive than we feared, and worth
-      naming anyway because shipping a leading-indicator with manual-trigger scrapers is the kind of mistake
-      that doesn't show up until you need the indicator.
+      not a solid statistical floor. The miss cost less than I feared. It's still worth naming: a leading
+      indicator running on manual-trigger scrapers is the kind of mistake you only notice when you need the
+      indicator.
     </p>
     <p>
       The classifier itself is one of the tracked models. Sentiment runs through Claude Haiku 4.5, classifying
@@ -268,8 +267,9 @@ const ClaudeApril2026Body = () => (
       <code>supabase/functions/_shared/</code>.
     </p>
     <p>
-      The next iteration of LLM Vibes will compute recovery-shape divergence as a first-class metric: a single
-      number that flags when one model keeps falling while peers recover. The repo is open; PRs welcome.
+      One open item. Recovery-shape divergence (one model still falling while its peers recover) caught this
+      regression, and it still isn't a first-class metric on the dashboard. It should be. The repo is open;
+      PRs welcome.
     </p>
 
     <h2 id="notes">Notes</h2>
