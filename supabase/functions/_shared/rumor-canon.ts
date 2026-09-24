@@ -357,6 +357,7 @@ interface AliasEntry {
   released?: boolean; // true once shipped → retired from the radar (see isReleasedVersion)
   releasePrompt?: string; // released-set wording; omit on superseded snapshots
   releaseAliases?: string[]; // distinctive names safe to scan in GA announcement text
+  releasedOn?: string; // YYYY-MM-DD ship date; retires "<Line>-Next"/"-new" placeholders seen before it
 }
 
 // Known upcoming versions whose codenames/labels are aliases of one model. The
@@ -396,6 +397,7 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       aliases: ["opus55", "claudeopus55"],
       released: true,
       releasePrompt: "Opus 5.5 and earlier",
+      releasedOn: "2026-09-22",
     },
     {
       key: "sonnet46",
@@ -494,6 +496,17 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       released: true,
       releasePrompt: "GPT-6 (Astra) and earlier",
       releaseAliases: ["astra", "gpt6astra"],
+    },
+    {
+      // Shipped in the API and ChatGPT as two variants; the variant names are
+      // the only way leak posts refer to it.
+      key: "gptimage25",
+      label: "GPT Image 2.5",
+      codename: null,
+      aliases: ["gptimage25", "flare", "sunburst", "gptimage25flare", "gptimage25sunburst"],
+      released: true,
+      releasePrompt: "GPT Image 2.5 (Flare, Sunburst)",
+      releaseAliases: ["gptimage25"],
     },
   ],
   gemini: [
@@ -594,6 +607,23 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       // describe the same pending launch, so both land on one card. A "Gemini 4
       // Flash" leak stays separate — only the Pro spelling folds in.
       aliases: ["gemini4", "gemini4pro", "4pro"],
+    },
+    {
+      // Shipped 2026-06-30 as gemini-3.1-flash-lite-image; leak posts about an
+      // "updated NB2Lite" describe a refresh of a live model, not a new one.
+      key: "nb2lite",
+      label: "Nano Banana 2 Lite",
+      codename: null,
+      aliases: ["nb2lite", "nanobanana2lite"],
+      released: true,
+    },
+    {
+      // Unreleased successor to Nano Banana 2. The Arena codename and the
+      // "2.5 Flash" spelling describe the same pending model, so one card.
+      key: "nanobanana25",
+      label: "Nano Banana 2.5",
+      codename: "Spicy-Mayo",
+      aliases: ["nanobanana25", "nanobanana25flash", "spicymayo"],
     },
   ],
   grok: [
@@ -892,6 +922,120 @@ export function isReleasedVersion(
     if (RELEASED_TOKENS.has(q)) return true;
     for (const stem of FAMILY_STEMS) {
       if (q.startsWith(stem) && RELEASED_TOKENS.has(q.slice(stem.length))) return true;
+    }
+  }
+  return false;
+}
+
+// A numbered release line: "Opus 5.2" → { line: "claude:opus", version: [5, 2] }.
+// Gemini keeps its tier in the line so "Gemini 3.5 Pro" never compares against
+// a Flash release, and a tierless "Gemini 3.5" only against tierless ones.
+interface LineVersion {
+  line: string;
+  version: number[];
+}
+
+const LINE_VERSION_RES: Record<string, RegExp> = {
+  claude: /^(?:claude\s*)?(opus|sonnet|haiku|fable|mythos)[\s-]*(\d+(?:\.\d+)*)\b/i,
+  chatgpt: /^(?:chat)?(gpt)[\s-]*(\d+(?:\.\d+)*)\b/i,
+  gemini: /^(gemini)[\s-]*(\d+(?:\.\d+)*)((?:[\s-]+(?:pro|flash|lite|ultra|nano))*)/i,
+  grok: /^(grok)[\s-]*(\d+(?:\.\d+)*)\b/i,
+};
+
+function parseLineVersion(family: string, raw: string | null | undefined): LineVersion | null {
+  const re = LINE_VERSION_RES[family];
+  const text = cleanStr(raw);
+  if (!re || !text) return null;
+
+  const m = text.match(re);
+  if (!m) return null;
+
+  const tier = squash(m[3] ?? "");
+  const line = `${family}:${m[1].toLowerCase().replace("mythos", "fable")}${tier ? `-${tier}` : ""}`;
+  return { line, version: m[2].split(".").map(Number) };
+}
+
+function compareVersions(a: number[], b: number[]): number {
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const diff = (a[i] ?? 0) - (b[i] ?? 0);
+    if (diff !== 0) {
+      return diff;
+    }
+  }
+  return 0;
+}
+
+interface LineRelease {
+  version: number[];
+  releasedOn: string | null;
+}
+
+// Newest shipped version (and ship date, when recorded) per release line.
+const LATEST_RELEASE_BY_LINE: ReadonlyMap<string, LineRelease> = (() => {
+  const latest = new Map<string, LineRelease>();
+  for (const [family, entries] of Object.entries(FAMILY_ALIASES)) {
+    for (const entry of entries) {
+      if (!entry.released) {
+        continue;
+      }
+      const parsed = parseLineVersion(family, entry.label);
+      if (!parsed) {
+        continue;
+      }
+      const current = latest.get(parsed.line);
+      if (!current || compareVersions(parsed.version, current.version) > 0) {
+        latest.set(parsed.line, { version: parsed.version, releasedOn: entry.releasedOn ?? null });
+      }
+    }
+  }
+  return latest;
+})();
+
+// "Opus-Next", "Opus new", "next Sonnet": a placeholder for whatever the line
+// ships next, not a version of its own.
+const NEXT_PLACEHOLDER_RE = /^(?:next[\s-]*)?(opus|sonnet|haiku|fable)(?:[\s-]*(?:next|new))?$/i;
+
+/**
+ * Has a newer release already overtaken this rumor? Two cases:
+ *
+ *   Opus 5.2 rumored, Opus 5.5 shipped      → superseded (older number, same line)
+ *   "Opus-Next" last seen Sep 18, Opus 5.5
+ *   shipped Sep 22                          → superseded (the "next" one arrived)
+ *
+ * Only numbered versions strictly below the newest release count, so a variant
+ * of the current generation ("GPT-6 Mini") and anything newer stay on the radar.
+ */
+export function isSupersededVersion(
+  family: string | null | undefined,
+  label: string | null | undefined,
+  codename: string | null | undefined,
+  lastSeenAt?: string | null,
+): boolean {
+  const fam = (family ?? "").toLowerCase();
+
+  for (const raw of [label, codename]) {
+    const parsed = parseLineVersion(fam, raw);
+    if (!parsed) {
+      continue;
+    }
+    const latest = LATEST_RELEASE_BY_LINE.get(parsed.line);
+    if (latest && compareVersions(parsed.version, latest.version) < 0) {
+      return true;
+    }
+  }
+
+  if (!lastSeenAt) {
+    return false;
+  }
+  for (const raw of [label, codename]) {
+    const text = cleanStr(raw);
+    const m = text?.match(NEXT_PLACEHOLDER_RE);
+    if (!m || !/next|new/i.test(text ?? "")) {
+      continue;
+    }
+    const latest = LATEST_RELEASE_BY_LINE.get(`${fam}:${m[1].toLowerCase()}`);
+    if (latest?.releasedOn && lastSeenAt.slice(0, 10) < latest.releasedOn) {
+      return true;
     }
   }
   return false;
@@ -1238,6 +1382,7 @@ export function mergeRumorRows<T extends MergeableRumor>(rows: T[]): T[] {
     if (!TRACKED_FAMILIES.has(slug)) continue;
     if (isNonFrontierLabel(slug, r.version_label, r.codename)) continue;
     if (isReleasedVersion(slug, r.version_label, r.codename)) continue;
+    if (isSupersededVersion(slug, r.version_label, r.codename, r.last_seen_at)) continue;
     filtered.push(r);
   }
 

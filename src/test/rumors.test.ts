@@ -29,6 +29,7 @@ import {
   isNonFrontierLabel,
   isReleasedVersion,
   isStrongPublicRumor,
+  isSupersededVersion,
   mergeRumorRows,
   releasedSetPrompt,
   rumorStrengthScore,
@@ -854,6 +855,32 @@ describe("isFamilyConsistentLabel / isNonFrontierLabel", () => {
   });
 });
 
+describe("isSupersededVersion", () => {
+  it("drops numbered versions below the newest release in the same line", () => {
+    expect(isSupersededVersion("claude", "Opus 5.2", null)).toBe(true);
+    expect(isSupersededVersion("claude", "Opus 5.1", "Marshmallow")).toBe(true);
+    expect(isSupersededVersion("claude", "Fable 5 Extra", null)).toBe(true);
+  });
+
+  it("keeps newer versions, other lines, and variants of the current generation", () => {
+    expect(isSupersededVersion("claude", "Opus 6", null)).toBe(false);
+    expect(isSupersededVersion("claude", "Sonnet 5.5", null)).toBe(false);
+    expect(isSupersededVersion("claude", "Fable 5.5", null)).toBe(false);
+    expect(isSupersededVersion("chatgpt", "GPT-6 Astra Max", null)).toBe(false);
+    expect(isSupersededVersion("grok", "Grok 4.8", null)).toBe(false);
+    // Tiers compare only within the tier: 3.8 Flash shipping says nothing about 3.5 Pro.
+    expect(isSupersededVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
+    expect(isSupersededVersion("gemini", "Gemini 3.5", null)).toBe(false);
+  });
+
+  it("retires next/new placeholders last seen before the line shipped", () => {
+    expect(isSupersededVersion("claude", null, "Opus-Next", "2026-09-18T12:00:00Z")).toBe(true);
+    expect(isSupersededVersion("claude", null, "Opus-new", "2026-09-21T12:00:00Z")).toBe(true);
+    expect(isSupersededVersion("claude", null, "Opus-Next", "2026-09-30T12:00:00Z")).toBe(false);
+    expect(isSupersededVersion("claude", null, "Opus-Next", null)).toBe(false);
+  });
+});
+
 describe("isReleasedVersion", () => {
   it("flags launched versions across every spelling", () => {
     expect(isReleasedVersion("claude", "Fable 5", null)).toBe(true);
@@ -903,6 +930,8 @@ describe("isReleasedVersion", () => {
     // Still pending, and must not be swept up by the entries above.
     expect(isReleasedVersion("claude", "Mythos 6", null)).toBe(false);
     expect(isReleasedVersion("claude", "Opus 5.1", null)).toBe(false);
+    expect(isReleasedVersion("chatgpt", null, "Flare")).toBe(true);
+    expect(isReleasedVersion("chatgpt", null, "Sunburst")).toBe(true);
     expect(isReleasedVersion("chatgpt", "GPT-6.1", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.7 Pro", null)).toBe(false);
   });
