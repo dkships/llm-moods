@@ -173,6 +173,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     notes: "Musk announced July 8; public release July 9 (Cursor users got it a day early).",
   },
   {
+    id: "anthropic-opus-5-launch",
+    vendor: "anthropic",
+    modelSlug: "claude",
+    eventDate: "2026-07-24",
+    eventType: "model_launch",
+    title: "Claude Opus 5 launch",
+    url: "https://www.anthropic.com/news/claude-opus-5",
+    notes: "$5/$25 per million tokens, same as Opus 4.8; new default on Claude Max.",
+  },
+  {
     id: "xai-grok-4-6-launch",
     vendor: "xai",
     modelSlug: "grok",
@@ -222,6 +232,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     title: "GPT-6 Astra launch",
     url: "https://www.cnbc.com/2026/09/03/open-ai-astra-gpt-6-cyber.html",
     notes: "Approved-user rollout September 3, general availability the next day. Computer-use headline feature; API priced at 2.5x GPT-5.6 Sol.",
+  },
+  {
+    id: "anthropic-opus-5-5-launch",
+    vendor: "anthropic",
+    modelSlug: "claude",
+    eventDate: "2026-09-22",
+    eventType: "model_launch",
+    title: "Claude Opus 5.5 launch",
+    url: "https://www.anthropic.com/news/claude-opus-5-5",
+    notes: "$4/$20 per million tokens, higher five-hour limits on paid plans, and a saved rate-limit reset. Ships with Fable 5.1-style safeguards; flagged tasks fall back to an older model.",
   },
 ];
 

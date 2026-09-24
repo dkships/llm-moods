@@ -35,6 +35,9 @@ export const RESEARCH_BODIES: Record<string, LazyExoticComponent<ComponentType>>
     () => import("./research/fable-5-lifecycle-june-july-2026"),
   ),
   "grok-45-launch-july-2026": lazy(() => import("./research/grok-45-launch-july-2026")),
+  "opus-5-5-vs-opus-5-launch-sentiment-2026": lazy(
+    () => import("./research/opus-5-5-vs-opus-5-launch-sentiment-2026"),
+  ),
 };
 
 export function getResearchBody(slug: string): LazyExoticComponent<ComponentType> | undefined {

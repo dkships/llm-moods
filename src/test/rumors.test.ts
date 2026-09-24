@@ -79,7 +79,7 @@ describe("isLikelyRumorCandidate", () => {
       "Fable 5 is returning soon",
       "model string for opus 5 leaked",
       "GPT-6 appeared behind a feature flag in the model selector",
-      "Claude Opus 5 entered internal testing",
+      "Claude Opus 6 entered internal testing",
       "Gemini 4 is in a private preview",
       "Grok 5 is being red-teamed before launch",
       "A new checkpoint was spotted under the Honeycomb codename",
@@ -139,16 +139,16 @@ describe("buildContribution", () => {
     const raw: RawClaim = {
       is_rumor: true,
       target_family: "claude",
-      version_label: "Opus 5",
+      version_label: "Opus 6",
       is_unreleased: true,
       claim_type: "in_testing",
       claim_summary: "Available to select enterprise customers under EAP.",
       confidence: 0.7,
     };
-    const c = buildContribution(raw, source, "Claude Opus 5 is in early access for enterprise");
+    const c = buildContribution(raw, source, "Claude Opus 6 is in early access for enterprise");
     expect(c).not.toBeNull();
     expect(c!.modelSlug).toBe("claude");
-    expect(c!.versionKey).toBe("opus5");
+    expect(c!.versionKey).toBe("opus6");
     expect(c!.claimType).toBe("in_testing");
   });
 
@@ -156,7 +156,7 @@ describe("buildContribution", () => {
     const base: RawClaim = {
       is_rumor: true,
       target_family: "claude",
-      version_label: "Opus 5",
+      version_label: "Opus 6",
       is_unreleased: true,
       claim_type: "launch",
       confidence: 0.8,
@@ -165,14 +165,14 @@ describe("buildContribution", () => {
       buildContribution(
         base,
         source,
-        "Anthropic needs Opus 5 to hit just below Fable 5, so Fable 5.1 would make room for it.",
+        "Anthropic needs Opus 6 to hit just below Fable 5, so Fable 5.1 would make room for it.",
       ),
     ).toBeNull();
     expect(
       buildContribution(
         { ...base, claim_mode: "speculation", evidence_kind: "none" },
         source,
-        "Opus 5 is probably coming someday.",
+        "Opus 6 is probably coming someday.",
       ),
     ).toBeNull();
   });
@@ -216,10 +216,10 @@ describe("buildContribution", () => {
   });
 
   it("drops non-rumors, released versions, and unknown family", () => {
-    const base: RawClaim = { is_rumor: true, target_family: "claude", version_label: "Opus 5", is_unreleased: true };
-    expect(buildContribution({ ...base, is_rumor: false }, source, "Opus 5")).toBeNull();
-    expect(buildContribution({ ...base, is_unreleased: false }, source, "Opus 5")).toBeNull();
-    expect(buildContribution({ ...base, target_family: "unknown" }, source, "Opus 5")).toBeNull();
+    const base: RawClaim = { is_rumor: true, target_family: "claude", version_label: "Opus 6", is_unreleased: true };
+    expect(buildContribution({ ...base, is_rumor: false }, source, "Opus 6")).toBeNull();
+    expect(buildContribution({ ...base, is_unreleased: false }, source, "Opus 6")).toBeNull();
+    expect(buildContribution({ ...base, target_family: "unknown" }, source, "Opus 6")).toBeNull();
     // A version that has now shipped is dropped even when the model judged it unreleased.
     expect(buildContribution({ ...base, version_label: "Sonnet 5" }, source, "Sonnet 5 rumor")).toBeNull();
   });
@@ -230,7 +230,7 @@ describe("buildContribution", () => {
   });
 
   it("anti-hallucination: drops a version_label not present in the post text", () => {
-    const raw: RawClaim = { is_rumor: true, target_family: "claude", version_label: "Opus 5", is_unreleased: true };
+    const raw: RawClaim = { is_rumor: true, target_family: "claude", version_label: "Opus 6", is_unreleased: true };
     expect(buildContribution(raw, source, "just talking about claude in general")).toBeNull();
   });
 
@@ -434,16 +434,16 @@ describe("mergeCluster", () => {
       null,
       [
         contrib({
-          versionKey: "opus5",
-          versionLabel: "Opus 5",
+          versionKey: "opus6",
+          versionLabel: "Opus 6",
           codename: "Honeycomb",
           claimType: "imminent",
-          claimSummary: "Opus 5 is dropping Monday.",
+          claimSummary: "Opus 6 is dropping Monday.",
           source: src("https://x.com/unknown/status/1", "twitter", "2026-07-12", 0),
         }),
         contrib({
-          versionKey: "opus5",
-          versionLabel: "Opus 5",
+          versionKey: "opus6",
+          versionLabel: "Opus 6",
           codename: "Honeycomb",
           claimType: "in_testing",
           claimSummary: "Honeycomb appeared in Cursor app data.",
@@ -654,8 +654,8 @@ describe("groupByCluster", () => {
     const groups = groupByCluster([honeycomb], [
       {
         model_slug: "claude",
-        version_key: "opus5",
-        version_label: "Opus 5",
+        version_key: "opus6",
+        version_label: "Opus 6",
         codename: "Honeycomb",
       },
       {
@@ -665,10 +665,10 @@ describe("groupByCluster", () => {
         codename: "Honeycomb",
       },
     ]);
-    expect([...groups.keys()]).toEqual(["claude:opus5"]);
-    expect(groups.get("claude:opus5")?.[0]).toMatchObject({
-      versionKey: "opus5",
-      versionLabel: "Opus 5",
+    expect([...groups.keys()]).toEqual(["claude:opus6"]);
+    expect(groups.get("claude:opus6")?.[0]).toMatchObject({
+      versionKey: "opus6",
+      versionLabel: "Opus 6",
       codename: "Honeycomb",
     });
   });
@@ -877,7 +877,7 @@ describe("isReleasedVersion", () => {
   });
 
   it("keeps unreleased versions (no false positives)", () => {
-    expect(isReleasedVersion("claude", "Opus 5", null)).toBe(false);
+    expect(isReleasedVersion("claude", "Opus 6", null)).toBe(false);
     expect(isReleasedVersion("chatgpt", "GPT-6.1", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 5", null)).toBe(false);
@@ -954,7 +954,7 @@ describe("modelIdToTokens / deriveReleasedTokens (API auto-detect)", () => {
     const gemini = new Set(deriveReleasedTokens([], ["models/gemini-3-pro"]));
     expect(gemini.has(canonicalVersionKey("gemini", "Gemini 3 Pro", null).key!)).toBe(true);
     // An unreleased rumor's key is NOT in the shipped-token set.
-    expect(anthropic.has(canonicalVersionKey("claude", "Opus 5", null).key!)).toBe(false);
+    expect(anthropic.has(canonicalVersionKey("claude", "Opus 6", null).key!)).toBe(false);
   });
 });
 
@@ -1173,10 +1173,10 @@ describe("mergeRumorRows", () => {
   it("auto-links a version/codename bridge and lets artifact evidence lead", () => {
     const out = mergeRumorRows([
       rrow({
-        version_label: "Opus 5",
+        version_label: "Opus 6",
         codename: "Honeycomb",
         claim_type: "imminent",
-        claim_summary: "Opus 5 is dropping Monday.",
+        claim_summary: "Opus 6 is dropping Monday.",
         signals: "speculative comparison",
         mention_count: 8,
         platform_count: 2,
@@ -1189,12 +1189,12 @@ describe("mergeRumorRows", () => {
           {
             url: "https://bsky.app/profile/timkellogg.me/post/one",
             platform: "bluesky",
-            snippet: "Anthropic needs Opus 5 to hit below Fable, so Fable 5.1 would make room.",
+            snippet: "Anthropic needs Opus 6 to hit below Fable, so Fable 5.1 would make room.",
           },
           {
             url: "https://bsky.app/profile/cameron.stream/post/two",
             platform: "bluesky",
-            snippet: "If I were them, I would announce Opus 5 this week.",
+            snippet: "If I were them, I would announce Opus 6 this week.",
           },
         ],
       }),
@@ -1217,7 +1217,7 @@ describe("mergeRumorRows", () => {
 
     expect(out).toHaveLength(1);
     expect(out[0]).toMatchObject({
-      version_label: "Opus 5",
+      version_label: "Opus 6",
       codename: "Honeycomb",
       claim_type: "in_testing",
       claim_summary: "Honeycomb appeared in Cursor app data.",
@@ -1283,17 +1283,17 @@ describe("mergeRumorRows", () => {
 
   it("filters out non-frontier labels and untracked families", () => {
     const out = mergeRumorRows([
-      rrow({ version_label: "Opus 5", representative_sources: [{ url: "a", platform: "reddit" }] }),
+      rrow({ version_label: "Opus 6", representative_sources: [{ url: "a", platform: "reddit" }] }),
       rrow({ version_label: "DeepSeek V3" }), // competitor label
       rrow({ model_slug: "mistral", version_label: "Large 3" }), // untracked family
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("Opus 5");
+    expect(out[0].version_label).toBe("Opus 6");
   });
 
   it("drops rows for versions that have launched", () => {
     const out = mergeRumorRows([
-      rrow({ version_label: "Opus 5", representative_sources: [{ url: "a", platform: "reddit" }] }),
+      rrow({ version_label: "Opus 6", representative_sources: [{ url: "a", platform: "reddit" }] }),
       rrow({ codename: "Mythos" }), // Fable 5 shipped
       rrow({ version_label: "Sonnet 5" }), // shipped
       rrow({ version_label: "Claude Sonnet 5" }), // shipped, family-prefixed spelling
@@ -1302,7 +1302,7 @@ describe("mergeRumorRows", () => {
       rrow({ model_slug: "grok", version_label: "Grok 4.5" }),
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("Opus 5");
+    expect(out[0].version_label).toBe("Opus 6");
   });
 });
 

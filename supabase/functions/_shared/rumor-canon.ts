@@ -381,7 +381,21 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       codename: null,
       aliases: ["opus48", "claudeopus48"],
       released: true,
-      releasePrompt: "Opus 4.8 and earlier",
+    },
+    {
+      key: "opus5",
+      label: "Opus 5",
+      codename: null,
+      aliases: ["opus5", "claudeopus5"],
+      released: true,
+    },
+    {
+      key: "opus55",
+      label: "Opus 5.5",
+      codename: null,
+      aliases: ["opus55", "claudeopus55"],
+      released: true,
+      releasePrompt: "Opus 5.5 and earlier",
     },
     {
       key: "sonnet46",
