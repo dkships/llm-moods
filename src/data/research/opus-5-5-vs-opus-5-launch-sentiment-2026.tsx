@@ -55,6 +55,17 @@ const COMPLAINT_ROWS = [
   { label: "Opus 5 · Jul 27 – Sep 21", detail: "1,412 complaints", counts: { safety: 59, quality: 1012, price: 66, other: 275 } },
 ];
 
+// Independent cross-check: every Hacker News post naming the model (Algolia
+// API) plus ~230 X posts per window, graded by a separate LLM pass that never
+// touched our production classifier. Launch day + next day. Irrelevant posts
+// excluded. Per-post labels are in independent-sample.csv.
+const CROSS_CHECK_ROWS = [
+  { label: "Opus 5.5 · Sep 22–23", detail: "311 posts", counts: { positive: 189, neutral: 66, negative: 56 } },
+  { label: "Opus 5 · Jul 24–25", detail: "321 posts", counts: { positive: 146, neutral: 82, negative: 93 } },
+  { label: "GPT-5.6 · Jul 9–10", detail: "250 posts", counts: { positive: 150, neutral: 37, negative: 63 } },
+  { label: "GPT-6 Sol + Luna · Sep 22–23", detail: "196 posts", counts: { positive: 86, neutral: 38, negative: 72 } },
+];
+
 // Share of Opus 5 posts that took a side (positive / (positive + negative)),
 // in 7-day buckets counted from the Jul 24 launch.
 const OPUS5_TONE_WEEKLY: { day: string; value: number | null }[] = [
@@ -76,7 +87,8 @@ const OpusLaunchBody = () => (
       model before it.
     </p>
     <p>
-      The data says I'm mostly right. And the part where I'm wrong is the more useful part.
+      The data says I'm mostly right. And the part where I'm wrong is the more useful part. Also, OpenAI
+      launched GPT-6 Sol and Luna the same afternoon, and that launch went the other way.
     </p>
 
     <StatCallout
@@ -258,6 +270,18 @@ const OpusLaunchBody = () => (
       </em>
     </p>
     <p>
+      One X user captured the whole arc in about 20 hours. Their first-day take was that Opus 5 "solved the
+      biggest problems Fable 5 has - cost and speed… this is clearly going to be the daily driver." The next
+      evening:
+    </p>
+    <PullQuote
+      text="opus 5 is a VERY interesting release for a few reasons 1. it showed that the general benchmarks we use today are almost completely useless now opus 5 is nowhere near fable in practical use, not even close."
+      handle="@kunchenguid"
+      platform="X"
+      timestamp="2026-07-25 21:11 UTC"
+      href="https://x.com/kunchenguid/status/2081125298050060694"
+    />
+    <p>
       Three weeks in, positive share had halved. The Claude score bottomed at 32 on August 26 and spent
       most of late August in the 30s. The complaints weren't about price or refusals. 72% of the 1,412
       negative Opus 5 posts after launch week were some flavor of quality drop: lazy responses, worse code,
@@ -335,6 +359,150 @@ const OpusLaunchBody = () => (
       href="https://x.com/ashen_one/status/2102429046558609669"
     />
 
+    <h2 id="openai-went-the-other-way">Same day, other direction: GPT-6 Sol and Luna</h2>
+    <p>
+      Opus 5.5 didn't launch alone. OpenAI shipped{" "}
+      <ExternalLink href="https://siliconangle.com/2026/09/22/anthropic-releases-claude-opus-5-5-and-openai-counters-with-two-cheaper-gpt-6-models/">
+        GPT-6 Sol and GPT-6 Luna
+      </ExternalLink>{" "}
+      the same afternoon, at half the price of the GPT-5.6 Sol and Luna they replace. So the natural question
+      for OpenAI is the same one I asked about Anthropic: did people like the new generation more than the
+      last one?
+    </p>
+    <p>
+      No. And the two companies basically traded places.
+    </p>
+
+    <ResearchTableFrame label="ChatGPT and Claude scores around each generation's launch">
+      <table className="w-full">
+        <caption className="sr-only">
+          Daily sentiment score in the week before each launch and over launch day plus the next day, for the
+          two OpenAI and two Anthropic launches compared in this article.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Launch</th>
+            <th scope="col" className="whitespace-nowrap">Week before</th>
+            <th scope="col" className="whitespace-nowrap">First two days</th>
+            <th scope="col">Change</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td className="whitespace-nowrap">GPT-5.6 · Jul 9</td>
+            <td>33.9</td>
+            <td>54.5</td>
+            <td><strong>+20.6</strong></td>
+          </tr>
+          <tr>
+            <td className="whitespace-nowrap">GPT-6 Sol + Luna · Sep 22</td>
+            <td>58.7</td>
+            <td>50.0</td>
+            <td><strong>−8.7</strong></td>
+          </tr>
+          <tr>
+            <td className="whitespace-nowrap">Opus 5 · Jul 24</td>
+            <td>52.4</td>
+            <td>59.5</td>
+            <td>+7.1</td>
+          </tr>
+          <tr>
+            <td className="whitespace-nowrap">Opus 5.5 · Sep 22</td>
+            <td>38.1</td>
+            <td>58.0</td>
+            <td>+19.9</td>
+          </tr>
+        </tbody>
+      </table>
+    </ResearchTableFrame>
+
+    <p>
+      In July, GPT-5.6 got the 20-point launch pop. In September, Opus 5.5 got it and ChatGPT lost 9 points
+      on launch day plus the next. Same size swing, opposite company.
+    </p>
+
+    <EmbeddedModelChart modelSlug="chatgpt" startDate="2026-07-01" endDate="2026-09-23" />
+    <p className="mt-2 text-sm text-text-tertiary">
+      <em>
+        ChatGPT's daily sentiment score, July 1 – September 23, 2026, with the GPT-5.6, GPT-6 Astra and GPT-6
+        Sol launches marked. GPT-5.6 lifts it out of the 30s. GPT-6 Sol arrives near the summer high and
+        dips.
+      </em>
+    </p>
+
+    <p>
+      The complaints are about the model itself, and the model it replaced keeps coming up. People liked
+      GPT-5.6 Sol, and GPT-6 Sol reads to them as cheaper rather than better:
+    </p>
+    <PullQuote
+      text="I think it's safe to say that GPT-6 Sol came in below expectations. Anthropic wins the day"
+      handle="@synthwavedd"
+      platform="X"
+      timestamp="2026-09-22 18:50 UTC"
+      href="https://x.com/synthwavedd/status/2102470593744605594"
+    />
+    <PullQuote
+      text={'I\'m sad man. GPT-6-Sol has no soul, no humour, just a mechanical robot compared to GPT-5.6-Sol. I\'m going to really miss 5.6-Sol when they retire it. I can now sympathize with the "Bring Back 4o" crowd.'}
+      handle="@migtissera"
+      platform="X"
+      timestamp="2026-09-23 16:01 UTC"
+      href="https://x.com/migtissera/status/2102790471567454676"
+    />
+    <PullQuote
+      text="API pricing looks great, but in Codex my real usage tells a different story. GPT-6 Luna Max is consuming far more of my 5h limit than GPT-5.6 Luna Max on similar tasks — often 10–15%+ vs ~3% before"
+      handle="@mostafa_najee"
+      platform="X"
+      timestamp="2026-09-23 04:03 UTC"
+      href="https://x.com/mostafa_najee/status/2102609762131268092"
+    />
+    <p>
+      It isn't all negative. Peter Yang's take, relayed on Techmeme, is probably the fairest one-line summary
+      of launch day: "GPT 6 Sol definitely feels better than GPT 5.6 and I still prefer ChatGPT as my harness
+      but in my humble opinion Opus 5.5 is the best model available right now." Better than its
+      predecessor, and still not the model people were talking about.
+    </p>
+    <p>
+      <strong>Price cuts don't read as upgrades.</strong> Opus 5.5 cut price and still felt like a jump.
+      GPT-6 Sol cut price by more and felt like a trade: half the cost, some of the personality gone, and
+      at least some Codex users reporting that their limits burn faster. When the same-day comparison is a model people call
+      the best available, "cheaper" loses.
+    </p>
+
+    <h2 id="an-independent-check">An independent check: 1,500 posts, graded separately</h2>
+    <p>
+      Our pipeline samples. It keeps a slice of each platform, and on launch days the slices get thin: 22
+      relevant posts named GPT-6 Sol or Luna in its first two days. So I pulled a bigger sample and graded it
+      outside the pipeline entirely. Every Hacker News comment and story naming each model in its launch
+      window, plus about 230 X posts per window, 1,499 posts in all. A separate LLM pass labeled each one
+      positive, neutral, negative or irrelevant toward the named model, with no access to our classifier's
+      labels.
+    </p>
+
+    <ShareBars
+      title="Independent sample · tone toward the named model · launch day + next day"
+      legend={TONE_LEGEND}
+      rows={CROSS_CHECK_ROWS}
+      ariaLabel="Independent sample of Hacker News and X posts: Opus 5.5 61% positive and 18% negative, Opus 5 45% positive and 29% negative, GPT-5.6 60% positive and 25% negative, GPT-6 Sol and Luna 44% positive and 37% negative."
+    />
+
+    <p>
+      Same story, bigger sample. Among posts that took a side, Opus 5.5 ran 77% positive against Opus 5's
+      61%, and GPT-6 Sol and Luna ran 54% against GPT-5.6's 70%. Our pipeline had 80%, 64%, 65% and 48%.
+      Every direction matches.
+    </p>
+    <p>
+      The complaint shapes held up too. Safeguards were the biggest single complaint about Opus 5.5 (16 of
+      56 negative posts, all of them on Hacker News),
+      against 12 of 93 for Opus 5. For GPT-6 Sol and Luna, 60 of 72 complaints were about
+      quality, and a recurring version was "5.6 was better."
+    </p>
+    <p>
+      One wrinkle worth keeping. Split by platform, Hacker News liked GPT-6 Sol and Luna <em>more</em> than
+      GPT-5.6 (25 positive to 14 negative, against 39 to 31). The GPT-6 disappointment is an X story, where
+      it went from 111-to-32 positive for GPT-5.6 to an even 61-to-58. Hacker News reads price-performance
+      tables. X reads vibes. Both are real audiences, and they disagreed.
+    </p>
+
     <h2 id="what-i-would-watch">What I'd watch if I shipped this model</h2>
     <p>
       Nick Turley, head of ChatGPT,{" "}
@@ -378,6 +546,14 @@ const OpusLaunchBody = () => (
       62.7%. That's noise, not a shift. Launch day itself (September 22) is all Terra.
     </p>
     <p>
+      <strong>The OpenAI comparison has its own seams.</strong> GPT-5.6's second day, July 10, is the day we
+      shipped a pipeline overhaul (new sources and a scoring change), so its +20.6 is partly our instrument
+      moving; its launch day alone went from a 33.9 weekly average to 52. And from September 23 our classifier
+      is GPT-6 Sol, grading posts about itself. It didn't flatter itself: 19 of the 22 GPT-6 Sol and Luna
+      posts in the pipeline window were graded by the outgoing Terra model anyway, and the independent
+      sample above doesn't use our classifier at all.
+    </p>
+    <p>
       <strong>Two days is two days.</strong> Opus 5.5's windows are small: 122 relevant posts naming it,
       23 of them negative. The direction is clear. The exact percentages will move. OpenAI also shipped
       GPT-6 Sol the same day, so some Opus 5.5 posts are head-to-head comparisons, not standalone
@@ -402,10 +578,22 @@ const OpusLaunchBody = () => (
       its row is muddied by that news.
     </p>
     <p>
+      The independent sample pulled every Hacker News story and comment matching each model name in its
+      window from the public Algolia API, plus two latest-sorted X searches per window (one per day, UTC)
+      through the same Apify actor the pipeline uses, deduplicated with retweets dropped. Each post was
+      graded by Claude Sonnet 5 reading it in full against a fixed rubric; announcement relays, leak posts and
+      spam were marked irrelevant. Posts from the labs' own staff were not filtered out, which nudges every
+      window slightly positive.
+    </p>
+    <p>
       Download the{" "}
       <a href="/research/opus-5-5-vs-opus-5-launch-sentiment-2026/data.csv">dataset</a> (daily Claude score
       plus positive and negative mention counts for Opus 5, Opus 5.5 and Fable 5.1, July 13 – September
-      23), or <ExternalLink href="https://github.com/dkships/llm-moods">fork the pipeline on GitHub</ExternalLink>.
+      23), the <a href="/research/opus-5-5-vs-opus-5-launch-sentiment-2026/chatgpt-launches.csv">ChatGPT
+      launch series</a>, the{" "}
+      <a href="/research/opus-5-5-vs-opus-5-launch-sentiment-2026/independent-sample.csv">1,499 graded posts</a>{" "}
+      from the independent check, or{" "}
+      <ExternalLink href="https://github.com/dkships/llm-moods">fork the pipeline on GitHub</ExternalLink>.
       The <a href="/model/claude">live Claude chart</a> will show whether Opus 5.5 holds past day 14.
     </p>
 

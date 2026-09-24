@@ -11,10 +11,12 @@
       <title>Opus 5.5 got the warmest Claude launch we&apos;ve measured. Opus 5 looked warm too, for three days.</title>
       <link>https://llmvibes.ai/research/opus-5-5-vs-opus-5-launch-sentiment-2026</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/opus-5-5-vs-opus-5-launch-sentiment-2026</guid>
-      <description>Everyone was waiting for an Opus 5.1 to fix Opus 5. Anthropic shipped Opus 5.5 instead, and the Claude score jumped 20 points in two days. The catch: Opus 5 opened strong too, and Opus 5.5&apos;s early complaints are about safeguards, not quality.</description>
+      <description>Everyone was waiting for an Opus 5.1 to fix Opus 5. Anthropic shipped Opus 5.5 instead, and the Claude score jumped 20 points in two days. OpenAI&apos;s GPT-6 Sol and Luna launched the same day and went the other way. The catch: Opus 5 opened strong too, and Opus 5.5&apos;s early complaints are about safeguards, not quality.</description>
       <pubDate>Thu, 24 Sep 2026 12:00:00 GMT</pubDate>
       <category>claude</category>
       <category>anthropic</category>
+      <category>chatgpt</category>
+      <category>cross-model</category>
       <category>case-study</category>
     </item>
     <item>

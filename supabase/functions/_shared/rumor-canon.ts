@@ -492,7 +492,7 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       // No canonical codename: the generation collects both Astra and the
       // variant suffixes (Sol/Terra/Luna), so each row keeps the one it stated.
       codename: null,
-      aliases: ["gpt6", "astra", "gpt6astra"],
+      aliases: ["gpt6", "astra", "gpt6astra", "gpt6sol", "gpt6luna"],
       released: true,
       releasePrompt: "GPT-6 (Astra) and earlier",
       releaseAliases: ["astra", "gpt6astra"],

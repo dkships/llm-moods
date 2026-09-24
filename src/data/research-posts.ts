@@ -65,11 +65,11 @@ export const RESEARCH_POSTS: ResearchPost[] = [
     title: "Opus 5.5 got the warmest Claude launch we've measured. Opus 5 looked warm too, for three days.",
     publishedAt: "2026-09-24",
     summary:
-      "Everyone was waiting for an Opus 5.1 to fix Opus 5. Anthropic shipped Opus 5.5 instead, and the Claude score jumped 20 points in two days. The catch: Opus 5 opened strong too, and Opus 5.5's early complaints are about safeguards, not quality.",
+      "Everyone was waiting for an Opus 5.1 to fix Opus 5. Anthropic shipped Opus 5.5 instead, and the Claude score jumped 20 points in two days. OpenAI's GPT-6 Sol and Luna launched the same day and went the other way. The catch: Opus 5 opened strong too, and Opus 5.5's early complaints are about safeguards, not quality.",
     metaDescription:
-      "Launch-window sentiment for Claude Opus 5.5 vs Opus 5 and Fable 5.1: a 20-point jump, an 80% positive open, and a new complaint shape.",
+      "Launch sentiment for Opus 5.5 vs Opus 5, and GPT-6 Sol/Luna vs GPT-5.6: two same-day launches, opposite reactions, checked on 1,500 posts.",
     author: "David Kelly",
-    tags: ["claude", "anthropic", "case-study"],
+    tags: ["claude", "anthropic", "chatgpt", "cross-model", "case-study"],
     relatedModelSlug: "claude",
     ogImage: "/research/opus-5-5-vs-opus-5-launch-sentiment-2026/og.png",
     dataset: {

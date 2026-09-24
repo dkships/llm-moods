@@ -234,6 +234,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     notes: "Approved-user rollout September 3, general availability the next day. Computer-use headline feature; API priced at 2.5x GPT-5.6 Sol.",
   },
   {
+    id: "openai-gpt-6-sol-launch",
+    vendor: "openai",
+    modelSlug: "chatgpt",
+    eventDate: "2026-09-22",
+    eventType: "model_launch",
+    title: "GPT-6 Sol launch",
+    url: "https://siliconangle.com/2026/09/22/anthropic-releases-claude-opus-5-5-and-openai-counters-with-two-cheaper-gpt-6-models/",
+    notes: "Shipped alongside GPT-6 Luna, the same day as Opus 5.5. Sol $2/$10 and Luna $0.10/$0.50 per million tokens, half their GPT-5.6 namesakes.",
+  },
+  {
     id: "anthropic-opus-5-5-launch",
     vendor: "anthropic",
     modelSlug: "claude",
