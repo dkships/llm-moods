@@ -20,7 +20,7 @@ interface PullQuoteProps {
 }
 
 const PullQuote = ({ text, handle, platform, timestamp, href, archivedHref }: PullQuoteProps) => (
-  <figure className="my-6 border-l-2 border-primary bg-secondary/40 pl-5 pr-4 py-4 rounded-r-lg">
+  <figure className="not-prose my-6 border-l-2 border-primary bg-secondary/40 pl-5 pr-4 py-4 rounded-r-lg">
     <blockquote className="not-italic text-[1.0625rem] leading-[1.65] text-foreground">
       <span aria-hidden="true" className="select-none text-primary/60 mr-1">
         “
@@ -35,17 +35,21 @@ const PullQuote = ({ text, handle, platform, timestamp, href, archivedHref }: Pu
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="whitespace-nowrap text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         {handle}
       </a>
-      <span aria-hidden="true">·</span>
-      <span>{platform}</span>
-      <span aria-hidden="true">·</span>
-      <span>{timestamp}</span>
+      <span className="whitespace-nowrap">
+        <span aria-hidden="true">· </span>
+        {platform}
+      </span>
+      <span className="whitespace-nowrap">
+        <span aria-hidden="true">· </span>
+        {timestamp}
+      </span>
       {archivedHref ? (
-        <>
-          <span aria-hidden="true">·</span>
+        <span className="whitespace-nowrap">
+          <span aria-hidden="true">· </span>
           <a
             href={archivedHref}
             target="_blank"
@@ -54,7 +58,7 @@ const PullQuote = ({ text, handle, platform, timestamp, href, archivedHref }: Pu
           >
             archived
           </a>
-        </>
+        </span>
       ) : null}
     </figcaption>
   </figure>

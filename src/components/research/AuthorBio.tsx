@@ -9,7 +9,7 @@ import { AUTHOR_BIO, AUTHOR_NAME, AUTHOR_SAMEAS, BIO_LINKS } from "@/data/author
 export { AUTHOR_NAME, AUTHOR_SAMEAS };
 
 const AuthorBio = () => (
-  <aside className="mt-12 rounded-lg border border-border bg-secondary/30 px-6 py-5">
+  <aside className="not-prose mt-12 rounded-lg border border-border bg-secondary/30 px-6 py-5">
     <p className="text-mono-cap text-text-tertiary">
       About the author
     </p>

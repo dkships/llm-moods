@@ -39,7 +39,7 @@ const ResearchTableFrame = ({ label, children }: ResearchTableFrameProps) => {
   }, [updateEdges]);
 
   return (
-    <div className="relative my-6">
+    <div className="not-prose relative my-6">
       {edgeState.right && (
         <div
           id={hintId}
@@ -55,7 +55,7 @@ const ResearchTableFrame = ({ label, children }: ResearchTableFrameProps) => {
         aria-describedby={edgeState.right ? hintId : undefined}
         tabIndex={0}
         onScroll={updateEdges}
-        className="scrollbar-thin overflow-x-auto overscroll-x-contain rounded-lg border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [&_table]:min-w-[640px] sm:[&_table]:min-w-full"
+        className="scrollbar-thin overflow-x-auto overscroll-x-contain rounded-lg border border-border focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background [&_table]:my-0 [&_table]:w-full [&_table]:min-w-[640px] sm:[&_table]:min-w-full [&_table]:border-collapse [&_table]:font-mono [&_table]:text-sm [&_th]:bg-secondary/40 [&_th]:px-3 [&_th]:py-2 [&_th]:text-left [&_th]:font-semibold [&_th]:text-foreground [&_td]:border-t [&_td]:border-border [&_td]:px-3 [&_td]:py-2 [&_td]:text-text-secondary"
       >
         {children}
       </div>

@@ -162,6 +162,7 @@ const FableLifecycleBody = () => (
     </ResearchTableFrame>
 
     <ArticleSeriesChart
+      title="Fable · share of tracked AI chatter, 7-day trailing"
       data={FABLE_SHARE_7D}
       valueSuffix="%"
       ariaLabel="Share of all tracked AI-model chatter mentioning Fable or Mythos, 7-day trailing, June 1 to July 16 2026: near zero before June 9, 17% after launch, dipping to 5.5% mid-suspension, peaking at 22.7% on July 7, settling around 16%."
@@ -220,6 +221,7 @@ const FableLifecycleBody = () => (
     </p>
 
     <ArticleSeriesChart
+      title="Claude · share of posts using refusal language, 7-day trailing"
       data={REFUSAL_SHARE_7D}
       valueSuffix="%"
       ariaLabel="Share of Claude posts using refusal or classifier language, 7-day trailing, June 1 to July 16 2026: about 0.5 to 1 percent baseline, peaking at 3.4 percent after the June 9 launch, falling to 0.2 percent during the suspension, and holding at 2 to 3 percent after the July 1 redeploy."

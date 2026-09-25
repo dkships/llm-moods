@@ -32,8 +32,7 @@ export const PROSE_CLASS_NAME = [
   "prose-blockquote:border-l-primary prose-blockquote:bg-secondary/30 prose-blockquote:rounded-r-lg",
   "prose-blockquote:py-3 prose-blockquote:px-5 prose-blockquote:not-italic prose-blockquote:text-foreground/90",
   "[&_blockquote_p:first-of-type]:before:content-none [&_blockquote_p:last-of-type]:after:content-none",
-  // tables (Phase 6A)
-  "prose-table:font-mono prose-table:text-sm prose-table:border-collapse",
-  "prose-th:bg-secondary/40 prose-th:px-3 prose-th:py-2 prose-th:text-left prose-th:font-semibold prose-th:text-foreground",
-  "prose-td:border-t prose-td:border-border prose-td:px-3 prose-td:py-2 prose-td:text-text-secondary",
+  // Tables render inside ResearchTableFrame, which is `not-prose` (fixes a
+  // stray margin band above/below the bordered frame) and carries its own
+  // font-mono/border/th/td styling directly, so no prose-table:* here.
 ].join(" ");

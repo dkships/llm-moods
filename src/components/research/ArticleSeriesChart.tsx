@@ -1,5 +1,6 @@
 import { LineChart, Line, ResponsiveContainer, YAxis, XAxis, Tooltip as RechartsTooltip, ReferenceLine, ReferenceArea } from "recharts";
 import { memo } from "react";
+import Surface from "@/components/Surface";
 
 /**
  * Static single-series line chart for research-article data that isn't a model
@@ -37,6 +38,8 @@ interface ArticleSeriesChartProps {
   events?: ArticleSeriesEvent[];
   yDomain?: [number, number];
   height?: number;
+  /** Mono-cap header rendered above the chart, matching EmbeddedModelChart's frame. */
+  title?: string;
 }
 
 interface SeriesTooltipProps {
@@ -72,83 +75,90 @@ const SeriesTooltip = ({ active, payload, label, valueSuffix }: SeriesTooltipPro
 };
 
 const ArticleSeriesChart = memo(
-  ({ data, valueSuffix = "", ariaLabel, events = [], yDomain, height = 220 }: ArticleSeriesChartProps) => {
+  ({ data, valueSuffix = "", ariaLabel, events = [], yDomain, height = 220, title }: ArticleSeriesChartProps) => {
     const values = data.map((d) => d.value).filter((v): v is number => typeof v === "number");
     const autoMax = values.length > 0 ? Math.ceil(Math.max(...values) * 1.15) : 10;
     const [yMin, yMax] = yDomain ?? [0, autoMax];
+    const isPercent = valueSuffix.trim().startsWith("%");
     return (
-      <div role="img" aria-label={ariaLabel} className="my-6 w-full" style={{ height }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 0 }} accessibilityLayer>
-            <XAxis
-              dataKey="day"
-              tick={{ fill: CHART_COLORS.mutedForeground, fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              tickMargin={8}
-              // Width-aware thinning; see the same change in VibesChart. Labels
-              // here are shorter (MM-DD via tickFormatter), so the gap is too.
-              interval="preserveStartEnd"
-              minTickGap={40}
-              padding={{ left: 10, right: 10 }}
-              tickFormatter={(day: string) => day.slice(5)}
-            />
-            <YAxis
-              domain={[yMin, yMax]}
-              tick={{ fill: CHART_COLORS.mutedForeground, fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
-              axisLine={false}
-              tickLine={false}
-              tickMargin={4}
-              width={32}
-            />
-            <RechartsTooltip
-              cursor={{ stroke: CHART_COLORS.border, strokeDasharray: "3 3" }}
-              content={(props) => <SeriesTooltip {...(props as SeriesTooltipProps)} valueSuffix={valueSuffix} />}
-            />
-            {events.map((event, i) => {
-              const isRange = event.endDay && event.endDay !== event.startDay;
-              if (isRange) {
+      <Surface className="not-prose my-6">
+        {title && (
+          <h3 className="mb-3 text-mono-cap leading-relaxed text-text-tertiary">{title}</h3>
+        )}
+        <div role="img" aria-label={ariaLabel} className="w-full" style={{ height }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 8, right: 12, bottom: 4, left: 0 }} accessibilityLayer>
+              <XAxis
+                dataKey="day"
+                tick={{ fill: CHART_COLORS.mutedForeground, fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                tickMargin={8}
+                // Width-aware thinning; see the same change in VibesChart. Labels
+                // here are shorter (MM-DD via tickFormatter), so the gap is too.
+                interval="preserveStartEnd"
+                minTickGap={40}
+                padding={{ left: 10, right: 10 }}
+                tickFormatter={(day: string) => day.slice(5)}
+              />
+              <YAxis
+                domain={[yMin, yMax]}
+                tick={{ fill: CHART_COLORS.mutedForeground, fontFamily: "JetBrains Mono, monospace", fontSize: 11 }}
+                axisLine={false}
+                tickLine={false}
+                tickMargin={4}
+                width={isPercent ? 36 : 32}
+                tickFormatter={isPercent ? (v: number) => `${v}%` : undefined}
+              />
+              <RechartsTooltip
+                cursor={{ stroke: CHART_COLORS.border, strokeDasharray: "3 3" }}
+                content={(props) => <SeriesTooltip {...(props as SeriesTooltipProps)} valueSuffix={valueSuffix} />}
+              />
+              {events.map((event, i) => {
+                const isRange = event.endDay && event.endDay !== event.startDay;
+                if (isRange) {
+                  return (
+                    <ReferenceArea
+                      key={`evt-${i}`}
+                      x1={event.startDay}
+                      x2={event.endDay}
+                      y1={yMin}
+                      y2={yMax}
+                      fill={event.color}
+                      fillOpacity={0.08}
+                      stroke={event.color}
+                      strokeOpacity={0.35}
+                      ifOverflow="visible"
+                    />
+                  );
+                }
                 return (
-                  <ReferenceArea
+                  <ReferenceLine
                     key={`evt-${i}`}
-                    x1={event.startDay}
-                    x2={event.endDay}
-                    y1={yMin}
-                    y2={yMax}
-                    fill={event.color}
-                    fillOpacity={0.08}
+                    x={event.startDay}
                     stroke={event.color}
-                    strokeOpacity={0.35}
+                    strokeDasharray="3 3"
+                    strokeOpacity={0.7}
                     ifOverflow="visible"
                   />
                 );
-              }
-              return (
-                <ReferenceLine
-                  key={`evt-${i}`}
-                  x={event.startDay}
-                  stroke={event.color}
-                  strokeDasharray="3 3"
-                  strokeOpacity={0.7}
-                  ifOverflow="visible"
-                />
-              );
-            })}
-            <Line
-              type="monotone"
-              dataKey="value"
-              stroke="hsl(var(--primary))"
-              strokeWidth={2.5}
-              dot={false}
-              activeDot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
-              connectNulls={false}
-              // JS-driven (rAF), so the global prefers-reduced-motion rule in
-              // index.css cannot neutralise it. See VibesChart.
-              isAnimationActive={false}
-            />
-          </LineChart>
-        </ResponsiveContainer>
-      </div>
+              })}
+              <Line
+                type="monotone"
+                dataKey="value"
+                stroke="hsl(var(--primary))"
+                strokeWidth={2.5}
+                dot={false}
+                activeDot={{ r: 4, fill: "hsl(var(--primary))", strokeWidth: 0 }}
+                connectNulls={false}
+                // JS-driven (rAF), so the global prefers-reduced-motion rule in
+                // index.css cannot neutralise it. See VibesChart.
+                isAnimationActive={false}
+              />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      </Surface>
     );
   },
 );

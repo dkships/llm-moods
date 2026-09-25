@@ -257,6 +257,7 @@ const OpusLaunchBody = () => (
     </p>
 
     <ArticleSeriesChart
+      title="Opus 5 · share positive by week since launch"
       data={OPUS5_TONE_WEEKLY}
       valueSuffix="% positive"
       yDomain={[0, 60]}

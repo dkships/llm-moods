@@ -76,7 +76,7 @@ const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, ca
 
   if (isError) {
     return (
-      <Surface className="my-6 text-center text-body text-text-tertiary">
+      <Surface className="not-prose my-6 text-center text-body text-text-tertiary">
         Failed to load chart data.
       </Surface>
     );
@@ -86,7 +86,7 @@ const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, ca
   // all-null grid; without this branch the article shows a silent empty axis box.
   if (!isLoading && chartData.every((d) => d.score == null)) {
     return (
-      <Surface className="my-6 text-center text-body text-text-tertiary">
+      <Surface className="not-prose my-6 text-center text-body text-text-tertiary">
         No score data for this window.
       </Surface>
     );
@@ -99,7 +99,7 @@ const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, ca
       : `${model?.name ?? modelSlug} · daily score · last ${days} days`;
 
   return (
-    <Surface className="my-6">
+    <Surface className="not-prose my-6">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-mono-cap leading-relaxed text-text-tertiary">
           {headerLabel}
@@ -175,7 +175,7 @@ const EmbeddedModelChart = (props: EmbeddedModelChartProps) => {
   if (shouldMount) return <EmbeddedModelChartContent {...props} />;
 
   return (
-    <div ref={placeholderRef} className="my-6" role="status">
+    <div ref={placeholderRef} className="not-prose my-6" role="status">
       {/* Matches mounted height: Surface p-4/sm:p-6 + mono-cap header row (line-height
           ~18px) + mb-3 + h-56/sm:h-64 chart, so stacked charts don't jump on mount. */}
       <Surface className="flex min-h-[18rem] items-center justify-center sm:min-h-[21rem]">

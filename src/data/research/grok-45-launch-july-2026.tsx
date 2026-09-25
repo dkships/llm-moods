@@ -81,6 +81,7 @@ const Grok45LaunchBody = () => (
     </p>
 
     <ArticleSeriesChart
+      title="Grok · share of tracked AI chatter, 7-day trailing"
       data={GROK_SOV_7D}
       valueSuffix="%"
       ariaLabel="Grok's share of tracked AI-model chatter, 7-day trailing, June 1 to July 16 2026: roughly 10% through mid-June, declining to 4.7% on July 6, then tripling to about 15% after the July 8 Grok 4.5 launch."
