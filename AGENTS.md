@@ -7,7 +7,7 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 - React 18 + TypeScript + Vite (SWC) + shadcn/ui + Tailwind + Recharts
 - Supabase (PostgreSQL + Edge Functions)
 - Sentiment: GPT-6 Sol (`gpt-6-sol`) via OpenAI Chat Completions (batch classification; cutover from GPT-5.6 Terra on 2026-09-23 for better complaint categories at ~11% lower cost; Terra had replaced Claude Haiku 4.5 on 2026-08-08). Provider pluggable via `CLASSIFIER_MODEL` (claude-* → Anthropic, gpt-* → OpenAI, else Gemini); Gemini kept as spillover fallback
-- Scrapers (6 active): Reddit (Apify), HN (stories + comments), Bluesky, Twitter/X (Apify), Mastodon, App Store reviews
+- Scrapers (6 active): Reddit (Apify), HN (stories + comments), Bluesky, Twitter/X (Apify), App Store reviews, plus the OpenRouter model list (rumors-radar signal). Mastodon and GitHub issues are unscheduled
 
 ## Scope And Boundaries
 - Lovable-generated app synced bi-directionally with GitHub on `main`
