@@ -82,6 +82,18 @@ const ResearchPostPage = () => {
     return { "@context": "https://schema.org", "@graph": graph };
   }, [post]);
 
+  const article = useMemo(
+    () =>
+      post
+        ? {
+            publishedTime: post.publishedAt,
+            modifiedTime: post.updatedAt ?? post.publishedAt,
+            author: post.author,
+          }
+        : undefined,
+    [post],
+  );
+
   useHead({
     // This effect runs AFTER the nested <NotFound/>'s (child effects fire
     // first), so the bad-slug case must carry the 404 head state itself.
@@ -90,13 +102,7 @@ const ResearchPostPage = () => {
     url: post ? `/research/${post.slug}` : undefined,
     ogImage: post?.ogImage,
     ogType: post ? "article" : undefined,
-    article: post
-      ? {
-          publishedTime: post.publishedAt,
-          modifiedTime: post.updatedAt ?? post.publishedAt,
-          author: post.author,
-        }
-      : undefined,
+    article,
     jsonLd,
     noindex: !post || !Body,
   });
@@ -125,11 +131,11 @@ const ResearchPostPage = () => {
                     <Tag shape="pill">Updated · {formatDate(post.updatedAt)}</Tag>
                   )}
                 </div>
-                {/* text-section below sm: .text-page is a fixed 36px, and
-                    headlines here run to ~97 characters — at 320px that wraps
-                    to 6-7 oversized lines before any article body is visible.
-                    ResearchIndex already uses this pair for the same titles. */}
-                <h1 className="mt-3 text-section text-foreground sm:text-page">
+                {/* text-page at every width: text-section (18px) rendered smaller
+                    than the article's own H2s (prose-h2:text-2xl), so the title read
+                    as a subheading below sm. Headlines can still run ~6-7 lines at
+                    320px, but a wrapping H1 beats one that's outranked by its H2s. */}
+                <h1 className="mt-3 text-page text-foreground">
                   {post.title}
                 </h1>
                 <p className="mt-4 text-body text-text-secondary">{post.summary}</p>
@@ -170,7 +176,7 @@ const ResearchPostPage = () => {
                 <ShareLinks url={`https://llmvibes.ai/research/${post.slug}`} title={post.title} />
 
                 <p className="mt-4 text-meta text-text-tertiary">
-                  Cite this analysis: {post.author}, &ldquo;{post.title},&rdquo; LLM Vibes,{" "}
+                  Cite this analysis: {post.author}, &ldquo;{post.title.replace(/\.$/, "")},&rdquo; LLM Vibes,{" "}
                   {formatDate(post.publishedAt)}. llmvibes.ai/research/{post.slug}
                 </p>
               </footer>
