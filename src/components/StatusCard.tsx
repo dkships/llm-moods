@@ -54,6 +54,15 @@ function formatAnomalyDate(iso: string): string {
   });
 }
 
+function anomalyDetail(anomaly: CorrelatedStatusEvent["correlatedAnomalies"][number]): string {
+  const sign = anomaly.z >= 0 ? "+" : "";
+  return `Score anomaly (${anomaly.severity}), z=${sign}${anomaly.z.toFixed(1)}`;
+}
+
+// Only this many incidents render; the "no matching score drop" note must be
+// judged on the same slice, not on incidents the reader never sees.
+const VISIBLE_EVENT_LIMIT = 3;
+
 const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
   const dateLabel = formatAnomalyDate(event.updatedAt);
   const topCorrelations = event.correlatedAnomalies.slice(0, 2);
@@ -73,11 +82,10 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
           <ul className="mt-2 space-y-1" aria-label="Correlated LLM Vibes anomalies">
             {topCorrelations.map((a) => (
               <li key={`${a.modelSlug}-${a.periodStart}`}>
-                <Tag shape="pill">
-                  Possible overlap · {formatAnomalyDate(a.periodStart)} {a.severity}
-                  <span className="text-text-secondary">
-                    z={a.z >= 0 ? "+" : ""}{a.z.toFixed(1)}
-                  </span>
+                {/* Severity and z-score are internal anomaly-detector terms;
+                    they stay available on hover rather than in the label. */}
+                <Tag shape="pill" title={anomalyDetail(a)}>
+                  Possible overlap · {formatAnomalyDate(a.periodStart)}
                 </Tag>
               </li>
             ))}
@@ -117,6 +125,7 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
     if (!data?.events?.length) return [];
     return correlateStatusWithAnomalies(data.events, anomalies ?? [], modelSlug);
   }, [data?.events, anomalies, modelSlug]);
+  const visibleEvents = correlatedEvents.slice(0, VISIBLE_EVENT_LIMIT);
 
   return (
     <Surface as="section" aria-label={`Official status for ${vendorName}`}>
@@ -164,11 +173,11 @@ const StatusCard = ({ modelSlug }: StatusCardProps) => {
       ) : (
         <>
           <ul>
-            {correlatedEvents.slice(0, 3).map((event) => (
+            {visibleEvents.map((event) => (
               <StatusEventRow key={event.id} event={event} />
             ))}
           </ul>
-          {correlatedEvents.every((event) => event.correlatedAnomalies.length === 0) && (
+          {visibleEvents.every((event) => event.correlatedAnomalies.length === 0) && (
             <p className="mt-3 text-body text-text-tertiary">
               No matching score drop found.
             </p>
