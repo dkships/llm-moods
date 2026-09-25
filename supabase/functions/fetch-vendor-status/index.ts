@@ -262,7 +262,7 @@ function isVendor(value: string): value is Vendor {
 // browsers/CDN, not this origin.
 // Bump CODE_VERSION on changes to this file — Lovable deploys can silently
 // ship stale code, and the response field is the only external deploy check.
-const CODE_VERSION = "2026-07-02.1";
+const CODE_VERSION = "2026-09-25.1";
 const ORIGIN_CACHE_TTL_MS = 5 * 60 * 1000;
 const originCache = new Map<Vendor, { result: VendorStatusResponse; expiresAt: number }>();
 
@@ -308,6 +308,16 @@ Deno.serve(async (req) => {
 
   const result = await fetchVendorStatusCached(vendor);
   const responseBody = { ...result, publicUrl: VENDOR_PUBLIC_URL[vendor], codeVersion: CODE_VERSION };
+
+  // An upstream failure is a 502, not a 200 with zero events: otherwise the
+  // 6-hourly ingest stores it as a quiet period and the status card claims
+  // "All operational". Failures are never cached, so the next call retries.
+  if (result.error) {
+    return new Response(JSON.stringify(responseBody), {
+      status: 502,
+      headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "no-store" },
+    });
+  }
 
   return new Response(JSON.stringify(responseBody), {
     status: 200,
