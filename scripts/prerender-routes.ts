@@ -159,7 +159,7 @@ function buildRoutes(): RouteMeta[] {
     // Mirrors the useHead call in src/pages/ModelDetail.tsx — the description
     // string must stay byte-identical there (no automated parity guard).
     title: `${name} Vibes — LLM Vibes`,
-    description: `Daily 0-100 community sentiment score for ${name}: trend history, complaint breakdown, and incident timeline from Reddit, Hacker News, X, Bluesky, and Mastodon.`,
+    description: `Daily 0-100 community sentiment score for ${name}: trend history, complaint breakdown, and incident timeline from Reddit, Hacker News, X, Bluesky, and App Store reviews.`,
     ogImage: defaultOgImage,
     ogType: "website",
     jsonLd: buildModelJsonLd(slug, name),

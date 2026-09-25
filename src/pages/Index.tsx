@@ -101,7 +101,7 @@ const Index = () => {
                 {[
                   {
                     title: "Scrape",
-                    body: "Reddit, Hacker News, Bluesky, X/Twitter, and Mastodon checked throughout the day, plus App Store reviews.",
+                    body: "Reddit, Hacker News, Bluesky, X/Twitter, and App Store reviews checked throughout the day.",
                   },
                   {
                     title: "Classify",

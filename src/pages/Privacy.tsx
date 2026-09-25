@@ -51,9 +51,11 @@ const Privacy = () => {
             <h2 className="mt-10 text-section text-foreground">Public posts</h2>
             <p className="mt-3 text-body text-text-secondary">
               LLM Vibes scrapes public posts about AI models from Reddit, Hacker News, Bluesky,
-              X/Twitter, and Mastodon. Each post is stored with its text, author handle, source
-              link, and an AI-assigned sentiment classification. Nothing non-public is collected from
-              those platforms.
+              X/Twitter, and Apple App Store reviews. Each is stored with its text, a source link,
+              and (where the platform provides one) an author handle, plus an AI-assigned sentiment
+              classification. Nothing non-public is collected from those platforms. Mastodon and
+              GitHub issue scraping are currently paused; posts collected from them before the pause
+              can still be in the store until they age out below.
             </p>
 
             <h2 className="mt-10 text-section text-foreground">How long it keeps it</h2>

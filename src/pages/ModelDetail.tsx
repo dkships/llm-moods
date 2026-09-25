@@ -120,7 +120,7 @@ const ModelDetail = () => {
     title: model ? `${model.name} Vibes — LLM Vibes` : "Loading — LLM Vibes",
     // Must stay byte-identical to the models block in scripts/prerender-routes.ts.
     description: model
-      ? `Daily 0-100 community sentiment score for ${model.name}: trend history, complaint breakdown, and incident timeline from Reddit, Hacker News, X, Bluesky, and Mastodon.`
+      ? `Daily 0-100 community sentiment score for ${model.name}: trend history, complaint breakdown, and incident timeline from Reddit, Hacker News, X, Bluesky, and App Store reviews.`
       : undefined,
     url: slug ? `/model/${slug}` : undefined,
     // Belt-and-braces for bad slugs: the nested <NotFound/> usually carries
