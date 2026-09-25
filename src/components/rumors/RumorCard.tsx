@@ -167,8 +167,15 @@ const RumorCard = ({ rumor, accent, modelName, strengthPct, className }: RumorCa
                   {s.verified && s.handle && (
                     <span className="text-text-tertiary" aria-label="verified">✓</span>
                   )}
-                  <span className="text-text-tertiary">·</span>
-                  <span className="shrink-0 text-text-tertiary">{platform}</span>
+                  {/* handle already falls back to platform when there's no @handle,
+                      so only show the separate platform label when handle is real —
+                      otherwise it repeats ("Reddit · Reddit"). */}
+                  {s.handle && (
+                    <>
+                      <span className="text-text-tertiary">·</span>
+                      <span className="shrink-0 text-text-tertiary">{platform}</span>
+                    </>
+                  )}
                   {when && (
                     <>
                       <span className="text-text-tertiary">·</span>
