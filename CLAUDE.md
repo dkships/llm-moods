@@ -18,6 +18,7 @@ Beyond the AGENTS.md rules:
 - Edge Function deploys still need `mcp__lovable__send_message` — but that tool has a verified stale-response bug (returns a byte-identical cached reply and has falsely claimed success). Never trust its return value: confirm via `list_messages` plus the actual observable state (a `codeVersion` marker in the function response, or `cron.job` rows).
 - Avoid restructuring directories or renaming files Lovable manages. Don't edit `src/components/ui/` (shadcn-managed) or remove the `lovable-tagger` dev dependency.
 - Never enter API keys directly in Lovable — use Supabase Edge Function secrets.
+- If Lovable and GitHub diverge, Lovable pushes its side to a `lovable-sync` branch for manual PR merge (source: https://docs.lovable.dev/integrations/github) — treat such a branch as real work, not noise.
 
 ## Development
 

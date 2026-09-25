@@ -14,14 +14,15 @@ Reference material moved out of `CLAUDE.md` (2026-07-07). Operating rules live i
 | State | TanStack React Query 5.83 |
 | Animations | Framer Motion 12.35 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
-| Edge Functions | 16 Deno functions (5 active scrapers + utilities) |
-| Sentiment AI | Claude Haiku 4.5 via Anthropic Messages API; provider pluggable via `CLASSIFIER_MODEL`, Gemini fallback |
+| Edge Functions | 17 Deno functions (5 active scrapers + utilities) |
+| Sentiment AI | GPT-6 Sol via OpenAI Chat Completions; provider pluggable via `CLASSIFIER_MODEL` (claude-*/gpt-*/else Gemini) |
 
 ## Key Routes
 
 - `/` — Landing page (hero + model preview grid)
 - `/dashboard` — All models with scores, trends, sparklines, chatter feed
 - `/model/:slug` — Model detail (history chart, complaint/source breakdown, posts, vendor events overlay, recent-incident card, official status card with anomaly correlation, surface-tagged recent posts)
+- `/compare` — Side-by-side two-model comparison (score, 30-day trend, complaints, sentiment mix, recent chatter)
 - `/research` — Research index (long-form articles index)
 - `/research/:slug` — Research article (live embedded charts via `chart-model` markdown sentinel; first article ships with CSV download + Dataset JSON-LD)
 - `/benchmark` — Ship Sense benchmark leaderboard (static snapshot from github.com/dkships/ship-sense; regenerate via `npm run sync:shipsense` after each official run)
@@ -94,12 +95,13 @@ Reddit (Apify), Hacker News (Algolia API — stories + comments since 2026-07-10
 
 **Edge Functions (Supabase secrets — never commit these):**
 - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
-- `ANTHROPIC_API_KEY` — production sentiment classifier (Claude Haiku 4.5); dedicated `llm-moods-classifier` key
-- `CLASSIFIER_MODEL` — active classifier model id (`claude-haiku-4-5-20251001`); the cutover/rollback switch
+- `OPENAI_API_KEY` — production sentiment classifier (GPT-6 Sol); added 2026-08-08 for the GPT-5.6 cutover
+- `CLASSIFIER_MODEL` — active classifier model id (`gpt-6-sol`); the cutover/rollback switch
+- `ANTHROPIC_API_KEY` — Claude provider key for `CLASSIFIER_MODEL` rollback (e.g. `claude-haiku-4-5-20251001`, the pre-2026-08-08 production model); dedicated `llm-moods-classifier` key
 - `GEMINI_API_KEY` — the **paid spillover / second-opinion grader**, not the primary classifier (the only Gemini key; billing must stay active on its Google project — pacing details in `AGENT-REFERENCE.md`).
 - `LOVABLE_API_KEY` — Lovable AI gateway key (no longer used by scrapers, kept for Lovable platform)
 - `APIFY_API_TOKEN` — Apify token (Reddit + Twitter, and any future Apify-based source); `BLUESKY_HANDLE`, `BLUESKY_APP_PASSWORD`
-- Actual secret store (verified 2026-06-20) is exactly: `CLASSIFIER_MODEL`, `ANTHROPIC_API_KEY`, `RUN_PIPELINE_TRIGGER_SECRET`, `GEMINI_API_KEY`, `APIFY_API_TOKEN`, `BLUESKY_APP_PASSWORD`, `BLUESKY_HANDLE`, `LOVABLE_API_KEY`. Earlier-documented `MASTODON_URL/TOKEN`, `DISCOURSE_*`, `GITHUB_TOKEN`, `LEMMY_*` are **not** present — Mastodon runs on public endpoints (no token); those integrations are inert.
+- Actual secret store (verified 2026-06-20) is exactly: `CLASSIFIER_MODEL`, `ANTHROPIC_API_KEY`, `RUN_PIPELINE_TRIGGER_SECRET`, `GEMINI_API_KEY`, `APIFY_API_TOKEN`, `BLUESKY_APP_PASSWORD`, `BLUESKY_HANDLE`, `LOVABLE_API_KEY`, plus `OPENAI_API_KEY` (added 2026-08-08 for the GPT-5.6 classifier). Earlier-documented `MASTODON_URL/TOKEN`, `DISCOURSE_*`, `GITHUB_TOKEN`, `LEMMY_*` are **not** present — Mastodon runs on public endpoints (no token); those integrations are inert.
 
 **Security notes:**
 - `.gitignore` uses `.env*` glob with `!.env.example` whitelist

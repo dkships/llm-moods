@@ -14,7 +14,7 @@ AI sentiment dashboard updated throughout the day for Claude, ChatGPT, Gemini, a
 
 ## Why this exists
 
-Every day, thousands of developers share their real experiences with AI models across Reddit, Hacker News, Bluesky, Mastodon, and Twitter/X. But there's no easy way to see the big picture: which models are loved, which are frustrating people, and what's trending.
+Every day, thousands of developers share their real experiences with AI models across Reddit, Hacker News, Bluesky, Twitter/X, and the App Store. But there's no easy way to see the big picture: which models are loved, which are frustrating people, and what's trending.
 
 **LLM Vibes** scrapes 5 social platforms, classifies sentiment with AI, and scores each model in daily 0-100 windows that refresh throughout the day. No surveys, no voting — just real conversations from real developers.
 
@@ -37,19 +37,20 @@ Every day, thousands of developers share their real experiences with AI models a
 | Hacker News | Algolia Search API | None |
 | Twitter/X | Apify scraper | API token |
 | Bluesky | AT Protocol search | App password |
-| Mastodon | Public hashtag timelines (5 instances) | None |
+| App Store reviews | Apple's iTunes RSS reviews feed | None |
+| Mastodon | Public hashtag timelines (5 instances) — unscheduled since Aug 2026 | None |
+| GitHub issues | GitHub Issues API — unscheduled since Sep 2026, historical rows only | None |
 
 ## Tech Stack
 
 | Layer | Technology |
 |-------|-----------|
 | Framework | React 18.3 + TypeScript 5.8 |
-| Build | Vite 5.4 (SWC plugin) |
-| Routing | React Router 6 (lazy-loaded pages) |
+| Build | Vite 6 (SWC plugin) |
+| Routing | React Router 7 (lazy-loaded pages) |
 | UI | shadcn/ui (Radix + Tailwind CSS) |
 | Charts | Recharts 2.15 |
 | State | TanStack React Query 5 |
-| Animations | Framer Motion 12 |
 | Backend | Supabase (PostgreSQL + Edge Functions) |
 | Sentiment AI | GPT-6 Sol via the OpenAI API (Gemini spillover fallback; provider-pluggable via `CLASSIFIER_MODEL`) |
 
@@ -83,7 +84,7 @@ src/
 └── integrations/   # Supabase client config (auto-generated types)
 
 supabase/
-├── functions/      # 15 deployable Deno edge functions (5 active scrapers + utilities)
+├── functions/      # 17 deployable Deno edge functions (5 active scrapers + utilities)
 └── migrations/     # Database schema migrations
 ```
 
