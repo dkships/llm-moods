@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { RESEARCH_POSTS } from "@/data/research-posts";
 
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -48,6 +48,22 @@ const NavBar = () => {
     activeLinkRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [pathname]);
 
+  // Once the strip is scrolled off its start (by hand or by the auto-scroll
+  // above), a left-edge fade mirrors the right one so a clipped first label
+  // reads as "more this way" instead of a cut-off word.
+  const navRef = useRef<HTMLElement>(null);
+  const [isScrolledFromStart, setIsScrolledFromStart] = useState(false);
+  useEffect(() => {
+    const nav = navRef.current;
+    if (!nav) {
+      return;
+    }
+    const update = () => setIsScrolledFromStart(nav.scrollLeft > 0);
+    update();
+    nav.addEventListener("scroll", update, { passive: true });
+    return () => nav.removeEventListener("scroll", update);
+  }, []);
+
   const navLinkClass = (active: boolean) =>
     `inline-flex min-h-11 shrink-0 snap-start items-center rounded-md px-1.5 text-mono-cap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:px-2 sm:py-1 ${
       active ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-foreground"
@@ -74,10 +90,11 @@ const NavBar = () => {
           </span>
         </Link>
         {/* Five links plus the mark crowd a phone-width bar. Below `sm` the row scrolls
-            sideways (scrollbar hidden, right-edge fade as the affordance)
+            sideways (scrollbar hidden, edge fades as the affordance)
             and the active link scrolls itself into view on route change. */}
         <div className="relative min-w-0 flex-1 sm:flex-none">
           <nav
+            ref={navRef}
             aria-label="Primary"
             className="flex items-center gap-1 overflow-x-auto snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-3 sm:overflow-visible lg:gap-5"
           >
@@ -108,6 +125,12 @@ const NavBar = () => {
             <GitHubIcon className="h-5 w-5" />
           </a>
           </nav>
+          <div
+            className={`pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent transition-opacity sm:hidden ${
+              isScrolledFromStart ? "opacity-100" : "opacity-0"
+            }`}
+            aria-hidden="true"
+          />
           <div
             className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent sm:hidden"
             aria-hidden="true"

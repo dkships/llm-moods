@@ -38,7 +38,8 @@ const ChatterPost = memo(({ post, extraMeta, hideModel = false }: ChatterPostPro
       <p className="text-mono-cap text-text-tertiary">
         {metaPieces.join(" · ")}
       </p>
-      <p className="line-clamp-2 text-body text-foreground">
+      {/* Cap the measure: full-width cards ran ~180-character lines on desktop. */}
+      <p className="line-clamp-2 max-w-[75ch] text-body text-foreground">
         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}
         {post.original_language && (
           <Tag className="ml-1.5">
