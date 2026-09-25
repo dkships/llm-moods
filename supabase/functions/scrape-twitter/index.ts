@@ -491,7 +491,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
         errors: [message],
         metadata: {
           error: message,
-          apify_usage: (apifySummary as any).apifyUsage ?? null,
+          apify_usage: (apifySummary as { apifyUsage?: unknown }).apifyUsage ?? null,
           code_version: CODE_VERSION,
         },
         completed_at: new Date().toISOString(),
