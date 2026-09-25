@@ -39,6 +39,8 @@ import {
 import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-twitter";
+// Deploy-verification marker, written into scraper_runs.metadata. Bump on change.
+const CODE_VERSION = "2026-09-25.1";
 const APIFY_MAX_TOTAL_CHARGE_USD = 0.15;
 const DEFAULT_SEARCH_TERMS = [
   `("claude" OR "claude ai" OR "claude code" OR anthropic OR "chatgpt" OR "chat gpt" OR "openai gpt" OR openai OR "gemini" OR "google gemini" OR "gemini ai" OR "grok" OR "grok ai" OR "xai grok") lang:en -filter:retweets`,
@@ -87,7 +89,10 @@ function buildTwitterSummary() {
   };
 }
 
+// The caller owns `summary` so its failure path can still record apifyUsage
+// (the budget ledger) when this throws after the actor run has started.
 async function runApifyPath(
+  summary: ReturnType<typeof buildTwitterSummary>,
   supabase: any,
   apifyToken: string,
   modelMap: Record<string, string>,
@@ -96,7 +101,6 @@ async function runApifyPath(
   titleKeys: Set<string>,
   config: Record<string, string[]>,
 ) {
-  const summary = buildTwitterSummary();
   const searchTerms = getConfigValues(config, "search_term");
   const apifyInput = {
     searchTerms: searchTerms.length > 0 ? searchTerms : DEFAULT_SEARCH_TERMS,
@@ -165,7 +169,7 @@ async function runApifyPath(
 
   if (runStatus !== "SUCCEEDED") {
     let errorDetail = "";
-    if (!runStatus) {
+    if (!terminalRunData) {
       const abortMetadata = await abortApifyRun(apifyToken, apifyRunId);
       (summary as any).apifyUsage = abortMetadata ?? (summary as any).apifyUsage;
       runStatus = "TIMED-OUT";
@@ -346,6 +350,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   let runRecord: RunRecordRow | null = null;
+  const apifySummary = buildTwitterSummary();
 
   try {
     const config = await loadScraperConfig(supabase, SOURCE);
@@ -428,7 +433,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
     const existingUrls = new Set((existingData || []).map((entry: any) => entry.source_url).filter(Boolean));
     const titleKeys = await loadRecentTitleKeys(supabase);
 
-    const summary = await runApifyPath(supabase, apifyToken, modelMap, keywords, existingUrls, titleKeys, config);
+    const summary = await runApifyPath(apifySummary, supabase, apifyToken, modelMap, keywords, existingUrls, titleKeys, config);
 
     const derived = deriveRunMetrics(summary);
     const completedAt = new Date().toISOString();
@@ -450,6 +455,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
         classification_success: summary.classification_success,
         classification_queued: summary.classificationQueued,
         apify_usage: (summary as any).apifyUsage ?? null,
+        code_version: CODE_VERSION,
         apify_budget: (summary as any).apifyBudget ?? null,
         dedup_skipped: summary.dedupSkipped,
         content_skipped: summary.contentSkipped,
@@ -483,7 +489,11 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
       await updateRunRecord(supabase, runRecord!.id, {
         status: "failed",
         errors: [message],
-        metadata: { error: message },
+        metadata: {
+          error: message,
+          apify_usage: (apifySummary as any).apifyUsage ?? null,
+          code_version: CODE_VERSION,
+        },
         completed_at: new Date().toISOString(),
       });
     }
