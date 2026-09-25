@@ -9,12 +9,6 @@ type DenoGlobal = typeof globalThis & {
   Deno?: { env: { get(name: string): string | undefined } };
 };
 type JsonRecord = Record<string, unknown>;
-type QuotaClient = {
-  rpc: (
-    fn: string,
-    args: Record<string, unknown>,
-  ) => Promise<{ data: unknown; error: { message: string } | null }>;
-};
 
 function envValue(name: string, fallback: string): string {
   return (globalThis as DenoGlobal).Deno?.env.get(name) ?? fallback;
@@ -28,10 +22,6 @@ function nullableString(value: unknown): string | null {
   return typeof value === "string" && value.length > 0 ? value : null;
 }
 
-const DAILY_REQUEST_LIMIT = Number(envValue("GEMINI_DAILY_REQUEST_LIMIT", "200"));
-const MINUTE_REQUEST_LIMIT = Number(envValue("GEMINI_MINUTE_REQUEST_LIMIT", "8"));
-const EVAL_DAILY_REQUEST_LIMIT = Number(envValue("GEMINI_EVAL_DAILY_REQUEST_LIMIT", "20"));
-const EVAL_MINUTE_REQUEST_LIMIT = Number(envValue("GEMINI_EVAL_MINUTE_REQUEST_LIMIT", "2"));
 const MAX_REMOTE_429_RETRY_WAIT_MS = Number(envValue("GEMINI_429_MAX_RETRY_WAIT_MS", "65000"));
 // 529 = Anthropic "overloaded"; treat as transient so overload events retry/defer
 // rather than dead-lettering posts as a non-retryable classifier_error.
@@ -76,10 +66,6 @@ export type OpenAiServiceTier = "flex" | "auto" | "default";
 
 export interface ClassifyOptions {
   model?: string;
-  quotaKey?: string;
-  dailyLimit?: number;
-  minuteLimit?: number;
-  quotaScope?: "production" | "eval";
   onUsage?: (sample: UsageSample) => void | Promise<void>;
   // "none" (default) keeps current production behavior. "omit" leaves the
   // field unset entirely, which is required for thinking-only models like
@@ -137,21 +123,6 @@ export function getClassifierApiKey(model?: string): string | undefined {
   if (provider === "anthropic") return env?.get("ANTHROPIC_API_KEY");
   if (provider === "openai") return env?.get("OPENAI_API_KEY");
   return env?.get("GEMINI_API_KEY");
-}
-
-function quotaKeyFor(model: string, options: ClassifyOptions = {}): string {
-  const scope = options.quotaScope ?? "production";
-  return options.quotaKey ?? (scope === "eval" ? `${model}:eval` : model);
-}
-
-function dailyLimitFor(options: ClassifyOptions = {}): number {
-  if (options.dailyLimit !== undefined) return options.dailyLimit;
-  return (options.quotaScope ?? "production") === "eval" ? EVAL_DAILY_REQUEST_LIMIT : DAILY_REQUEST_LIMIT;
-}
-
-function minuteLimitFor(options: ClassifyOptions = {}): number {
-  if (options.minuteLimit !== undefined) return options.minuteLimit;
-  return (options.quotaScope ?? "production") === "eval" ? EVAL_MINUTE_REQUEST_LIMIT : MINUTE_REQUEST_LIMIT;
 }
 
 export const CLASSIFY_PROMPT = `You are classifying a social media post about AI language models (ChatGPT, Claude, Gemini, Grok, DeepSeek, Perplexity, etc).
@@ -756,49 +727,6 @@ async function readAnthropicFailure(res: Response): Promise<{
   };
 }
 
-function nextMinuteDelayMs(): number {
-  const msIntoMinute = Date.now() % 60_000;
-  return (60_000 - msIntoMinute) + Math.round(Math.random() * 1_000);
-}
-
-let quotaClient: QuotaClient | null = null;
-
-async function claimGeminiQuota(
-  options: ClassifyOptions = {},
-  logError?: (msg: string, ctx?: string) => Promise<void>,
-): Promise<ClassifyResult | null> {
-  const supabaseUrl = (globalThis as DenoGlobal).Deno?.env.get("SUPABASE_URL");
-  const serviceRoleKey = (globalThis as DenoGlobal).Deno?.env.get("SUPABASE_SERVICE_ROLE_KEY");
-  if (!supabaseUrl || !serviceRoleKey) return null;
-
-  if (!quotaClient) {
-    const supabaseModuleUrl = "https://esm.sh/@supabase/supabase-js@2.45.4";
-    const { createClient } = await import(supabaseModuleUrl) as { createClient: (url: string, key: string) => QuotaClient };
-    quotaClient = createClient(supabaseUrl, serviceRoleKey);
-  }
-  const model = classifierModel(options);
-  const { data, error } = await quotaClient.rpc("claim_api_quota", {
-    p_provider: "gemini",
-    p_quota_key: quotaKeyFor(model, options),
-    p_daily_limit: dailyLimitFor(options),
-    p_minute_limit: minuteLimitFor(options),
-  });
-
-  if (error) {
-    if (logError) await logError(`Gemini quota gate error: ${error.message}`, "quota-error");
-    return makeSkippedResult("classifier_error", "quota_gate_error");
-  }
-
-  const response = Array.isArray(data) ? data[0] : data;
-  if (response && response.allowed === false) {
-    const reason = response.reason || "quota_deferred";
-    if (logError) await logError(`Gemini quota deferred: ${reason}`, "quota-deferred");
-    return makeSkippedResult("quota_deferred", reason);
-  }
-
-  return null;
-}
-
 async function fetchGemini(
   prompt: string,
   apiKey: string,
@@ -808,17 +736,6 @@ async function fetchGemini(
   options: ClassifyOptions = {},
 ): Promise<Response | ClassifyResult> {
   for (let attempt = 0; attempt < 3; attempt++) {
-    const quotaResult = await claimGeminiQuota(options, logError);
-    if (quotaResult) {
-      if (quotaResult.status === "quota_deferred" && quotaResult.error === "minute_limit" && attempt < 2) {
-        const waitMs = nextMinuteDelayMs();
-        if (logError) await logError(`Gemini minute quota deferred, retrying in ${waitMs}ms`, "quota-minute-wait");
-        await new Promise((r) => setTimeout(r, waitMs));
-        continue;
-      }
-      return quotaResult;
-    }
-
     let res: Response | null = null;
     try {
       res = await fetch(API_URL, {
@@ -1153,8 +1070,8 @@ async function fetchAnthropic(
   return makeSkippedResult("classifier_error", "retry_exhausted");
 }
 
-// Single dispatch point: claude-* models go to the Anthropic native path (no
-// Gemini quota gate), gpt-* to OpenAI, everything else to Gemini. Gemini and
+// Single dispatch point: claude-* models go to the Anthropic native path,
+// gpt-* to OpenAI, everything else to Gemini. Gemini and
 // OpenAI keep the single concatenated prompt (OpenAI's automatic prefix caching
 // picks up the static instruction prefix); Anthropic gets the instruction/posts
 // split for explicit caching.
@@ -1441,7 +1358,7 @@ function runBatches(
   options: ClassifyOptions = {},
 ): Promise<ClassifyResult[]> {
   if (descriptors.length === 0) return Promise.resolve([]);
-  // Gemini is the only provider with the free-tier quota gate + pacing needs;
+  // Gemini is the only provider with serial pacing needs;
   // Anthropic and OpenAI both run bounded-concurrency lanes.
   return providerForModel(classifierModel(options)) === "gemini"
     ? runBatchesSerial(prompt, descriptors, totalLength, apiKey, logError, options)

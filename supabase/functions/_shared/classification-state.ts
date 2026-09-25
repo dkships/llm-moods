@@ -31,17 +31,9 @@ export const CURRENT_CLASSIFIER_VERSION = currentClassifierVersion();
 // classifier, posts that hit a transient classifier_error are retried through
 // Gemini so a primary-provider blip doesn't stall the queue. Uses the paid GEMINI_API_KEY (the production setup as of
 // 2026-06 — owner accepts the small cost; Gemini is cheap; there is no separate
-// free-tier key). Paced via its own quota bucket (defaults 8/min, 200/day) so
-// spillover stays bounded; raise GEMINI_FREE_MINUTE_REQUEST_LIMIT /
-// _DAILY_REQUEST_LIMIT (Lovable env, no redeploy) if a Claude incident needs more.
+// free-tier key). Bounded by the Gemini path's serial pacing and 429 early-break
+// (the Postgres quota bucket, claim_api_quota, was dropped on 2026-08-22).
 const FREE_GEMINI_MODEL = "gemini-2.5-flash";
-const FREE_GEMINI_QUOTA_KEY = "gemini-free";
-const FREE_GEMINI_MINUTE_LIMIT = Number(
-  (globalThis as DenoGlobal).Deno?.env.get("GEMINI_FREE_MINUTE_REQUEST_LIMIT") ?? "8",
-);
-const FREE_GEMINI_DAILY_LIMIT = Number(
-  (globalThis as DenoGlobal).Deno?.env.get("GEMINI_FREE_DAILY_REQUEST_LIMIT") ?? "200",
-);
 
 export type ModelMentionClassificationStatus = "pending" | "retry" | "classified" | "irrelevant" | "failed";
 
@@ -231,12 +223,7 @@ async function applyFreeGeminiSpillover(
     geminiKey,
     batchSize,
     logError,
-    {
-      model: FREE_GEMINI_MODEL,
-      quotaKey: FREE_GEMINI_QUOTA_KEY,
-      minuteLimit: FREE_GEMINI_MINUTE_LIMIT,
-      dailyLimit: FREE_GEMINI_DAILY_LIMIT,
-    },
+    { model: FREE_GEMINI_MODEL },
   );
 
   let recovered = 0;

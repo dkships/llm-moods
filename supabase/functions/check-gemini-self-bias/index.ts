@@ -576,12 +576,6 @@ Deno.serve(async (req) => {
   const candidates = parseCandidates(body.candidates);
   const sampleSize = clampSampleSize(body.sample_size);
   const stratify = mergeStratify(body.stratify);
-  const evalMinuteLimit = typeof body.eval_minute_limit === "number" && body.eval_minute_limit > 0
-    ? Math.floor(body.eval_minute_limit)
-    : undefined;
-  const evalDailyLimit = typeof body.eval_daily_limit === "number" && body.eval_daily_limit > 0
-    ? Math.floor(body.eval_daily_limit)
-    : undefined;
 
   // Per-provider keys. Gemini candidates/oracle use GEMINI_API_KEY (there is no
   // separate free-tier key); Claude candidates use ANTHROPIC_API_KEY; gpt-*
@@ -646,7 +640,7 @@ Deno.serve(async (req) => {
       // "low" constrains reasoning; bigger token cap gives the JSON room.
       // Non-thinking models (incl. all Claude) also benefit from extra headroom
       // because non-English posts with verbose translations bloat the response.
-      // reasoningEffort/quotaScope are ignored on the Anthropic path.
+      // reasoningEffort is ignored on the Anthropic path.
       const effort = effortSuffix === "low" || effortSuffix === "medium" || effortSuffix === "high" || effortSuffix === "none"
         ? effortSuffix
         : thinking
@@ -662,9 +656,6 @@ Deno.serve(async (req) => {
         logError,
         {
           model,
-          quotaScope: "eval",
-          minuteLimit: evalMinuteLimit,
-          dailyLimit: evalDailyLimit,
           reasoningEffort: effort,
           maxTokensOverride: thinking || effort !== "none" ? 12288 : 8192,
           onUsage: (s) => {
@@ -754,8 +745,6 @@ Deno.serve(async (req) => {
       sample_size: sample.length,
       composition,
       stratify,
-      eval_minute_limit: evalMinuteLimit ?? null,
-      eval_daily_limit: evalDailyLimit ?? null,
       generated_at: new Date().toISOString(),
       sample_ids: sample.map((p) => p.id),
       reports,
