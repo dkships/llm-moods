@@ -33,7 +33,7 @@ import { isCredibleReleaseSource, isReleaseAnnouncement } from "../_shared/relea
 // changes — Lovable deploys can silently ship stale code, and this field in
 // the run summary (response body + error_log context) is the only external
 // deploy check.
-const CODE_VERSION = "2026-09-21.1";
+const CODE_VERSION = "2026-09-25.1";
 const SOURCE = "aggregate-rumors";
 const LOCK_KEY = "rumor-aggregate";
 const ANTHROPIC_API_URL = "https://api.anthropic.com/v1/messages";
@@ -48,6 +48,8 @@ const CANDIDATE_LIMIT = 200;
 const EXTRACT_BATCH_SIZE = 10;
 const EXTRACT_CONCURRENCY = 4;
 const EXTRACT_MAX_TOKENS = 8000;
+// A hung Anthropic request must not eat the edge function's 400 s budget.
+const EXTRACT_TIMEOUT_MS = 60_000;
 const MAX_REPRESENTATIVE = 12;
 const TRANSIENT_STATUSES = new Set([408, 429, 500, 502, 503, 504, 529]);
 
@@ -199,11 +201,15 @@ function retryDelayMs(attempt: number): number {
   return Math.min(8000, 500 * 2 ** attempt) + Math.floor(Math.random() * 250);
 }
 
+// A failed call is reported distinctly from "the model found no rumors" so the
+// caller can leave the batch unchecked and retry it next run.
+type ExtractCall = { input: unknown } | { failure: string };
+
 async function callAnthropic(
   apiKey: string,
   model: string,
   userBlock: string,
-): Promise<unknown | null> {
+): Promise<ExtractCall> {
   const body = JSON.stringify({
     model,
     max_tokens: EXTRACT_MAX_TOKENS,
@@ -225,9 +231,12 @@ async function callAnthropic(
           "Content-Type": "application/json",
         },
         body,
+        signal: AbortSignal.timeout(EXTRACT_TIMEOUT_MS),
       });
-    } catch (_e) {
-      if (attempt === 2) return null;
+    } catch (e) {
+      if (attempt === 2) {
+        return { failure: `request failed: ${e instanceof Error ? e.message : String(e)}` };
+      }
       await new Promise((r) => setTimeout(r, retryDelayMs(attempt)));
       continue;
     }
@@ -241,29 +250,36 @@ async function callAnthropic(
           (b as { type?: unknown }).type === "tool_use" &&
           typeof (b as { input?: unknown }).input === "object",
       );
-      return toolUse ? (toolUse as { input: unknown }).input : null;
+      if (!toolUse) {
+        return { failure: "response had no record_rumors tool_use block" };
+      }
+      return { input: (toolUse as { input: unknown }).input };
     }
 
-    if (!TRANSIENT_STATUSES.has(res.status) || attempt === 2) return null;
+    if (!TRANSIENT_STATUSES.has(res.status) || attempt === 2) {
+      const detail = (await res.text().catch(() => "")).slice(0, 200);
+      return { failure: `Anthropic ${res.status}: ${detail}` };
+    }
     await new Promise((r) => setTimeout(r, retryDelayMs(attempt)));
   }
-  return null;
+  return { failure: "retries exhausted" };
 }
 
 // Run extraction over batches with bounded concurrency; each batch's claims are
-// written into the candidate's positional slot.
+// written into the candidate's positional slot. A failed batch yields null for
+// each of its candidates (distinct from [] = no rumors found).
 async function extractAll(
   candidates: Candidate[],
   apiKey: string,
   model: string,
   logError: (msg: string, ctx: string) => Promise<void>,
-): Promise<RawClaim[][]> {
+): Promise<(RawClaim[] | null)[]> {
   const batches: Candidate[][] = [];
   for (let i = 0; i < candidates.length; i += EXTRACT_BATCH_SIZE) {
     batches.push(candidates.slice(i, i + EXTRACT_BATCH_SIZE));
   }
 
-  const out: RawClaim[][][] = new Array(batches.length);
+  const out: (RawClaim[] | null)[][] = new Array(batches.length);
   let next = 0;
   const worker = async () => {
     while (true) {
@@ -274,11 +290,16 @@ async function extractAll(
         .map((c, i) => `POST ${i} [${c.row.source}, ${c.row.posted_at ?? "unknown date"}]: ${c.postText}`)
         .join("\n\n");
       try {
-        const input = await callAnthropic(apiKey, model, userBlock);
-        out[bIdx] = input ? parseRecordRumors(input, batch.length) : batch.map(() => []);
+        const call = await callAnthropic(apiKey, model, userBlock);
+        if ("failure" in call) {
+          await logError(`extract batch failed: ${call.failure}`, "extract-batch");
+          out[bIdx] = batch.map(() => null);
+          continue;
+        }
+        out[bIdx] = parseRecordRumors(call.input, batch.length);
       } catch (e) {
         await logError(`extract batch failed: ${e instanceof Error ? e.message : String(e)}`, "extract-batch");
-        out[bIdx] = batch.map(() => []);
+        out[bIdx] = batch.map(() => null);
       }
     }
   };
@@ -403,6 +424,7 @@ Deno.serve(async (req) => {
 
     const contributions: RumorContribution[] = [];
     let checkedPosts = 0;
+    let failedCandidates = 0;
 
     // Released-model auto-detection. API layer (authoritative for Claude + Gemini):
     // the Models APIs only list shipped ids, so a match can't be a false positive.
@@ -425,9 +447,17 @@ Deno.serve(async (req) => {
 
       for (let i = 0; i < candidates.length; i++) {
         const cand = candidates[i];
-        const claims = claimsByCandidate[i] ?? [];
+        const claims = claimsByCandidate[i];
+
+        // Extraction failed for this post's batch: leave rumor_checked_at null
+        // so the next hourly run retries it instead of burning the candidate.
+        if (claims === null) {
+          failedCandidates++;
+          continue;
+        }
+
         const recoveredClaims = recoverDeterministicClaims(cand.source, cand.postText);
-        const auditClaims = [...claims, ...recoveredClaims];
+        const auditClaims = [...(claims ?? []), ...recoveredClaims];
 
         // Social layer: a GA announcement from a credible source retires whatever
         // version(s) it names — the backstop for ChatGPT/Grok (no Models API key)
@@ -549,6 +579,7 @@ Deno.serve(async (req) => {
       code_version: CODE_VERSION,
       candidates: candidates.length,
       checked_posts: checkedPosts,
+      failed_candidates: failedCandidates,
       contributions: contributions.length,
       clusters_upserted: upserts,
       released_tokens: releasedList.length,
@@ -558,7 +589,7 @@ Deno.serve(async (req) => {
     };
     await supabase.from("error_log").insert({
       function_name: SOURCE,
-      error_message: `Rumor aggregate complete: candidates=${candidates.length} contributions=${contributions.length} clusters=${upserts}`,
+      error_message: `Rumor aggregate complete: candidates=${candidates.length} failed=${failedCandidates} contributions=${contributions.length} clusters=${upserts}`,
       context: JSON.stringify(summary),
     });
 
