@@ -135,9 +135,9 @@ const GenerationRow = ({ g, showBench }: { g: ShipSenseGeneration; showBench?: b
   return (
     <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3">
       <p className="text-body text-text-secondary">
-        {g.prevLabel} {fmt1(g.prevScore)}
+        <span className="whitespace-nowrap">{g.prevLabel} {fmt1(g.prevScore)}</span>
         <span className="mx-2 text-text-tertiary">→</span>
-        <span className="text-foreground">
+        <span className="whitespace-nowrap text-foreground">
           {g.currLabel} {fmt1(g.currScore)}
         </span>
       </p>
@@ -263,7 +263,7 @@ const Benchmark = () => {
                   </span>
                   {HAS_RANK_SETS ? (
                     <span title="95% rank confidence set from the paired tests; P(#1) = share of joint item-bootstrap resamples in which this model scores highest">
-                      Rank range {rankRangeText(m)} · P(#1) {pFirstText(m)}
+                      · Rank range {rankRangeText(m)} · P(#1) {pFirstText(m)}
                     </span>
                   ) : null}
                   <span
@@ -273,7 +273,7 @@ const Benchmark = () => {
                         : undefined
                     }
                   >
-                    {price(m.priceIn)} / {price(m.priceOut)} per 1M
+                    · {price(m.priceIn)} / {price(m.priceOut)} per 1M
                     {m.atTestPriceIn !== undefined ? " †" : ""}
                     {m.pendingEffective !== undefined ? (
                       <span
@@ -284,7 +284,7 @@ const Benchmark = () => {
                     ) : null}
                   </span>
                   <span>
-                    R {fmt2(m.restraint)} · H {fmt2(m.honesty)} · C{" "}
+                    · R {fmt2(m.restraint)} · H {fmt2(m.honesty)} · C{" "}
                     {fmt2(m.conviction)}
                   </span>
                 </p>
