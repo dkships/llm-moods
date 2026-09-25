@@ -936,6 +936,15 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("gemini", "Gemini 3.7 Pro", null)).toBe(false);
   });
 
+  // Grok has no Models API, so each release is a manual timeline entry; a
+  // missed one leaves the Grok chart with outage markers and no launch label.
+  it("records every catalogued Grok release since 4.5 on the launch timeline", () => {
+    const grokLaunches = VENDOR_EVENTS
+      .filter((item) => item.eventType === "model_launch" && item.modelSlug === "grok")
+      .map((item) => item.title.replace(/\s+launch$/i, ""));
+    expect(grokLaunches).toEqual(expect.arrayContaining(["Grok 4.5", "Grok 4.6", "Grok 4.7"]));
+  });
+
   it("covers every model launch recorded in the vendor event timeline", () => {
     for (const event of VENDOR_EVENTS.filter((item) => item.eventType === "model_launch" && item.modelSlug)) {
       const label = event.title.replace(/\s+launch$/i, "");

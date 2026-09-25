@@ -234,6 +234,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     notes: "Approved-user rollout September 3, general availability the next day. Computer-use headline feature; API priced at 2.5x GPT-5.6 Sol.",
   },
   {
+    id: "xai-grok-4-7-launch",
+    vendor: "xai",
+    modelSlug: "grok",
+    eventDate: "2026-09-21",
+    eventType: "model_launch",
+    title: "Grok 4.7 launch",
+    url: "https://x.ai/news/grok-4-7",
+    notes: "Announced on x.ai September 21 as xAI's most capable model for coding and knowledge work; 500k context, same token rates as 4.6. Shipped the same day as an API/Grok.com/Grok Build outage.",
+  },
+  {
     id: "openai-gpt-6-sol-launch",
     vendor: "openai",
     modelSlug: "chatgpt",
