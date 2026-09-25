@@ -82,7 +82,7 @@ export interface ClassifyOptions {
 
 const OPENAI_SERVICE_TIERS = new Set<OpenAiServiceTier>(["flex", "auto", "default"]);
 // Flex requests are slower and may hang; bound them so one call can't eat the
-// drain's 240 s lock (a 20-post batch normally completes in well under 60 s).
+// drain's pass budget (a 20-post batch normally completes in well under 60 s).
 const OPENAI_FLEX_TIMEOUT_MS = Number(envValue("OPENAI_FLEX_TIMEOUT_MS", "120000"));
 
 export function openAiServiceTier(options: ClassifyOptions = {}): OpenAiServiceTier {

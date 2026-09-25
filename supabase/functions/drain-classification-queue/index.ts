@@ -17,12 +17,15 @@ const SOURCE = "drain-classification-queue";
 // change; verify after redeploy with a dry_run invocation and check the
 // response's code_version. "r1" = the compact-irrelevant revert (2026-07-30);
 // 2026-08-22 = OpenAI flex service tier + classifier_usage_daily ledger.
-const CODE_VERSION = "2026-08-22-flex-tier-usage-ledger";
+const CODE_VERSION = "2026-09-25-gemini-gate-removed";
 // Fallbacks for invocations that omit limit/batch_size. Match the pg_cron
 // production body (limit=200, batch_size=20); batch_size stays at 20 to
 // respect the batch-JSON-size cap decision (see AGENT-REFERENCE.md).
 const DEFAULT_LIMIT = 200;
 const DEFAULT_BATCH_SIZE = 20;
+// Outlives the 400 s edge-function budget, so a slow pass can never be joined
+// by the next 2-minute cron tick re-selecting (and re-billing) the same rows.
+const LOCK_TTL_SECONDS = 420;
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
@@ -49,7 +52,7 @@ Deno.serve(async (req) => {
     });
   }
 
-  const lock = await claimServiceLock(supabase, SOURCE, 240);
+  const lock = await claimServiceLock(supabase, SOURCE, LOCK_TTL_SECONDS);
   if (!lock.claimed) {
     return new Response(JSON.stringify({ status: "skipped", reason: "already_running", code_version: CODE_VERSION }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
