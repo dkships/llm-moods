@@ -6,6 +6,7 @@ import { useDailyChartData, useChartEvents, useStatusIncidentMarkers } from "@/l
 import { useVendorIncidents } from "@/hooks/useVendorIncidents";
 import { VENDOR_BY_MODEL, type ModelSlug } from "@/data/vendor-events";
 import { getUtcInstantForPacificMidnight } from "@/lib/pacific-day";
+import { getModelAccent } from "@/lib/vibes";
 
 const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 
@@ -58,7 +59,7 @@ const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, ca
     isPinned ? { sinceISO, untilISO } : undefined,
   );
 
-  const accent = model?.accent_color || "#888";
+  const accent = getModelAccent(model);
 
   const { chartData, dateLabels } = useDailyChartData(vibesHistory, days, anchorDate);
   const timelineEvents = useChartEvents(modelSlug, dateLabels);

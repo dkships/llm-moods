@@ -9,8 +9,9 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from "recharts";
-import { memo, useId, useMemo } from "react";
+import { memo, useCallback, useId, useMemo, useState } from "react";
 import { LIMITED_SAMPLE_THRESHOLD } from "@/lib/vibes";
+import { computeYDomain, computeYTicks, type YDomain } from "@/lib/chart-scale";
 
 // Theme colors — mapped from CSS variables (Recharts needs raw strings)
 const CHART_COLORS = {
@@ -35,6 +36,17 @@ const AREA_BOTTOM_OPACITY = 0;
 const LABEL_FLIP_FRACTION = 2 / 3;
 const EVENT_LABEL_OFFSET = 6;
 const EVENT_LABEL_FONT_SIZE = 10;
+
+// In-chart event labels need room. Below this container width they are
+// dropped entirely (the "Known events" legend under the chart still names
+// every marker), and above it a label closer than MIN_EVENT_LABEL_GAP_PX to
+// the previous kept label is dropped instead of drawn on top of it.
+const MIN_LABELED_CHART_WIDTH = 500;
+const MIN_EVENT_LABEL_GAP_PX = 90;
+
+// The dashed 50 line is where positive and negative chatter balance out.
+const MIDLINE_SCORE = 50;
+const MIDLINE_LABEL = "balanced";
 
 export type ChartEventKind = "launch" | "regression" | "incident" | "note";
 
@@ -77,23 +89,9 @@ interface VibesChartProps {
   accent: string;
   timeRange: string;
   events?: ChartEventMarker[];
-}
-
-function computeYDomain(data: { score: number | null }[]): [number, number] {
-  // Auto-scale around the visible data with a 5-point pad and snap to multiples of 5.
-  // Always cap to [0, 100] since scores can never exceed that range.
-  const scores = data.map((d) => d.score).filter((v): v is number => typeof v === "number");
-  if (scores.length === 0) return [20, 100];
-  const min = Math.min(...scores);
-  const max = Math.max(...scores);
-  const lo = Math.max(0, Math.floor((min - 5) / 5) * 5);
-  const hi = Math.min(100, Math.ceil((max + 5) / 5) * 5);
-  // Keep at least a 30-point span so a flat day doesn't crush the line.
-  if (hi - lo < 30) {
-    const mid = (hi + lo) / 2;
-    return [Math.max(0, Math.round((mid - 15) / 5) * 5), Math.min(100, Math.round((mid + 15) / 5) * 5)];
-  }
-  return [lo, hi];
+  /** Shared y-domain so side-by-side charts use one scale (Compare). Defaults
+   * to a domain fitted to this chart's own data. */
+  yDomain?: YDomain;
 }
 
 // Split the series so the still-filling day draws as a dashed tail. Only the
@@ -275,6 +273,37 @@ function buildAriaLabel(chartData: VibesChartDatum[], timeRange: string): string
   return `Sentiment score chart, ${timeRange} range: latest score ${latest.score} at ${latest.day}, ${trend} across the visible period.${provisional}`;
 }
 
+// Indexes of events whose label fits: none on a narrow chart, otherwise each
+// label must sit at least MIN_EVENT_LABEL_GAP_PX right of the last kept one.
+// X positions are approximated as evenly spaced days across the full width.
+function labeledEventIndexes(
+  events: ChartEventMarker[],
+  dayIndex: Record<string, number>,
+  dayCount: number,
+  chartWidth: number,
+): Set<number> {
+  const labeled = new Set<number>();
+  if (chartWidth < MIN_LABELED_CHART_WIDTH || dayCount === 0) {
+    return labeled;
+  }
+
+  const pxPerDay = chartWidth / dayCount;
+  const candidates = events
+    .map((event, i) => ({ i, day: dayIndex[event.startLabel], hasLabel: Boolean(event.shortLabel) }))
+    .filter((c) => c.hasLabel && c.day != null)
+    .sort((a, b) => a.day - b.day);
+
+  let lastDay: number | null = null;
+  for (const { i, day } of candidates) {
+    if (lastDay != null && (day - lastDay) * pxPerDay < MIN_EVENT_LABEL_GAP_PX) {
+      continue;
+    }
+    labeled.add(i);
+    lastDay = day;
+  }
+  return labeled;
+}
+
 function eventLabel(event: ChartEventMarker, flip: boolean) {
   if (!event.shortLabel) return undefined;
   return {
@@ -288,10 +317,13 @@ function eventLabel(event: ChartEventMarker, flip: boolean) {
   } as const;
 }
 
-const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesChartProps) => {
+const VibesChart = memo(({ chartData, accent, timeRange, events = [], yDomain }: VibesChartProps) => {
   const gradientId = useId();
-  const [yMin, yMax] = computeYDomain(chartData);
-  const showMidlineRef = yMin <= 50 && yMax >= 50;
+  const [chartWidth, setChartWidth] = useState(0);
+  const handleResize = useCallback((width: number) => setChartWidth(width), []);
+  const [yMin, yMax] = yDomain ?? computeYDomain(chartData);
+  const yTicks = computeYTicks([yMin, yMax]);
+  const showMidlineRef = yMin <= MIDLINE_SCORE && yMax >= MIDLINE_SCORE;
   const plotData = useMemo(() => toPlotData(chartData), [chartData]);
   const dayIndex = useMemo(() => {
     const index: Record<string, number> = {};
@@ -301,6 +333,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
     return index;
   }, [chartData]);
   const flipAfter = chartData.length * LABEL_FLIP_FRACTION;
+  const labeledEvents = labeledEventIndexes(events, dayIndex, chartData.length, chartWidth);
   const tooltip = (props: unknown) => (
     <VibesTooltip {...(props as VibesTooltipProps)} accent={accent} events={events} dayIndex={dayIndex} />
   );
@@ -309,7 +342,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
   // h-full w-full is load-bearing: consumers size the chart via wrapper divs,
   // and ResponsiveContainer's height:100% resolves to 0 in an unsized parent.
   <div role="img" aria-label={buildAriaLabel(chartData, timeRange)} className="h-full w-full">
-  <ResponsiveContainer width="100%" height="100%">
+  <ResponsiveContainer width="100%" height="100%" onResize={handleResize}>
     <ComposedChart data={plotData} margin={{ top: 8, right: 12, bottom: 4, left: 0 }} accessibilityLayer>
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
@@ -335,6 +368,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
       />
       <YAxis
         domain={[yMin, yMax]}
+        ticks={yTicks}
         tick={{ fill: CHART_COLORS.mutedForeground, fontFamily: MONO_FONT, fontSize: 11 }}
         axisLine={false}
         tickLine={false}
@@ -346,7 +380,19 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
         content={tooltip}
       />
       {showMidlineRef && (
-        <ReferenceLine y={50} stroke={CHART_COLORS.referenceLine} strokeDasharray="4 4" />
+        <ReferenceLine
+          y={MIDLINE_SCORE}
+          stroke={CHART_COLORS.referenceLine}
+          strokeDasharray="4 4"
+          label={{
+            value: MIDLINE_LABEL,
+            position: "insideBottomLeft",
+            fill: CHART_COLORS.mutedForeground,
+            fontSize: EVENT_LABEL_FONT_SIZE,
+            fontFamily: MONO_FONT,
+            opacity: 0.7,
+          }}
+        />
       )}
       {events.map((event, i) => {
         const isRange = event.endLabel && event.endLabel !== event.startLabel;
@@ -364,7 +410,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
               stroke={event.color}
               strokeOpacity={0.35}
               ifOverflow="visible"
-              label={eventLabel(event, flip)}
+              label={labeledEvents.has(i) ? eventLabel(event, flip) : undefined}
             />
           );
         }
@@ -376,7 +422,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [] }: VibesCha
             strokeDasharray="3 3"
             strokeOpacity={0.7}
             ifOverflow="visible"
-            label={eventLabel(event, flip)}
+            label={labeledEvents.has(i) ? eventLabel(event, flip) : undefined}
           />
         );
       })}

@@ -5,6 +5,7 @@ import { RumorCardSkeleton } from "@/components/Skeletons";
 import useHead from "@/hooks/useHead";
 import { useRumors } from "@/hooks/useRumors";
 import { useModelsWithLatestVibes } from "@/hooks/useVibesData";
+import { getModelAccent } from "@/lib/vibes";
 import { rumorStrengthScore } from "../../supabase/functions/_shared/rumor-canon";
 
 const MODEL_LABELS: Record<string, string> = {
@@ -75,7 +76,7 @@ const Rumors = () => {
                     <RumorCard
                       key={`${rumor.model_slug}:${rumor.version_label ?? rumor.codename}`}
                       rumor={rumor}
-                      accent={m?.accent_color ?? "#888"}
+                      accent={getModelAccent(m)}
                       modelName={m?.name ?? MODEL_LABELS[rumor.model_slug] ?? rumor.model_slug}
                       strengthPct={Math.round((rumorStrengthScore(rumor) / boardMax) * 100)}
                       // A lone rumor would otherwise sit half-width with an

@@ -49,6 +49,42 @@ export function sentimentAlpha(color: string, alpha: number): string {
   return color.replace(/\)\s*$/, ` / ${alpha})`);
 }
 
+// Neutral grey for a model with no brand color on file (or not loaded yet).
+const FALLBACK_MODEL_ACCENT = "#888";
+
+export function getModelAccent(model: { accent_color?: string | null } | null | undefined): string {
+  return model?.accent_color || FALLBACK_MODEL_ACCENT;
+}
+
+const WHOLE_PERCENT = 100;
+
+// Turns counts into integer percents that sum to exactly 100 using the
+// largest-remainder method. Plain Math.round can overshoot: counts [7, 1]
+// are 87.5% / 12.5%, which round to 88 + 13 = 101; this gives [88, 12].
+// Ties go to the earlier entry. All-zero input yields all zeros.
+export function toWholePercents(counts: number[]): number[] {
+  const total = counts.reduce((sum, count) => sum + count, 0);
+  if (total <= 0) {
+    return counts.map(() => 0);
+  }
+
+  const exact = counts.map((count) => (count / total) * WHOLE_PERCENT);
+  const percents = exact.map((value) => Math.floor(value));
+  let leftover = WHOLE_PERCENT - percents.reduce((sum, value) => sum + value, 0);
+
+  const byRemainder = exact
+    .map((value, i) => ({ i, remainder: value - percents[i] }))
+    .sort((a, b) => b.remainder - a.remainder);
+  for (const { i } of byRemainder) {
+    if (leftover <= 0) {
+      break;
+    }
+    percents[i] += 1;
+    leftover -= 1;
+  }
+  return percents;
+}
+
 // Sample-size warning threshold for asymmetric "Limited sample" notes on
 // the model detail page and chart tooltips. Mirrors DEFAULT_MIN_POSTS=5 in
 // vibes-scoring.ts: below this floor the smoothing weights tip heavily

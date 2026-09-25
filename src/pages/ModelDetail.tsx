@@ -25,6 +25,7 @@ import { VENDOR_BY_MODEL, type ModelSlug } from "@/data/vendor-events";
 import { eventGlyph } from "@/components/VibesChart";
 import {
   getVibeStatus, formatComplaintLabel, SOURCE_LABELS, sentimentAlpha,
+  getModelAccent, toWholePercents,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton, Shimmer } from "@/components/Skeletons";
 
@@ -73,7 +74,7 @@ const ModelDetail = () => {
     "7D",
   ];
   const vibe = getVibeStatus(latestScore);
-  const accent = model?.accent_color || "#888";
+  const accent = getModelAccent(model);
 
   // Lexical product-surface tagging on recent posts. Same regex map applies to all four
   // tracked models — see src/lib/product-surface.ts for per-model patterns.
@@ -104,12 +105,12 @@ const ModelDetail = () => {
     const key = surface?.label ?? "Unspecified";
     negativeBySurface.set(key, (negativeBySurface.get(key) ?? 0) + 1);
   }
-  const negativeSurfaceRows = Array.from(negativeBySurface.entries())
-    .sort((a, b) => b[1] - a[1])
-    .map(([label, count]) => ({
-      label,
-      pct: totalNegativePosts > 0 ? Math.round((count / totalNegativePosts) * 100) : 0,
-    }));
+  const sortedSurfaceCounts = Array.from(negativeBySurface.entries()).sort((a, b) => b[1] - a[1]);
+  const surfacePercents = toWholePercents(sortedSurfaceCounts.map(([, count]) => count));
+  const negativeSurfaceRows = sortedSurfaceCounts.map(([label], i) => ({
+    label,
+    pct: surfacePercents[i],
+  }));
 
   // Only surface this panel when there is a real product-surface signal — a
   // lone "Unknown 100%" bar carries no information (asymmetric-caveat pattern).
@@ -487,7 +488,6 @@ const ModelDetail = () => {
           {/* Recent Posts */}
           <section className="container pb-12">
             <SectionHeader
-              level="page"
               title={`Recent posts about ${model.name}`}
               className="mb-3"
             />

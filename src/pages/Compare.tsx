@@ -14,7 +14,8 @@ import {
 } from "@/hooks/useVibesData";
 import type { ModelWithVibes } from "@/hooks/useVibesData";
 import { useDailyChartData } from "@/lib/use-chart-data";
-import { formatComplaintLabel } from "@/lib/vibes";
+import { formatComplaintLabel, getModelAccent, toWholePercents } from "@/lib/vibes";
+import { computeYDomain, type YDomain } from "@/lib/chart-scale";
 import { normalizeSentiment } from "@/shared/public-taxonomy";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton, CardSkeleton } from "@/components/Skeletons";
 
@@ -23,14 +24,47 @@ const LazyVibesChart = lazy(() => import("@/components/VibesChart"));
 const CHART_DAYS = 30;
 const RECENT_POSTS_LIMIT = 3;
 
-function ChartCell({ model }: { model: ModelWithVibes }) {
-  const accent = model.accent_color || "#888";
+// A disabled chip is the model already picked on the other side. It keeps
+// full-strength tertiary text (the old opacity-40 was unreadable) and reads
+// as unavailable through a dashed border and inert hover instead.
+const TAKEN_CHIP_CLASS = "cursor-not-allowed border-dashed disabled:hover:border-border disabled:hover:text-text-tertiary disabled:active:scale-100";
+
+type TrendSeries = ReturnType<typeof useTrendSeries>;
+
+function useTrendSeries(model: ModelWithVibes) {
   const { data: history, isLoading, isError } = useVibesHistory(model.id, "daily", "30d");
   const { chartData } = useDailyChartData(history, CHART_DAYS);
+  return { chartData, isLoading, isError };
+}
+
+// Both trend charts share one y-scale. Independently fitted domains made a
+// 10-point swing on one side look as steep as a 30-point swing on the other.
+function ChartRow({ modelA, modelB }: { modelA: ModelWithVibes; modelB: ModelWithVibes }) {
+  const seriesA = useTrendSeries(modelA);
+  const seriesB = useTrendSeries(modelB);
+  const yDomain = computeYDomain([...seriesA.chartData, ...seriesB.chartData]);
+
+  return (
+    <>
+      <ChartCell model={modelA} series={seriesA} yDomain={yDomain} />
+      <ChartCell model={modelB} series={seriesB} yDomain={yDomain} />
+    </>
+  );
+}
+
+interface ChartCellProps {
+  model: ModelWithVibes;
+  series: TrendSeries;
+  yDomain: YDomain;
+}
+
+function ChartCell({ model, series, yDomain }: ChartCellProps) {
+  const accent = getModelAccent(model);
+  const { chartData, isLoading, isError } = series;
 
   return (
     <Surface>
-      <SectionHeader title="30-day trend" />
+      <SectionHeader title={`${model.name} 30-day trend`} />
       {isError ? (
         <p className="py-6 text-center text-body text-text-tertiary" role="status" aria-live="polite">
           Couldn't load the chart.
@@ -54,7 +88,7 @@ function ChartCell({ model }: { model: ModelWithVibes }) {
             }
           >
             <Suspense fallback={<div className="h-full animate-pulse rounded bg-secondary/40" />}>
-              <LazyVibesChart chartData={chartData} accent={accent} timeRange="30d" />
+              <LazyVibesChart chartData={chartData} accent={accent} timeRange="30d" yDomain={yDomain} />
             </Suspense>
           </ErrorBoundary>
         </div>
@@ -64,13 +98,13 @@ function ChartCell({ model }: { model: ModelWithVibes }) {
 }
 
 function ComplaintsCell({ model }: { model: ModelWithVibes }) {
-  const accent = model.accent_color || "#888";
+  const accent = getModelAccent(model);
   const { data: complaints, isLoading, isError } = useComplaintBreakdown(model.id);
   const top3 = (complaints ?? []).slice(0, 3);
 
   return (
     <Surface>
-      <SectionHeader title="Top complaints" meta="Last 30 days" />
+      <SectionHeader title={`${model.name} top complaints`} meta="Last 30 days" />
       {isError ? (
         <p className="text-body text-text-tertiary" role="status" aria-live="polite">Couldn't load complaints.</p>
       ) : isLoading ? (
@@ -100,7 +134,7 @@ function ComplaintsCell({ model }: { model: ModelWithVibes }) {
 // last-7-days window as the Recent posts panel below instead of fabricating
 // a category list.
 function SentimentMixCell({ model }: { model: ModelWithVibes }) {
-  const accent = model.accent_color || "#888";
+  const accent = getModelAccent(model);
   const { data: posts, isLoading, isError } = useModelPosts(model.id, 25);
 
   const counts = { positive: 0, neutral: 0, negative: 0 };
@@ -114,10 +148,11 @@ function SentimentMixCell({ model }: { model: ModelWithVibes }) {
     { label: "Neutral", count: counts.neutral },
     { label: "Negative", count: counts.negative },
   ];
+  const percents = toWholePercents(rows.map((r) => r.count));
 
   return (
     <Surface>
-      <SectionHeader title="Sentiment mix" meta="Last 7 days" />
+      <SectionHeader title={`${model.name} sentiment mix`} meta="Last 7 days" />
       {isError ? (
         <p className="text-body text-text-tertiary" role="status" aria-live="polite">Couldn't load recent posts.</p>
       ) : isLoading ? (
@@ -129,10 +164,7 @@ function SentimentMixCell({ model }: { model: ModelWithVibes }) {
         <BarList
           max={100}
           accent={accent}
-          items={rows.map((r) => ({
-            label: r.label,
-            value: total > 0 ? Math.round((r.count / total) * 100) : 0,
-          }))}
+          items={rows.map((r, i) => ({ label: r.label, value: percents[i] }))}
         />
       ) : (
         <p className="text-body text-text-tertiary">No posts in the last 7 days</p>
@@ -147,7 +179,7 @@ function RecentPostsCell({ model }: { model: ModelWithVibes }) {
 
   return (
     <div>
-      <SectionHeader title="Recent posts" />
+      <SectionHeader title={`Recent posts about ${model.name}`} />
       {isError ? (
         <p className="py-4 text-center text-body text-text-tertiary" role="status" aria-live="polite">
           Couldn't load posts.
@@ -236,26 +268,28 @@ const Compare = () => {
         ) : (
           <>
             <div className="space-y-3">
-              <div role="group" aria-label="Left model" className="flex flex-wrap gap-2">
+              <div role="group" aria-labelledby="compare-pick-a" className="flex flex-wrap items-center gap-2">
+                <span id="compare-pick-a" className="w-full text-meta text-text-tertiary sm:w-16">Model A</span>
                 {(models ?? []).map((m) => (
                   <FilterChip
                     key={`a-${m.slug}`}
                     pressed={m.slug === modelA.slug}
                     disabled={m.slug === modelB.slug}
-                    className={m.slug === modelB.slug ? "opacity-40" : ""}
+                    className={m.slug === modelB.slug ? TAKEN_CHIP_CLASS : ""}
                     onClick={() => selectModel("a", m.slug)}
                   >
                     {m.name}
                   </FilterChip>
                 ))}
               </div>
-              <div role="group" aria-label="Right model" className="flex flex-wrap gap-2">
+              <div role="group" aria-labelledby="compare-pick-b" className="flex flex-wrap items-center gap-2">
+                <span id="compare-pick-b" className="w-full text-meta text-text-tertiary sm:w-16">Model B</span>
                 {(models ?? []).map((m) => (
                   <FilterChip
                     key={`b-${m.slug}`}
                     pressed={m.slug === modelB.slug}
                     disabled={m.slug === modelA.slug}
-                    className={m.slug === modelA.slug ? "opacity-40" : ""}
+                    className={m.slug === modelA.slug ? TAKEN_CHIP_CLASS : ""}
                     onClick={() => selectModel("b", m.slug)}
                   >
                     {m.name}
@@ -276,8 +310,7 @@ const Compare = () => {
               <ModelCard m={modelA} showSparkline />
               <ModelCard m={modelB} showSparkline />
 
-              <ChartCell model={modelA} />
-              <ChartCell model={modelB} />
+              <ChartRow modelA={modelA} modelB={modelB} />
 
               <ComplaintsCell model={modelA} />
               <ComplaintsCell model={modelB} />

@@ -1,7 +1,7 @@
 import { memo, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
 import Surface from "@/components/Surface";
-import { getVibeStatus, formatComplaintLabel } from "@/lib/vibes";
+import { getVibeStatus, formatComplaintLabel, getModelAccent } from "@/lib/vibes";
 import type { ModelWithVibes } from "@/hooks/useVibesData";
 
 const LazySparkline = lazy(() => import("@/components/Sparkline"));
@@ -14,7 +14,7 @@ interface ModelCardProps {
 
 const ModelCard = memo(({ m, showSparkline = false, onHover }: ModelCardProps) => {
   const vibe = getVibeStatus(m.latestScore);
-  const brandColor = m.accent_color || "#888";
+  const brandColor = getModelAccent(m);
 
   const trendUp = m.trend.direction === "up" && !m.isLatestCarryForward && !m.isStale;
   const trendDown = m.trend.direction === "down" && !m.isLatestCarryForward && !m.isStale;
