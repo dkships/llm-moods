@@ -38,7 +38,7 @@
   <!-- lastmod = updatedAt ?? publishedAt from src/data/research-posts.ts; update when a post changes. -->
   <url>
     <loc>https://llmvibes.ai/research</loc>
-    <lastmod>2026-09-24</lastmod>
+    <lastmod>2026-09-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
