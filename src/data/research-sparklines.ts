@@ -1,9 +1,9 @@
 /**
- * Score lines for the /research index cards. Each series is copied from the
- * article's own companion CSV (public/research/<slug>/data.csv; the
+ * Score lines for the featured post on /research (the newest post gets the
+ * hero chart). Each series is copied from the article's own companion CSV (public/research/<slug>/data.csv; the
  * cross-model post reuses claude-april-2026's), so a card shows the same
  * frozen snapshot its article is built on. Markers point at VENDOR_EVENTS ids
- * so dates live in one place. Posts without a dataset have no entry.
+ * so dates live in one place. A newest post without an entry shows no chart.
  */
 
 export interface SparklineSeries {

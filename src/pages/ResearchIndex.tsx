@@ -7,13 +7,12 @@ import { controlPill } from "@/components/ControlPill";
 import { RESEARCH_POSTS } from "@/data/research-posts";
 import { RESEARCH_SPARKLINES } from "@/data/research-sparklines";
 import ResearchSparkline from "@/components/research/ResearchSparkline";
-import ScoreScale from "@/components/research/ScoreScale";
 import NotFound from "@/pages/NotFound";
 import type { ResearchPost } from "@/data/research-posts";
 
-const formatDate = (iso: string) =>
+const formatDate = (iso: string, month: "long" | "short" = "long") =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", {
-    month: "long",
+    month,
     day: "numeric",
     year: "numeric",
     timeZone: "UTC",
@@ -50,31 +49,38 @@ const PostTags = ({ post }: { post: ResearchPost }) => (
   </div>
 );
 
-// Every card leads with its article's own score line; the methodology post
-// has no series, so it shows the scale the method produces instead.
-const CardStrip = ({ post }: { post: ResearchPost }) => {
-  const sparkline = RESEARCH_SPARKLINES[post.slug];
-  return (
-    <div className="border-b border-border bg-background/40 px-4 pb-3 pt-4 sm:px-6">
-      {sparkline ? <ResearchSparkline data={sparkline} size="card" /> : <ScoreScale />}
-    </div>
-  );
-};
+// Older posts read as a table of contents: one row each, date in its own
+// column, no charts. The newest post above carries the page's one visual.
+const ArchiveRow = ({ post }: { post: ResearchPost }) => (
+  <li>
+    <Link
+      to={`/research/${post.slug}`}
+      className="block px-4 py-5 transition-colors hover:bg-secondary/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-6 md:grid md:grid-cols-[9rem_minmax(0,1fr)] md:gap-x-6"
+    >
+      <p className="text-meta text-text-tertiary md:pt-0.5">
+        <time dateTime={post.publishedAt}>{formatDate(post.publishedAt, "short")}</time>
+      </p>
+      <div className="mt-1.5 max-w-3xl md:mt-0">
+        <h3 className="text-section text-foreground">{post.title}</h3>
+        <p className="mt-1.5 line-clamp-2 text-body text-text-secondary">{post.summary}</p>
+      </div>
+    </Link>
+  </li>
+);
 
 const FeaturedPost = ({ post }: { post: ResearchPost }) => {
   const sparkline = RESEARCH_SPARKLINES[post.slug];
   return (
-    <Link to={`/research/${post.slug}`} className={`${CARD_LINK_CLASS} md:col-span-2`}>
+    <Link to={`/research/${post.slug}`} className={CARD_LINK_CLASS}>
       <Surface
         as="article"
         size="bare"
         elevation="lift"
-        className="h-full overflow-hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]"
+        className={`h-full overflow-hidden ${sparkline ? "md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]" : ""}`}
       >
         <div className="flex flex-col p-4 sm:p-6 md:p-8">
           <p className="text-mono-cap text-text-tertiary">
-            {formatDate(post.publishedAt)}
-            {post.updatedAt && post.updatedAt !== post.publishedAt ? `, updated ${formatDate(post.updatedAt)}` : ""}
+            <time dateTime={post.publishedAt}>{formatDate(post.publishedAt)}</time>
           </p>
           <h2 className="mt-3 text-section text-foreground sm:text-page">{post.title}</h2>
           <p className="mt-4 text-body text-text-secondary">{post.summary}</p>
@@ -82,7 +88,7 @@ const FeaturedPost = ({ post }: { post: ResearchPost }) => {
         </div>
         {sparkline && (
           <div className="border-t border-border bg-background/40 p-4 sm:p-6 md:border-l md:border-t-0 md:p-8">
-            <ResearchSparkline data={sparkline} size="hero" className="h-full" />
+            <ResearchSparkline data={sparkline} className="h-full" />
           </div>
         )}
       </Surface>
@@ -128,22 +134,17 @@ const ResearchIndex = () => {
           </section>
 
           <section className="container pb-12">
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <FeaturedPost post={posts[0]} />
-              {posts.slice(1).map((post) => (
-                <Link key={post.slug} to={`/research/${post.slug}`} className={CARD_LINK_CLASS}>
-                  <Surface as="article" size="bare" elevation="lift" className="flex h-full flex-col overflow-hidden">
-                    <CardStrip post={post} />
-                    <div className="p-4 sm:p-6">
-                      <p className="text-mono-cap text-text-tertiary">{formatDate(post.publishedAt)}</p>
-                      <h2 className="mt-2 text-section text-foreground">{post.title}</h2>
-                      <p className="mt-3 text-body text-text-secondary">{post.summary}</p>
-                      <PostTags post={post} />
-                    </div>
-                  </Surface>
-                </Link>
-              ))}
-            </div>
+            <FeaturedPost post={posts[0]} />
+
+            {posts.length > 1 && (
+              <Surface as="section" size="bare" elevation="card" className="mt-6 overflow-hidden" aria-label="Earlier research">
+                <ul className="divide-y divide-border">
+                  {posts.slice(1).map((post) => (
+                    <ArchiveRow key={post.slug} post={post} />
+                  ))}
+                </ul>
+              </Surface>
+            )}
           </section>
     </>
   );

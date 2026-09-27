@@ -1,7 +1,7 @@
 /**
- * Static score line for /research index cards. Draws a post's frozen series
- * (src/data/research-sparklines.ts) with its key events marked, so each card
- * previews the shape its article is about. No Recharts and no data fetch: the
+ * Static score line for the featured post on /research. Draws the post's
+ * frozen series (src/data/research-sparklines.ts) with its key events
+ * labelled, so the page opens on the shape the article is about. No Recharts and no data fetch: the
  * index stays light and renders the same way for crawlers and readers.
  *
  * The line and area are an SVG stretched to the box; text is positioned in
@@ -12,10 +12,8 @@ import { useId } from "react";
 import type { ResearchSparkline as SparklineData } from "@/data/research-sparklines";
 import { VENDOR_EVENTS } from "@/data/vendor-events";
 
-export type SparklineSize = "hero" | "card";
-
 const VIEW_WIDTH = 1000;
-const VIEW_HEIGHT: Record<SparklineSize, number> = { hero: 300, card: 100 };
+const VIEW_HEIGHT = 300;
 // Headroom above/below the data so the stroke never kisses the edge.
 const Y_PAD_SCORE = 4;
 const MIDLINE_SCORE = 50;
@@ -95,19 +93,17 @@ function placeMarkers(data: SparklineData, dayCount: number): PlacedMarker[] {
 
 interface ResearchSparklineProps {
   data: SparklineData;
-  size: SparklineSize;
   className?: string;
 }
 
-const ResearchSparkline = ({ data, size, className = "" }: ResearchSparklineProps) => {
+const ResearchSparkline = ({ data, className = "" }: ResearchSparklineProps) => {
   const gradientId = useId();
-  const height = VIEW_HEIGHT[size];
+  const height = VIEW_HEIGHT;
   const dayCount = Math.max(...data.series.map((s) => s.scores.length));
   const [yMin, yMax] = yDomain(data);
   const x = (i: number) => (i / (dayCount - 1)) * VIEW_WIDTH;
   const y = (v: number) => height - ((v - yMin) / (yMax - yMin)) * height;
   const markers = placeMarkers(data, dayCount);
-  const isHero = size === "hero";
 
   // Muted comparison lines first so the primary line draws on top.
   const ordered = [
@@ -117,12 +113,12 @@ const ResearchSparkline = ({ data, size, className = "" }: ResearchSparklineProp
   const primary = data.series.find((s) => s.emphasis === "primary");
   const lastIndex = primary ? primary.scores.length - 1 : -1;
   const lastScore = primary ? primary.scores[lastIndex] : null;
-  const showMidline = isHero && yMin < MIDLINE_SCORE && yMax > MIDLINE_SCORE;
+  const showMidline = yMin < MIDLINE_SCORE && yMax > MIDLINE_SCORE;
 
   return (
     <figure className={className}>
       {/* The hero reserves a right gutter for the last-value label. */}
-      <div className={`relative ${isHero ? "mr-8 h-56 sm:h-64" : "h-14"}`}>
+      <div className="relative mr-8 h-56 sm:h-64">
         <svg
           viewBox={`0 0 ${VIEW_WIDTH} ${height}`}
           preserveAspectRatio="none"
@@ -169,7 +165,7 @@ const ResearchSparkline = ({ data, size, className = "" }: ResearchSparklineProp
               d={linePath(s.scores, x, y)}
               fill="none"
               stroke={s.emphasis === "primary" ? ACCENT : MUTED_STROKE}
-              strokeWidth={s.emphasis === "primary" ? (isHero ? 2.5 : 1.75) : 1.25}
+              strokeWidth={s.emphasis === "primary" ? 2.5 : 1.25}
               strokeLinejoin="round"
               strokeLinecap="round"
               vectorEffect="non-scaling-stroke"
@@ -177,7 +173,7 @@ const ResearchSparkline = ({ data, size, className = "" }: ResearchSparklineProp
           ))}
         </svg>
 
-        {isHero && markers.map((m) => (
+        {markers.map((m) => (
           <span
             key={`label-${m.label}`}
             aria-hidden="true"
@@ -192,7 +188,7 @@ const ResearchSparkline = ({ data, size, className = "" }: ResearchSparklineProp
           </span>
         ))}
 
-        {isHero && lastScore != null && (
+        {lastScore != null && (
           <span
             aria-hidden="true"
             className="absolute flex -translate-y-1/2 items-center gap-2"
@@ -204,20 +200,11 @@ const ResearchSparkline = ({ data, size, className = "" }: ResearchSparklineProp
         )}
       </div>
 
-      {isHero ? (
-        <figcaption className="mr-8 mt-3 flex items-baseline justify-between gap-4 text-meta text-text-tertiary">
-          <span>{formatDay(data.startDate, 0)}</span>
-          <span className="text-center">{data.subject}</span>
-          <span>{formatDay(data.startDate, dayCount - 1)}</span>
-        </figcaption>
-      ) : (
-        <figcaption className="mt-2 flex items-baseline justify-between gap-4 text-meta text-text-tertiary">
-          <span className="truncate">{data.subject}</span>
-          <span className="shrink-0">
-            {formatDay(data.startDate, 0)} – {formatDay(data.startDate, dayCount - 1)}
-          </span>
-        </figcaption>
-      )}
+      <figcaption className="mr-8 mt-3 flex items-baseline justify-between gap-4 text-meta text-text-tertiary">
+        <span>{formatDay(data.startDate, 0)}</span>
+        <span className="text-center">{data.subject}</span>
+        <span>{formatDay(data.startDate, dayCount - 1)}</span>
+      </figcaption>
     </figure>
   );
 };
