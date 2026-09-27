@@ -12,6 +12,7 @@ import {
 import { memo, useCallback, useId, useMemo, useState } from "react";
 import { LIMITED_SAMPLE_THRESHOLD } from "@/lib/vibes";
 import { computeYDomain, computeYTicks, type YDomain } from "@/lib/chart-scale";
+import { pickEventLabels, pickMidlineSpot, type MidlineSpot } from "@/lib/chart-label-layout";
 
 // Theme colors — mapped from CSS variables (Recharts needs raw strings)
 const CHART_COLORS = {
@@ -39,10 +40,19 @@ const EVENT_LABEL_FONT_SIZE = 10;
 
 // In-chart event labels need room. Below this container width they are
 // dropped entirely (the "Known events" legend under the chart still names
-// every marker), and above it a label closer than MIN_EVENT_LABEL_GAP_PX to
-// the previous kept label is dropped instead of drawn on top of it.
+// every marker), and above it a label that would touch another kept label is
+// dropped instead of drawn on top of it (see chart-label-layout.ts).
 const MIN_LABELED_CHART_WIDTH = 500;
-const MIN_EVENT_LABEL_GAP_PX = 90;
+
+// Plot area = container minus the y-axis, chart margins, x-axis padding and
+// the x-axis tick row. Used only to estimate label boxes.
+const X_AXIS_PADDING_PX = 10;
+const PLOT_INSET_X_PX = 32 + 12 + 2 * X_AXIS_PADDING_PX;
+const PLOT_INSET_Y_PX = 8 + 4 + 30;
+// Gap between the midline and its label, above (baseline) or below (cap).
+const MIDLINE_LABEL_GAP_ABOVE_PX = 5;
+const MIDLINE_LABEL_GAP_BELOW_PX = 12;
+const MIDLINE_LABEL_INSET_PX = 4;
 
 // The dashed 50 line is where positive and negative chatter balance out.
 const MIDLINE_SCORE = 50;
@@ -273,35 +283,30 @@ function buildAriaLabel(chartData: VibesChartDatum[], timeRange: string): string
   return `Sentiment score chart, ${timeRange} range: latest score ${latest.score} at ${latest.day}, ${trend} across the visible period.${provisional}`;
 }
 
-// Indexes of events whose label fits: none on a narrow chart, otherwise each
-// label must sit at least MIN_EVENT_LABEL_GAP_PX right of the last kept one.
-// X positions are approximated as evenly spaced days across the full width.
+// Indexes of events whose label fits: none on a narrow chart, otherwise
+// labels that would overlap a newer kept label are dropped.
 function labeledEventIndexes(
   events: ChartEventMarker[],
   dayIndex: Record<string, number>,
   dayCount: number,
   chartWidth: number,
 ): Set<number> {
-  const labeled = new Set<number>();
   if (chartWidth < MIN_LABELED_CHART_WIDTH || dayCount === 0) {
-    return labeled;
+    return new Set<number>();
   }
 
-  const pxPerDay = chartWidth / dayCount;
-  const candidates = events
-    .map((event, i) => ({ i, day: dayIndex[event.startLabel], hasLabel: Boolean(event.shortLabel) }))
-    .filter((c) => c.hasLabel && c.day != null)
-    .sort((a, b) => a.day - b.day);
-
-  let lastDay: number | null = null;
-  for (const { i, day } of candidates) {
-    if (lastDay != null && (day - lastDay) * pxPerDay < MIN_EVENT_LABEL_GAP_PX) {
-      continue;
+  const markers = events.flatMap((event, index) => {
+    const day = dayIndex[event.startLabel];
+    if (!event.shortLabel || day == null) {
+      return [];
     }
-    labeled.add(i);
-    lastDay = day;
-  }
-  return labeled;
+    return [{ index, day, text: event.shortLabel }];
+  });
+  return pickEventLabels(markers, {
+    dayCount,
+    plotWidth: chartWidth - PLOT_INSET_X_PX,
+    flipAfterDay: dayCount * LABEL_FLIP_FRACTION,
+  });
 }
 
 function eventLabel(event: ChartEventMarker, flip: boolean) {
@@ -317,10 +322,41 @@ function eventLabel(event: ChartEventMarker, flip: boolean) {
   } as const;
 }
 
+interface MidlineLabelProps {
+  viewBox?: { x: number; y: number; width: number };
+}
+
+// Draws "balanced" at the spot pickMidlineSpot chose, so the score line
+// never runs through the word.
+const renderMidlineLabel = (spot: MidlineSpot, dayCount: number) => ({ viewBox }: MidlineLabelProps) => {
+  if (!viewBox) {
+    return null;
+  }
+  const plotWidth = viewBox.width - 2 * X_AXIS_PADDING_PX;
+  const pxPerDay = dayCount > 1 ? plotWidth / (dayCount - 1) : 0;
+  const x = viewBox.x + X_AXIS_PADDING_PX + spot.startDay * pxPerDay + MIDLINE_LABEL_INSET_PX;
+  const y = spot.side === "above"
+    ? viewBox.y - MIDLINE_LABEL_GAP_ABOVE_PX
+    : viewBox.y + MIDLINE_LABEL_GAP_BELOW_PX;
+  return (
+    <text
+      x={x}
+      y={y}
+      fill={CHART_COLORS.mutedForeground}
+      fontSize={EVENT_LABEL_FONT_SIZE}
+      fontFamily={MONO_FONT}
+      opacity={0.7}
+    >
+      {MIDLINE_LABEL}
+    </text>
+  );
+};
+
 const VibesChart = memo(({ chartData, accent, timeRange, events = [], yDomain }: VibesChartProps) => {
   const gradientId = useId();
-  const [chartWidth, setChartWidth] = useState(0);
-  const handleResize = useCallback((width: number) => setChartWidth(width), []);
+  const [chartSize, setChartSize] = useState({ width: 0, height: 0 });
+  const handleResize = useCallback((width: number, height: number) => setChartSize({ width, height }), []);
+  const chartWidth = chartSize.width;
   const [yMin, yMax] = yDomain ?? computeYDomain(chartData);
   const yTicks = computeYTicks([yMin, yMax]);
   const showMidlineRef = yMin <= MIDLINE_SCORE && yMax >= MIDLINE_SCORE;
@@ -334,6 +370,17 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [], yDomain }:
   }, [chartData]);
   const flipAfter = chartData.length * LABEL_FLIP_FRACTION;
   const labeledEvents = labeledEventIndexes(events, dayIndex, chartData.length, chartWidth);
+  const midlineSpot = useMemo(
+    () => pickMidlineSpot(chartData.map((d) => d.score), {
+      yDomain: [yMin, yMax],
+      plotWidth: chartSize.width - PLOT_INSET_X_PX,
+      plotHeight: chartSize.height - PLOT_INSET_Y_PX,
+      midline: MIDLINE_SCORE,
+      text: MIDLINE_LABEL,
+      markerDays: events.map((e) => dayIndex[e.startLabel]).filter((d): d is number => d != null),
+    }),
+    [chartData, yMin, yMax, chartSize, events, dayIndex],
+  );
   const tooltip = (props: unknown) => (
     <VibesTooltip {...(props as VibesTooltipProps)} accent={accent} events={events} dayIndex={dayIndex} />
   );
@@ -384,14 +431,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [], yDomain }:
           y={MIDLINE_SCORE}
           stroke={CHART_COLORS.referenceLine}
           strokeDasharray="4 4"
-          label={{
-            value: MIDLINE_LABEL,
-            position: "insideBottomLeft",
-            fill: CHART_COLORS.mutedForeground,
-            fontSize: EVENT_LABEL_FONT_SIZE,
-            fontFamily: MONO_FONT,
-            opacity: 0.7,
-          }}
+          label={renderMidlineLabel(midlineSpot, chartData.length)}
         />
       )}
       {events.map((event, i) => {
