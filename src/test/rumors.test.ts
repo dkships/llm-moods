@@ -558,6 +558,9 @@ describe("source quality", () => {
     expect(inferSourceQuality({ url: "https://x.com/haydenfield/status/1", platform: "twitter" })).toBe(
       "press_scoop",
     );
+    expect(inferSourceQuality({ url: "https://x.com/lyraxana/status/1", platform: "twitter", handle: "@lyraxana" })).toBe(
+      "tracked_leaker",
+    );
     expect(inferSourceQuality({ url: "https://www.axios.com/2026/06/27/fable-5", platform: "web" })).toBe(
       "press_scoop",
     );

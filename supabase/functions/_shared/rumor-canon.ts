@@ -63,6 +63,7 @@ export const TRACKED_LEAKER_HANDLES: ReadonlySet<string> = new Set([
   "testingcatalog",
   "scaling01",
   "m1astra",
+  "lyraxana",
 ]);
 
 // Security researchers and reverse engineers with a demonstrated primary-
