@@ -1,5 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { Menu, X } from "lucide-react";
 import { RESEARCH_POSTS } from "@/data/research-posts";
 
 const GitHubIcon = ({ className }: { className?: string }) => (
@@ -28,45 +29,59 @@ const SvgMark = () => (
   </svg>
 );
 
-// Tailwind `sm` breakpoint minus one: the nav row scrolls below this width.
-const NAV_SCROLL_MAX_WIDTH_PX = 639;
+interface NavItem {
+  to: string;
+  label: string;
+  isActive: (pathname: string) => boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
+  { to: "/dashboard", label: "Dashboard", isActive: (p) => p === "/dashboard" || p.startsWith("/model/") },
+  { to: "/compare", label: "Compare", isActive: (p) => p === "/compare" },
+  { to: "/benchmark", label: "Benchmark", isActive: (p) => p === "/benchmark" },
+  { to: "/research", label: "Research", isActive: (p) => p === "/research" || p.startsWith("/research/") },
+  { to: "/rumors", label: "Rumors", isActive: (p) => p === "/rumors" },
+];
+
+const GITHUB_URL = "https://github.com/dkships/llm-moods";
+
+const FOCUS_RING =
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
 
 const NavBar = () => {
   const { pathname } = useLocation();
-  const showResearchLink = RESEARCH_POSTS.length > 0;
-  const isResearchActive = pathname === "/research" || pathname.startsWith("/research/");
-  const isRumorsActive = pathname === "/rumors";
-  const isBenchmarkActive = pathname === "/benchmark";
-  const isCompareActive = pathname === "/compare";
-  const isDashboardActive = pathname === "/dashboard" || pathname.startsWith("/model/");
+  const menuId = useId();
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const items = NAV_ITEMS.filter((item) => item.to !== "/research" || RESEARCH_POSTS.length > 0);
+  const activeItem = items.find((item) => item.isActive(pathname));
 
-  const activeLinkRef = useRef<HTMLAnchorElement>(null);
+  // A new page closes the phone menu.
   useEffect(() => {
-    // Only the scrolling (phone) layout needs this; on wider screens every
-    // link is already visible and scrollIntoView would nudge the page.
-    if (!window.matchMedia(`(max-width: ${NAV_SCROLL_MAX_WIDTH_PX}px)`).matches) return;
-    activeLinkRef.current?.scrollIntoView({ block: "nearest", inline: "center" });
+    setIsMenuOpen(false);
   }, [pathname]);
 
-  // Once the strip is scrolled off its start (by hand or by the auto-scroll
-  // above), a left-edge fade mirrors the right one so a clipped first label
-  // reads as "more this way" instead of a cut-off word.
-  const navRef = useRef<HTMLElement>(null);
-  const [isScrolledFromStart, setIsScrolledFromStart] = useState(false);
+  // Escape closes it too.
   useEffect(() => {
-    const nav = navRef.current;
-    if (!nav) {
+    if (!isMenuOpen) {
       return;
     }
-    const update = () => setIsScrolledFromStart(nav.scrollLeft > 0);
-    update();
-    nav.addEventListener("scroll", update, { passive: true });
-    return () => nav.removeEventListener("scroll", update);
-  }, []);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setIsMenuOpen(false);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [isMenuOpen]);
 
-  const navLinkClass = (active: boolean) =>
-    `inline-flex min-h-11 shrink-0 snap-start items-center rounded-md px-1.5 text-mono-cap transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:min-h-0 sm:px-2 sm:py-1 ${
+  const desktopLinkClass = (active: boolean) =>
+    `inline-flex shrink-0 items-center rounded-md px-2 py-1 text-mono-cap transition-colors ${FOCUS_RING} ${
       active ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-foreground"
+    }`;
+
+  const menuLinkClass = (active: boolean) =>
+    `flex min-h-11 items-center rounded-md px-3 text-mono-cap transition-colors ${FOCUS_RING} ${
+      active ? "bg-primary/10 text-primary" : "text-text-secondary hover:text-foreground"
     }`;
 
   return (
@@ -78,65 +93,80 @@ const NavBar = () => {
         <Link
           to="/"
           aria-label="LLM Vibes"
-          className="inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:gap-2"
+          className={`inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md sm:gap-2 ${FOCUS_RING}`}
         >
           <SvgMark />
-          {/* Five nav links leave no room for the wordmark on the narrowest
-              screens (320–400px): the mark alone carries the brand there, and
-              the aria-label keeps the accessible name. */}
-          <span className="hidden whitespace-nowrap text-section text-foreground min-[400px]:inline">
-            <span className="hidden min-[460px]:inline">LLM </span>
-            <span className="text-primary">Vibes</span>
+          <span className="whitespace-nowrap text-section text-foreground">
+            LLM <span className="text-primary">Vibes</span>
           </span>
         </Link>
-        {/* Five links plus the mark crowd a phone-width bar. Below `sm` the row scrolls
-            sideways (scrollbar hidden, edge fades as the affordance)
-            and the active link scrolls itself into view on route change. */}
-        <div className="relative min-w-0 flex-1 sm:flex-none">
-          <nav
-            ref={navRef}
-            aria-label="Primary"
-            className="flex items-center gap-1 overflow-x-auto snap-x snap-proximity [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:gap-3 sm:overflow-visible lg:gap-5"
-          >
-          <Link to="/dashboard" className={navLinkClass(isDashboardActive)} ref={isDashboardActive ? activeLinkRef : undefined}>
-            Dashboard
-          </Link>
-          <Link to="/compare" className={navLinkClass(isCompareActive)} ref={isCompareActive ? activeLinkRef : undefined}>
-            Compare
-          </Link>
-          <Link to="/benchmark" className={navLinkClass(isBenchmarkActive)} ref={isBenchmarkActive ? activeLinkRef : undefined}>
-            Benchmark
-          </Link>
-          {showResearchLink && (
-            <Link to="/research" className={navLinkClass(isResearchActive)} ref={isResearchActive ? activeLinkRef : undefined}>
-              Research
+
+        {/* Wide screens: every link in one row. */}
+        <nav aria-label="Primary" className="hidden items-center gap-3 sm:flex lg:gap-5">
+          {items.map((item) => (
+            <Link
+              key={item.to}
+              to={item.to}
+              className={desktopLinkClass(item.isActive(pathname))}
+              aria-current={item.isActive(pathname) ? "page" : undefined}
+            >
+              {item.label}
             </Link>
-          )}
-          <Link to="/rumors" className={navLinkClass(isRumorsActive)} ref={isRumorsActive ? activeLinkRef : undefined}>
-            Rumors
-          </Link>
+          ))}
           <a
-            href="https://github.com/dkships/llm-moods"
+            href={GITHUB_URL}
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub repository"
-            className="hidden h-11 w-11 items-center justify-center rounded-md text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background sm:inline-flex"
+            className={`inline-flex h-11 w-11 items-center justify-center rounded-md text-text-tertiary transition-colors hover:text-foreground ${FOCUS_RING}`}
           >
             <GitHubIcon className="h-5 w-5" />
           </a>
-          </nav>
-          <div
-            className={`pointer-events-none absolute inset-y-0 left-0 w-6 bg-gradient-to-r from-background to-transparent transition-opacity sm:hidden ${
-              isScrolledFromStart ? "opacity-100" : "opacity-0"
-            }`}
-            aria-hidden="true"
-          />
-          <div
-            className="pointer-events-none absolute inset-y-0 right-0 w-6 bg-gradient-to-l from-background to-transparent sm:hidden"
-            aria-hidden="true"
-          />
-        </div>
+        </nav>
+
+        {/* Phones: five labels don't fit beside the wordmark, so the row
+            collapses to one button naming the current page. */}
+        <button
+          type="button"
+          aria-expanded={isMenuOpen}
+          aria-controls={menuId}
+          aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+          onClick={() => setIsMenuOpen((open) => !open)}
+          className={`inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-secondary/40 px-3 text-mono-cap text-text-secondary transition-colors hover:text-foreground sm:hidden ${FOCUS_RING}`}
+        >
+          {activeItem ? <span className="text-primary">{activeItem.label}</span> : <span>Menu</span>}
+          {isMenuOpen ? <X className="h-4 w-4" aria-hidden="true" /> : <Menu className="h-4 w-4" aria-hidden="true" />}
+        </button>
       </div>
+
+      {isMenuOpen && (
+        <nav id={menuId} aria-label="Primary" className="border-t border-border/80 sm:hidden">
+          <ul className="container flex flex-col gap-1 py-3">
+            {items.map((item) => (
+              <li key={item.to}>
+                <Link
+                  to={item.to}
+                  className={menuLinkClass(item.isActive(pathname))}
+                  aria-current={item.isActive(pathname) ? "page" : undefined}
+                >
+                  {item.label}
+                </Link>
+              </li>
+            ))}
+            <li>
+              <a
+                href={GITHUB_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`${menuLinkClass(false)} gap-2`}
+              >
+                <GitHubIcon className="h-4 w-4" />
+                GitHub
+              </a>
+            </li>
+          </ul>
+        </nav>
+      )}
     </header>
   );
 };
