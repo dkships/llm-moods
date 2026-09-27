@@ -109,11 +109,10 @@ const OpusLaunchBody = () => (
 
     <h2 id="there-was-no-opus-5-1">There was no Opus 5.1</h2>
     <p>
-      First, a correction to my own question. I went in to compare Opus 5.5 against Opus 5.1. That model
-      doesn't exist. Anthropic went from{" "}
+      The model before Opus 5.5 is Opus 5. Anthropic went from{" "}
       <ExternalLink href="https://www.anthropic.com/news/claude-opus-5">Opus 5</ExternalLink> on July 24
       straight to <ExternalLink href="https://www.anthropic.com/news/claude-opus-5-5">Opus 5.5</ExternalLink>{" "}
-      on September 22. Fable 5.1 shipped in between, on September 1.
+      on September 22, with Fable 5.1 in between on September 1.
     </p>
     <p>
       But "Opus 5.1" is all over our corpus anyway. 20 posts between August 20 and September 21 named it,
@@ -139,8 +138,8 @@ const OpusLaunchBody = () => (
       turned up in third-party apps on August 23. "Opus 5.2" canary routing inside Claude Code got reported
       on September 14. Two days before launch, a leaker said the model in testing had been renamed from 5.2
       to 5.5. Whatever the internal story, the public one is clear. <strong>Anthropic skipped the
-      fix-it release everyone was asking for and shipped a bigger jump instead.</strong> So the real
-      comparison is Opus 5.5 against Opus 5, with Fable 5.1 as the other recent Anthropic launch.
+      fix-it release everyone was asking for and shipped a bigger jump instead.</strong> So this piece
+      compares Opus 5.5 against Opus 5, with Fable 5.1 as the other recent Anthropic launch.
     </p>
 
     <h2 id="the-launch-scorecard">The launch scorecard</h2>
