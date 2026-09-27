@@ -315,8 +315,8 @@ const OpusLaunchBody = () => (
     />
     <p>
       Three weeks in, positive share had halved. The Claude score bottomed at 32 on August 26 and spent
-      most of late August in the 30s. The complaints weren't about price or refusals. 72% of the 1,412
-      negative Opus 5 posts after launch week were some flavor of quality drop: lazy responses, worse code,
+      most of late August in the 30s. The complaints weren't about price or refusals. 71% of the 1,275
+      negative Opus 5 posts from July 29 to September 21 were some flavor of quality drop: lazy responses, worse code,
       "it got dumber."
     </p>
     <p>
@@ -634,9 +634,10 @@ const OpusLaunchBody = () => (
       of Opus 5.5 posts on day 14, next to Opus 5's 40%.
     </p>
     <p>
-      <strong>Safeguard friction is the new quality complaint.</strong> For Opus 5, 72% of complaints were
-      "it got worse." For Opus 5.5, the loudest early complaint is "it won't let me." Different fix, different
-      team, and a false-positive rate you can measure straight from public posts.
+      <strong>Safeguard friction is the new quality complaint.</strong> For Opus 5, 71% of complaints were
+      "it got worse." For Opus 5.5, the loudest launch-day complaint was "it won't let me." It faded by day
+      three, but the false positives that remain are the kind you can count straight from public posts.
+      Different fix, different team.
     </p>
     <p>
       <strong>Skipping a version is a promise.</strong> People asked for a 5.1 to fix 5. They got 5.5, a
@@ -646,7 +647,7 @@ const OpusLaunchBody = () => (
 
     <h2 id="confounds">Confounds</h2>
     <p>
-      Two, and I'd rather name them than bury them.
+      Three, and I'd rather name them than bury them.
     </p>
     <p>
       <strong>We changed our classifier the day after launch.</strong> LLM Vibes moved from GPT-5.6 Terra to
@@ -657,7 +658,7 @@ const OpusLaunchBody = () => (
     </p>
     <p>
       <strong>The OpenAI comparison has its own seams.</strong> GPT-5.6's second day, July 10, is the day we
-      shipped a pipeline overhaul (new sources and a scoring change), so its +20.6 is partly our instrument
+      shipped a pipeline overhaul (new sources and a scoring change), so its +17.7 is partly our instrument
       moving; its launch day alone went from a 33.9 weekly average to 52. And from September 23 our classifier
       is GPT-6 Sol, grading posts about itself. It didn't flatter itself: posts naming GPT-6 Sol or Luna
       stayed at 48% positive after the switch, and the independent sample above doesn't use our classifier

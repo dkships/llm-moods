@@ -63,8 +63,7 @@ export const RESEARCH_POSTS: ResearchPost[] = [
   {
     slug: "opus-5-5-vs-opus-5-launch-sentiment-2026",
     title: "Opus 5.5 got the warmest Claude launch we've measured. Opus 5 looked warm too, for three days.",
-    publishedAt: "2026-09-24",
-    updatedAt: "2026-09-27",
+    publishedAt: "2026-09-27",
     summary:
       "Everyone was waiting for an Opus 5.1 to fix Opus 5. Anthropic shipped Opus 5.5 instead, and over its first five days the Claude score climbed 27 points and kept climbing after day two. Opus 5 opened strong too, then cooled by day five. OpenAI's GPT-6 Sol and Luna launched the same day and landed flat.",
     metaDescription:
@@ -78,7 +77,7 @@ export const RESEARCH_POSTS: ResearchPost[] = [
       path: "/research/opus-5-5-vs-opus-5-launch-sentiment-2026/data.csv",
       description:
         "Daily Claude sentiment score and eligible posts, plus positive and negative counts of relevant posts naming Opus 5, Opus 5.5 and Fable 5.1, and all posts naming Opus 5.1. Source for every series in the article.",
-      publishedAt: "2026-09-24",
+      publishedAt: "2026-09-27",
       license: "MIT",
     },
   },
