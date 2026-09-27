@@ -482,8 +482,11 @@ describe("credibility", () => {
     expect(isCredibleSource(src("u", "reddit", "2026-06-22", 500))).toBe(false);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 1000, { handle: "bedros_p" }))).toBe(false);
     expect(isCredibleSource(src("u", "twitter", "2026-06-22", 1000, { handle: "nima_owji" }))).toBe(false);
-    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "Fried_rice" }))).toBe(true);
-    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "pankajkumar_dev" }))).toBe(true);
+    // Dropped 2026-09-26: scaling01 posts commentary, not leaks; pankajkumar_dev
+    // mostly relays others' leaks and called a nonexistent Opus 5.1/Sonnet 5.1.
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "scaling01" }))).toBe(false);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "Fried_rice" }))).toBe(false);
+    expect(isCredibleSource(src("u", "twitter", "2026-06-22", 0, { handle: "pankajkumar_dev" }))).toBe(false);
     expect(isCredibleSource(src("https://www.testingcatalog.com/openai-app-string-leak/", "web", "2026-06-22", 0))).toBe(true);
     expect(isCredibleSource(src("u", "bluesky", "2026-06-22", 2))).toBe(false);
   });
@@ -551,9 +554,6 @@ describe("source quality", () => {
     );
     expect(inferSourceQuality({ url: "https://x.com/OpenAI/status/1", platform: "twitter", handle: "@OpenAI" })).toBe(
       "official",
-    );
-    expect(inferSourceQuality({ url: "https://x.com/Fried_rice/status/1", platform: "twitter" })).toBe(
-      "artifact_leak",
     );
     expect(inferSourceQuality({ url: "https://x.com/haydenfield/status/1", platform: "twitter" })).toBe(
       "press_scoop",

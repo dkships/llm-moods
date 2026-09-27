@@ -61,7 +61,6 @@ export const TRACKED_LEAKER_HANDLES: ReadonlySet<string> = new Set([
   "btibor91",
   "apples_jimmy",
   "testingcatalog",
-  "scaling01",
   "m1astra",
   "lyraxana",
 ]);
@@ -69,10 +68,9 @@ export const TRACKED_LEAKER_HANDLES: ReadonlySet<string> = new Set([
 // Security researchers and reverse engineers with a demonstrated primary-
 // artifact track record. Their posts are labeled as artifact leaks rather than
 // generic leaker reports so concrete app/API/source findings rank correctly.
-export const ARTIFACT_LEAKER_HANDLES: ReadonlySet<string> = new Set([
-  "fried_rice",
-  "pankajkumar_dev",
-]);
+// Empty since 2026-09-26: fried_rice went quiet and pankajkumar_dev mostly
+// relays other leakers, so neither earned the tier.
+export const ARTIFACT_LEAKER_HANDLES: ReadonlySet<string> = new Set([]);
 
 const PRESS_SCOOP_HANDLES: ReadonlySet<string> = new Set([
   "axios",
