@@ -92,8 +92,8 @@ const OPUS5_TONE_WEEKLY: { day: string; value: number | null }[] = [
 const OpusLaunchBody = () => (
   <>
     <p>
-      My hypothesis going in was simple. Everyone is much happier with Opus 5.5 than they were with the
-      model before it.
+      My hypothesis going in was simple. Everyone is much happier with Opus 5.5 than they were with
+      Opus 5, the model before it.
     </p>
     <p>
       The data says I'm mostly right. And the part where I'm wrong is the more useful part. Also, OpenAI
@@ -107,17 +107,12 @@ const OpusLaunchBody = () => (
       ]}
     />
 
-    <h2 id="there-was-no-opus-5-1">There was no Opus 5.1</h2>
+    <h2 id="there-was-no-opus-5-1">Everyone expected Opus 5.1</h2>
     <p>
-      The model before Opus 5.5 is Opus 5. Anthropic went from{" "}
-      <ExternalLink href="https://www.anthropic.com/news/claude-opus-5">Opus 5</ExternalLink> on July 24
-      straight to <ExternalLink href="https://www.anthropic.com/news/claude-opus-5-5">Opus 5.5</ExternalLink>{" "}
-      on September 22, with Fable 5.1 in between on September 1.
-    </p>
-    <p>
-      But "Opus 5.1" is all over our corpus anyway. 20 posts between August 20 and September 21 named it,
-      from leak chatter to outright pleading. Not a wave, but the message is consistent: Opus 5 has problems, and people were waiting for a
-      point release to fix them.
+      <ExternalLink href="https://www.anthropic.com/news/claude-opus-5">Opus 5</ExternalLink> shipped on
+      July 24. Within a month, people had a name for the fix they wanted: Opus 5.1. 20 posts between August
+      20 and September 21 named it, from leak chatter to outright pleading. Not a wave, but the message is
+      consistent: Opus 5 has problems, and people were waiting for a point release to fix them.
     </p>
     <PullQuote
       text="Opus 5.1 would heal people guys. I'm not kidding. Opus 5 ruined Claude for a lot of us. It made working with it far harder than it should be."
@@ -134,12 +129,19 @@ const OpusLaunchBody = () => (
       href="https://bsky.app/profile/pmwwp.givesky.social/post/3mvolas7dn22v"
     />
     <p>
-      Our own <a href="/rumors">rumors radar</a> logged the leaks. An "Opus 5.1" (codename Marshmallow)
-      turned up in third-party apps on August 23. "Opus 5.2" canary routing inside Claude Code got reported
-      on September 14. Two days before launch, a leaker said the model in testing had been renamed from 5.2
-      to 5.5. Whatever the internal story, the public one is clear. <strong>Anthropic skipped the
-      fix-it release everyone was asking for and shipped a bigger jump instead.</strong> So this piece
-      compares Opus 5.5 against Opus 5, with Fable 5.1 as the other recent Anthropic launch.
+      The leaks followed the same path, and our <a href="/rumors">rumors radar</a> logged each step. An
+      "Opus 5.1" (codename Marshmallow) turned up in third-party apps on August 23. On September 14, reports
+      had Claude Code quietly routing Opus 5 traffic to an "Opus 5.2" that was faster and less lazy. On
+      September 20, a leaker said the model in testing had been renamed from 5.2 to 5.5.
+    </p>
+    <p>
+      Two days later Anthropic shipped{" "}
+      <ExternalLink href="https://www.anthropic.com/news/claude-opus-5-5">Opus 5.5</ExternalLink>, at $4/$20
+      per million tokens against Opus 5's $5/$25. There never was an Opus 5.1. My read of the naming is that
+      the model in testing turned out good enough that a point release would have undersold it, so it got a
+      bigger number. Anthropic hasn't said that, but the version path fits. <strong>People asked for a
+      fix-it release and got a bigger jump instead.</strong> So this piece compares Opus 5.5 against Opus 5,
+      with Fable 5.1 (September 1) as the other recent Anthropic launch.
     </p>
 
     <h2 id="the-launch-scorecard">The launch scorecard</h2>
@@ -296,8 +298,8 @@ const OpusLaunchBody = () => (
     <p className="mt-2 text-sm text-text-tertiary">
       <em>
         Share of posts naming Opus 5 that were positive (of those that took a side), in 7-day buckets from
-        the July 24 launch. The first bucket already includes the July 27–30 turn, which is why it starts at
-        52% and not the 64% of the first two days.
+        the July 24 launch. The first bucket already includes the slide that started July 27, which is why it
+        starts at 52% and not the 64% of the first two days.
       </em>
     </p>
     <p>
@@ -459,7 +461,7 @@ const OpusLaunchBody = () => (
       last one?
     </p>
     <p>
-      Not really. And the two companies basically traded places.
+      Not really. Compared with July, the two companies traded places.
     </p>
 
     <ResearchTableFrame label="ChatGPT and Claude scores around each generation's launch">
@@ -604,7 +606,7 @@ const OpusLaunchBody = () => (
     <p>
       Split by platform, the most interesting move is Hacker News. It was the cooler audience on Opus 5.5 at
       launch, 53% positive of posts that took a side. By days three to five it was 74%. X was already at 93%
-      and stayed there. The launch-day wrinkle on GPT-6 didn't last either. In days one and two, Hacker News
+      and stayed there. On GPT-6, the launch-day split between the two platforms didn't last. In days one and two, Hacker News
       liked GPT-6 Sol and Luna <em>more</em> than GPT-5.6 (25 positive to 14 negative, against 39 to 31).
       By days three to five, Hacker News had mostly stopped talking about them: 20 posts named GPT-6 Sol or
       Luna, against 89 for GPT-5.6 over the same stretch of its launch.
