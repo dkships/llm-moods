@@ -99,14 +99,6 @@ const OpusLaunchBody = () => (
       The data says I'm mostly right. And the part where I'm wrong is the more useful part. Also, OpenAI
       launched GPT-6 Sol and Luna the same afternoon, and that launch landed flat.
     </p>
-    <p className="text-sm text-text-tertiary">
-      <em>
-        Updated September 27 with five full days of data (September 22–26) instead of two. Today is left out
-        because its score is still filling in. The short version: Opus 5.5 got warmer after day two, which
-        Opus 5 didn't. One correction too. The first version measured September 23 before it had finished
-        filling in, and that overstated GPT-6's dip (details below).
-      </em>
-    </p>
 
     <StatCallout
       stats={[
@@ -523,12 +515,6 @@ const OpusLaunchBody = () => (
     <p>
       In July, GPT-5.6 got the big launch pop. In September, Opus 5.5 got it and ChatGPT's score barely
       moved: a small dip over the first two days, then back to where it was.
-    </p>
-    <p>
-      A correction here. The first version of this piece said ChatGPT lost 9 points over the first two
-      days. That was my mistake. I measured September 23 while it was still filling in (84 posts scored 47).
-      The full day came in at 122 posts and 56, which makes the two-day dip 4 points, not 9. That's why
-      this update only counts finished days.
     </p>
 
     <EmbeddedModelChart modelSlug="chatgpt" startDate="2026-07-01" endDate="2026-09-26" />
