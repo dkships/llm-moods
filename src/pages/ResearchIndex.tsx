@@ -5,7 +5,11 @@ import useHead from "@/hooks/useHead";
 import Tag from "@/components/Tag";
 import { controlPill } from "@/components/ControlPill";
 import { RESEARCH_POSTS } from "@/data/research-posts";
+import { RESEARCH_SPARKLINES } from "@/data/research-sparklines";
+import ResearchSparkline from "@/components/research/ResearchSparkline";
+import ScoreScale from "@/components/research/ScoreScale";
 import NotFound from "@/pages/NotFound";
+import type { ResearchPost } from "@/data/research-posts";
 
 const formatDate = (iso: string) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", {
@@ -33,6 +37,57 @@ const RESEARCH_INDEX_JSON_LD = {
     url: `https://llmvibes.ai/research/${post.slug}`,
     name: post.title,
   })),
+};
+
+const CARD_LINK_CLASS =
+  "block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background";
+
+const PostTags = ({ post }: { post: ResearchPost }) => (
+  <div className="mt-4 flex flex-wrap items-center gap-2">
+    {post.tags.slice(0, 3).map((tag) => (
+      <Tag key={tag} shape="pill">{tag}</Tag>
+    ))}
+  </div>
+);
+
+// Every card leads with its article's own score line; the methodology post
+// has no series, so it shows the scale the method produces instead.
+const CardStrip = ({ post }: { post: ResearchPost }) => {
+  const sparkline = RESEARCH_SPARKLINES[post.slug];
+  return (
+    <div className="border-b border-border bg-background/40 px-4 pb-3 pt-4 sm:px-6">
+      {sparkline ? <ResearchSparkline data={sparkline} size="card" /> : <ScoreScale />}
+    </div>
+  );
+};
+
+const FeaturedPost = ({ post }: { post: ResearchPost }) => {
+  const sparkline = RESEARCH_SPARKLINES[post.slug];
+  return (
+    <Link to={`/research/${post.slug}`} className={`${CARD_LINK_CLASS} md:col-span-2`}>
+      <Surface
+        as="article"
+        size="bare"
+        elevation="lift"
+        className="h-full overflow-hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]"
+      >
+        <div className="flex flex-col p-4 sm:p-6 md:p-8">
+          <p className="text-mono-cap text-text-tertiary">
+            {formatDate(post.publishedAt)}
+            {post.updatedAt && post.updatedAt !== post.publishedAt ? `, updated ${formatDate(post.updatedAt)}` : ""}
+          </p>
+          <h2 className="mt-3 text-section text-foreground sm:text-page">{post.title}</h2>
+          <p className="mt-4 text-body text-text-secondary">{post.summary}</p>
+          <PostTags post={post} />
+        </div>
+        {sparkline && (
+          <div className="border-t border-border bg-background/40 p-4 sm:p-6 md:border-l md:border-t-0 md:p-8">
+            <ResearchSparkline data={sparkline} size="hero" className="h-full" />
+          </div>
+        )}
+      </Surface>
+    </Link>
+  );
 };
 
 const ResearchIndex = () => {
@@ -74,55 +129,20 @@ const ResearchIndex = () => {
 
           <section className="container pb-12">
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              {posts.map((post, i) => {
-                const isFeatured = i === 0;
-                return (
-                  <Link
-                    key={post.slug}
-                    to={`/research/${post.slug}`}
-                    className={`block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                      isFeatured ? "md:col-span-2" : ""
-                    }`}
-                  >
-                    <Surface
-                      as="article"
-                      elevation="lift"
-                      className="h-full"
-                    >
-                      <p className="text-mono-cap text-text-tertiary">
-                        {formatDate(post.publishedAt)}
-                      </p>
-                      {/* The featured card spans both grid columns. Setting its
-                          headline and deck across the full ~1290px gave ~90 and
-                          ~140 characters per line; splitting them into a lede
-                          pair holds both near a readable measure and uses the
-                          width instead of leaving it blank. Half-width cards
-                          already sit at a natural measure and stay single-column. */}
-                      <div
-                        className={
-                          isFeatured
-                            ? "mt-2 md:grid md:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)] md:gap-x-10"
-                            : "mt-2"
-                        }
-                      >
-                        <h2
-                          className={`text-foreground ${isFeatured ? "text-section sm:text-page" : "text-section"}`}
-                        >
-                          {post.title}
-                        </h2>
-                        <div className={isFeatured ? "mt-3 md:mt-0" : "mt-3"}>
-                          <p className="text-body text-text-secondary">{post.summary}</p>
-                          <div className="mt-4 flex flex-wrap items-center gap-2">
-                            {post.tags.slice(0, 3).map((tag) => (
-                              <Tag key={tag} shape="pill">{tag}</Tag>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </Surface>
-                  </Link>
-                );
-              })}
+              <FeaturedPost post={posts[0]} />
+              {posts.slice(1).map((post) => (
+                <Link key={post.slug} to={`/research/${post.slug}`} className={CARD_LINK_CLASS}>
+                  <Surface as="article" size="bare" elevation="lift" className="flex h-full flex-col overflow-hidden">
+                    <CardStrip post={post} />
+                    <div className="p-4 sm:p-6">
+                      <p className="text-mono-cap text-text-tertiary">{formatDate(post.publishedAt)}</p>
+                      <h2 className="mt-2 text-section text-foreground">{post.title}</h2>
+                      <p className="mt-3 text-body text-text-secondary">{post.summary}</p>
+                      <PostTags post={post} />
+                    </div>
+                  </Surface>
+                </Link>
+              ))}
             </div>
           </section>
     </>
