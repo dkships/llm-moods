@@ -430,7 +430,15 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       // it canonically collapses here rather than surfacing as a stray card.
       aliases: ["sonnet5", "sonic5"],
       released: true,
-      releasePrompt: "Sonnet 5 and earlier",
+    },
+    {
+      key: "sonnet55",
+      label: "Sonnet 5.5",
+      codename: null,
+      aliases: ["sonnet55", "claudesonnet55"],
+      released: true,
+      releasePrompt: "Sonnet 5.5 and earlier",
+      releasedOn: "2026-09-28",
     },
     {
       key: "haiku45",

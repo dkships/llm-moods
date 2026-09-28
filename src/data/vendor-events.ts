@@ -263,6 +263,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     url: "https://www.anthropic.com/news/claude-opus-5-5",
     notes: "$4/$20 per million tokens, higher five-hour limits on paid plans, and a saved rate-limit reset. Ships with Fable 5.1-style safeguards; flagged tasks fall back to an older model.",
   },
+  {
+    id: "anthropic-sonnet-5-5-launch",
+    vendor: "anthropic",
+    modelSlug: "claude",
+    eventDate: "2026-09-28",
+    eventType: "model_launch",
+    title: "Claude Sonnet 5.5 launch",
+    url: "https://techcrunch.com/2026/09/28/anthropic-releases-sonnet-5-5-which-it-calls-a-significantly-cheaper-faster-work-partner/",
+    notes: "Same $2/$10 per million tokens as Sonnet 5, over 30% faster output and up to 30% less per task. First Sonnet to ship with frontier-style cyber safeguards.",
+  },
 ];
 
 export function getEventsForModel(slug: string | undefined): VendorEvent[] {
