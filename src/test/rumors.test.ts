@@ -1098,6 +1098,16 @@ describe("mergeRumorRows", () => {
     expect(out[0].platform_count).toBe(2);
   });
 
+  it("collapses a family-prefixed Claude label into the bare-line card (live board 2026-09-28)", () => {
+    const out = mergeRumorRows([
+      rrow({ version_label: "Sonnet 5.5", claim_type: "launch", mention_count: 4, last_seen_at: "2026-09-27",
+        representative_sources: [{ url: "u1", platform: "twitter" }] }),
+      rrow({ version_label: "Claude Sonnet 5.5", claim_type: "imminent", last_seen_at: "2026-09-26",
+        representative_sources: [{ url: "u2", platform: "reddit" }] }),
+    ]);
+    expect(out).toHaveLength(1);
+  });
+
   it("folds bare 'Gemini 3.5' chatter into the Pro card and retires shipped Flash Cyber (live board 2026-07-24)", () => {
     const out = mergeRumorRows([
       rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Pro", claim_type: "delayed", last_seen_at: "2026-07-24",

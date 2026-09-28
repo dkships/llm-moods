@@ -1231,6 +1231,13 @@ function identityTokens<T extends MergeableRumor>(row: T): string[] {
   if (canon.key) tokens.add(canon.key);
   const label = squash(row.version_label);
   if (label.length >= 2) tokens.add(label);
+
+  // "Claude Sonnet 5.5" must share a token with "Sonnet 5.5". Strip a leading
+  // family stem only when a line name follows, so "Grok 5" never becomes "5".
+  const stem = FAMILY_STEMS.find((s) => label.startsWith(s));
+  const unprefixed = stem ? label.slice(stem.length) : "";
+  if (/^[a-z]/.test(unprefixed)) tokens.add(unprefixed);
+
   for (const part of splitCompoundLabel(row.codename)) {
     const raw = squash(part);
     if (raw.length >= 2) tokens.add(raw);
