@@ -242,8 +242,8 @@ describe("buildContribution", () => {
   });
 
   it("accepts a punctuation-variant label for an unreleased version", () => {
-    const raw: RawClaim = { is_rumor: true, target_family: "chatgpt", version_label: "GPT-6.1", is_unreleased: true };
-    const c = buildContribution(raw, source, "GPT-6,1 dropping next week per a leaker");
+    const raw: RawClaim = { is_rumor: true, target_family: "chatgpt", version_label: "GPT-6.2", is_unreleased: true };
+    const c = buildContribution(raw, source, "GPT-6,2 dropping next week per a leaker");
     expect(c).not.toBeNull();
     expect(c!.modelSlug).toBe("chatgpt");
   });
@@ -252,13 +252,13 @@ describe("buildContribution", () => {
     const raw: RawClaim = {
       is_rumor: true,
       target_family: "chatgpt",
-      version_label: "GPT-6.1 Sol",
+      version_label: "GPT-6.2 Sol",
       codename: "Sol",
       is_unreleased: true,
     };
-    const c = buildContribution(raw, source, "GPT-6.1 Sol was spotted in testing");
-    expect(c?.versionKey).toBe("gpt61");
-    expect(c?.versionLabel).toBe("GPT-6.1");
+    const c = buildContribution(raw, source, "GPT-6.2 Sol was spotted in testing");
+    expect(c?.versionKey).toBe("gpt62");
+    expect(c?.versionLabel).toBe("GPT-6.2");
     expect(c?.codename).toBe("Sol");
   });
 
@@ -869,7 +869,7 @@ describe("isSupersededVersion", () => {
     expect(isSupersededVersion("claude", "Opus 6", null)).toBe(false);
     expect(isSupersededVersion("claude", "Sonnet 5.5", null)).toBe(false);
     expect(isSupersededVersion("claude", "Fable 5.5", null)).toBe(false);
-    expect(isSupersededVersion("chatgpt", "GPT-6 Astra Max", null)).toBe(false);
+    expect(isSupersededVersion("chatgpt", "GPT-6.1 Astra Max", null)).toBe(false);
     expect(isSupersededVersion("grok", "Grok 4.8", null)).toBe(false);
     // Tiers compare only within the tier: 3.8 Flash shipping says nothing about 3.5 Pro.
     expect(isSupersededVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
@@ -908,7 +908,7 @@ describe("isReleasedVersion", () => {
 
   it("keeps unreleased versions (no false positives)", () => {
     expect(isReleasedVersion("claude", "Opus 6", null)).toBe(false);
-    expect(isReleasedVersion("chatgpt", "GPT-6.1", null)).toBe(false);
+    expect(isReleasedVersion("chatgpt", "GPT-6.2", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 5", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 4.8", null)).toBe(false);
@@ -935,7 +935,7 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("claude", "Opus 5.1", null)).toBe(false);
     expect(isReleasedVersion("chatgpt", null, "Flare")).toBe(true);
     expect(isReleasedVersion("chatgpt", null, "Sunburst")).toBe(true);
-    expect(isReleasedVersion("chatgpt", "GPT-6.1", null)).toBe(false);
+    expect(isReleasedVersion("chatgpt", "GPT-6.2", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.7 Pro", null)).toBe(false);
   });
 
@@ -972,8 +972,8 @@ describe("released model catalog", () => {
     expect(versionKeysFromReleaseText("GPT-5.6 Sol and GPT-Live are now available")).toEqual(
       expect.arrayContaining(["gpt56", "bidi"]),
     );
-    expect(versionKeysFromReleaseText("Today we're launching Grok 5 and GPT-6.1")).toEqual(
-      expect.arrayContaining(["grok5", "gpt61"]),
+    expect(versionKeysFromReleaseText("Today we're launching Grok 5 and GPT-6.2")).toEqual(
+      expect.arrayContaining(["grok5", "gpt62"]),
     );
   });
 });
@@ -1127,13 +1127,13 @@ describe("mergeRumorRows", () => {
     const out = mergeRumorRows([
       rrow({
         model_slug: "chatgpt",
-        version_label: "GPT-6.1",
+        version_label: "GPT-6.2",
         codename: "Sol, Terra, Luna",
         representative_sources: [{ url: "x", platform: "twitter" }],
       }),
       rrow({
         model_slug: "chatgpt",
-        version_label: "GPT-6.1 Sol",
+        version_label: "GPT-6.2 Sol",
         codename: "Sol",
         last_seen_at: "2026-06-24",
         representative_sources: [{ url: "b", platform: "bluesky" }],
@@ -1141,7 +1141,7 @@ describe("mergeRumorRows", () => {
     ]);
 
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("GPT-6.1");
+    expect(out[0].version_label).toBe("GPT-6.2");
     expect(out[0].codename).toBe("Sol, Terra, Luna");
     expect(out[0].mention_count).toBe(2);
     expect(out[0].platform_count).toBe(2);
@@ -1282,7 +1282,7 @@ describe("mergeRumorRows", () => {
     const repeated = mergeRumorRows([
       rrow({
         model_slug: "chatgpt",
-        version_label: "GPT-6.1",
+        version_label: "GPT-6.2",
         mention_count: 2,
         platform_count: 1,
         representative_sources: [

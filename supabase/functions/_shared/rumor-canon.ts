@@ -505,6 +505,16 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releaseAliases: ["astra", "gpt6astra"],
     },
     {
+      // Shipped 2026-09-29 at DevDay as a Sol-only point release.
+      key: "gpt61",
+      label: "GPT-6.1",
+      codename: null,
+      aliases: ["gpt61", "gpt61sol"],
+      released: true,
+      releasePrompt: "GPT-6.1 (Sol) and earlier",
+      releasedOn: "2026-09-29",
+    },
+    {
       // Shipped in the API and ChatGPT as two variants; the variant names are
       // the only way leak posts refer to it.
       key: "gptimage25",

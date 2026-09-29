@@ -273,6 +273,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     url: "https://techcrunch.com/2026/09/28/anthropic-releases-sonnet-5-5-which-it-calls-a-significantly-cheaper-faster-work-partner/",
     notes: "Same $2/$10 per million tokens as Sonnet 5, over 30% faster output and up to 30% less per task. First Sonnet to ship with frontier-style cyber safeguards.",
   },
+  {
+    id: "openai-gpt-6-1-sol-launch",
+    vendor: "openai",
+    modelSlug: "chatgpt",
+    eventDate: "2026-09-29",
+    eventType: "model_launch",
+    title: "GPT-6.1 Sol launch",
+    url: "https://techcrunch.com/2026/09/29/openai-launches-gpt-6-1-sol-says-it-nearly-matches-gpt-6-astra-and-costs-less/",
+    notes: "Announced at DevDay a week after GPT-6 Sol. Same $2/$10 per million tokens; OpenAI says it nearly matches GPT-6 Astra at one-fifth of Astra's price.",
+  },
 ];
 
 export function getEventsForModel(slug: string | undefined): VendorEvent[] {
