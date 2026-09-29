@@ -227,6 +227,22 @@ export function successions(
   return out;
 }
 
+/**
+ * The model a succession chain ends at: GPT-5.6 Sol -> GPT-6 Sol -> GPT-6.1 Sol
+ * ends at GPT-6.1 Sol once both later models are on the board. A model with no
+ * successor is its own end. Returns null on a cycle, which no board should hold.
+ */
+export function successionChainEnd(succ: Map<string, string>, name: string): string | null {
+  const seen = new Set<string>();
+  let at = name;
+  while (succ.has(at)) {
+    if (seen.has(at)) return null;
+    seen.add(at);
+    at = succ.get(at)!;
+  }
+  return at;
+}
+
 const RANK_SET_ALPHA = 0.05;
 
 /** stats.holm_adjust: Holm step-down adjusted p-values, original order. */

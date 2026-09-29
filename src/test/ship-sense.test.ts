@@ -13,6 +13,7 @@ import {
   previousBenchSnapshots,
   rankSets,
   scoringDates,
+  successionChainEnd,
   successions,
   type DeriveModel,
   type DerivePairRecord,
@@ -107,6 +108,23 @@ describe("successions", () => {
     const succ = successions(models, new Map());
     expect(succ.get("grok-4.3")).toBe("grok-4.5");
     expect(succ.get("grok-4.5")).toBe("grok-4.6");
+  });
+
+  it("follows a succession chain to the model that is still current", () => {
+    const models = [
+      model("gpt-5.6-sol", "GPT-5.6 Sol", 86, 83, 89),
+      model("gpt-6-sol", "GPT-6 Sol", 84, 81, 86),
+      model("gpt-6.1-sol", "GPT-6.1 Sol", 85, 82, 88),
+    ];
+    const succ = successions(models, new Map());
+    expect(succ.get("gpt-5.6-sol")).toBe("gpt-6-sol");
+    expect(successionChainEnd(succ, "gpt-5.6-sol")).toBe("gpt-6.1-sol");
+    expect(successionChainEnd(succ, "gpt-6.1-sol")).toBe("gpt-6.1-sol");
+  });
+
+  it("stops a cyclic succession chain instead of looping", () => {
+    const succ = new Map([["a", "b"], ["b", "a"]]);
+    expect(successionChainEnd(succ, "a")).toBeNull();
   });
 
   it("never retires on the strength of an unranked successor", () => {
@@ -591,9 +609,14 @@ describe("committed snapshot invariants", () => {
     // An earlier bench's successor need not hold a rank on today's board (it
     // may itself have been retired since) — this invariant is about the
     // latest run's own successions only.
+    // The successor may itself retire later on the same board (GPT-5.6 Sol ->
+    // GPT-6 Sol -> GPT-6.1 Sol), so follow the chain to its end.
     const current = new Set(SHIP_SENSE_LINEUP.map((m) => m.label));
-    SHIP_SENSE_GENERATIONS.filter((g) => !g.earlier).forEach((g) => {
-      expect(current.has(g.currLabel)).toBe(true);
+    const latest = SHIP_SENSE_GENERATIONS.filter((g) => !g.earlier);
+    const next = new Map(latest.map((g) => [g.prevLabel, g.currLabel]));
+    latest.forEach((g) => {
+      expect(successionChainEnd(next, g.prevLabel)).not.toBeNull();
+      expect(current.has(successionChainEnd(next, g.prevLabel)!)).toBe(true);
       expect(current.has(g.prevLabel)).toBe(false);
     });
   });

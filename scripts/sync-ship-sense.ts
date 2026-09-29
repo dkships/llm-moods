@@ -53,6 +53,7 @@ import {
   previousBenchSnapshots,
   rankSets,
   scoringDates,
+  successionChainEnd,
   successions,
   type FloorRow,
   type LedgerRun,
@@ -204,9 +205,13 @@ async function main() {
     );
   if (current.length < 2)
     fail(`derived only ${current.length} current model(s) — successions() is over-retiring`);
-  for (const [prev, curr] of succ)
-    if (!current.some((m) => m.name === curr))
-      fail(`${prev} retires to ${curr}, which is not in the current lineup`);
+  // A successor may itself be retired (GPT-5.6 Sol -> GPT-6 Sol -> GPT-6.1 Sol);
+  // the chain must still end at a current model.
+  for (const [prev, curr] of succ) {
+    const end = successionChainEnd(succ, prev);
+    if (!end || !current.some((m) => m.name === end))
+      fail(`${prev} retires to ${curr}, whose chain does not end in the current lineup`);
+  }
   for (const m of rankedModels)
     if (!(m.score.lo <= m.score.value && m.score.value <= m.score.hi))
       fail(`${m.name} score ${m.score.value} outside its CI [${m.score.lo}, ${m.score.hi}]`);
