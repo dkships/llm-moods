@@ -12,7 +12,7 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "runId": "2026-09-28-v4.2",
   "runDate": "2026-09-28",
   "bankItems": 82,
-  "modelCount": 22,
+  "modelCount": 23,
   "floor": 52.3,
   "floorKind": "adversarial",
   "floorRows": [
@@ -32,8 +32,8 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
     }
   ],
   "decisiveRule": "bh",
-  "decisivePairs": 149,
-  "totalPairs": 231,
+  "decisivePairs": 157,
+  "totalPairs": 253,
   "scoringDates": [
     {
       "date": "2026-09-28",
@@ -46,7 +46,6 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "GPT-6 Astra",
         "Gemini 3.8 Flash",
         "GPT-5.6 Terra",
-        "GPT-6 Sol",
         "GLM-5.3",
         "Gemini 3.1 Pro",
         "Grok 4.7",
@@ -58,8 +57,15 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "Mistral Medium 3.5",
         "Claude Haiku 4.5",
         "GPT-5.6 Sol",
+        "GPT-6 Sol",
         "Claude Sonnet 5",
         "GPT-5.6 Luna"
+      ]
+    },
+    {
+      "date": "2026-09-29",
+      "labels": [
+        "GPT-6.1 Sol"
       ]
     }
   ]
@@ -196,10 +202,28 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "pendingEffective": "2027-01-01"
   },
   {
+    "name": "gpt-6.1-sol",
+    "label": "GPT-6.1 Sol",
+    "provider": "openai",
+    "pos": 8,
+    "rankLo": 2,
+    "rankHi": 14,
+    "pFirst": 0,
+    "testedOn": "v4.2",
+    "score": 85.1,
+    "lo": 82.3,
+    "hi": 87.7,
+    "restraint": 0.93,
+    "honesty": 0.67,
+    "conviction": 0.95,
+    "priceIn": 2,
+    "priceOut": 10
+  },
+  {
     "name": "gpt-5.6-terra",
     "label": "GPT-5.6 Terra",
     "provider": "openai",
-    "pos": 8,
+    "pos": 9,
     "rankLo": 2,
     "rankHi": 14,
     "pFirst": 0,
@@ -212,24 +236,6 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "conviction": 0.92,
     "priceIn": 2,
     "priceOut": 12
-  },
-  {
-    "name": "gpt-6-sol",
-    "label": "GPT-6 Sol",
-    "provider": "openai",
-    "pos": 9,
-    "rankLo": 2,
-    "rankHi": 14,
-    "pFirst": 0,
-    "testedOn": "v4.2",
-    "score": 83.7,
-    "lo": 81,
-    "hi": 86.1,
-    "restraint": 0.93,
-    "honesty": 0.65,
-    "conviction": 0.93,
-    "priceIn": 2,
-    "priceOut": 10
   },
   {
     "name": "glm-5.3",
@@ -435,6 +441,19 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "deltaPts": 1.8,
     "loPts": -0.3,
     "hiPts": 3.9,
+    "verdict": "up",
+    "family": "confirmatory",
+    "bench": "v4.2",
+    "earlier": false
+  },
+  {
+    "prevLabel": "GPT-6 Sol",
+    "currLabel": "GPT-6.1 Sol",
+    "prevScore": 83.7,
+    "currScore": 85.1,
+    "deltaPts": 1.4,
+    "loPts": -1.3,
+    "hiPts": 4.2,
     "verdict": "up",
     "family": "confirmatory",
     "bench": "v4.2",
