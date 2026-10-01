@@ -789,6 +789,18 @@ describe("canonicalVersionKey", () => {
     expect(canonicalVersionKey("gemini", null, "Gemini 4 Pro").key).toBe("gemini4");
   });
 
+  it("folds the Argon codename into the Gemini 4 card", () => {
+    for (const [label, codename] of [
+      [null, "Argon"],
+      ["Gemini 4", "Argon"],
+      [null, "gemini-4-argon"],
+    ] as [string | null, string | null][]) {
+      const c = canonicalVersionKey("gemini", label, codename);
+      expect(c.key).toBe("gemini4");
+      expect(c.label).toBe("Gemini 4");
+    }
+  });
+
   it("collapses Gemini 3.5 Pro spelling variants to one canonical identity", () => {
     for (const label of ["3.5 Pro", "Gemini 3.5 Pro", "Gemini-3.5-Pro", "Gemini 3.5", "3.5"]) {
       const c = canonicalVersionKey("gemini", label, null);
@@ -848,6 +860,9 @@ describe("isFamilyConsistentLabel / isNonFrontierLabel", () => {
     expect(isNonFrontierLabel("claude", null, "Claude Code")).toBe(true); // product, not a version
     expect(isNonFrontierLabel("chatgpt", null, "Luna-Lisa")).toBe(true); // image checkpoint
     expect(isNonFrontierLabel("chatgpt", null, "luna-lisa-alpha")).toBe(true);
+    expect(isNonFrontierLabel("chatgpt", null, "Dots")).toBe(true); // DevDay agent product
+    expect(isNonFrontierLabel("chatgpt", null, "Spaces")).toBe(true); // ChatGPT Space
+    expect(isNonFrontierLabel("chatgpt", null, "Aeon")).toBe(true); // pre-launch name for Dots
     expect(isNonFrontierLabel("claude", "Opus 5.1", "Marshmallow")).toBe(false); // real leak stays
   });
 

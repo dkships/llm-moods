@@ -619,11 +619,12 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
     {
       key: "gemini4",
       label: "Gemini 4",
-      codename: null,
+      codename: "Argon",
       // The generation is the rumor: "Gemini 4" and "Gemini 4 Pro" chatter
       // describe the same pending launch, so both land on one card. A "Gemini 4
-      // Flash" leak stays separate — only the Pro spelling folds in.
-      aliases: ["gemini4", "gemini4pro", "4pro"],
+      // Flash" leak stays separate — only the Pro spelling folds in. "Argon" is
+      // its Arena/trusted-tester codename ("gemini-4-argon").
+      aliases: ["gemini4", "gemini4pro", "4pro", "argon", "gemini4argon"],
     },
     {
       // Shipped 2026-06-30 as gemini-3.1-flash-lite-image; leak posts about an
@@ -736,6 +737,11 @@ const NON_MODEL_DENY: string[] = [
   "lunalisa",
   "monalisa",
   "gptimage",
+  // ChatGPT agent products launched at DevDay 2026-09-29; Aeon was a
+  // pre-launch name for Dots.
+  "dots",
+  "space",
+  "aeon",
 ];
 
 // Tokens that make a stated version_label "look like" each family. Tested against
