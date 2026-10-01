@@ -32,15 +32,15 @@ const TONE_LEGEND = [
   { key: "negative", label: "Negative", color: NEGATIVE_COLOR },
 ];
 
-// Relevant posts naming each model, days 1–2 and days 3–5 after launch
+// Relevant posts naming each model, days 1–2 and days 3–6 after launch
 // (Pacific; launch day is day 1).
 const LAUNCH_TONE_ROWS = [
   { label: "Opus 5.5 · days 1–2", detail: "122 posts", counts: { positive: 91, neutral: 8, negative: 23 } },
-  { label: "Opus 5.5 · days 3–5", detail: "150 posts", counts: { positive: 119, neutral: 7, negative: 24 } },
+  { label: "Opus 5.5 · days 3–6", detail: "208 posts", counts: { positive: 164, neutral: 9, negative: 35 } },
   { label: "Opus 5 · days 1–2", detail: "223 posts", counts: { positive: 132, neutral: 16, negative: 75 } },
-  { label: "Opus 5 · days 3–5", detail: "387 posts", counts: { positive: 180, neutral: 44, negative: 163 } },
+  { label: "Opus 5 · days 3–6", detail: "550 posts", counts: { positive: 235, neutral: 60, negative: 255 } },
   { label: "Fable 5.1 · days 1–2", detail: "113 posts", counts: { positive: 62, neutral: 10, negative: 41 } },
-  { label: "Fable 5.1 · days 3–5", detail: "96 posts", counts: { positive: 47, neutral: 2, negative: 47 } },
+  { label: "Fable 5.1 · days 3–6", detail: "129 posts", counts: { positive: 63, neutral: 5, negative: 61 } },
 ];
 
 // Negative posts naming the model, grouped from the classifier's complaint
@@ -55,24 +55,24 @@ const COMPLAINT_LEGEND = [
 
 const COMPLAINT_ROWS = [
   { label: "Opus 5.5 · days 1–2", detail: "23 complaints", counts: { safety: 9, quality: 8, price: 2, other: 4 } },
-  { label: "Opus 5.5 · days 3–5", detail: "24 complaints", counts: { safety: 3, quality: 13, price: 2, other: 6 } },
-  { label: "Opus 5 · days 1–5", detail: "238 complaints", counts: { safety: 12, quality: 174, price: 22, other: 30 } },
-  { label: "Opus 5 · Jul 29 – Sep 21", detail: "1,275 complaints", counts: { safety: 55, quality: 907, price: 56, other: 257 } },
+  { label: "Opus 5.5 · days 3–6", detail: "35 complaints", counts: { safety: 4, quality: 19, price: 3, other: 9 } },
+  { label: "Opus 5 · days 1–6", detail: "330 complaints", counts: { safety: 16, quality: 231, price: 25, other: 58 } },
+  { label: "Opus 5 · Jul 30 – Sep 21", detail: "1,183 complaints", counts: { safety: 51, quality: 850, price: 53, other: 229 } },
 ];
 
 // Independent cross-check: every Hacker News post naming the model (Algolia
-// API) plus ~230 X posts per window (days 1–2) or ~330 (days 3–5), graded by
+// API) plus ~230 X posts per window (days 1–2) or ~440 (days 3–6), graded by
 // a separate LLM pass that never touched our production classifier.
 // Irrelevant posts excluded. Per-post labels are in independent-sample.csv.
 const CROSS_CHECK_ROWS = [
   { label: "Opus 5.5 · days 1–2", detail: "311 posts", counts: { positive: 189, neutral: 66, negative: 56 } },
-  { label: "Opus 5.5 · days 3–5", detail: "376 posts", counts: { positive: 290, neutral: 53, negative: 33 } },
+  { label: "Opus 5.5 · days 3–6", detail: "508 posts", counts: { positive: 393, neutral: 77, negative: 38 } },
   { label: "Opus 5 · days 1–2", detail: "321 posts", counts: { positive: 146, neutral: 82, negative: 93 } },
-  { label: "Opus 5 · days 3–5", detail: "325 posts", counts: { positive: 152, neutral: 35, negative: 138 } },
+  { label: "Opus 5 · days 3–6", detail: "406 posts", counts: { positive: 181, neutral: 50, negative: 175 } },
   { label: "GPT-5.6 · days 1–2", detail: "250 posts", counts: { positive: 150, neutral: 37, negative: 63 } },
-  { label: "GPT-5.6 · days 3–5", detail: "290 posts", counts: { positive: 181, neutral: 42, negative: 67 } },
+  { label: "GPT-5.6 · days 3–6", detail: "370 posts", counts: { positive: 231, neutral: 56, negative: 83 } },
   { label: "GPT-6 Sol + Luna · days 1–2", detail: "196 posts", counts: { positive: 86, neutral: 38, negative: 72 } },
-  { label: "GPT-6 Sol + Luna · days 3–5", detail: "231 posts", counts: { positive: 88, neutral: 44, negative: 99 } },
+  { label: "GPT-6 Sol + Luna · days 3–6", detail: "297 posts", counts: { positive: 107, neutral: 51, negative: 139 } },
 ];
 
 // Share of Opus 5 posts that took a side (positive / (positive + negative)),
@@ -102,8 +102,8 @@ const OpusLaunchBody = () => (
 
     <StatCallout
       stats={[
-        { value: "+27 pts", label: "Claude score, week before launch → first five days (38 → 65)" },
-        { value: "82%", label: "Opus 5.5 posts that took a side and were positive, days 1–5 (Opus 5: 57%)" },
+        { value: "+27 pts", label: "Claude score, week before launch → first six days (38 → 65)" },
+        { value: "81%", label: "Opus 5.5 posts that took a side and were positive, days 1–6 (Opus 5: 53%)" },
       ]}
     />
 
@@ -146,15 +146,15 @@ const OpusLaunchBody = () => (
 
     <h2 id="the-launch-scorecard">The launch scorecard</h2>
     <p>
-      Here's Claude's daily score from mid-July through Opus 5.5's fifth day. The launches are marked.
+      Here's Claude's daily score from mid-July through Opus 5.5's sixth day. The launches are marked.
     </p>
 
-    <EmbeddedModelChart modelSlug="claude" startDate="2026-07-13" endDate="2026-09-26" />
+    <EmbeddedModelChart modelSlug="claude" startDate="2026-07-13" endDate="2026-09-27" />
     <p className="mt-2 text-sm text-text-tertiary">
       <em>
-        Claude's daily sentiment score, July 13 – September 26, 2026. Opus 5 lands on a rising line and
-        holds it for three days. Then the slide. Opus 5.5 lands on the lowest stretch of the summer and
-        keeps climbing: 55, 61, 67, 71, 69.
+        Claude's daily sentiment score, July 13 – September 27, 2026. Opus 5 lands on a rising line and
+        holds it for three days. Then the slide. Opus 5.5 lands on the lowest stretch of the summer, climbs
+        for four days, and holds there: 55, 61, 67, 71, 69, 67.
       </em>
     </p>
     <p>
@@ -166,16 +166,16 @@ const OpusLaunchBody = () => (
     <ResearchTableFrame label="Claude score around six Anthropic launches">
       <table className="w-full">
         <caption className="sr-only">
-          Claude daily sentiment score in the week before each launch, over days 1–2 and days 3–5 after it
-          (launch day is day 1), and the change from the week before to the five-day average.
+          Claude daily sentiment score in the week before each launch, over days 1–2 and days 3–6 after it
+          (launch day is day 1), and the change from the week before to the six-day average.
         </caption>
         <thead>
           <tr>
             <th scope="col">Launch</th>
             <th scope="col" className="whitespace-nowrap">Week before</th>
             <th scope="col" className="whitespace-nowrap">Days 1–2</th>
-            <th scope="col" className="whitespace-nowrap">Days 3–5</th>
-            <th scope="col" className="whitespace-nowrap">Change, days 1–5</th>
+            <th scope="col" className="whitespace-nowrap">Days 3–6</th>
+            <th scope="col" className="whitespace-nowrap">Change, days 1–6</th>
           </tr>
         </thead>
         <tbody>
@@ -183,43 +183,43 @@ const OpusLaunchBody = () => (
             <td className="whitespace-nowrap">Opus 5.5 · Sep 22</td>
             <td>38.1</td>
             <td>58.0</td>
-            <td>69.0</td>
-            <td><strong>+26.5</strong></td>
-          </tr>
-          <tr>
-            <td className="whitespace-nowrap">Opus 4.7 · Apr 17</td>
-            <td>38.3</td>
-            <td>54.5</td>
-            <td>39.7</td>
-            <td>+7.3</td>
+            <td>68.5</td>
+            <td><strong>+26.9</strong></td>
           </tr>
           <tr>
             <td className="whitespace-nowrap">Fable 5.1 · Sep 1</td>
             <td>36.9</td>
             <td>43.5</td>
-            <td>43.3</td>
-            <td>+6.5</td>
+            <td>44.3</td>
+            <td>+7.1</td>
+          </tr>
+          <tr>
+            <td className="whitespace-nowrap">Opus 4.7 · Apr 17</td>
+            <td>38.3</td>
+            <td>54.5</td>
+            <td>39.0</td>
+            <td>+5.9</td>
           </tr>
           <tr>
             <td className="whitespace-nowrap">Sonnet 5 · Jun 30</td>
             <td>51.3</td>
             <td>49.5</td>
             <td>60.0</td>
-            <td>+4.5</td>
+            <td>+5.2</td>
           </tr>
           <tr>
             <td className="whitespace-nowrap">Opus 5 · Jul 24</td>
             <td>52.4</td>
             <td>59.5</td>
-            <td>53.0</td>
-            <td>+3.2</td>
+            <td>51.3</td>
+            <td>+1.6</td>
           </tr>
           <tr>
             <td className="whitespace-nowrap">Fable 5 · Jun 9</td>
             <td>54.6</td>
             <td>48.5</td>
-            <td>45.7</td>
-            <td>−7.8</td>
+            <td>48.3</td>
+            <td>−6.3</td>
           </tr>
         </tbody>
       </table>
@@ -228,20 +228,20 @@ const OpusLaunchBody = () => (
     <p>
       The daily score covers everything people say about Claude, so a launch gets diluted by every
       unrelated rate-limit gripe. The sharper read is posts that actually name the new model. Here's the
-      tone of those posts over each model's first two days, then days three through five.
+      tone of those posts over each model's first two days, then days three through six.
     </p>
 
     <ShareBars
-      title="Tone of posts naming the new model · days 1–2 vs days 3–5"
+      title="Tone of posts naming the new model · days 1–2 vs days 3–6"
       legend={TONE_LEGEND}
       rows={LAUNCH_TONE_ROWS}
-      ariaLabel="Share of positive, neutral, and negative posts naming each model. Opus 5.5: 75% positive and 19% negative in days 1–2, 79% positive and 16% negative in days 3–5. Opus 5: 59% and 34%, then 47% and 42%. Fable 5.1: 55% and 36%, then 49% and 49%."
+      ariaLabel="Share of positive, neutral, and negative posts naming each model. Opus 5.5: 75% positive and 19% negative in days 1–2, 79% positive and 17% negative in days 3–6. Opus 5: 59% and 34%, then 43% and 46%. Fable 5.1: 55% and 36%, then 49% and 47%."
     />
 
     <p>
       This is the chart I'd point to. Opus 5 and Fable 5.1 both cooled after day two. Opus 5.5 warmed up.
-      Of posts that took a side, it went from 80% positive to 83%, while Opus 5 went from 64% to 52% and
-      Fable 5.1 from 60% to 50%.
+      Of posts that took a side, it went from 80% positive to 82%, while Opus 5 went from 64% to 48% and
+      Fable 5.1 from 60% to 51%.
     </p>
     <p>
       The praise is specific, too. Speed, token efficiency, and coding quality, from people on the top plan:
@@ -268,8 +268,9 @@ const OpusLaunchBody = () => (
       Note the "opus 5.1." Even the people praising the upgrade remember a release that never shipped.
     </p>
     <p>
-      By days three through five, the posts sound less like first impressions and more like people who've
-      moved their work over. The most-upvoted Reddit post naming it in that stretch was a late convert:
+      By days three through six, the posts sound less like first impressions and more like people who've
+      moved their work over. The most-upvoted Reddit post naming it in days three to five was a late
+      convert:
     </p>
     <PullQuote
       text="I didn't understand what everybody was talking about, it felt better and stopped pushing back artificially like previous models, but the quality of the code and the model's understanding didn't seem that special... Tonight I was bored and asked it to do a product video for the thing I've been building for a few months and I was shocked by the results."
@@ -277,6 +278,17 @@ const OpusLaunchBody = () => (
       platform="Reddit"
       timestamp="2026-09-26 00:18 UTC"
       href="https://www.reddit.com/r/ClaudeAI/comments/1wqcara/aight_i_get_it_opus_55_is_actually_peak/"
+    />
+    <p>
+      On day six, the top Reddit post naming it wasn't a review at all. It was a whole Game Boy game, rebuilt
+      by the model:
+    </p>
+    <PullQuote
+      text="Pokémon Claude Red: Opus 5.5 remade all of Pokémon Red and drew every pixel in code. No image files, playable in browser"
+      handle="r/ClaudeAI"
+      platform="Reddit"
+      timestamp="2026-09-27 23:10 UTC"
+      href="https://www.reddit.com/r/ClaudeAI/comments/1wryjs1/pok%C3%A9mon_claude_red_opus_55_remade_all_of_pok%C3%A9mon/"
     />
 
     <h2 id="opus-5-launched-well-too">Opus 5 launched well too</h2>
@@ -316,16 +328,17 @@ const OpusLaunchBody = () => (
     />
     <p>
       Three weeks in, positive share had halved. The Claude score bottomed at 32 on August 26 and spent
-      most of late August in the 30s. The complaints weren't about price or refusals. 71% of the 1,275
-      negative Opus 5 posts from July 29 to September 21 were some flavor of quality drop: lazy responses, worse code,
+      most of late August in the 30s. The complaints weren't about price or refusals. 72% of the 1,183
+      negative Opus 5 posts from July 30 to September 21 were some flavor of quality drop: lazy responses, worse code,
       "it got dumber."
     </p>
     <p>
       The turn started fast. By day five, July 28, negative posts naming Opus 5 outnumbered positive ones,
-      78 to 72. Opus 5.5's day five, September 26, ran 32 positive to 5 negative.
+      78 to 72. On day six it was 92 to 55. Opus 5.5's day six, September 27, ran 45 positive to 10
+      negative.
     </p>
     <p>
-      <strong>Through day two, Opus 5.5's launch looked a lot like Opus 5's. Days three to five are where
+      <strong>Through day two, Opus 5.5's launch looked a lot like Opus 5's. Days three to six are where
       they split.</strong> Opus 5's first 72 hours would have fooled anyone reading them as a verdict. The
       best post in the launch corpus says exactly this:
     </p>
@@ -342,7 +355,7 @@ const OpusLaunchBody = () => (
       when, and that people remember it. That memory is now the bar Opus 5.5 gets graded against.
     </p>
     <p>
-      You can see people pricing it in. Seven posts in our pipeline naming Opus 5.5 in days three to five
+      You can see people pricing it in. Seven posts in our pipeline naming Opus 5.5 from September 24 to 26
       used words like "nerf" or "degraded." Only one claimed it had actually happened. The rest were
       conditions:
     </p>
@@ -363,7 +376,7 @@ const OpusLaunchBody = () => (
 
     <h2 id="the-rumblings">The rumblings: safeguards first, then comparisons</h2>
     <p>
-      Opus 5.5's complaints are few. 47 negative posts named it across five days, against 238 for Opus 5
+      Opus 5.5's complaints are few. 58 negative posts named it across six days, against 330 for Opus 5
       over the same stretch. But they have a different shape from anything Opus 5 produced.
     </p>
 
@@ -371,7 +384,7 @@ const OpusLaunchBody = () => (
       title="What negative posts complain about"
       legend={COMPLAINT_LEGEND}
       rows={COMPLAINT_ROWS}
-      ariaLabel="Complaint mix in negative posts: Opus 5.5 days 1–2 39% refusals and safeguards, 35% quality; Opus 5.5 days 3–5 13% refusals, 54% quality; Opus 5 days 1–5 5% refusals, 73% quality; Opus 5 after that 4% refusals, 71% quality."
+      ariaLabel="Complaint mix in negative posts: Opus 5.5 days 1–2 39% refusals and safeguards, 35% quality; Opus 5.5 days 3–6 11% refusals, 54% quality; Opus 5 days 1–6 5% refusals, 70% quality; Opus 5 after that 4% refusals, 72% quality."
     />
 
     <p>
@@ -398,9 +411,9 @@ const OpusLaunchBody = () => (
       I wrote about the same pattern in the{" "}
       <a href="/research/fable-5-lifecycle-june-july-2026">Fable 5 lifecycle</a> piece: refusal complaints
       showed up within 48 hours of launch and never came back down to baseline. Opus 5.5 is, so far, the
-      opposite. Safeguard complaints fell to 3 of 24 in days three to five. Across all relevant Claude posts,
+      opposite. Safeguard complaints fell to 4 of 35 in days three to six. Across all relevant Claude posts,
       refusal and flagging language went from 2.8% the week before launch to 5.1% in the first two days,
-      then back to 2.6%.
+      then back to 2.8%, right where it started.
     </p>
     <p>
       It hasn't gone away, though, and the false positives that remain are hard to defend:
@@ -413,7 +426,7 @@ const OpusLaunchBody = () => (
       href="https://www.reddit.com/r/ClaudeAI/comments/1wplz0c/hitting_claudes_ridiculous_filters/"
     />
     <p>
-      In days three to five, quality took over as the biggest bucket: 13 of 24 complaints. Those aren't
+      In days three to six, quality took over as the biggest bucket: 19 of 35 complaints. Those aren't
       "it got dumber" posts, though. They're specific gripes (it repeats itself, it does too much without
       explaining what it did) and head-to-heads with OpenAI's GPT-6 Astra on long agentic tasks. On Hacker
       News, a newer complaint is length. That's worth watching, because the way Opus 5 wrote was exactly
@@ -438,8 +451,8 @@ const OpusLaunchBody = () => (
       href="https://x.com/ashen_one/status/2102429046558609669"
     />
     <p>
-      Then the limits conversation flipped. The week before launch, 34 of the 52 Claude posts about usage
-      limits were negative. In days three to five, 22 of 27 were positive. People were noticing how slowly
+      Then the limits conversation flipped. The week before launch, 35 of the 52 Claude posts about usage
+      limits were negative. In days three to six, 32 of 40 were positive. People were noticing how slowly
       their usage moved:
     </p>
     <PullQuote
@@ -448,6 +461,16 @@ const OpusLaunchBody = () => (
       platform="Bluesky"
       timestamp="2026-09-25 19:41 UTC"
       href="https://bsky.app/profile/jefferyharrell.bsky.social/post/3mwejnprhf22a"
+    />
+    <p>
+      By day six that had become a point about the cheapest plan, and the competition:
+    </p>
+    <PullQuote
+      text="The best part about Opus 5.5 is that the $20 Claude plan feels usable. And it will force OpenAI to actually care about their $20 Plus users again."
+      handle="@ishuagra02"
+      platform="X"
+      timestamp="2026-09-27 23:42 UTC"
+      href="https://x.com/ishuagra02/status/2104356143199867328"
     />
 
     <h2 id="openai-went-the-other-way">Same day, other direction: GPT-6 Sol and Luna</h2>
@@ -467,8 +490,8 @@ const OpusLaunchBody = () => (
     <ResearchTableFrame label="ChatGPT and Claude scores around each generation's launch">
       <table className="w-full">
         <caption className="sr-only">
-          Daily sentiment score in the week before each launch, over days 1–2 and days 3–5 after it, and the
-          change to the five-day average, for the two OpenAI and two Anthropic launches compared in this
+          Daily sentiment score in the week before each launch, over days 1–2 and days 3–6 after it, and the
+          change to the six-day average, for the two OpenAI and two Anthropic launches compared in this
           article.
         </caption>
         <thead>
@@ -476,8 +499,8 @@ const OpusLaunchBody = () => (
             <th scope="col">Launch</th>
             <th scope="col" className="whitespace-nowrap">Week before</th>
             <th scope="col" className="whitespace-nowrap">Days 1–2</th>
-            <th scope="col" className="whitespace-nowrap">Days 3–5</th>
-            <th scope="col" className="whitespace-nowrap">Change, days 1–5</th>
+            <th scope="col" className="whitespace-nowrap">Days 3–6</th>
+            <th scope="col" className="whitespace-nowrap">Change, days 1–6</th>
           </tr>
         </thead>
         <tbody>
@@ -485,51 +508,51 @@ const OpusLaunchBody = () => (
             <td className="whitespace-nowrap">GPT-5.6 · Jul 9</td>
             <td>33.9</td>
             <td>54.5</td>
-            <td>49.7</td>
-            <td><strong>+17.7</strong></td>
+            <td>49.0</td>
+            <td><strong>+16.9</strong></td>
           </tr>
           <tr>
             <td className="whitespace-nowrap">GPT-6 Sol + Luna · Sep 22</td>
             <td>58.7</td>
             <td>54.5</td>
-            <td>58.7</td>
-            <td><strong>−1.7</strong></td>
+            <td>60.8</td>
+            <td><strong>0.0</strong></td>
           </tr>
           <tr>
             <td className="whitespace-nowrap">Opus 5 · Jul 24</td>
             <td>52.4</td>
             <td>59.5</td>
-            <td>53.0</td>
-            <td>+3.2</td>
+            <td>51.3</td>
+            <td>+1.6</td>
           </tr>
           <tr>
             <td className="whitespace-nowrap">Opus 5.5 · Sep 22</td>
             <td>38.1</td>
             <td>58.0</td>
-            <td>69.0</td>
-            <td>+26.5</td>
+            <td>68.5</td>
+            <td>+26.9</td>
           </tr>
         </tbody>
       </table>
     </ResearchTableFrame>
 
     <p>
-      In July, GPT-5.6 got the big launch pop. In September, Opus 5.5 got it and ChatGPT's score barely
-      moved: a small dip over the first two days, then back to where it was.
+      In July, GPT-5.6 got the big launch pop. In September, Opus 5.5 got it and ChatGPT's score didn't
+      move: a small dip over the first two days, then back to a touch above where it was.
     </p>
 
-    <EmbeddedModelChart modelSlug="chatgpt" startDate="2026-07-01" endDate="2026-09-26" />
+    <EmbeddedModelChart modelSlug="chatgpt" startDate="2026-07-01" endDate="2026-09-27" />
     <p className="mt-2 text-sm text-text-tertiary">
       <em>
-        ChatGPT's daily sentiment score, July 1 – September 26, 2026, with the GPT-5.6, GPT-6 Astra and GPT-6
+        ChatGPT's daily sentiment score, July 1 – September 27, 2026, with the GPT-5.6, GPT-6 Astra and GPT-6
         Sol launches marked. GPT-5.6 lifts it out of the 30s. GPT-6 Sol arrives near the summer high and
         stays there.
       </em>
     </p>
     <p>
       The daily score is flat. The posts that name GPT-6 Sol or Luna aren't warm, though. Of the ones that
-      took a side, 48% were positive in days one and two, and 48% again in days three to five. GPT-5.6 had
-      opened at 65%.
+      took a side, 48% were positive in days one and two, and 49% in days three to six. GPT-5.6 had opened
+      at 65%.
     </p>
 
     <p>
@@ -570,46 +593,46 @@ const OpusLaunchBody = () => (
       the best available, "cheaper" loses.
     </p>
 
-    <h2 id="an-independent-check">An independent check: 3,100 posts, graded separately</h2>
+    <h2 id="an-independent-check">An independent check: 3,700 posts, graded separately</h2>
     <p>
       Our pipeline samples. It keeps a slice of each platform, and on launch days the slices get thin: 22
       relevant posts named GPT-6 Sol or Luna in its first two days. So I pulled a bigger sample and graded it
-      outside the pipeline entirely. Every Hacker News comment and story naming each model in its first five
-      days, plus 230 to 350 X posts per window, 3,149 posts in all. A separate LLM pass labeled each one
+      outside the pipeline entirely. Every Hacker News comment and story naming each model in its first six
+      days, plus 230 to 470 X posts per window, 3,690 posts in all. A separate LLM pass labeled each one
       positive, neutral, negative or irrelevant toward the named model, with no access to our classifier's
       labels.
     </p>
 
     <ShareBars
-      title="Independent sample · tone toward the named model · days 1–2 vs days 3–5"
+      title="Independent sample · tone toward the named model · days 1–2 vs days 3–6"
       legend={TONE_LEGEND}
       rows={CROSS_CHECK_ROWS}
-      ariaLabel="Independent sample of Hacker News and X posts. Opus 5.5: 61% positive and 18% negative in days 1–2, 77% and 9% in days 3–5. Opus 5: 45% and 29%, then 47% and 42%. GPT-5.6: 60% and 25%, then 62% and 23%. GPT-6 Sol and Luna: 44% and 37%, then 38% and 43%."
+      ariaLabel="Independent sample of Hacker News and X posts. Opus 5.5: 61% positive and 18% negative in days 1–2, 77% and 7% in days 3–6. Opus 5: 45% and 29%, then 45% and 43%. GPT-5.6: 60% and 25%, then 62% and 22%. GPT-6 Sol and Luna: 44% and 37%, then 36% and 47%."
     />
 
     <p>
       Same story, bigger sample. Among posts that took a side, Opus 5.5 went from 77% positive in days one
-      and two to 90% in days three to five. Opus 5 went from 61% to 52%. GPT-6 Sol and Luna slipped from 54%
-      to 47%, while GPT-5.6 had held at 70–73%.
+      and two to 91% in days three to six. Opus 5 went from 61% to 51%. GPT-6 Sol and Luna slipped from 54%
+      to 44%, while GPT-5.6 had held at 70–74%.
     </p>
     <p>
-      One place the two methods disagree: GPT-5.6's days three to five. Our pipeline had it cooling to 50%,
-      on just 51 posts, right after our July 10 pipeline overhaul. The bigger sample says it held. Every other
+      One place the two methods disagree: GPT-5.6's days three to six. Our pipeline had it cooling to 49%,
+      on just 56 posts, right after our July 10 pipeline overhaul. The bigger sample says it held. Every other
       direction matches.
     </p>
     <p>
       The complaint shapes held up too. In the first two days, safeguards were the biggest single complaint
-      about Opus 5.5 (16 of 56 negative posts, all of them on Hacker News). In days three to five they
-      dropped to 5 of 33, and quality became the biggest bucket at 15. For GPT-6 Sol and Luna, quality was
-      65 of 99 complaints in days three to five, and a recurring version was still "5.6 was better."
+      about Opus 5.5 (16 of 56 negative posts, all of them on Hacker News). In days three to six they
+      dropped to 6 of 38, and quality became the biggest bucket at 18. For GPT-6 Sol and Luna, quality was
+      94 of 139 complaints in days three to six, and a recurring version was still "5.6 was better."
     </p>
     <p>
       Split by platform, the most interesting move is Hacker News. It was the cooler audience on Opus 5.5 at
-      launch, 53% positive of posts that took a side. By days three to five it was 74%. X was already at 93%
+      launch, 53% positive of posts that took a side. By days three to six it was 76%. X was already at 93%
       and stayed there. On GPT-6, the launch-day split between the two platforms didn't last. In days one and two, Hacker News
       liked GPT-6 Sol and Luna <em>more</em> than GPT-5.6 (25 positive to 14 negative, against 39 to 31).
-      By days three to five, Hacker News had mostly stopped talking about them: 20 posts named GPT-6 Sol or
-      Luna, against 89 for GPT-5.6 over the same stretch of its launch.
+      By days three to six, Hacker News had mostly stopped talking about them: 24 posts named GPT-6 Sol or
+      Luna, against 110 for GPT-5.6 over the same stretch of its launch.
     </p>
 
     <h2 id="what-i-would-watch">What I'd watch if I shipped this model</h2>
@@ -630,7 +653,7 @@ const OpusLaunchBody = () => (
     </p>
     <p>
       <strong>The first two days are the least informative days.</strong> Opus 5 and Opus 5.5 both opened
-      strong. Days three to five already told them apart, and what separated Opus 5's reputation from its
+      strong. Days three to six already told them apart, and what separated Opus 5's reputation from its
       benchmarks was weeks 2 through 4. If I owned this launch, the number I'd put on the wall is the tone
       of Opus 5.5 posts on day 14, next to Opus 5's 40%.
     </p>
@@ -666,10 +689,12 @@ const OpusLaunchBody = () => (
       at all.
     </p>
     <p>
-      <strong>Five days is still five days.</strong> Opus 5.5's windows are small: 272 relevant posts naming
-      it, 47 of them negative. The direction is clear. The exact percentages will move. OpenAI also shipped
+      <strong>Six days is still six days.</strong> Opus 5.5's windows are small: 330 relevant posts naming
+      it, 58 of them negative. The direction is clear. The exact percentages will move. OpenAI also shipped
       GPT-6 Sol the same day, so some Opus 5.5 posts are head-to-head comparisons, not standalone
-      reactions.
+      reactions. And the window stops at September 27 on purpose: Anthropic shipped Sonnet 5.5 the next
+      day, and every Claude number after that mixes two launches. Leaks about it were already circulating
+      on the 27th, but only one relevant post in our pipeline mentioned it that day.
     </p>
 
     <h2 id="methodology">Methodology</h2>
@@ -703,9 +728,9 @@ const OpusLaunchBody = () => (
       Download the{" "}
       <a href="/research/opus-5-5-vs-opus-5-launch-sentiment-2026/data.csv">dataset</a> (daily Claude score
       plus positive and negative mention counts for Opus 5, Opus 5.5 and Fable 5.1, July 13 – September
-      26), the <a href="/research/opus-5-5-vs-opus-5-launch-sentiment-2026/chatgpt-launches.csv">ChatGPT
+      27), the <a href="/research/opus-5-5-vs-opus-5-launch-sentiment-2026/chatgpt-launches.csv">ChatGPT
       launch series</a>, the{" "}
-      <a href="/research/opus-5-5-vs-opus-5-launch-sentiment-2026/independent-sample.csv">3,149 graded posts</a>{" "}
+      <a href="/research/opus-5-5-vs-opus-5-launch-sentiment-2026/independent-sample.csv">3,690 graded posts</a>{" "}
       from the independent check, or{" "}
       <ExternalLink href="https://github.com/dkships/llm-moods">fork the pipeline on GitHub</ExternalLink>.
       The <a href="/model/claude">live Claude chart</a> will show whether Opus 5.5 holds past day 14.

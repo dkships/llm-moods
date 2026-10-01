@@ -19,7 +19,7 @@ LLM Vibes is 100% automated — there are no user-submitted reports or votes. Se
 
 ## Research
 
-- [Opus 5.5 got the warmest Claude launch we've measured](https://llmvibes.ai/research/opus-5-5-vs-opus-5-launch-sentiment-2026): Five days of launch sentiment for Opus 5.5 vs Opus 5 and Fable 5.1: Opus 5.5 warmed up after day two, Opus 5 cooled.
+- [Opus 5.5 got the warmest Claude launch we've measured](https://llmvibes.ai/research/opus-5-5-vs-opus-5-launch-sentiment-2026): Six days of launch sentiment for Opus 5.5 vs Opus 5 and Fable 5.1: Opus 5.5 warmed up after day two, Opus 5 cooled.
 - [Fable 5's launch took 17% of tracked AI chatter](https://llmvibes.ai/research/fable-5-lifecycle-june-july-2026): Five weeks of daily data across Fable 5's launch, government suspension, redeploy and farewell that was called off.
 - [Grok 4.5's launch pop faded in five days](https://llmvibes.ai/research/grok-45-launch-july-2026): A tripled share of voice, a five-day score pop, and a switching story smaller than the headlines.
 - [Claude Code lost 19 points during the cache bug](https://llmvibes.ai/research/surface-segmentation-march-may-2026): Per-product-surface sentiment shows the same model's scores diverge sharply by surface during a regression.

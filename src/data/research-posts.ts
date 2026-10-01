@@ -63,21 +63,21 @@ export const RESEARCH_POSTS: ResearchPost[] = [
   {
     slug: "opus-5-5-vs-opus-5-launch-sentiment-2026",
     title: "Opus 5.5 got the warmest Claude launch we've measured. Opus 5 looked warm too, for three days.",
-    publishedAt: "2026-09-27",
+    publishedAt: "2026-10-01",
     summary:
-      "Everyone was waiting for an Opus 5.1 to fix Opus 5. Anthropic shipped Opus 5.5 instead, and over its first five days the Claude score climbed 27 points and kept climbing after day two. Opus 5 opened strong too, then cooled by day five. OpenAI's GPT-6 Sol and Luna launched the same day and landed flat.",
+      "Everyone was waiting for an Opus 5.1 to fix Opus 5. Anthropic shipped Opus 5.5 instead, and over six days the Claude score rose 27 points and posts naming it warmed up after day two. Opus 5 opened strong too, then cooled by day five. OpenAI's GPT-6 Sol and Luna launched the same day and landed flat.",
     metaDescription:
-      "Five days of launch sentiment for Opus 5.5 vs Opus 5, and GPT-6 Sol/Luna vs GPT-5.6: Opus 5.5 warmed up after day two, GPT-6 landed flat. Checked on 3,100 posts.",
+      "Six days of launch sentiment for Opus 5.5 vs Opus 5, and GPT-6 Sol/Luna vs GPT-5.6: Opus 5.5 warmed up after day two, GPT-6 landed flat. Checked on 3,700 posts.",
     author: "David Kelly",
     tags: ["claude", "anthropic", "chatgpt", "cross-model", "case-study"],
     relatedModelSlug: "claude",
     ogImage: "/research/opus-5-5-vs-opus-5-launch-sentiment-2026/og.png",
     dataset: {
-      label: "Daily Claude score + Opus/Fable mention tone · Jul 13 – Sep 26, 2026 (CSV)",
+      label: "Daily Claude score + Opus/Fable mention tone · Jul 13 – Sep 27, 2026 (CSV)",
       path: "/research/opus-5-5-vs-opus-5-launch-sentiment-2026/data.csv",
       description:
         "Daily Claude sentiment score and eligible posts, plus positive and negative counts of relevant posts naming Opus 5, Opus 5.5 and Fable 5.1, and all posts naming Opus 5.1. Source for every series in the article.",
-      publishedAt: "2026-09-27",
+      publishedAt: "2026-10-01",
       license: "MIT",
     },
   },
