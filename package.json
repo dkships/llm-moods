@@ -61,7 +61,7 @@
     "@types/node": "^26.6.2",
     "@types/react": "^18.3.23",
     "@types/react-dom": "^18.3.7",
-    "@vitejs/plugin-react-swc": "^3.11.0",
+    "@vitejs/plugin-react-swc": "^4.3.3",
     "autoprefixer": "^10.6.1",
     "drizzle-kit": "^0.31.11",
     "drizzle-orm": "^0.45.3",
