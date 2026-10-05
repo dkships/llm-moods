@@ -26,50 +26,111 @@ export interface EventLabelMarker {
 export interface EventLabelLayout {
   dayCount: number;
   plotWidth: number;
-  /** Markers at or past this day draw their label to the left of the line. */
+  /** Markers at or past this day prefer to draw their label left of the line. */
   flipAfterDay: number;
 }
+
+export type EventLabelSide = "left" | "right";
+
+/** Where a kept label sits: which side of its line, and which text row. */
+export interface EventLabelPlacement {
+  side: EventLabelSide;
+  /** 0 = top row; 1 = one line lower, used when the top row is taken. */
+  row: number;
+}
+
+const EVENT_LABEL_ROWS = 2;
 
 interface Span {
   start: number;
   end: number;
 }
 
+interface PlacedSpan extends Span {
+  row: number;
+}
+
 function labelWidth(text: string): number {
   return text.length * LABEL_CHAR_WIDTH_PX + LABEL_PADDING_PX;
 }
 
-function labelSpan(marker: EventLabelMarker, layout: EventLabelLayout): Span {
+function labelSpan(marker: EventLabelMarker, side: EventLabelSide, layout: EventLabelLayout): Span {
   const pxPerDay = layout.plotWidth / Math.max(layout.dayCount - 1, 1);
   const x = marker.day * pxPerDay;
   const width = labelWidth(marker.text);
-  if (marker.day >= layout.flipAfterDay) {
+  if (side === "left") {
     return { start: x - width, end: x };
   }
   return { start: x, end: x + width };
 }
 
-function overlaps(a: Span, b: Span): boolean {
-  return a.start < b.end + MIN_LABEL_GAP_PX && b.start < a.end + MIN_LABEL_GAP_PX;
+function overlaps(a: Span, b: Span, gap = MIN_LABEL_GAP_PX): boolean {
+  return a.start < b.end + gap && b.start < a.end + gap;
+}
+
+function insidePlot(span: Span, layout: EventLabelLayout): boolean {
+  return span.start >= 0 && span.end <= layout.plotWidth;
+}
+
+function preferredSide(marker: EventLabelMarker, layout: EventLabelLayout): EventLabelSide {
+  return marker.day >= layout.flipAfterDay ? "left" : "right";
+}
+
+// Candidate placements in preference order: the default side on the top row,
+// the other side on the top row, then the same two on the next row down.
+function candidates(marker: EventLabelMarker, layout: EventLabelLayout): EventLabelPlacement[] {
+  const preferred = preferredSide(marker, layout);
+  const other: EventLabelSide = preferred === "left" ? "right" : "left";
+  const placements: EventLabelPlacement[] = [];
+  for (let row = 0; row < EVENT_LABEL_ROWS; row++) {
+    placements.push({ side: preferred, row }, { side: other, row });
+  }
+  return placements;
 }
 
 /**
- * Indexes of markers whose label fits without touching another kept label.
- * Newest markers win a collision: the latest launch is usually the one the
- * reader came to see.
+ * Placement for every marker whose label fits without touching another
+ * kept label. A label that collides first tries the other side of its line,
+ * then a second row; only when all four spots are taken is it dropped (the
+ * legend under the chart still names it). Newest markers place first: the
+ * latest launch is usually the one the reader came to see.
+ *
+ *   Sep 22 Opus            Sep 28 Sonnet
+ *   [Opus 5.5] |  [Sonnet 5.5] |        <- both on the top row, Opus flipped
  */
-export function pickEventLabels(markers: EventLabelMarker[], layout: EventLabelLayout): Set<number> {
-  const kept = new Set<number>();
-  const keptSpans: Span[] = [];
+export function pickEventLabels(
+  markers: EventLabelMarker[],
+  layout: EventLabelLayout,
+): Map<number, EventLabelPlacement> {
+  const kept = new Map<number, EventLabelPlacement>();
+  const keptSpans: PlacedSpan[] = [];
   const newestFirst = [...markers].sort((a, b) => b.day - a.day);
 
   for (const marker of newestFirst) {
-    const span = labelSpan(marker, layout);
-    if (keptSpans.some((other) => overlaps(span, other))) {
-      continue;
+    const preferred = preferredSide(marker, layout);
+    // On a lower row, a side that sits under another label reads as part of
+    // it, so try the side clear of every kept label first.
+    const underAnother = (p: EventLabelPlacement) =>
+      p.row > 0 && keptSpans.some((other) => overlaps(labelSpan(marker, p.side, layout), other, 0));
+    const ordered = candidates(marker, layout).sort(
+      (a, b) => a.row - b.row || Number(underAnother(a)) - Number(underAnother(b)),
+    );
+
+    for (const placement of ordered) {
+      const span = labelSpan(marker, placement.side, layout);
+      // The default side always fits by construction of flipAfterDay; a
+      // flipped label must stay inside the plot.
+      if (placement.side !== preferred && !insidePlot(span, layout)) {
+        continue;
+      }
+      const taken = keptSpans.some((other) => other.row === placement.row && overlaps(span, other));
+      if (taken) {
+        continue;
+      }
+      kept.set(marker.index, placement);
+      keptSpans.push({ ...span, row: placement.row });
+      break;
     }
-    kept.add(marker.index);
-    keptSpans.push(span);
   }
   return kept;
 }

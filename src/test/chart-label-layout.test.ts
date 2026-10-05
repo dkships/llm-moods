@@ -12,20 +12,72 @@ describe("pickEventLabels", () => {
     { index: 2, day: 71, text: "Claude Opus 5.5" },
   ];
 
-  it("drops a label that would collide with a facing label", () => {
+  it("keeps facing labels by flipping the older one", () => {
     const kept = pickEventLabels(markers, layout);
-    expect(kept.has(1) && kept.has(2)).toBe(false);
+    expect(kept.get(2)).toEqual({ side: "left", row: 0 });
+    expect(kept.get(1)).toEqual({ side: "left", row: 0 });
+    expect(kept.get(0)).toEqual({ side: "right", row: 0 });
   });
 
-  it("keeps the most recent label when two collide", () => {
-    const kept = pickEventLabels(markers, layout);
-    expect(kept.has(2)).toBe(true);
-    expect(kept.has(0)).toBe(true);
+  it("keeps both 30d launch labels a week apart", () => {
+    // Claude's 30d chart on Oct 5: Opus 5.5 (Sep 22, day 16) runs right and
+    // Sonnet 5.5 (Sep 28, day 22) flips left, so they met in the middle and
+    // Opus 5.5 was dropped.
+    const thirtyDay = { dayCount: 30, plotWidth: 656, flipAfterDay: 20 };
+    const kept = pickEventLabels(
+      [
+        { index: 0, day: 16, text: "Claude Opus 5.5" },
+        { index: 1, day: 22, text: "Claude Sonnet 5.5" },
+      ],
+      thirtyDay,
+    );
+    expect(kept.size).toBe(2);
   });
 
-  it("keeps both labels when there is room", () => {
+  it("drops to a second row when both sides are taken", () => {
+    const tight = { dayCount: 30, plotWidth: 656, flipAfterDay: 20 };
+    const kept = pickEventLabels(
+      [
+        { index: 0, day: 10, text: "Claude Opus 5.5" },
+        { index: 1, day: 12, text: "Claude Sonnet 5.5" },
+        { index: 2, day: 14, text: "Claude Haiku 5" },
+      ],
+      tight,
+    );
+    expect(kept.size).toBe(3);
+    expect([...kept.values()].some((p) => p.row === 1)).toBe(true);
+  });
+
+  it("puts a second-row label on the side clear of the top row", () => {
+    // A 556px plot: neither side of Opus 5.5 clears Sonnet 5.5 on the top
+    // row, and right-of-line on row two would sit under the Sonnet label.
+    const narrow = { dayCount: 30, plotWidth: 556, flipAfterDay: 20 };
+    const kept = pickEventLabels(
+      [
+        { index: 0, day: 16, text: "Claude Opus 5.5" },
+        { index: 1, day: 22, text: "Claude Sonnet 5.5" },
+      ],
+      narrow,
+    );
+    expect(kept.get(1)).toEqual({ side: "left", row: 0 });
+    expect(kept.get(0)).toEqual({ side: "left", row: 1 });
+  });
+
+  it("never flips a label out of the plot", () => {
+    const kept = pickEventLabels(
+      [
+        { index: 0, day: 1, text: "Claude Opus 5.5" },
+        { index: 1, day: 3, text: "Claude Sonnet 5.5" },
+      ],
+      { dayCount: 30, plotWidth: 656, flipAfterDay: 20 },
+    );
+    expect(kept.get(0)?.side).toBe("right");
+  });
+
+  it("keeps every label on the top row when there is room", () => {
     const kept = pickEventLabels(markers, { ...layout, plotWidth: 2400 });
-    expect([...kept].sort()).toEqual([0, 1, 2]);
+    expect([...kept.keys()].sort()).toEqual([0, 1, 2]);
+    expect([...kept.values()].every((p) => p.row === 0)).toBe(true);
   });
 });
 

@@ -12,7 +12,12 @@ import {
 import { memo, useCallback, useId, useMemo, useState } from "react";
 import { LIMITED_SAMPLE_THRESHOLD } from "@/lib/vibes";
 import { computeYDomain, computeYTicks, type YDomain } from "@/lib/chart-scale";
-import { pickEventLabels, pickMidlineSpot, type MidlineSpot } from "@/lib/chart-label-layout";
+import {
+  pickEventLabels,
+  pickMidlineSpot,
+  type EventLabelPlacement,
+  type MidlineSpot,
+} from "@/lib/chart-label-layout";
 
 // Theme colors — mapped from CSS variables (Recharts needs raw strings)
 const CHART_COLORS = {
@@ -37,11 +42,14 @@ const AREA_BOTTOM_OPACITY = 0;
 const LABEL_FLIP_FRACTION = 2 / 3;
 const EVENT_LABEL_OFFSET = 6;
 const EVENT_LABEL_FONT_SIZE = 10;
+// Vertical step between label rows when two labels share the top row.
+const EVENT_LABEL_ROW_HEIGHT_PX = 14;
 
 // In-chart event labels need room. Below this container width they are
 // dropped entirely (the "Known events" legend under the chart still names
-// every marker), and above it a label that would touch another kept label is
-// dropped instead of drawn on top of it (see chart-label-layout.ts).
+// every marker), and above it a label that would touch another kept label
+// flips sides or drops a row, and is omitted only when neither fits (see
+// chart-label-layout.ts).
 const MIN_LABELED_CHART_WIDTH = 500;
 
 // Plot area = container minus the y-axis, chart margins, x-axis padding and
@@ -283,16 +291,16 @@ function buildAriaLabel(chartData: VibesChartDatum[], timeRange: string): string
   return `Sentiment score chart, ${timeRange} range: latest score ${latest.score} at ${latest.day}, ${trend} across the visible period.${provisional}`;
 }
 
-// Indexes of events whose label fits: none on a narrow chart, otherwise
-// labels that would overlap a newer kept label are dropped.
-function labeledEventIndexes(
+// Label placement per event index: none on a narrow chart, otherwise each
+// label goes where it clears the others (see pickEventLabels).
+function eventLabelPlacements(
   events: ChartEventMarker[],
   dayIndex: Record<string, number>,
   dayCount: number,
   chartWidth: number,
-): Set<number> {
+): Map<number, EventLabelPlacement> {
   if (chartWidth < MIN_LABELED_CHART_WIDTH || dayCount === 0) {
-    return new Set<number>();
+    return new Map<number, EventLabelPlacement>();
   }
 
   const markers = events.flatMap((event, index) => {
@@ -309,12 +317,15 @@ function labeledEventIndexes(
   });
 }
 
-function eventLabel(event: ChartEventMarker, flip: boolean) {
-  if (!event.shortLabel) return undefined;
+function eventLabel(event: ChartEventMarker, placement: EventLabelPlacement | undefined) {
+  if (!event.shortLabel || !placement) {
+    return undefined;
+  }
   return {
     value: event.shortLabel,
-    position: flip ? "insideTopRight" : "insideTopLeft",
+    position: placement.side === "left" ? "insideTopRight" : "insideTopLeft",
     offset: EVENT_LABEL_OFFSET,
+    dy: placement.row * EVENT_LABEL_ROW_HEIGHT_PX,
     fill: event.color,
     fontSize: EVENT_LABEL_FONT_SIZE,
     fontFamily: MONO_FONT,
@@ -368,8 +379,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [], yDomain }:
     });
     return index;
   }, [chartData]);
-  const flipAfter = chartData.length * LABEL_FLIP_FRACTION;
-  const labeledEvents = labeledEventIndexes(events, dayIndex, chartData.length, chartWidth);
+  const labelPlacements = eventLabelPlacements(events, dayIndex, chartData.length, chartWidth);
   const midlineSpot = useMemo(
     () => pickMidlineSpot(chartData.map((d) => d.score), {
       yDomain: [yMin, yMax],
@@ -436,7 +446,6 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [], yDomain }:
       )}
       {events.map((event, i) => {
         const isRange = event.endLabel && event.endLabel !== event.startLabel;
-        const flip = (dayIndex[event.startLabel] ?? 0) >= flipAfter;
         if (isRange) {
           return (
             <ReferenceArea
@@ -450,7 +459,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [], yDomain }:
               stroke={event.color}
               strokeOpacity={0.35}
               ifOverflow="visible"
-              label={labeledEvents.has(i) ? eventLabel(event, flip) : undefined}
+              label={eventLabel(event, labelPlacements.get(i))}
             />
           );
         }
@@ -462,7 +471,7 @@ const VibesChart = memo(({ chartData, accent, timeRange, events = [], yDomain }:
             strokeDasharray="3 3"
             strokeOpacity={0.7}
             ifOverflow="visible"
-            label={labeledEvents.has(i) ? eventLabel(event, flip) : undefined}
+            label={eventLabel(event, labelPlacements.get(i))}
           />
         );
       })}
