@@ -13,6 +13,7 @@ import {
   previousBenchSnapshots,
   rankSets,
   scoringDates,
+  replacements,
   successionChainEnd,
   successions,
   type DeriveModel,
@@ -120,6 +121,19 @@ describe("successions", () => {
     expect(succ.get("gpt-5.6-sol")).toBe("gpt-6-sol");
     expect(successionChainEnd(succ, "gpt-5.6-sol")).toBe("gpt-6.1-sol");
     expect(successionChainEnd(succ, "gpt-6.1-sol")).toBe("gpt-6.1-sol");
+  });
+
+  it("retires a replaced model without forming a succession", () => {
+    const models = [
+      model("mistral-medium-3-5", "Mistral Medium 3.5", 72.6, 69, 76),
+      model("mistral-large-4", "Mistral Large 4", 76.5, 72.6, 80.3),
+    ];
+    expect(successions(models, new Map()).size).toBe(0);
+    const replaced = replacements(models, new Map([["mistral-medium-3-5", "mistral-large-4"]]));
+    expect(replaced.get("mistral-medium-3-5")).toBe("mistral-large-4");
+    // An unranked replacement leaves the old model current.
+    const unranked = [models[0], { ...models[1], ranked_eligible: false }];
+    expect(replacements(unranked, new Map([["mistral-medium-3-5", "mistral-large-4"]])).size).toBe(0);
   });
 
   it("stops a cyclic succession chain instead of looping", () => {

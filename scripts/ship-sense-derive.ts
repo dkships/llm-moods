@@ -29,6 +29,10 @@ export interface RegistryEntry {
   priceIn?: number;
   priceOut?: number;
   supersededBy?: string;
+  /** A different-tier model that took this one's lab slot (Mistral Large 4
+   * over Medium 3.5): retires it from the current lineup with NO generation
+   * pair. Mirrors upstream leaderboard.replacements(). */
+  replacedBy?: string;
   pending?: RegistryPending;
 }
 
@@ -113,6 +117,7 @@ export function parseModelsYaml(text: string): Map<string, RegistryEntry> {
     else if (key === "price_in") current.priceIn = Number(value);
     else if (key === "price_out") current.priceOut = Number(value);
     else if (key === "superseded_by") current.supersededBy = value;
+    else if (key === "replaced_by") current.replacedBy = value;
   }
   closePending();
   return registry;
@@ -223,6 +228,26 @@ export function successions(
       );
       out.set(m.name, newer[0].name);
     }
+  }
+  return out;
+}
+
+/**
+ * Replaced model name -> the ranked model that took its lab slot (upstream
+ * replacements(), 2026-10-06). Not a succession: a replaced model leaves the
+ * current lineup but forms no generation pair and no confirmatory test.
+ */
+export function replacements(
+  models: DeriveModel[],
+  declared: Map<string, string>,
+): Map<string, string> {
+  const ranked = new Set(
+    models.filter((m) => !m.is_baseline && (m.ranked_eligible ?? true)).map((m) => m.name),
+  );
+  const out = new Map<string, string>();
+  for (const m of models) {
+    const by = declared.get(m.name);
+    if (by && by !== m.name && ranked.has(by)) out.set(m.name, by);
   }
   return out;
 }

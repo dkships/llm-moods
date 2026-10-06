@@ -52,6 +52,7 @@ import {
   parsePairwise,
   previousBenchSnapshots,
   rankSets,
+  replacements,
   scoringDates,
   successionChainEnd,
   successions,
@@ -178,12 +179,23 @@ async function main() {
       .map(([name, entry]) => [name, entry.supersededBy!]),
   );
   const succ = successions(models, declared);
+  const replaced = replacements(
+    models,
+    new Map(
+      [...registry]
+        .filter(([, entry]) => entry.replacedBy)
+        .map(([name, entry]) => [name, entry.replacedBy!]),
+    ),
+  );
+  for (const name of succ.keys()) replaced.delete(name);
   const current = rankedModels
-    .filter((m) => !succ.has(m.name))
+    .filter((m) => !succ.has(m.name) && !replaced.has(m.name))
     .sort((a, b) => b.score.value - a.score.value);
   const previous = models
     .filter((m) => succ.has(m.name))
     .sort((a, b) => b.score.value - a.score.value);
+  // Replaced models leave the lineup but have no generation pair.
+  const replacedModels = models.filter((m) => replaced.has(m.name));
 
   // Rank sets over the CURRENT lineup only (attach_rank_sets); legacy
   // pairwise files carry no raw p-values and yield no ranges.
@@ -199,10 +211,13 @@ async function main() {
   // the case this sync now has to handle unattended: upstream added a model.
   // These checks still catch a broken derivation port — they just don't
   // mistake "ship-sense scored a new model" for a bug.
-  if (current.length + previous.length !== rankedModels.length)
+  if (current.length + previous.length + replacedModels.length !== rankedModels.length)
     fail(
-      `lineage split lost models: ${current.length} current + ${previous.length} retired != ${rankedModels.length} ranked`,
+      `lineage split lost models: ${current.length} current + ${previous.length} retired + ${replacedModels.length} replaced != ${rankedModels.length} ranked`,
     );
+  for (const [prev, by] of replaced)
+    if (!current.some((m) => m.name === by))
+      fail(`${prev} is replaced by ${by}, which is not in the current lineup`);
   if (current.length < 2)
     fail(`derived only ${current.length} current model(s) — successions() is over-retiring`);
   // A successor may itself be retired (GPT-5.6 Sol -> GPT-6 Sol -> GPT-6.1 Sol);
@@ -231,7 +246,7 @@ async function main() {
   // generated prose names models the way the page ranks them. Clamped to the
   // run DATE (run ids carry a version suffix since v3.6).
   const runDate: string = run.run_date ?? run.run_id;
-  const dates = scoringDates([...current, ...previous], runDate);
+  const dates = scoringDates([...current, ...previous, ...replacedModels], runDate);
   if (dates[0]?.date !== runDate)
     fail(`earliest scoring date ${dates[0]?.date} is not the run date ${runDate}`);
   const dated = dates.reduce((n, d) => n + d.labels.length, 0);
