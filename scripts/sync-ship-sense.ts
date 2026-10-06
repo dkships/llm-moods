@@ -377,6 +377,7 @@ async function main() {
     runDate,
     bankItems: run.bank.n_items,
     modelCount: rankedModels.length,
+    replacedCount: replacedModels.length,
     floor: r1(floor.value!),
     floorKind: floor.kind,
     floorRows,

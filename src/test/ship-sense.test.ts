@@ -602,7 +602,10 @@ describe("committed snapshot invariants", () => {
     // an earlier bench version's kept-alive successions (g.earlier) describe
     // a different run entirely and are not part of this one's roster.
     const latest = SHIP_SENSE_GENERATIONS.filter((g) => !g.earlier);
-    expect(SHIP_SENSE_LINEUP.length + latest.length).toBe(SHIP_SENSE_RUN.modelCount);
+    // Replaced models (upstream replaced_by) leave the lineup with no pair.
+    expect(SHIP_SENSE_LINEUP.length + latest.length + (SHIP_SENSE_RUN.replacedCount ?? 0)).toBe(
+      SHIP_SENSE_RUN.modelCount,
+    );
     expect(SHIP_SENSE_LINEUP.length).toBeGreaterThan(1);
   });
 

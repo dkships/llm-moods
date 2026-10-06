@@ -106,8 +106,11 @@ export interface ShipSenseRunMeta {
   /** ISO run date (run ids carry a version suffix since v3.6). */
   runDate: string;
   bankItems: number;
-  /** Ranked models scored in the run: current lineup + retired predecessors. */
+  /** Ranked models scored in the run: current lineup + retired predecessors
+   * + models replaced by a different-tier model (no generation pair). */
   modelCount: number;
+  /** Models off the lineup via upstream `replaced_by`; absent before 2026-10-06. */
+  replacedCount?: number;
   /** Score floor: the best adversarial policy (v4.0+) or the naive baseline. */
   floor: number;
   floorKind: "adversarial" | "naive";

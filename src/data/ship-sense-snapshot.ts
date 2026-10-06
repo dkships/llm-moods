@@ -12,7 +12,8 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "runId": "2026-09-28-v4.2",
   "runDate": "2026-09-28",
   "bankItems": 82,
-  "modelCount": 23,
+  "modelCount": 24,
+  "replacedCount": 1,
   "floor": 52.3,
   "floorKind": "adversarial",
   "floorRows": [
@@ -32,8 +33,8 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
     }
   ],
   "decisiveRule": "bh",
-  "decisivePairs": 157,
-  "totalPairs": 253,
+  "decisivePairs": 176,
+  "totalPairs": 276,
   "scoringDates": [
     {
       "date": "2026-09-28",
@@ -54,18 +55,24 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "Qwen 3.8 Max",
         "MiniMax M3",
         "Gemini 3.5 Flash-Lite",
-        "Mistral Medium 3.5",
         "Claude Haiku 4.5",
         "GPT-5.6 Sol",
         "GPT-6 Sol",
         "Claude Sonnet 5",
-        "GPT-5.6 Luna"
+        "GPT-5.6 Luna",
+        "Mistral Medium 3.5"
       ]
     },
     {
       "date": "2026-09-29",
       "labels": [
         "GPT-6.1 Sol"
+      ]
+    },
+    {
+      "date": "2026-10-06",
+      "labels": [
+        "Mistral Large 4"
       ]
     }
   ]
@@ -261,7 +268,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "provider": "google",
     "pos": 11,
     "rankLo": 3,
-    "rankHi": 14,
+    "rankHi": 15,
     "pFirst": 0,
     "testedOn": "v4.2",
     "score": 83.3,
@@ -297,7 +304,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "provider": "deepseek",
     "pos": 13,
     "rankLo": 7,
-    "rankHi": 16,
+    "rankHi": 17,
     "pFirst": 0,
     "testedOn": "v4.2",
     "score": 80.9,
@@ -315,7 +322,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "provider": "openai",
     "pos": 14,
     "rankLo": 6,
-    "rankHi": 16,
+    "rankHi": 17,
     "pFirst": 0,
     "testedOn": "v4.2",
     "score": 80.9,
@@ -346,10 +353,28 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 6
   },
   {
+    "name": "mistral-large-4",
+    "label": "Mistral Large 4",
+    "provider": "mistral",
+    "pos": 16,
+    "rankLo": 13,
+    "rankHi": 18,
+    "pFirst": 0,
+    "testedOn": "v4.2",
+    "score": 76.5,
+    "lo": 72.6,
+    "hi": 80.3,
+    "restraint": 0.79,
+    "honesty": 0.74,
+    "conviction": 0.77,
+    "priceIn": 1.36,
+    "priceOut": 4.18
+  },
+  {
     "name": "minimax-m3",
     "label": "MiniMax M3",
     "provider": "minimax",
-    "pos": 16,
+    "pos": 17,
     "rankLo": 14,
     "rankHi": 18,
     "pFirst": 0,
@@ -367,7 +392,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gemini-3.5-flash-lite",
     "label": "Gemini 3.5 Flash-Lite",
     "provider": "google",
-    "pos": 17,
+    "pos": 18,
     "rankLo": 15,
     "rankHi": 19,
     "pFirst": 0,
@@ -382,29 +407,11 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 2.5
   },
   {
-    "name": "mistral-medium-3-5",
-    "label": "Mistral Medium 3.5",
-    "provider": "mistral",
-    "pos": 18,
-    "rankLo": 15,
-    "rankHi": 19,
-    "pFirst": 0,
-    "testedOn": "v4.2",
-    "score": 72.6,
-    "lo": 69,
-    "hi": 76,
-    "restraint": 0.79,
-    "honesty": 0.61,
-    "conviction": 0.78,
-    "priceIn": 1.5,
-    "priceOut": 7.5
-  },
-  {
     "name": "claude-haiku-4-5",
     "label": "Claude Haiku 4.5",
     "provider": "anthropic",
     "pos": 19,
-    "rankLo": 17,
+    "rankLo": 18,
     "rankHi": 19,
     "pFirst": 0,
     "testedOn": "v4.2",
