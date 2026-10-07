@@ -376,6 +376,7 @@ describe("Anthropic classifier path", () => {
     const [, anthropicInit] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     const sentBody = JSON.parse(anthropicInit.body as string);
     expect(sentBody.tools[0].input_schema.properties.results.items.required).toEqual([
+      "post",
       "relevant",
       "sentiment",
       "complaint_category",

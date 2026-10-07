@@ -1,4 +1,12 @@
 import { normalizeComplaintCategory, normalizePraiseCategory, normalizeSentiment } from "./taxonomy.ts";
+import {
+  claudeBudgetFields,
+  claudeToolChoice,
+  defaultToolChoice,
+  readToolInput,
+  type ClaudeEffort,
+  type ToolChoiceMode,
+} from "./claude-request.ts";
 
 const API_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions";
 const OPENAI_API_URL = "https://api.openai.com/v1/chat/completions";
@@ -78,6 +86,9 @@ export interface ClassifyOptions {
   // Batch rates with no batching rework; capacity 429s / timeouts fall back to
   // "auto" for that request. "default" forces standard pricing.
   serviceTier?: OpenAiServiceTier;
+  // Anthropic only. Eval knob; the default is defaultToolChoice(model). Models
+  // that reject forcing (Sonnet 5.5, Opus 5.5) get auto either way.
+  toolChoice?: ToolChoiceMode;
 }
 
 const OPENAI_SERVICE_TIERS = new Set<OpenAiServiceTier>(["flex", "auto", "default"]);
@@ -551,6 +562,14 @@ function responseSchema(mode: "single" | "batch") {
     };
 }
 
+// gpt-6.1-* has no reasoning_effort "none" (HTTP 400, verified 2026-10-07);
+// "low" is its floor. Every other model keeps "none".
+const NO_NONE_EFFORT = /^gpt-6\.1/;
+
+function defaultReasoningEffort(model: string): "none" | "low" {
+  return NO_NONE_EFFORT.test(model.toLowerCase()) ? "low" : "none";
+}
+
 function requestBody(
   prompt: string,
   maxTokens: number,
@@ -560,7 +579,7 @@ function requestBody(
 ) {
   const model = classifierModel(options);
   const provider = providerForModel(model);
-  const effort = options.reasoningEffort ?? "none";
+  const effort = options.reasoningEffort ?? defaultReasoningEffort(model);
   const body: Record<string, unknown> = {
     model,
     messages: [{ role: "user", content: prompt }],
@@ -897,6 +916,14 @@ async function fetchOpenAi(
 // ({result} single / {results} batch), so the downstream JSON parser is shared.
 // Forcing this tool guarantees schema-shaped output without prose JSON.
 const ANTHROPIC_CLASSIFY_TOOL_NAME = "record_classifications";
+// With tool_choice auto (required on Sonnet 5.5 / Opus 5.5) the user turn has
+// to ask for the call; harmless when the call is forced.
+const ANTHROPIC_TOOL_INSTRUCTION =
+  `\n\nRecord your answer by calling the ${ANTHROPIC_CLASSIFY_TOOL_NAME} tool exactly once. Do not answer in text.`;
+// Batch results are keyed by post number on the Claude path: Haiku 5.5 returned
+// 21 results for 20 posts in 4 of 6 positional batches (2026-10-07 eval), and
+// a keyed result lands on its own post however the array is ordered.
+const ANTHROPIC_BATCH_KEY_INSTRUCTION = " Set each result's `post` to that post's number.";
 
 // NOTE (2026-07-30, validated live — do NOT re-attempt as-is): asking for a
 // compact {"relevant": false} on irrelevant posts (with `required` relaxed to
@@ -913,6 +940,11 @@ const ANTHROPIC_CLASSIFY_TOOL_NAME = "record_classifications";
 // (e.g. {"i": N, ...}) or a hard length-match guard, not prompt wording. Full
 // record in OPERATIONS-HISTORY.md.
 function anthropicTool(mode: "single" | "batch") {
+  const keyedResult = {
+    ...CLASSIFICATION_RESULT_SCHEMA,
+    required: ["post", ...CLASSIFICATION_RESULT_SCHEMA.required],
+    properties: { post: { type: "integer" }, ...CLASSIFICATION_RESULT_SCHEMA.properties },
+  };
   const input_schema = mode === "single"
     ? {
       type: "object",
@@ -924,7 +956,7 @@ function anthropicTool(mode: "single" | "batch") {
       type: "object",
       additionalProperties: false,
       required: ["results"],
-      properties: { results: { type: "array", items: CLASSIFICATION_RESULT_SCHEMA } },
+      properties: { results: { type: "array", items: keyedResult } },
     };
   return {
     name: ANTHROPIC_CLASSIFY_TOOL_NAME,
@@ -939,6 +971,16 @@ function anthropicTool(mode: "single" | "batch") {
   };
 }
 
+// Claude effort chosen by the 2026-10-07 eval (OPERATIONS-HISTORY.md): Haiku
+// 5.5 needed high to come near gpt-6-sol on complaint categories.
+// reasoningEffort low/medium/high overrides it; "none"/"omit" keep it.
+const CLAUDE_EFFORT: ClaudeEffort = "high";
+
+function claudeEffort(options: ClassifyOptions): ClaudeEffort {
+  const effort = options.reasoningEffort;
+  return effort === "low" || effort === "medium" || effort === "high" ? effort : CLAUDE_EFFORT;
+}
+
 function anthropicRequestBody(
   instructions: string,
   postsBlock: string,
@@ -946,31 +988,30 @@ function anthropicRequestBody(
   mode: "single" | "batch",
   options: ClassifyOptions = {},
 ): string {
+  const model = classifierModel(options);
+  const toolChoice = claudeToolChoice(model, ANTHROPIC_CLASSIFY_TOOL_NAME, options.toolChoice ?? defaultToolChoice(model));
   return JSON.stringify({
-    model: classifierModel(options),
-    max_tokens: maxTokens,
-    // No `temperature`: current Claude models (Haiku 4.5 / Sonnet 4.6 / Opus)
-    // reject it with "temperature is deprecated for this model". tool_choice
-    // forcing already makes the classification output stable enough.
+    model,
+    // max_tokens (with thinking headroom when the model thinks) and effort.
+    ...claudeBudgetFields(model, maxTokens, claudeEffort(options), toolChoice),
+    // No `temperature`, `top_p` or prefill: current Claude models reject them.
+    // The record_classifications tool carries the output shape.
     // Static instruction prefix in a cached system block (1.5-2.5k tokens); the
     // per-call posts go in the user turn so the cache prefix is identical each
-    // call. Sonnet/Opus (>=1024 min) cache; Haiku (4096 min) silently won't —
-    // that's fine, Haiku is cheap. cache_control after system also caches tools.
+    // call. Haiku 4.5 (4096 min) silently won't cache; Haiku 5.5 (512 min) and
+    // Sonnet/Opus do. cache_control after system also caches tools.
     system: [{ type: "text", text: instructions, cache_control: { type: "ephemeral" } }],
-    messages: [{ role: "user", content: postsBlock }],
+    messages: [{ role: "user", content: postsBlock + ANTHROPIC_TOOL_INSTRUCTION + (mode === "batch" ? ANTHROPIC_BATCH_KEY_INSTRUCTION : "") }],
     tools: [anthropicTool(mode)],
-    tool_choice: { type: "tool", name: ANTHROPIC_CLASSIFY_TOOL_NAME },
+    tool_choice: toolChoice,
   });
 }
 
 // Re-shape Claude's Messages response into the OpenAI envelope the callers already
 // parse: tool_use.input → JSON string at choices[0].message.content, and Anthropic
 // usage fields mapped onto prompt/completion/total (+ cache_read for cost).
-function anthropicAsOpenAiResponse(data: unknown): Response {
+function anthropicAsOpenAiResponse(data: unknown, input: JsonRecord): Response {
   const record = isRecord(data) ? data : {};
-  const content = Array.isArray(record.content) ? record.content : [];
-  const toolUse = content.find((block) => isRecord(block) && block.type === "tool_use" && isRecord(block.input));
-  const input = isRecord(toolUse) ? toolUse.input : {};
   const usage = isRecord(record.usage) ? record.usage : {};
   const inputTokens = readUsageField(usage.input_tokens) ?? 0;
   const cacheCreate = readUsageField(usage.cache_creation_input_tokens) ?? 0;
@@ -1022,7 +1063,26 @@ async function fetchAnthropic(
       continue;
     }
 
-    if (res.ok) return anthropicAsOpenAiResponse(await res.json());
+    if (res.ok) {
+      const data = await res.json();
+      const read = readToolInput(data, ANTHROPIC_CLASSIFY_TOOL_NAME);
+      if ("input" in read) {
+        return anthropicAsOpenAiResponse(data, read.input);
+      }
+
+      if (logError) {
+        await logError(`Anthropic ${read.failure}`, "classify-anthropic-no-result");
+      }
+      // A refusal is deterministic for this text, so it is not retried here.
+      if (read.kind === "refusal") {
+        return makeSkippedResult("classifier_error", read.failure, { error_type: "refusal" });
+      }
+      // tool_choice auto does not guarantee the call; ask again.
+      if (read.kind === "no_tool_call" && attempt < 2) {
+        continue;
+      }
+      return makeSkippedResult("parse_error", read.failure);
+    }
 
     if (res.status === 429 || res.status === 529) {
       const details = await readAnthropicFailure(res);
@@ -1129,6 +1189,26 @@ export async function classifyPost(
   }
 }
 
+// Results keyed by `post` (1-based, the Claude batch tool) are placed by key
+// instead of by position. Positional (unkeyed) output returns null and keeps
+// the length guards below. A duplicate or out-of-range key is a mismatch.
+function alignByPostNumber(results: unknown[], batchLength: number): unknown[] | "mismatch" | null {
+  const keyed = results.length > 0 && results.every((r) => isRecord(r) && Number.isInteger(r.post));
+  if (!keyed) {
+    return null;
+  }
+
+  const aligned: unknown[] = new Array(batchLength).fill(undefined);
+  for (const r of results as JsonRecord[]) {
+    const slot = (r.post as number) - 1;
+    if (slot < 0 || slot >= batchLength || aligned[slot] !== undefined) {
+      return "mismatch";
+    }
+    aligned[slot] = r;
+  }
+  return aligned;
+}
+
 async function batchClassifyWithPrompt(
   prompt: string,
   numbered: string,
@@ -1165,6 +1245,16 @@ async function batchClassifyWithPrompt(
   const parsedResults = Array.isArray(parsed) ? parsed : isRecord(parsed) ? parsed.results : null;
   if (!Array.isArray(parsedResults)) {
     return Array.from({ length: batchLength }, () => makeSkippedResult("parse_error", "missing_results_array"));
+  }
+  const keyed = alignByPostNumber(parsedResults, batchLength);
+  if (keyed === "mismatch") {
+    if (logError) {
+      await logError(`Batch returned duplicate or out-of-range post numbers for ${batchLength} posts`, "batch-classify-parse");
+    }
+    return Array.from({ length: batchLength }, () => makeSkippedResult("parse_error", "result_count_mismatch"));
+  }
+  if (keyed) {
+    return keyed.map((item) => item === undefined ? makeSkippedResult("parse_error", "missing_result_index") : parseResult(item));
   }
   // MORE results than posts means the model miscounted the batch (e.g. framing
   // tokens inside a post) — positional alignment is untrusted for the whole

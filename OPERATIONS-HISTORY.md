@@ -4,6 +4,71 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-10-07 — Claude 5.5 migration + classifier/rumor model eval (code only, not deployed)
+
+Eval harness lived in a scratch dir (not in this repo). Data: real posts from
+`get_public_recent_chatter`. The RPC only returns rows already classified relevant, so the
+relevance numbers below can only show "wrongly dropped" against that set. Classifier: 240 posts
+(60 per tracked model, sol era, 120 tune / 120 held-out), production `classifyBatchTargeted`
+path at batch 20. Rumors: all 90 leak-lexicon candidates from the last 10 days, production
+request builder, batches of 10. References, prompts unchanged: `claude-opus-5-5` (effort
+medium) and `gpt-6-astra` (reasoning medium, flex). The two references agree on only 68% of
+full labels, so read gaps under ~5 pts as noise. Every arm ran twice. Total spend about $3.40.
+
+Classifier, full label (relevance + sentiment + category) vs each reference, two runs:
+
+| model | vs Opus 5.5 | vs Astra | neg. category vs Opus | re-run consistency | $ / 1k posts | p50 batch |
+|---|---|---|---|---|---|---|
+| gpt-6-sol, effort none (production) | 64.2 / 64.2% | 67.5 / 63.7% | 70.7 / 67.2% | 82% | $0.34 | 5 s |
+| gpt-6-sol, effort low | 70.4 / 65.0% | 67.5 / 68.8% | 74.6 / 65.1% | 85% | $0.37 | 6 s |
+| **gpt-6.1-sol, effort low** | 70.0 / 67.9% | 90.4 / 90.0% | 78.7 / 76.3% | **94%** | $0.35 | 17 s |
+| claude-haiku-5-5, forced, low | 41.7 / 41.2% | 36.2 / 35.4% | 50.0 / 52.6% | 73% | $0.06 | 5 s |
+| claude-haiku-5-5, auto, medium | 57.9 / 57.5% | 52.9 / 50.4% | 59.6 / 59.3% | 73% | $0.11 | 14 s |
+| claude-haiku-5-5, auto, high | 60.8 / 70.0% | 57.9 / 59.2% | 64.4 / 72.9% | 75% | $0.15 | 20 s |
+
+- **gpt-6.1-sol is the better classifier at the same price**: ahead of Sol against both
+  references, with 94% re-run consistency vs 82%. Its Astra agreement (90%) is inflated by
+  family resemblance, so weigh the Opus column. It is slower (17 s p50 per 20-post batch) but a
+  12-batch run still finished in 52 s, well inside the drain's 400 s budget.
+- **gpt-6.1-sol 400s on `reasoning_effort: "none"`** (it accepts low through xhigh). The OpenAI
+  path now sends `low` for `gpt-6.1-*`, so the code must be deployed BEFORE the secret flip.
+- **Haiku 5.5 not adopted for sentiment.** Only at effort high does it come near Sol, and only
+  against Opus, which is the same family. It drops more relevant posts, and at that effort it
+  costs $0.15 per 1k (about $6/mo saved at the ~1,090 posts/day the docs cite). Two of 96 auto batches came back
+  unusable (no `results` array, or 1 result for 20 posts), which became retryable `parse_error`s. Positional results
+  were unusable: 21 results for 20 posts in 4 of 6 batches. The Claude path now keys results by
+  post number (see AGENT-REFERENCE.md).
+- **Tried a prompt tune, did not ship it.** Category notes ("general_improvement = better than
+  before; else output_quality" and "no claimed decline → other, not general_drop") lifted Haiku
+  high's negative-category agreement vs Opus from 63-70% to 81-90% on tune, and from 66-76% to
+  73-83% on held-out. Sol and 6.1-Sol moved within noise, and production is an OpenAI model, so
+  the shared prompt is unchanged.
+
+Rumor extraction, against the Opus 5.5 reference (13 of 90 posts are rumors), two runs:
+
+| arm | is_rumor agreement | missed / extra | claim_type on matched | $ / call | p50 |
+|---|---|---|---|---|---|
+| claude-haiku-4-5 forced (previous) | 86, 87 / 90 | 3,2 / 1,1 | 14/19 | $0.0077 | 4.9 s |
+| claude-haiku-5-5 forced, low | 87, 85 / 90 | 0,2 / 3,3 | 17/24 | $0.0007 | 2.5 s |
+| **claude-haiku-5-5 auto, low (chosen)** | 89, 88 / 90 | 0,0 / 1,2 | 22/25 | $0.0009 | 3.7 s |
+| claude-haiku-5-5 auto, medium | 87, 88 / 90 | 3,2 / 0,0 | 17/21 | $0.0011 | 6.8 s |
+
+Family matched on 25 of 26 matched posts and `is_unreleased` on 25 of 25. The sample is small,
+but auto/low is 8x cheaper per call than Haiku 4.5, faster, and ahead on every measure.
+
+- **Code:** `aggregate-rumors` defaults to `claude-haiku-5-5` with `tool_choice` auto and effort
+  low. It reads the tool block by type and reports refusals and truncation. It sends no
+  sampling params, prefill or `fallbacks`, and the system prompt is now cached. `CODE_VERSION`
+  is `2026-10-07.1`. The classifier's Claude path is valid on Haiku 5.5, Sonnet 5.5 and
+  Opus 5.5 (Opus ran the eval reference through it; Sonnet 5.5 was smoke-tested on the rumor
+  path). The drain `CODE_VERSION` is `2026-10-07-claude-55-gpt-61`.
+- **Rumor caveat:** a batch whose refusal repeats stays unchecked and is retried every hourly
+  run. None occurred in the eval.
+- **To ship:** deploy `drain-classification-queue` and `aggregate-rumors` (`reclassify-posts` and
+  `check-gemini-self-bias` share the classifier module and pick it up on their next deploy). Then set
+  `CLASSIFIER_MODEL=gpt-6.1-sol`. Rollback: `gpt-6-sol`, no redeploy. Rumors follow
+  `CLASSIFIER_MODEL` only when it is a `claude-*` id, so the flip does not touch them.
+
 ## 2026-09-23 — Classifier cutover: gpt-5.6-terra → gpt-6-sol (live-verified)
 
 Eval (run from ~/dev, not in this repo): 200 real posts from `get_public_model_posts`,
