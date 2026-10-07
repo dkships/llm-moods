@@ -94,7 +94,7 @@ describe("rumorRequestBody", () => {
     expect(body.output_config).toMatchObject({ effort: expect.any(String) });
 
     const messages = body.messages as { role: string }[];
-    expect(messages.at(-1)?.role).toBe("user");
+    expect(messages[messages.length - 1]?.role).toBe("user");
     const system = body.system as { cache_control?: unknown }[];
     expect(system[0].cache_control).toMatchObject({ type: "ephemeral" });
   });
