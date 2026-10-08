@@ -1115,9 +1115,9 @@ describe("mergeRumorRows", () => {
 
   it("collapses a family-prefixed Claude label into the bare-line card (live board 2026-09-28)", () => {
     const out = mergeRumorRows([
-      rrow({ version_label: "Haiku 5.5", claim_type: "launch", mention_count: 4, last_seen_at: "2026-09-27",
+      rrow({ version_label: "Fable 5.5", claim_type: "launch", mention_count: 4, last_seen_at: "2026-09-27",
         representative_sources: [{ url: "u1", platform: "twitter" }] }),
-      rrow({ version_label: "Claude Haiku 5.5", claim_type: "imminent", last_seen_at: "2026-09-26",
+      rrow({ version_label: "Claude Fable 5.5", claim_type: "imminent", last_seen_at: "2026-09-26",
         representative_sources: [{ url: "u2", platform: "reddit" }] }),
     ]);
     expect(out).toHaveLength(1);

@@ -173,6 +173,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     notes: "Musk announced July 8; public release July 9 (Cursor users got it a day early).",
   },
   {
+    id: "google-gemini-3-6-flash-launch",
+    vendor: "google",
+    modelSlug: "gemini",
+    eventDate: "2026-07-21",
+    eventType: "model_launch",
+    title: "Gemini 3.6 Flash launch",
+    url: "https://ai.google.dev/gemini-api/docs/models/gemini-3.6-flash",
+    notes: "GA as gemini-3.6-flash, alongside Gemini 3.5 Flash-Lite and 3.5 Flash Cyber; 3.5 Pro was still in partner testing.",
+  },
+  {
     id: "anthropic-opus-5-launch",
     vendor: "anthropic",
     modelSlug: "claude",
@@ -282,6 +292,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     title: "GPT-6.1 Sol launch",
     url: "https://techcrunch.com/2026/09/29/openai-launches-gpt-6-1-sol-says-it-nearly-matches-gpt-6-astra-and-costs-less/",
     notes: "Announced at DevDay a week after GPT-6 Sol. Same $2/$10 per million tokens; OpenAI says it nearly matches GPT-6 Astra at one-fifth of Astra's price.",
+  },
+  {
+    id: "anthropic-haiku-5-5-launch",
+    vendor: "anthropic",
+    modelSlug: "claude",
+    eventDate: "2026-10-07",
+    eventType: "model_launch",
+    title: "Claude Haiku 5.5 launch",
+    url: "https://www.anthropic.com/claude-haiku-5-5",
+    notes: "Third Claude 5.5 model in about a month. $0.10/$0.50 per million tokens up to 100k context, about 75% cheaper to run than Haiku 4.5; first Haiku with effort controls.",
   },
 ];
 

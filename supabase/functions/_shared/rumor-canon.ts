@@ -446,7 +446,15 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       codename: null,
       aliases: ["haiku45", "claudehaiku45"],
       released: true,
-      releasePrompt: "Haiku 4.5 and earlier",
+    },
+    {
+      key: "haiku55",
+      label: "Haiku 5.5",
+      codename: null,
+      aliases: ["haiku55", "claudehaiku55"],
+      released: true,
+      releasePrompt: "Haiku 5.5 and earlier",
+      releasedOn: "2026-10-07",
     },
   ],
   chatgpt: [
