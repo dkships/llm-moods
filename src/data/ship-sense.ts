@@ -34,9 +34,10 @@ export interface ShipSenseModelRow {
   restraint: number;
   honesty: number;
   conviction: number;
-  /** Current list price per 1M tokens (models.yaml registry). */
-  priceIn: number;
-  priceOut: number;
+  /** Current list price per 1M tokens (models.yaml registry); null when the
+   * vendor publishes no price (Reflection's Beam, 2026-10-12). */
+  priceIn: number | null;
+  priceOut: number | null;
   /** At-test prices, present only when the list price changed since the run. */
   atTestPriceIn?: number;
   atTestPriceOut?: number;
@@ -244,10 +245,13 @@ const perM = (m: ShipSenseModelRow) => `$${m.priceIn}/$${m.priceOut}`;
  * cheapest is also the priciest.
  */
 export const valueCalloutText = (lineup: ShipSenseModelRow[]): string | null => {
-  const top = lineup.filter((m) => m.rankLo === 1);
+  // An unpriced model can be neither the cheapest nor the dearest.
+  const top = lineup.filter(
+    (m) => m.rankLo === 1 && m.priceIn !== null && m.priceOut !== null,
+  );
   if (top.length < 2) return null;
 
-  const blended = (m: ShipSenseModelRow) => m.priceIn + m.priceOut;
+  const blended = (m: ShipSenseModelRow) => m.priceIn! + m.priceOut!;
   const cheap = top.reduce((best, m) => (blended(m) < blended(best) ? m : best));
   const peak = Math.max(...top.map(blended));
   const dear = top.filter((m) => blended(m) === peak);

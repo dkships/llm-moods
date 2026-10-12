@@ -273,7 +273,9 @@ const Benchmark = () => {
                         : undefined
                     }
                   >
-                    · {price(m.priceIn)} / {price(m.priceOut)} per 1M
+                    {m.priceIn === null || m.priceOut === null
+                      ? "· no published price"
+                      : `· ${price(m.priceIn)} / ${price(m.priceOut)} per 1M`}
                     {m.atTestPriceIn !== undefined ? " †" : ""}
                     {m.pendingEffective !== undefined ? (
                       <span

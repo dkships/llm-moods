@@ -255,9 +255,12 @@ async function main() {
 
   const lineup = current.map((m, i) => {
     const reg = registry.get(m.name) ?? {};
-    const priceIn = reg.priceIn ?? m.price_in ?? 0;
-    const priceOut = reg.priceOut ?? m.price_out ?? 0;
+    // No published price stays null ("—" on the page), never a fake $0.
+    const priceIn = reg.priceIn ?? m.price_in ?? null;
+    const priceOut = reg.priceOut ?? m.price_out ?? null;
     const repriced =
+      priceIn !== null &&
+      priceOut !== null &&
       m.price_in !== null &&
       m.price_out !== null &&
       (priceIn !== m.price_in || priceOut !== m.price_out);
@@ -468,8 +471,8 @@ async function describeChange(
   lineup: {
     label: string;
     score: number;
-    priceIn: number;
-    priceOut: number;
+    priceIn: number | null;
+    priceOut: number | null;
     pendingPriceIn?: number;
     pendingPriceOut?: number;
     pendingEffective?: string;

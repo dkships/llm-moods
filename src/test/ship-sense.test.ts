@@ -545,8 +545,8 @@ describe("run prose", () => {
 describe("rank range and value callout", () => {
   const row = (
     name: string,
-    priceIn: number,
-    priceOut: number,
+    priceIn: number | null,
+    priceOut: number | null,
     rankLo?: number,
   ): ShipSenseModelRow => ({
     name,
@@ -564,6 +564,15 @@ describe("rank range and value callout", () => {
     conviction: 0.8,
     priceIn,
     priceOut,
+  });
+
+  it("never treats a model with no published price as the cheapest", () => {
+    // Reflection's Beam (2026-10-12) has no list price; it must not read as $0.
+    const lineup = [row("unpriced", null, null, 1), row("a", 2, 10, 1), row("b", 10, 50, 1)];
+    const text = valueCalloutText(lineup) ?? "";
+    expect(text).toContain("A is the least expensive");
+    expect(text).not.toContain("UNPRICED");
+    expect(valueCalloutText([row("unpriced", null, null, 1), row("a", 2, 10, 1)])).toBeNull();
   });
 
   it("formats rank ranges and P(#1) like the upstream board", () => {
