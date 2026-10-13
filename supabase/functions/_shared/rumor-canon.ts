@@ -633,6 +633,11 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       // Flash" leak stays separate — only the Pro spelling folds in. "Argon" is
       // its Arena/trusted-tester codename ("gemini-4-argon").
       aliases: ["gemini4", "gemini4pro", "4pro", "argon", "gemini4argon"],
+      // Shipped 2026-10-13 as gemini-4-argon (Stable), Google's new flagship.
+      released: true,
+      releasePrompt: "Gemini 4 Argon",
+      releaseAliases: ["argon", "gemini4argon"],
+      releasedOn: "2026-10-13",
     },
     {
       // Shipped 2026-06-30 as gemini-3.1-flash-lite-image; leak posts about an
@@ -1044,7 +1049,11 @@ export function isSupersededVersion(
 ): boolean {
   const fam = (family ?? "").toLowerCase();
 
-  for (const raw of [label, codename]) {
+  // Judge an aliased rumor by the card it folds into: bare "Gemini 3.5" means
+  // the pending 3.5 Pro, so the tierless "Gemini 4" shipping must not retire it.
+  const canonLabel = canonicalVersionKey(fam, label, codename).label ?? label;
+
+  for (const raw of [canonLabel, codename]) {
     const parsed = parseLineVersion(fam, raw);
     if (!parsed) {
       continue;

@@ -303,6 +303,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     url: "https://www.anthropic.com/claude-haiku-5-5",
     notes: "Third Claude 5.5 model in about a month. $0.10/$0.50 per million tokens up to 100k context, about 75% cheaper to run than Haiku 4.5; first Haiku with effort controls.",
   },
+  {
+    id: "google-gemini-4-argon-launch",
+    vendor: "google",
+    modelSlug: "gemini",
+    eventDate: "2026-10-13",
+    eventType: "model_launch",
+    title: "Gemini 4 Argon launch",
+    url: "https://cloud.google.com/blog/products/ai-machine-learning/gemini-4-argon-available-on-google-cloud",
+    notes: "Google's new flagship, Stable as gemini-4-argon; takes over from the Gemini 3.1 Pro preview. Introductory $2/$10 per million tokens through November 30, then $4/$20.",
+  },
 ];
 
 export function getEventsForModel(slug: string | undefined): VendorEvent[] {

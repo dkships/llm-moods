@@ -919,12 +919,15 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("gemini", "Gemini 3.1 Pro", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 3.6 Flash", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 3.5 Flash-Lite", null)).toBe(true);
+    expect(isReleasedVersion("gemini", "Gemini 4 Argon", null)).toBe(true);
+    expect(isReleasedVersion("gemini", null, "Argon")).toBe(true);
   });
 
   it("keeps unreleased versions (no false positives)", () => {
     expect(isReleasedVersion("claude", "Opus 6", null)).toBe(false);
     expect(isReleasedVersion("chatgpt", "GPT-6.2", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
+    expect(isReleasedVersion("gemini", "Gemini 4 Flash", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 5", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 4.8", null)).toBe(false);
     // The shipped 3.5 Flash-Lite must not retire the next one by bare-name match.
