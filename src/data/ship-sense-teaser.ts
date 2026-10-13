@@ -9,18 +9,18 @@ export const SHIP_SENSE_TEASER: ShipSenseTeaserRow[] = [
     "score": 88.5
   },
   {
-    "label": "Claude Fable 5.1",
-    "score": 87.6
+    "label": "Gemini 4 Argon",
+    "score": 87.8
   },
   {
-    "label": "Kimi K3",
-    "score": 87.1
+    "label": "Claude Fable 5.1",
+    "score": 87.6
   }
 ];
 
 export const SHIP_SENSE_TEASER_RUN = {
   "version": "v4.4",
   "bankItems": 95,
-  "modelCount": 27,
+  "modelCount": 28,
   "currentCount": 20
 };
