@@ -593,7 +593,7 @@ describe("independent source identity", () => {
 });
 
 describe("deterministic rumor recovery", () => {
-  it("recovers the unreleased Gemini claim but drops the launched GPT-5.6 claim", () => {
+  it("recovers the Gemini 3.5 Pro claim, then drops it as overtaken, with the launched GPT-5.6 claim", () => {
     const source = src("https://x.com/synthwavedd/status/2069432791184650426", "twitter", "2026-06-24", 4, {
       handle: "synthwavedd",
     });
@@ -609,10 +609,7 @@ describe("deterministic rumor recovery", () => {
     const contributions = claims
       .map((raw) => buildContribution(raw, source, text))
       .filter(Boolean) as RumorContribution[];
-    expect(contributions.map((c) => `${c.modelSlug}:${c.versionKey}:${c.claimType}`)).toEqual([
-      "gemini:gemini35pro:in_testing",
-    ]);
-    expect(contributions[0].versionLabel).toBe("Gemini 3.5 Pro");
+    expect(contributions).toEqual([]);
   });
 
   it("does not recover from low-signal uncorroborated posts", () => {
@@ -921,12 +918,15 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("gemini", "Gemini 3.5 Flash-Lite", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 4 Argon", null)).toBe(true);
     expect(isReleasedVersion("gemini", null, "Argon")).toBe(true);
+    // Overtaken without shipping: Gemini 4 Argon took the 3.5 Pro slot.
+    expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(true);
+    expect(isReleasedVersion("gemini", "Gemini 3.5", null)).toBe(true);
   });
 
   it("keeps unreleased versions (no false positives)", () => {
     expect(isReleasedVersion("claude", "Opus 6", null)).toBe(false);
     expect(isReleasedVersion("chatgpt", "GPT-6.2", null)).toBe(false);
-    expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(false);
+    expect(isReleasedVersion("gemini", "Gemini 4.5 Pro", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 4 Flash", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 5", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 4.8", null)).toBe(false);
@@ -984,6 +984,9 @@ describe("released model catalog", () => {
     expect(prompt).toContain("Gemini 3.6 Flash");
     // Superseded snapshots drop their prompt wording; the token still retires.
     expect(prompt).not.toContain("Grok 4.6 and earlier");
+    expect(prompt).toContain("Gemini 4 Argon");
+    // Overtaken models never shipped, so the extractor is never told they did.
+    expect(prompt).not.toContain("3.5 Pro");
   });
 
   it("extracts known aliases and future numbered labels from release text", () => {
@@ -1104,14 +1107,14 @@ describe("mergeRumorRows", () => {
 
   it("collapses alias-duplicate rows into one card with summed distinct mentions", () => {
     const out = mergeRumorRows([
-      rrow({ model_slug: "gemini", version_label: "3.5 Pro", mention_count: 1, last_seen_at: "2026-06-22",
+      rrow({ model_slug: "gemini", version_label: "Nano Banana 2.5 Flash", mention_count: 1, last_seen_at: "2026-06-22",
         representative_sources: [{ url: "u1", platform: "twitter" }] }),
-      rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Pro", mention_count: 1, last_seen_at: "2026-06-23",
+      rrow({ model_slug: "gemini", version_label: "Nano Banana 2.5", mention_count: 1, last_seen_at: "2026-06-23",
         representative_sources: [{ url: "u2", platform: "reddit" }] }),
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("Gemini 3.5 Pro");
-    expect(out[0].codename).toBeNull();
+    expect(out[0].version_label).toBe("Nano Banana 2.5");
+    expect(out[0].codename).toBe("Spicy-Mayo");
     expect(out[0].mention_count).toBe(2); // single-unconfirmed-source tag now clears
     expect(out[0].platform_count).toBe(2);
   });
@@ -1126,7 +1129,7 @@ describe("mergeRumorRows", () => {
     expect(out).toHaveLength(1);
   });
 
-  it("folds bare 'Gemini 3.5' chatter into the Pro card and retires shipped Flash Cyber (live board 2026-07-24)", () => {
+  it("retires every Gemini 3.5 Pro spelling once Gemini 4 Argon overtook it, and shipped Flash Cyber", () => {
     const out = mergeRumorRows([
       rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Pro", claim_type: "delayed", last_seen_at: "2026-07-24",
         representative_sources: [{ url: "u1", platform: "twitter" }] }),
@@ -1135,10 +1138,7 @@ describe("mergeRumorRows", () => {
       rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Flash Cyber", claim_type: "in_testing", last_seen_at: "2026-07-22",
         representative_sources: [{ url: "u3", platform: "hackernews" }] }),
     ]);
-    expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("Gemini 3.5 Pro");
-    expect(out[0].mention_count).toBe(2);
-    expect(out[0].platform_count).toBe(2);
+    expect(out).toEqual([]);
   });
 
   it("collapses a numbered ChatGPT generation and repeated-codename row into one card", () => {
@@ -1169,7 +1169,7 @@ describe("mergeRumorRows", () => {
     const out = mergeRumorRows([
       rrow({
         model_slug: "gemini",
-        version_label: "3.5 Pro",
+        version_label: "Nano Banana 2.5 Flash",
         claim_type: "imminent",
         eta_text: "this week",
         eta_conflicting: true,
@@ -1182,7 +1182,7 @@ describe("mergeRumorRows", () => {
       }),
       rrow({
         model_slug: "gemini",
-        version_label: "Gemini 3.5 Pro",
+        version_label: "Nano Banana 2.5",
         claim_type: "in_testing",
         mention_count: 1,
         last_seen_at: "2026-06-24",
@@ -1190,39 +1190,39 @@ describe("mergeRumorRows", () => {
       }),
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("Gemini 3.5 Pro");
-    expect(out[0].codename).toBeNull();
+    expect(out[0].version_label).toBe("Nano Banana 2.5");
+    expect(out[0].codename).toBe("Spicy-Mayo");
     expect(out[0].claim_type).toBe("imminent");
     expect((out[0] as { eta_text?: string | null }).eta_text).toBe("this week");
     expect((out[0] as { eta_conflicting?: boolean }).eta_conflicting).toBe(true);
     expect(out[0].mention_count).toBe(3);
   });
 
-  it("collapses Gemini 3.5 Pro display rows into one canonical card", () => {
+  it("collapses Nano Banana 2.5 display rows into one canonical card", () => {
     const out = mergeRumorRows([
       rrow({
         model_slug: "gemini",
-        version_label: "3.5 Pro",
+        version_label: "Nano Banana 2.5 Flash",
         mention_count: 1,
         representative_sources: [{ url: "a", platform: "twitter" }],
       }),
       rrow({
         model_slug: "gemini",
-        version_label: "Gemini 3.5 Pro",
+        version_label: "Nano Banana 2.5",
         mention_count: 1,
         representative_sources: [{ url: "b", platform: "reddit" }],
       }),
     ]);
     expect(out).toHaveLength(1);
-    expect(out[0].version_label).toBe("Gemini 3.5 Pro");
+    expect(out[0].version_label).toBe("Nano Banana 2.5");
     expect(out[0].mention_count).toBe(2);
     expect(out[0].platform_count).toBe(2);
   });
 
   it("counts a url shared across two alias rows only once (no double-count)", () => {
     const out = mergeRumorRows([
-      rrow({ model_slug: "gemini", version_label: "3.5 Pro", representative_sources: [{ url: "shared", platform: "twitter" }] }),
-      rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Pro", representative_sources: [{ url: "shared", platform: "twitter" }] }),
+      rrow({ model_slug: "gemini", version_label: "Nano Banana 2.5 Flash", representative_sources: [{ url: "shared", platform: "twitter" }] }),
+      rrow({ model_slug: "gemini", version_label: "Nano Banana 2.5", representative_sources: [{ url: "shared", platform: "twitter" }] }),
     ]);
     expect(out).toHaveLength(1);
     expect(out[0].mention_count).toBe(1);
@@ -1230,9 +1230,9 @@ describe("mergeRumorRows", () => {
 
   it("applies claim_type precedence and takes display fields from the strongest row", () => {
     const out = mergeRumorRows([
-      rrow({ model_slug: "gemini", version_label: "3.5 Pro", claim_type: "launch", claim_summary: "old", last_seen_at: "2026-06-20",
+      rrow({ model_slug: "gemini", version_label: "Nano Banana 2.5 Flash", claim_type: "launch", claim_summary: "old", last_seen_at: "2026-06-20",
         representative_sources: [{ url: "a", platform: "reddit" }] }),
-      rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Pro", claim_type: "delayed", claim_summary: "newest", last_seen_at: "2026-06-24",
+      rrow({ model_slug: "gemini", version_label: "Nano Banana 2.5", claim_type: "delayed", claim_summary: "newest", last_seen_at: "2026-06-24",
         representative_sources: [{ url: "b", platform: "twitter" }] }),
     ]);
     expect(out[0].claim_type).toBe("delayed");
@@ -1315,7 +1315,7 @@ describe("mergeRumorRows", () => {
     const tracked = mergeRumorRows([
       rrow({
         model_slug: "gemini",
-        version_label: "Gemini 3.5 Pro",
+        version_label: "Nano Banana 2.5",
         representative_sources: [
           { url: "https://x.com/synthwavedd/status/1", platform: "twitter" },
         ],

@@ -357,6 +357,10 @@ interface AliasEntry {
   releasePrompt?: string; // released-set wording; omit on superseded snapshots
   releaseAliases?: string[]; // distinctive names safe to scan in GA announcement text
   releasedOn?: string; // YYYY-MM-DD ship date; retires "<Line>-Next"/"-new" placeholders seen before it
+  // Never shipped, but a later release took its place: the key of that entry.
+  // Retires from the radar like a release, yet stays out of the released-set
+  // prompt and the release-line map, since the model itself never launched.
+  overtakenBy?: string;
 }
 
 // Known upcoming versions whose codenames/labels are aliases of one model. The
@@ -623,6 +627,9 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       // Bare "Gemini 3.5" chatter means the pending Pro (Flash 3.5 already
       // shipped), so fold it in rather than surfacing a duplicate card.
       aliases: ["35", "gemini35", "35pro", "gemini35pro"],
+      // Promised for June, never shipped; Gemini 4 Argon took the flagship
+      // slot on 2026-10-13, so the card retires with that launch.
+      overtakenBy: "gemini4",
     },
     {
       key: "gemini4",
@@ -928,12 +935,12 @@ export function versionKeysFromReleaseText(text: string | null | undefined): str
 const FAMILY_STEMS = ["claude", "chatgpt", "gpt", "gemini", "grok"];
 
 // Canonical keys + every alias spelling of the FAMILY_ALIASES entries flagged
-// `released`. Derived once, so flipping one `released` boolean retires a model
+// `released` or `overtakenBy`. Derived once, so flipping one flag retires a model
 // across every consumer. Default-false: a novel unreleased leak can't be denied.
 const RELEASED_TOKENS: ReadonlySet<string> = new Set(
   Object.values(FAMILY_ALIASES)
     .flat()
-    .filter((e) => e.released)
+    .filter((e) => e.released || e.overtakenBy)
     .flatMap((e) => [e.key, ...e.aliases]),
 );
 
