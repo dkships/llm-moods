@@ -50,7 +50,7 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "GLM-5.3",
         "Claude Haiku 5.5",
         "Grok 4.7",
-        "Beam",
+        "Beam 1.0",
         "DeepSeek V4 Pro",
         "GPT-6 Luna",
         "Mistral Large 4",
@@ -325,7 +325,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
   },
   {
     "name": "beam-501b-a23b",
-    "label": "Beam",
+    "label": "Beam 1.0",
     "provider": "reflection",
     "pos": 14,
     "rankLo": 8,
