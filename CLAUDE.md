@@ -1,6 +1,6 @@
-# LLM Moods (LLM Vibes)
-
 @AGENTS.md
+
+# LLM Moods (LLM Vibes)
 
 Real-time AI sentiment dashboard for 4 LLM models across 5 social platforms; live at llmvibes.ai (Lovable-hosted). Reference docs: stack/routes/schema/cron tables in `docs/architecture-reference.md`; deep operational detail (classifier, scrapers, rumors pipeline, frontend catalog) in `AGENT-REFERENCE.md`; audit records in `OPERATIONS-HISTORY.md`.
 
@@ -13,7 +13,9 @@ Beyond the AGENTS.md rules:
   1. Push to `main`.
   2. Confirm Lovable synced: `mcp__lovable__list_projects` → `latest_screenshot_url` embeds the commit sha (`id-preview-<sha>--...`).
   3. `mcp__lovable__deploy_project` with **only** `project_id` (`94f104f7-b72c-4dc6-b12d-e84aa593cba4`) — passing `name` rewrites the published slug. Goes live in ~45 s. Do not wait for an auto-deploy: Lovable does not republish on a git push (a bot push in Sept 2026 sat unpublished for a week).
-  4. Verify by hash equality, not by eyeballing: `curl -s https://llmvibes.ai/ | grep -o '/assets/index-[A-Za-z0-9_-]*\.\(css\|js\)'` should match `ls dist/assets/index-*`. Caveat (2026-08-20): Lovable resolves caret ranges fresh instead of honoring `package-lock.json`, so right after a dependency bump the JS hash can differ while the CSS hash matches; in that case diff a small live chunk (e.g. `external-link-*.js`) against the local one — a mismatch that is only a chunk-hash reference plus a newer in-range dep version means the source is live. Never verify against `id-preview--<project_id>` — it serves a different, smaller build.
+  4. Verify by hash equality, not by eyeballing: `curl -s https://llmvibes.ai/ | grep -o '/assets/index-[A-Za-z0-9_-]*\.\(css\|js\)'` should match `ls dist/assets/index-*`.
+     - Lovable resolves caret ranges fresh instead of honoring `package-lock.json`, so right after a dependency bump the JS hash can differ while the CSS hash matches. Then diff a small live chunk (e.g. `external-link-*.js`) against the local one — a mismatch that is only a chunk-hash reference plus a newer in-range dep version means the source is live.
+     - Never verify against `id-preview--<project_id>` — it serves a different, smaller build.
 - **Migrations and ad-hoc SQL go through `mcp__lovable__query_database`** (supports DDL and writes), not a chat prompt. Dry-run reads first; a write against production is permanent.
 - Edge Function deploys still need `mcp__lovable__send_message` — but that tool has a verified stale-response bug (returns a byte-identical cached reply and has falsely claimed success). Never trust its return value: confirm via `list_messages` plus the actual observable state (a `codeVersion` marker in the function response, or `cron.job` rows).
 - Avoid restructuring directories or renaming files Lovable manages. Don't edit `src/components/ui/` (shadcn-managed) or remove the `lovable-tagger` dev dependency.
@@ -54,7 +56,9 @@ Edge functions that hit paid APIs (Anthropic, Apify, Gemini, etc.) MUST keep the
 ## Classifier & scraper invariants
 
 Read `AGENT-REFERENCE.md` before changing `_shared/classifier.ts` or any scraper. Invariants that must hold:
-- Classifier model is a pure config flip via `CLASSIFIER_MODEL` (claude-* → Anthropic, gpt-* → OpenAI, else Gemini; keys `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`). Production model is `gpt-6.1-sol` as of 2026-10-07 (eval in `OPERATIONS-HISTORY.md`; it 400s on `reasoning_effort: "none"`, so it needs the drain at `CODE_VERSION` `2026-10-07-claude-55-gpt-61` or later) — rollback = `CLASSIFIER_MODEL=gpt-6-sol` (previous production, 2026-09-23 to 2026-10-07; stricter on relevance than Terra — 18 of 200 wrongly dropped vs Terra's 8), then `gpt-5.6-terra` (2026-08-08 to 2026-09-23), or `claude-haiku-4-5-20251001` / `gemini-2.5-flash` (no redeploy, all providers stay live)
+- Classifier model is a pure config flip via `CLASSIFIER_MODEL` (claude-* → Anthropic, gpt-* → OpenAI, else Gemini; keys `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` / `GEMINI_API_KEY`).
+  - Production model is `gpt-6.1-sol` (eval and cutover dates in `OPERATIONS-HISTORY.md`). It 400s on `reasoning_effort: "none"`, so it needs the drain at `CODE_VERSION` `2026-10-07-claude-55-gpt-61` or later.
+  - Rollback, no redeploy (all providers stay live): `CLASSIFIER_MODEL=gpt-6-sol` (previous production; stricter on relevance — 18 of 200 wrongly dropped vs Terra's 8), then `gpt-5.6-terra`, or `claude-haiku-4-5-20251001` / `gemini-2.5-flash`.
 - Strict tool use (`strict:true`) stays OFF — nullable-union schema 400s under the structured-output subset (verified in prod 2026-06-02)
 - Reddit comment ingestion stays disabled (`include_comments=false`) until a comment→parent-post attribution fix exists
 - `maxTotalChargeUsd` is the authoritative Apify per-run cost cap. The guard in `_shared/apify-budget.ts` sums **this pipeline's own runs** from `scraper_runs.metadata.apify_usage` (rolling 30d / 24h) — never account-wide Apify usage, which is shared with unrelated actors and blocked LLM Vibes for a week in Aug 2026.
@@ -62,11 +66,19 @@ Read `AGENT-REFERENCE.md` before changing `_shared/classifier.ts` or any scraper
 
 ## Rumors radar (`/rumors`)
 
-Pipeline detail is in `AGENT-REFERENCE.md`; read it before touching anything rumor-related. Recurring manual touch: refresh the codename/next-version `model_keywords` rows and the `FAMILY_ALIASES` + `COMPETITOR_DENY` + `NON_MODEL_DENY` seeds in `_shared/rumor-canon.ts` each cycle. `NON_MODEL_DENY` drops right-vendor names that aren't model versions (product surfaces, feature flags, image-gen checkpoints). The extractor's released-set prompt is generated from `FAMILY_ALIASES`. To hide a just-launched model instantly with zero backend deploy, set `released: true` on its alias entry — that covers display only; `aggregate-rumors` needs a redeploy before the extractor prompt and the write-time filters see a catalog edit (it is the sole edge function importing `rumor-canon.ts`). ETAs are always framed as unconfirmed community estimates, never forecasts.
+Pipeline detail is in `AGENT-REFERENCE.md`; read it before touching anything rumor-related.
+
+- Recurring manual touch: refresh the codename/next-version `model_keywords` rows and the `FAMILY_ALIASES` + `COMPETITOR_DENY` + `NON_MODEL_DENY` seeds in `_shared/rumor-canon.ts` each cycle.
+- `NON_MODEL_DENY` drops right-vendor names that aren't model versions (product surfaces, feature flags, image-gen checkpoints). The extractor's released-set prompt is generated from `FAMILY_ALIASES`.
+- To hide a just-launched model instantly with zero backend deploy, set `released: true` on its alias entry — that covers display only; `aggregate-rumors` needs a redeploy before the extractor prompt and the write-time filters see a catalog edit (it is the sole edge function importing `rumor-canon.ts`).
+- ETAs are always framed as unconfirmed community estimates, never forecasts.
 
 ## Ship Sense benchmark (`/benchmark`)
 
-`.github/workflows/sync-ship-sense.yml` polls github.com/dkships/ship-sense daily, regenerates the snapshot, and **pushes to `main` on its own** — expect bot commits touching `src/data/ship-sense-{snapshot,teaser}.ts` and `public/benchmark/og.png`, and always `git fetch` before local edits. It verifies with lint + test + build before pushing. **A bot push does not reach llmvibes.ai**: Lovable syncs main into the editor but never republishes on its own (docs: "later changes are not automatically pushed live"; verified 2026-09-14, the site sat one commit behind for a week), and the Lovable MCP is OAuth-only so CI cannot publish. Each push opens or updates a `publish-needed` issue — run the publish sequence from the Lovable Workflow section and close the issue.
+`.github/workflows/sync-ship-sense.yml` polls github.com/dkships/ship-sense daily, regenerates the snapshot, and **pushes to `main` on its own** — expect bot commits touching `src/data/ship-sense-{snapshot,teaser}.ts` and `public/benchmark/og.png`, and always `git fetch` before local edits. It verifies with lint + test + build before pushing.
+
+- **A bot push does not reach llmvibes.ai**: Lovable syncs main into the editor but never republishes on its own (docs: "later changes are not automatically pushed live"; verified 2026-09-14, the site sat one commit behind for a week), and the Lovable MCP is OAuth-only so CI cannot publish.
+- Each push opens or updates a `publish-needed` issue — run the publish sequence from the Lovable Workflow section and close the issue.
 
 - Those three files are generated. Edit `scripts/sync-ship-sense.ts` (derivation, ported from ship-sense `src/leaderboard.py`) or `src/data/ship-sense.ts` (types + prose helpers) instead; `npm run sync:shipsense` regenerates locally, `-- --dry-run` reports without writing.
 - Everything the page renders is derived, including the scored-window eyebrow and the provenance sentence. Don't reintroduce hand-copied counts, dates, or model names — they defeat the unattended sync. Same for the tests: assert internal consistency, never a model count.

@@ -97,6 +97,8 @@ tier, twice per model, against `gpt-5.6-sol` at reasoning effort medium as the r
 - **Watch:** irrelevant share across all sources over the next few days (Terra baseline 65.4%
   for all sources on 09-22/23) and per-model eligible volume, especially Grok, which was already thin.
 
+- Moved verbatim from AGENTS.md on 2026-10-21: "cutover from GPT-5.6 Terra on 2026-09-23 for better complaint categories at ~11% lower cost; Terra had replaced Claude Haiku 4.5 on 2026-08-08"
+
 ## 2026-09-02 — Rumors radar cleanup (live-verified)
 
 Trigger: "check /rumors for released models, or any that can be combined or are old."
