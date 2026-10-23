@@ -231,9 +231,13 @@ async function runApifyPath(
   // run still SUCCEEDS, so surface any empty lane instead of failing silently.
   if (rawItems.some((item: any) => item.searchTerm)) {
     const perQuery: Record<string, number> = {};
-    for (const term of apifyInput.searchTerms) perQuery[term] = 0;
+    for (const term of apifyInput.searchTerms) {
+      perQuery[term] = 0;
+    }
     for (const item of rawItems) {
-      if (item.searchTerm in perQuery) perQuery[item.searchTerm]++;
+      if (item.searchTerm in perQuery) {
+        perQuery[item.searchTerm]++;
+      }
     }
     (summary as any).perQueryItems = Object.values(perQuery);
     const emptyLanes = Object.entries(perQuery).filter(([, count]) => count === 0);

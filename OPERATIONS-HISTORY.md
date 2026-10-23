@@ -4,6 +4,30 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-10-23 — Apify actor swaps (live side-by-side, Opus 5.5 + 3 Sonnet evaluators)
+
+Trigger: account-wide Apify spend $48.49 in the 09-20..10-19 cycle against the
+$29 hard cap (shared with job-finder + career-research). LLM Vibes' share:
+Reddit $13.4/30d, Twitter ~$6/30d.
+
+- **Reddit → `harshmaur/reddit-scraper-pro`** (config-only, `scraper_config.actor_id`).
+  Same author, input schema and output keys. Live 8-sub × 20 fan-out with the
+  production input: 160/160 items, all SUCCEEDED in 17 s wall, $0.304 vs $0.448
+  for that morning's production window (−32%, ~$4.3/mo); votes>0 127 vs 131,
+  body 131 vs 121. Pay-per-result since 2026-08-29 (was a rental) — watch price.
+- **Twitter → `xquik/x-tweet-scraper`** (code `2026-10-23.1`, actor now config-driven).
+  $0.039 vs ~$0.09/run (~$3.6/mo). 50/lane on all 5 lanes, en-only, 0 retweets,
+  `from:` roundup honored, 13/13 baseline leaker tweets recalled, full text.
+  **Without `maxItemsPerTarget` it returned 162/88/0/0/0 on a SUCCEEDED run** —
+  hence the per-lane count in `per_query_items` metadata and the empty-lane log.
+- Rejected (don't re-test): Reddit automation-lab (dropped LocalLLaMA,
+  placeholder bodies, zero votes), fetch_cat (RSS, null votes), fatihtahta
+  (66/160 null scores in an 8-URL run, 113 s); clearpath works but no cheaper
+  than pro. red_crawler (raw Reddit JSON, free from 10-29, 11 users) = shadow
+  candidate only. Twitter feedminer (needs login); kaito works ($0.22/1k,
+  apidojo schema) but xquik is cheaper.
+- Docs said r/OpenAI; production scrapes r/Bard — fixed in AGENT-REFERENCE.
+
 ## 2026-10-07 — Claude 5.5 migration + classifier/rumor model eval (code only, not deployed)
 
 Eval harness lived in a scratch dir (not in this repo). Data: real posts from

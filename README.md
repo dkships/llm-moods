@@ -33,9 +33,9 @@ Every day, thousands of developers share their real experiences with AI models a
 
 | Source | Method | Auth Required |
 |--------|--------|--------------|
-| Reddit | Apify (`harshmaur/reddit-scraper`, HTML-parsing) | API token |
+| Reddit | Apify (`harshmaur/reddit-scraper-pro`, HTML-parsing) | API token |
 | Hacker News | Algolia Search API | None |
-| Twitter/X | Apify scraper | API token |
+| Twitter/X | Apify (`xquik/x-tweet-scraper`) | API token |
 | Bluesky | AT Protocol search | App password |
 | App Store reviews | Apple's iTunes RSS reviews feed | None |
 | Mastodon | Public hashtag timelines (5 instances) — unscheduled since Aug 2026 | None |
