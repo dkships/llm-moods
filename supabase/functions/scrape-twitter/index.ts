@@ -40,8 +40,14 @@ import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-twitter";
 // Deploy-verification marker, written into scraper_runs.metadata. Bump on change.
-const CODE_VERSION = "2026-09-25.1";
+const CODE_VERSION = "2026-10-23.1";
 const APIFY_MAX_TOTAL_CHARGE_USD = 0.15;
+// Actor is config-driven (`scraper_config.actor_id`); flip back to
+// apidojo/tweet-scraper with no redeploy. xquik ($0.00015/tweet, no run fee)
+// replaced apidojo ($0.0004/tweet) 2026-10-23 after a side-by-side on the live
+// 5 lanes: 50/lane, en-only, zero retweets, 13/13 leaker tweets recalled.
+const DEFAULT_ACTOR_ID = "xquik/x-tweet-scraper";
+const APIDOJO_ACTOR_ID = "apidojo/tweet-scraper";
 const DEFAULT_SEARCH_TERMS = [
   `("claude" OR "claude ai" OR "claude code" OR anthropic OR "chatgpt" OR "chat gpt" OR "openai gpt" OR openai OR "gemini" OR "google gemini" OR "gemini ai" OR "grok" OR "grok ai" OR "xai grok") lang:en -filter:retweets`,
 ];
@@ -65,6 +71,21 @@ function extractQuotedStatusId(tweet: any): string | null {
     if (m) return m[1];
   }
   return null;
+}
+
+// apidojo takes `sort`; xquik takes `queryType` and needs a per-query cap so
+// every lane gets its share of maxItems (see the empty-lane check below).
+function buildActorInput(actorId: string, searchTerms: string[], sort: string, maxItems: number) {
+  if (actorId === APIDOJO_ACTOR_ID) {
+    return { searchTerms, sort, maxItems };
+  }
+  return {
+    searchTerms,
+    queryType: sort,
+    maxItems,
+    maxItemsPerTarget: Math.ceil(maxItems / searchTerms.length),
+    includeSearchTerms: true,
+  };
 }
 
 function buildTwitterSummary() {
@@ -102,11 +123,14 @@ async function runApifyPath(
   config: Record<string, string[]>,
 ) {
   const searchTerms = getConfigValues(config, "search_term");
-  const apifyInput = {
-    searchTerms: searchTerms.length > 0 ? searchTerms : DEFAULT_SEARCH_TERMS,
-    sort: getConfigValue(config, "sort_mode", "Latest"),
-    maxItems: getConfigNumber(config, "max_items", 50),
-  };
+  const actorId = getConfigValue(config, "actor_id", DEFAULT_ACTOR_ID);
+  const apifyInput = buildActorInput(
+    actorId,
+    searchTerms.length > 0 ? searchTerms : DEFAULT_SEARCH_TERMS,
+    getConfigValue(config, "sort_mode", "Latest"),
+    getConfigNumber(config, "max_items", 50),
+  );
+  (summary as any).actorId = actorId;
   const budget = await checkApifyBudget(supabase, APIFY_MAX_TOTAL_CHARGE_USD);
   if (!budget.allowed) {
     return {
@@ -119,7 +143,7 @@ async function runApifyPath(
     };
   }
 
-  const startRes = await fetch(apifyRunUrl("apidojo~tweet-scraper", apifyToken, apifyInput.maxItems, {
+  const startRes = await fetch(apifyRunUrl(actorId.replace("/", "~"), apifyToken, apifyInput.maxItems, {
     timeoutSecs: 180,
     maxTotalChargeUsd: APIFY_MAX_TOTAL_CHARGE_USD,
   }), {
@@ -202,6 +226,27 @@ async function runApifyPath(
   (summary as any).apifyBudget = budget.usage;
   await logToErrorLog(supabase, SOURCE, `Apify raw=${rawItems.length} tweets=${items.length}`, "apify-debug");
 
+  // xquik tags each item with its query. Without maxItemsPerTarget it spends
+  // the whole maxItems on the first lanes and returns 0 for the rest while the
+  // run still SUCCEEDS, so surface any empty lane instead of failing silently.
+  if (rawItems.some((item: any) => item.searchTerm)) {
+    const perQuery: Record<string, number> = {};
+    for (const term of apifyInput.searchTerms) perQuery[term] = 0;
+    for (const item of rawItems) {
+      if (item.searchTerm in perQuery) perQuery[item.searchTerm]++;
+    }
+    (summary as any).perQueryItems = Object.values(perQuery);
+    const emptyLanes = Object.entries(perQuery).filter(([, count]) => count === 0);
+    if (emptyLanes.length > 0) {
+      await logToErrorLog(
+        supabase,
+        SOURCE,
+        `Empty Twitter lanes (${emptyLanes.length}/${apifyInput.searchTerms.length}): ${emptyLanes.map(([term]) => term.slice(0, 60)).join(" | ")}`,
+        "apify-error",
+      );
+    }
+  }
+
   const cutoff = new Date(Date.now() - 24 * 3600000);
   const candidates: {
     text: string;
@@ -247,8 +292,9 @@ async function runApifyPath(
     }
     summary.filtered_candidates++;
 
-    const screenName = tweet.username || tweet.user?.screen_name || tweet.screen_name || tweet.author?.userName || "";
-    // apidojo returns an author object with verified + follower signals; capture
+    // apidojo: author.userName; xquik: author.username.
+    const screenName = tweet.username || tweet.user?.screen_name || tweet.screen_name || tweet.author?.userName || tweet.author?.username || "";
+    // Both actors return an author object with verified + follower signals; capture
     // them so credible leaker tweets can outrank raw Reddit upvote-volume.
     const tweetAuthor = tweet.author || tweet.user || {};
     const authorVerified = Boolean(
@@ -395,7 +441,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
     }
     runRecord = startedRun;
 
-    // Apify (apidojo) is the only backend. A Grok-search path existed until
+    // Apify (actor per scraper_config.actor_id) is the only backend. A Grok-search path existed until
     // 2026-08-22 but XAI_API_KEY was never in the secret store.
     const apifyToken = Deno.env.get("APIFY_API_TOKEN");
     if (!apifyToken) {
@@ -460,6 +506,8 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
         dedup_skipped: summary.dedupSkipped,
         content_skipped: summary.contentSkipped,
         skipped_reason: (summary as any).reason ?? null,
+        actor_id: (summary as any).actorId ?? null,
+        per_query_items: (summary as any).perQueryItems ?? null,
       },
       completed_at: completedAt,
     });
