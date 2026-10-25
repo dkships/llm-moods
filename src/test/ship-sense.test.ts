@@ -379,6 +379,16 @@ describe("scoringDates", () => {
     ]);
   });
 
+  it("caps dates at the run's last merge, so a later price re-check is not a scoring date", () => {
+    expect(
+      scoringDates(
+        [m("Base", "2026-10-24"), m("Re-checked", "2026-10-25")],
+        "2026-10-24",
+        "2026-10-24",
+      ),
+    ).toEqual([{ date: "2026-10-24", labels: ["Base", "Re-checked"] }]);
+  });
+
   it("groups same-day merges together and keeps board order within a group", () => {
     const groups = scoringDates(
       [m("Higher", "2026-07-21"), m("Lower", "2026-07-21"), m("Base", null)],
@@ -637,12 +647,16 @@ describe("committed snapshot invariants", () => {
     // latest run's own successions only.
     // The successor may itself retire later on the same board (GPT-5.6 Sol ->
     // GPT-6 Sol -> GPT-6.1 Sol), so follow the chain to its end.
+    // A chain may also end at a model another tier replaced (GPT-5.4 ->
+    // GPT-5.6 Terra, replaced by GPT-6.1 Sol); that replacement is current.
     const current = new Set(SHIP_SENSE_LINEUP.map((m) => m.label));
+    const replacedBy = SHIP_SENSE_RUN.replacedBy ?? {};
     const latest = SHIP_SENSE_GENERATIONS.filter((g) => !g.earlier);
     const next = new Map(latest.map((g) => [g.prevLabel, g.currLabel]));
     latest.forEach((g) => {
-      expect(successionChainEnd(next, g.prevLabel)).not.toBeNull();
-      expect(current.has(successionChainEnd(next, g.prevLabel)!)).toBe(true);
+      const end = successionChainEnd(next, g.prevLabel);
+      expect(end).not.toBeNull();
+      expect(current.has(replacedBy[end!] ?? end!)).toBe(true);
       expect(current.has(g.prevLabel)).toBe(false);
     });
   });

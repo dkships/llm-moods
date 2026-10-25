@@ -419,11 +419,15 @@ export interface ScoringDateGroup {
 export function scoringDates(
   models: Pick<DeriveModel, "label" | "price_verified">[],
   runId: string,
+  lastMerge?: string,
 ): ScoringDateGroup[] {
   const groups = new Map<string, string[]>();
   for (const m of models) {
     const verified = m.price_verified ?? "";
-    const date = verified > runId ? verified : runId;
+    // A price re-checked after the run's last merge (the ledger's `updated`,
+    // else the run date) is a price check, not a later scoring date.
+    const capped = lastMerge && verified > lastMerge ? lastMerge : verified;
+    const date = capped > runId ? capped : runId;
     if (!groups.has(date)) groups.set(date, []);
     groups.get(date)!.push(m.label);
   }

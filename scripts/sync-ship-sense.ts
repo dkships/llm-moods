@@ -220,11 +220,13 @@ async function main() {
       fail(`${prev} is replaced by ${by}, which is not in the current lineup`);
   if (current.length < 2)
     fail(`derived only ${current.length} current model(s) — successions() is over-retiring`);
-  // A successor may itself be retired (GPT-5.6 Sol -> GPT-6 Sol -> GPT-6.1 Sol);
-  // the chain must still end at a current model.
+  // A successor may itself be retired (GPT-5.6 Sol -> GPT-6 Sol -> GPT-6.1 Sol)
+  // or replaced by another tier (GPT-5.4 -> GPT-5.6 Terra, replaced by GPT-6.1
+  // Sol); the chain must still end at a current model.
   for (const [prev, curr] of succ) {
     const end = successionChainEnd(succ, prev);
-    if (!end || !current.some((m) => m.name === end))
+    const landing = end !== null && replaced.has(end) ? replaced.get(end)! : end;
+    if (!landing || !current.some((m) => m.name === landing))
       fail(`${prev} retires to ${curr}, whose chain does not end in the current lineup`);
   }
   for (const m of rankedModels)
@@ -245,8 +247,10 @@ async function main() {
   // Scoring-date reconstruction — see scoringDates(). Board order so the
   // generated prose names models the way the page ranks them. Clamped to the
   // run DATE (run ids carry a version suffix since v3.6).
+  const labelByName = new Map(rankedModels.map((m) => [m.name, m.label]));
   const runDate: string = run.run_date ?? run.run_id;
-  const dates = scoringDates([...current, ...previous, ...replacedModels], runDate);
+  const lastMerge: string = run.updated ?? runDate;
+  const dates = scoringDates([...current, ...previous, ...replacedModels], runDate, lastMerge);
   if (dates[0]?.date !== runDate)
     fail(`earliest scoring date ${dates[0]?.date} is not the run date ${runDate}`);
   const dated = dates.reduce((n, d) => n + d.labels.length, 0);
@@ -381,6 +385,9 @@ async function main() {
     bankItems: run.bank.n_items,
     modelCount: rankedModels.length,
     replacedCount: replacedModels.length,
+    replacedBy: Object.fromEntries(
+      [...replaced].map(([prev, by]) => [labelByName.get(prev) ?? prev, labelByName.get(by) ?? by]),
+    ),
     floor: r1(floor.value!),
     floorKind: floor.kind,
     floorRows,

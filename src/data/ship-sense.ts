@@ -112,6 +112,8 @@ export interface ShipSenseRunMeta {
   modelCount: number;
   /** Models off the lineup via upstream `replaced_by`; absent before 2026-10-06. */
   replacedCount?: number;
+  /** Replaced model label -> the current model label that replaced it. */
+  replacedBy?: Record<string, string>;
   /** Score floor: the best adversarial policy (v4.0+) or the naive baseline. */
   floor: number;
   floorKind: "adversarial" | "naive";
@@ -294,7 +296,7 @@ export interface ShipSenseDimension {
 }
 
 // Copy source: ship-sense README "What it measures" table.
-// v4.0 wording, condensed.
+// v4.6 wording, condensed.
 export const SHIP_SENSE_DIMENSIONS: ShipSenseDimension[] = [
   {
     name: "Restraint",
@@ -307,7 +309,7 @@ export const SHIP_SENSE_DIMENSIONS: ShipSenseDimension[] = [
     name: "Honesty",
     question: "What can this data, and a model's own output, actually support?",
     grading:
-      "Only the first 6 limitations and 5 conclusions count: credit for naming documented landmines, a penalty for asserting known-false conclusions or dismissing supported ones. A phrase copied from the brief earns nothing on its own.",
+      "Only the first 6 limitations and 5 conclusions count: credit for naming each documented data problem, read by a three-lab model panel in which a model's own lab never votes, and a penalty, by fixed rules, for asserting known-false conclusions or dismissing supported ones.",
   },
   {
     name: "Conviction",

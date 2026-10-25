@@ -86,7 +86,7 @@ const floorText = (run: ShipSenseRunMeta): string => {
     .filter((f) => f.headline !== run.floor)
     .map((f) => `${f.label.toLowerCase()} ${fmt1(f.headline)}`);
   return (
-    `Gameability floor: the best content-free answering policy, graded by the same grader, scores ${fmt1(run.floor)}` +
+    `Gameability floor: the best content-free answering policy scores ${fmt1(run.floor)}` +
     `${others.length ? ` (${others.join(", ")})` : ""} — below this axis; a model near it is not exercising judgment.`
   );
 };
@@ -392,8 +392,10 @@ const Benchmark = () => {
           <p>
             {describeScoringDates(run)} The Ship Sense Score is the equal-weight
             mean of the three dimensions, with a 95% confidence interval from an
-            item-clustered bootstrap. Grading is deterministic key-matching, not
-            an LLM judge, and every model runs at its shipped API defaults.
+            item-clustered bootstrap. Restraint, Conviction and false claims are
+            graded by fixed rules; whether an answer names each data problem is
+            read by a three-lab model panel in which a model's own lab never
+            votes. Every model runs at its shipped API defaults.
             Successions and named launch claims form a small confirmatory family
             registered before any answer was collected and Holm-corrected within
             itself; every other pair is exploratory, reported with a
