@@ -948,6 +948,8 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("chatgpt", "GPT-5.5-Cyber", null)).toBe(true);
     expect(isReleasedVersion("chatgpt", "GPT-6", "Astra")).toBe(true);
     expect(isReleasedVersion("chatgpt", null, "Astra")).toBe(true); // shipped as GPT-6 Astra
+    expect(isReleasedVersion("chatgpt", "GPT-6.1 Terra", null)).toBe(true); // shipped 2026-10-26
+    expect(isReleasedVersion("chatgpt", "GPT-6.2 Terra", null)).toBe(false);
     // Still pending, and must not be swept up by the entries above.
     expect(isReleasedVersion("claude", "Mythos 6", null)).toBe(false);
     expect(isReleasedVersion("claude", "Opus 5.1", null)).toBe(false);

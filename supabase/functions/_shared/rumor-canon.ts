@@ -527,6 +527,18 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releasedOn: "2026-09-29",
     },
     {
+      // Shipped 2026-10-26, four weeks after Sol, restoring the mid tier GPT-6
+      // dropped. Own key: "GPT-6.1 Terra" squashes to gpt61terra, and bare
+      // "Terra" stays out because the suffix is reused across generations.
+      key: "gpt61terra",
+      label: "GPT-6.1 Terra",
+      codename: null,
+      aliases: ["gpt61terra"],
+      released: true,
+      releasePrompt: "GPT-6.1 Terra",
+      releasedOn: "2026-10-26",
+    },
+    {
       // Shipped in the API and ChatGPT as two variants; the variant names are
       // the only way leak posts refer to it.
       key: "gptimage25",

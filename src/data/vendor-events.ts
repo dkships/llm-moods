@@ -313,6 +313,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     url: "https://cloud.google.com/blog/products/ai-machine-learning/gemini-4-argon-available-on-google-cloud",
     notes: "Google's new flagship, Stable as gemini-4-argon; takes over from the Gemini 3.1 Pro preview. Introductory $2/$10 per million tokens through November 30, then $4/$20.",
   },
+  {
+    id: "openai-gpt-6-1-terra-launch",
+    vendor: "openai",
+    modelSlug: "chatgpt",
+    eventDate: "2026-10-26",
+    eventType: "model_launch",
+    title: "GPT-6.1 Terra launch",
+    url: "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
+    notes: "Brings back the mid tier GPT-6 skipped, between Sol and Luna. $1/$5 per million tokens, half of GPT-6.1 Sol's price; pitched at visual reasoning, computer use and writing.",
+  },
 ];
 
 export function getEventsForModel(slug: string | undefined): VendorEvent[] {
