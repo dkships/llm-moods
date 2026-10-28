@@ -361,6 +361,10 @@ interface AliasEntry {
   // Retires from the radar like a release, yet stays out of the released-set
   // prompt and the release-line map, since the model itself never launched.
   overtakenBy?: string;
+  // Also retire rows that carry only this entry's codename and no version label.
+  // For a suffix reused across generations (Terra), which can't be an alias:
+  // aliases match any codename part, so "GPT-6.2" + "Sol, Terra" would retire too.
+  retiresBareCodename?: boolean;
 }
 
 // Known upcoming versions whose codenames/labels are aliases of one model. The
@@ -528,8 +532,8 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
     },
     {
       // Shipped 2026-10-26, four weeks after Sol, restoring the mid tier GPT-6
-      // dropped. Own key: "GPT-6.1 Terra" squashes to gpt61terra, and bare
-      // "Terra" stays out because the suffix is reused across generations.
+      // dropped. Own key: "GPT-6.1 Terra" squashes to gpt61terra; bare "Terra"
+      // belongs to the overtaken gpt6terra entry below.
       key: "gpt61terra",
       label: "GPT-6.1 Terra",
       codename: null,
@@ -537,6 +541,18 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       released: true,
       releasePrompt: "GPT-6.1 Terra",
       releasedOn: "2026-10-26",
+    },
+    {
+      // The rumored GPT-6 Terra never shipped (GPT-6 launched without a mid
+      // tier); GPT-6.1 Terra took that slot on 2026-10-26. Codename-only "Terra"
+      // rows meant this tier, so they retire with it; any numbered spelling
+      // ("GPT-6.2 Terra") keeps its own key and stays on the radar.
+      key: "gpt6terra",
+      label: "GPT-6 Terra",
+      codename: "Terra",
+      aliases: ["gpt6terra"],
+      overtakenBy: "gpt61terra",
+      retiresBareCodename: true,
     },
     {
       // Shipped in the API and ChatGPT as two variants; the variant names are
@@ -956,6 +972,14 @@ const RELEASED_TOKENS: ReadonlySet<string> = new Set(
     .flatMap((e) => [e.key, ...e.aliases]),
 );
 
+// Codenames retired only when a row has no version label (see retiresBareCodename).
+const BARE_CODENAME_TOKENS: ReadonlySet<string> = new Set(
+  Object.values(FAMILY_ALIASES)
+    .flat()
+    .filter((e) => e.retiresBareCodename && e.codename)
+    .map((e) => squash(e.codename)),
+);
+
 /**
  * Has this version already shipped? The radar tracks UNRELEASED models only, so a
  * launched version is retired from both the write path (`buildContribution`) and
@@ -969,6 +993,7 @@ export function isReleasedVersion(
 ): boolean {
   const { key } = canonicalVersionKey(family, label, codename);
   if (key && RELEASED_TOKENS.has(key)) return true;
+  if (!cleanStr(label) && BARE_CODENAME_TOKENS.has(squash(codename))) return true;
   // Family-prefixed spellings ("Claude Sonnet 5") fall past the alias map; strip
   // a leading family stem and re-test the squashed remainder.
   for (const raw of [label, codename]) {

@@ -950,6 +950,13 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("chatgpt", null, "Astra")).toBe(true); // shipped as GPT-6 Astra
     expect(isReleasedVersion("chatgpt", "GPT-6.1 Terra", null)).toBe(true); // shipped 2026-10-26
     expect(isReleasedVersion("chatgpt", "GPT-6.2 Terra", null)).toBe(false);
+    // Overtaken without shipping: GPT-6.1 Terra took the GPT-6 Terra slot, so
+    // codename-only "Terra" retires, but numbered Terra rumors stay.
+    expect(isReleasedVersion("chatgpt", null, "Terra")).toBe(true);
+    expect(isReleasedVersion("chatgpt", "GPT-6 Terra", null)).toBe(true);
+    expect(isReleasedVersion("chatgpt", "GPT-6.2", "Terra")).toBe(false);
+    expect(isReleasedVersion("chatgpt", "GPT-7 Terra", null)).toBe(false);
+    expect(isReleasedVersion("chatgpt", "GPT-6.2", "Sol, Terra, Luna")).toBe(false);
     // Still pending, and must not be swept up by the entries above.
     expect(isReleasedVersion("claude", "Mythos 6", null)).toBe(false);
     expect(isReleasedVersion("claude", "Opus 5.1", null)).toBe(false);
@@ -989,6 +996,7 @@ describe("released model catalog", () => {
     expect(prompt).toContain("Gemini 4 Argon");
     // Overtaken models never shipped, so the extractor is never told they did.
     expect(prompt).not.toContain("3.5 Pro");
+    expect(prompt).not.toContain("GPT-6 Terra");
   });
 
   it("extracts known aliases and future numbered labels from release text", () => {
@@ -1139,6 +1147,14 @@ describe("mergeRumorRows", () => {
         representative_sources: [{ url: "u2", platform: "reddit" }] }),
       rrow({ model_slug: "gemini", version_label: "Gemini 3.5 Flash Cyber", claim_type: "in_testing", last_seen_at: "2026-07-22",
         representative_sources: [{ url: "u3", platform: "hackernews" }] }),
+    ]);
+    expect(out).toEqual([]);
+  });
+
+  it("retires the codename-only Terra card once GPT-6.1 Terra overtook it (live board 2026-10-28)", () => {
+    const out = mergeRumorRows([
+      rrow({ model_slug: "chatgpt", version_label: null, codename: "Terra", last_seen_at: "2026-10-19",
+        representative_sources: [{ url: "t1", platform: "twitter" }] }),
     ]);
     expect(out).toEqual([]);
   });
