@@ -464,6 +464,18 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releasePrompt: "Haiku 5.5 and earlier",
       releasedOn: "2026-10-07",
     },
+    {
+      // Launched 2026-10-21 as a research-preview agent app built on Opus 5.5,
+      // not a new model. No releasedOn: it is not a numbered model line, so
+      // there are no "Opus-Next"-style placeholders for it to retire.
+      key: "duet",
+      label: "Claude Duet",
+      codename: null,
+      aliases: ["duet", "claudeduet"],
+      released: true,
+      releasePrompt: "Claude Duet (agent app)",
+      releaseAliases: ["claudeduet"],
+    },
   ],
   chatgpt: [
     {
@@ -564,6 +576,24 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       released: true,
       releasePrompt: "GPT Image 2.5 (Flare, Sunburst)",
       releaseAliases: ["gptimage25"],
+    },
+    {
+      // Unreleased image models seen in OpenAI's API on 2026-10-18 as
+      // aurora-red/green/blue-alpha, then in Arena. The color variants are one
+      // rumor, so they share a card; unconfirmed as GPT Image 3, so no label.
+      key: "aurora",
+      label: null,
+      codename: "Aurora",
+      aliases: [
+        "aurora",
+        "auroraalpha",
+        "aurorared",
+        "auroragreen",
+        "aurorablue",
+        "auroraredalpha",
+        "auroragreenalpha",
+        "aurorabluealpha",
+      ],
     },
   ],
   gemini: [

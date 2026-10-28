@@ -1151,6 +1151,33 @@ describe("mergeRumorRows", () => {
     expect(out).toEqual([]);
   });
 
+  it("combines every Aurora color variant into one unreleased card (live board 2026-10-28)", () => {
+    const out = mergeRumorRows([
+      rrow({ model_slug: "chatgpt", version_label: null, codename: "Aurora", last_seen_at: "2026-10-19",
+        representative_sources: [{ url: "a1", platform: "twitter" }] }),
+      rrow({ model_slug: "chatgpt", version_label: null, codename: "aurora-red-alpha", last_seen_at: "2026-10-18",
+        representative_sources: [{ url: "a2", platform: "reddit" }] }),
+      rrow({ model_slug: "chatgpt", version_label: null, codename: "aurora-green-alpha", last_seen_at: "2026-10-18",
+        representative_sources: [{ url: "a3", platform: "hackernews" }] }),
+      rrow({ model_slug: "chatgpt", version_label: null, codename: "aurora-blue-alpha", last_seen_at: "2026-10-18",
+        representative_sources: [{ url: "a4", platform: "bluesky" }] }),
+    ]);
+    expect(out).toHaveLength(1);
+    expect(out[0].codename).toBe("Aurora");
+    expect(out[0].mention_count).toBe(4);
+    expect(isReleasedVersion("chatgpt", null, "aurora-blue-alpha")).toBe(false);
+  });
+
+  it("retires the Claude Duet launch card", () => {
+    const out = mergeRumorRows([
+      rrow({ model_slug: "claude", version_label: null, codename: "Claude Duet", claim_type: "launch",
+        last_seen_at: "2026-10-21", representative_sources: [{ url: "d1", platform: "twitter" }] }),
+    ]);
+    expect(out).toEqual([]);
+    expect(isReleasedVersion("claude", "Duet", null)).toBe(true);
+    expect(isReleasedVersion("claude", "Opus 6", null)).toBe(false);
+  });
+
   it("retires the codename-only Terra card once GPT-6.1 Terra overtook it (live board 2026-10-28)", () => {
     const out = mergeRumorRows([
       rrow({ model_slug: "chatgpt", version_label: null, codename: "Terra", last_seen_at: "2026-10-19",
