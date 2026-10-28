@@ -21,6 +21,6 @@ export const SHIP_SENSE_TEASER: ShipSenseTeaserRow[] = [
 export const SHIP_SENSE_TEASER_RUN = {
   "version": "v4.6",
   "bankItems": 95,
-  "modelCount": 61,
-  "currentCount": 20
+  "modelCount": 62,
+  "currentCount": 21
 };
