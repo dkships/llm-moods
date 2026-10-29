@@ -562,8 +562,10 @@ function responseSchema(mode: "single" | "batch") {
     };
 }
 
-// gpt-6.1-* has no reasoning_effort "none" (HTTP 400, verified 2026-10-07);
-// "low" is its floor. Every other model keeps "none".
+// gpt-6.1-sol has no reasoning_effort "none" (HTTP 400, verified 2026-10-07);
+// "low" is its floor. gpt-6.1-terra accepts "none" but also gets "low": the
+// 2026-10-29 eval scored them within noise (OPERATIONS-HISTORY). Every other
+// model keeps "none".
 const NO_NONE_EFFORT = /^gpt-6\.1/;
 
 function defaultReasoningEffort(model: string): "none" | "low" {
