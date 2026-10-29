@@ -12,7 +12,7 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
   "runId": "2026-10-24-v4.6",
   "runDate": "2026-10-24",
   "bankItems": 95,
-  "modelCount": 62,
+  "modelCount": 63,
   "replacedCount": 1,
   "replacedBy": {
     "Mistral Medium 3.5": "Mistral Large 4"
@@ -36,8 +36,8 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
     }
   ],
   "decisiveRule": "bh",
-  "decisivePairs": 1403,
-  "totalPairs": 1891,
+  "decisivePairs": 1441,
+  "totalPairs": 1953,
   "scoringDates": [
     {
       "date": "2026-10-24",
@@ -105,15 +105,21 @@ export const SHIP_SENSE_RUN: ShipSenseRunMeta = {
         "DeepSeek V4 Pro",
         "Claude Haiku 5.5",
         "Qwen 3.8 Max",
-        "Mistral Large 4",
         "MiniMax M3",
-        "Gemini 3.5 Flash-Lite"
+        "Gemini 3.5 Flash-Lite",
+        "Mistral Large 4"
       ]
     },
     {
       "date": "2026-10-26",
       "labels": [
         "GPT-6.1 Terra"
+      ]
+    },
+    {
+      "date": "2026-10-29",
+      "labels": [
+        "Mistral Large 4 (Oct 29)"
       ]
     }
   ]
@@ -273,7 +279,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "provider": "moonshot",
     "pos": 9,
     "rankLo": 1,
-    "rankHi": 14,
+    "rankHi": 15,
     "pFirst": 0,
     "testedOn": "v4.6",
     "score": 91.5,
@@ -291,7 +297,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "provider": "google",
     "pos": 10,
     "rankLo": 5,
-    "rankHi": 17,
+    "rankHi": 18,
     "pFirst": 0,
     "testedOn": "v4.6",
     "score": 89.8,
@@ -312,7 +318,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "provider": "zai",
     "pos": 11,
     "rankLo": 4,
-    "rankHi": 17,
+    "rankHi": 18,
     "pFirst": 0,
     "testedOn": "v4.6",
     "score": 89.7,
@@ -330,7 +336,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "provider": "openai",
     "pos": 12,
     "rankLo": 5,
-    "rankHi": 17,
+    "rankHi": 18,
     "pFirst": 0,
     "testedOn": "v4.6",
     "score": 89.3,
@@ -348,7 +354,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "provider": "xai",
     "pos": 13,
     "rankLo": 7,
-    "rankHi": 17,
+    "rankHi": 18,
     "pFirst": 0,
     "testedOn": "v4.6",
     "score": 89.2,
@@ -361,10 +367,28 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 6
   },
   {
+    "name": "mistral-large-4-1029",
+    "label": "Mistral Large 4 (Oct 29)",
+    "provider": "mistral",
+    "pos": 14,
+    "rankLo": 9,
+    "rankHi": 19,
+    "pFirst": 0,
+    "testedOn": "v4.6",
+    "score": 88,
+    "lo": 85.3,
+    "hi": 90.6,
+    "restraint": 0.83,
+    "honesty": 0.92,
+    "conviction": 0.88,
+    "priceIn": 0.7,
+    "priceOut": 2.1
+  },
+  {
     "name": "beam-501b-a23b",
     "label": "Beam 1.0",
     "provider": "reflection",
-    "pos": 14,
+    "pos": 15,
     "rankLo": 9,
     "rankHi": 20,
     "pFirst": 0,
@@ -382,7 +406,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "gpt-6-luna",
     "label": "GPT-6 Luna",
     "provider": "openai",
-    "pos": 15,
+    "pos": 16,
     "rankLo": 10,
     "rankHi": 20,
     "pFirst": 0,
@@ -400,7 +424,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "deepseek-v4-pro",
     "label": "DeepSeek V4 Pro",
     "provider": "deepseek",
-    "pos": 16,
+    "pos": 17,
     "rankLo": 10,
     "rankHi": 20,
     "pFirst": 0,
@@ -418,7 +442,7 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "claude-haiku-5-5",
     "label": "Claude Haiku 5.5",
     "provider": "anthropic",
-    "pos": 17,
+    "pos": 18,
     "rankLo": 10,
     "rankHi": 20,
     "pFirst": 0,
@@ -436,8 +460,8 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "name": "qwen3.8-max",
     "label": "Qwen 3.8 Max",
     "provider": "qwen",
-    "pos": 18,
-    "rankLo": 16,
+    "pos": 19,
+    "rankLo": 17,
     "rankHi": 20,
     "pFirst": 0,
     "testedOn": "v4.6",
@@ -451,29 +475,11 @@ export const SHIP_SENSE_LINEUP: ShipSenseModelRow[] = [
     "priceOut": 6
   },
   {
-    "name": "mistral-large-4",
-    "label": "Mistral Large 4",
-    "provider": "mistral",
-    "pos": 19,
-    "rankLo": 14,
-    "rankHi": 20,
-    "pFirst": 0,
-    "testedOn": "v4.6",
-    "score": 83.9,
-    "lo": 80.8,
-    "hi": 86.8,
-    "restraint": 0.77,
-    "honesty": 0.91,
-    "conviction": 0.84,
-    "priceIn": 1.36,
-    "priceOut": 4.18
-  },
-  {
     "name": "minimax-m3",
     "label": "MiniMax M3",
     "provider": "minimax",
     "pos": 20,
-    "rankLo": 16,
+    "rankLo": 17,
     "rankHi": 20,
     "pFirst": 0,
     "testedOn": "v4.6",
@@ -673,6 +679,19 @@ export const SHIP_SENSE_GENERATIONS: ShipSenseGeneration[] = [
     "hiPts": 7.5,
     "verdict": "decisive-up",
     "family": "exploratory",
+    "bench": "v4.6",
+    "earlier": false
+  },
+  {
+    "prevLabel": "Mistral Large 4",
+    "currLabel": "Mistral Large 4 (Oct 29)",
+    "prevScore": 83.9,
+    "currScore": 88,
+    "deltaPts": 4,
+    "loPts": 1.6,
+    "hiPts": 6.5,
+    "verdict": "decisive-up",
+    "family": "confirmatory",
     "bench": "v4.6",
     "earlier": false
   },
