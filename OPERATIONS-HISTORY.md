@@ -4,6 +4,31 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-10-29 — gpt-6.1-terra evaluated as classifier (not adopted)
+
+Same harness as 2026-10-07 (production `classifyBatchTargeted`, batch 20), on a fresh
+240-post sample from 09-24..10-06 that gpt-6-sol had classified. References: `claude-opus-5-5`
+and `gpt-6-astra`, both at medium. They agree on 75.8% of full labels. Every arm ran twice.
+Spend was about $1.85.
+
+| arm | vs Opus | vs Astra | both refs agree (n=182) | re-run | $/1k posts (flex) |
+|---|---|---|---|---|---|
+| gpt-6.1-sol @ low (prod) | 78.3 | 91.7 | 97.5 | 96.7% | $0.339 |
+| gpt-6.1-terra @ none | 73.1 | 80.0 | 86.3 | 87.1% | $0.164 |
+| gpt-6.1-terra @ low | 73.8 | 78.1 | 86.6 | 90.0% | $0.170 |
+
+- Terra costs half as much per post, but it is worse on relevance. Against Opus it wrongly drops
+  13-15 posts and wrongly keeps 12-17. Sol drops 7 and keeps 11-12.
+- Sentiment and category agreement are about equal.
+- At effort medium Terra over-drops: 20% of posts marked irrelevant, against Sol's 11%.
+- Switching would save about $5.6/mo. Terra on flex is not faster: p50 12-13 s per batch vs 10.8 s.
+- At launch, about 5% of Terra flex calls returned 429 `flex_unavailable`. The fallback to
+  `auto` handled them.
+- Decision: stay on gpt-6.1-sol @ low. Revisit if Terra's relevance agreement with Opus reaches
+  Sol's 92%.
+- `NO_NONE_EFFORT` (`/^gpt-6\.1/`) also forces low on Terra, which does accept none. It was left
+  as is because Terra was not adopted.
+
 ## 2026-10-23 — Apify actor swaps (live side-by-side, Opus 5.5 + 3 Sonnet evaluators)
 
 Trigger: account-wide Apify spend $48.49 in the 09-20..10-19 cycle against the
