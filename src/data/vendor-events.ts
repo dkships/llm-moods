@@ -314,6 +314,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     notes: "Google's new flagship, Stable as gemini-4-argon; takes over from the Gemini 3.1 Pro preview. Introductory $2/$10 per million tokens through November 30, then $4/$20.",
   },
   {
+    id: "google-gemini-4-carbon-launch",
+    vendor: "google",
+    modelSlug: "gemini",
+    eventDate: "2026-10-28",
+    eventType: "model_launch",
+    title: "Gemini 4 Carbon launch",
+    url: "https://9to5google.com/2026/10/28/gemini-4-carbon-announcement/",
+    notes: "Google's strongest model, pitched at autonomous coding and cyber defense. Available first to trusted cyber defenders in the Fairwind program; developer and consumer access has no date yet.",
+  },
+  {
     id: "openai-gpt-6-1-terra-launch",
     vendor: "openai",
     modelSlug: "chatgpt",

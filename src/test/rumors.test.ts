@@ -918,6 +918,8 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("gemini", "Gemini 3.5 Flash-Lite", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 4 Argon", null)).toBe(true);
     expect(isReleasedVersion("gemini", null, "Argon")).toBe(true);
+    expect(isReleasedVersion("gemini", "Gemini 4 Carbon", null)).toBe(true); // announced 2026-10-28
+    expect(isReleasedVersion("gemini", null, "Carbon")).toBe(true);
     // Overtaken without shipping: Gemini 4 Argon took the 3.5 Pro slot.
     expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 3.5", null)).toBe(true);

@@ -705,6 +705,19 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releasedOn: "2026-10-13",
     },
     {
+      // Announced 2026-10-28, two weeks after Argon, first to Fairwind cyber
+      // defenders with wider access undated. Own key: "Gemini 4 Carbon"
+      // squashes to gemini4carbon, so it never folds into the Argon card.
+      key: "gemini4carbon",
+      label: "Gemini 4 Carbon",
+      codename: "Carbon",
+      aliases: ["carbon", "gemini4carbon"],
+      released: true,
+      releasePrompt: "Gemini 4 Carbon",
+      releaseAliases: ["gemini4carbon"],
+      releasedOn: "2026-10-28",
+    },
+    {
       // Shipped 2026-06-30 as gemini-3.1-flash-lite-image; leak posts about an
       // "updated NB2Lite" describe a refresh of a live model, not a new one.
       key: "nb2lite",
