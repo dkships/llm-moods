@@ -215,9 +215,14 @@ async function main() {
     fail(
       `lineage split lost models: ${current.length} current + ${previous.length} retired + ${replacedModels.length} replaced != ${rankedModels.length} ranked`,
     );
-  for (const [prev, by] of replaced)
-    if (!current.some((m) => m.name === by))
-      fail(`${prev} is replaced by ${by}, which is not in the current lineup`);
+  // A replacement may itself be superseded later (Mistral Medium 3.5 ->
+  // Mistral Large 4 preview -> its Oct 29 checkpoint); its chain must still
+  // end at a current model.
+  for (const [prev, by] of replaced) {
+    const landing = successionChainEnd(succ, by);
+    if (!landing || !current.some((m) => m.name === landing))
+      fail(`${prev} is replaced by ${by}, whose chain does not end in the current lineup`);
+  }
   if (current.length < 2)
     fail(`derived only ${current.length} current model(s) — successions() is over-retiring`);
   // A successor may itself be retired (GPT-5.6 Sol -> GPT-6 Sol -> GPT-6.1 Sol)
