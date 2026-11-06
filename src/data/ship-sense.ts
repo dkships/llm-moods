@@ -161,6 +161,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   mistral: "Mistral",
   minimax: "MiniMax",
   zai: "Z.ai",
+  thinkingmachines: "Thinking Machines",
 };
 
 export const providerLabel = (provider: string): string =>

@@ -549,6 +549,7 @@ describe("run prose", () => {
     expect(providerLabel("xai")).toBe("xAI");
     expect(providerLabel("newlab")).toBe("Newlab");
     expect(providerLabel("minimax")).toBe("MiniMax");
+    expect(providerLabel("thinkingmachines")).toBe("Thinking Machines");
   });
 });
 
