@@ -940,6 +940,10 @@ describe("isReleasedVersion", () => {
   it("retires versions that shipped since the last catalog refresh", () => {
     expect(isReleasedVersion("claude", "Fable 5.1", null)).toBe(true);
     expect(isReleasedVersion("claude", "Mythos 5.1", null)).toBe(true); // codename spelling
+    expect(isReleasedVersion("claude", "Fable 5.2", null)).toBe(true); // shipped 2026-11-09
+    expect(isReleasedVersion("claude", "Claude Fable 5.2", null)).toBe(true);
+    expect(isReleasedVersion("claude", "Mythos 5.2", null)).toBe(true);
+    expect(isReleasedVersion("claude", "Fable 5.3", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.7 Flash", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 3.7", null)).toBe(true); // bare, no Pro pending
     expect(isReleasedVersion("grok", "Grok 4.7", null)).toBe(true); // shipped 2026-09-21

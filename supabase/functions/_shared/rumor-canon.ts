@@ -427,8 +427,19 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       codename: null,
       aliases: ["fable51", "mythos51", "claudefable51"],
       released: true,
-      releasePrompt: "Fable 5.1 / Mythos 5.1 and earlier",
       releaseAliases: ["fable51", "mythos51"],
+    },
+    {
+      // Shipped 2026-11-09 as claude-fable-5-2 (GA), with the gated Mythos 5.2
+      // sibling; same convention as 5.1, so both spellings retire together.
+      key: "fable52",
+      label: "Fable 5.2",
+      codename: null,
+      aliases: ["fable52", "mythos52", "claudefable52"],
+      released: true,
+      releasePrompt: "Fable 5.2 / Mythos 5.2 and earlier",
+      releaseAliases: ["fable52", "mythos52"],
+      releasedOn: "2026-11-09",
     },
     {
       key: "sonnet5",

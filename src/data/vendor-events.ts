@@ -333,6 +333,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     url: "https://developers.openai.com/api/docs/models/gpt-6.1-terra",
     notes: "Brings back the mid tier GPT-6 skipped, between Sol and Luna. $1/$5 per million tokens, half of GPT-6.1 Sol's price; pitched at visual reasoning, computer use and writing.",
   },
+  {
+    id: "anthropic-fable-5-2-launch",
+    vendor: "anthropic",
+    modelSlug: "claude",
+    eventDate: "2026-11-09",
+    eventType: "model_launch",
+    title: "Claude Fable 5.2 launch",
+    url: "https://www.anthropic.com/news/claude-fable-and-mythos-5-2",
+    notes: "API id claude-fable-5-2, generally available the same day; the Mythos 5.2 sibling is limited to verified programs. $8/$40 per million tokens, 20% below Fable 5.1.",
+  },
 ];
 
 export function getEventsForModel(slug: string | undefined): VendorEvent[] {
