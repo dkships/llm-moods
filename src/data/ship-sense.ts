@@ -175,9 +175,19 @@ export const rankRangeText = (m: Pick<ShipSenseModelRow, "rankLo" | "rankHi">): 
   return m.rankLo === m.rankHi ? `${m.rankLo}` : `${m.rankLo}–${m.rankHi}`;
 };
 
-/** "63%" (leaderboard._p_first_text). */
-export const pFirstText = (m: Pick<ShipSenseModelRow, "pFirst">): string =>
-  m.pFirst === undefined ? "—" : `${Math.round(m.pFirst * 100)}%`;
+// Shares strictly between these and 0 or 1 would round to "0%" / "100%", a
+// certainty the bootstrap does not support (leaderboard._P_FIRST_FLOOR/_CEIL).
+const P_FIRST_FLOOR = 0.005;
+const P_FIRST_CEIL = 0.995;
+
+/** "63%", "<1%", ">99%" (leaderboard._p_first_text). */
+export const pFirstText = (m: Pick<ShipSenseModelRow, "pFirst">): string => {
+  const p = m.pFirst;
+  if (p === undefined) return "—";
+  if (p > 0 && p < P_FIRST_FLOOR) return "<1%";
+  if (p >= P_FIRST_CEIL && p < 1) return ">99%";
+  return `${Math.round(p * 100)}%`;
+};
 
 /** "2026-08-03" -> "08-03" when it shares a year with the run date. */
 const shortDate = (date: string, reference: string): string =>

@@ -592,6 +592,11 @@ describe("rank range and value callout", () => {
     expect(rankRangeText({})).toBe("—");
     expect(pFirstText({ pFirst: 0.6298 })).toBe("63%");
     expect(pFirstText({})).toBe("—");
+    // Never round a share to certainty or to zero (upstream, 2026-11-09).
+    expect(pFirstText({ pFirst: 0.996 })).toBe(">99%");
+    expect(pFirstText({ pFirst: 0.0021 })).toBe("<1%");
+    expect(pFirstText({ pFirst: 1 })).toBe("100%");
+    expect(pFirstText({ pFirst: 0 })).toBe("0%");
   });
 
   it("names the cheapest and every tied priciest #1 contender", () => {
