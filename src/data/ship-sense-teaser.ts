@@ -5,22 +5,22 @@ import type { ShipSenseTeaserRow } from "./ship-sense";
 
 export const SHIP_SENSE_TEASER: ShipSenseTeaserRow[] = [
   {
+    "label": "Claude Fable 5.2",
+    "score": 97
+  },
+  {
     "label": "Claude Opus 5.5",
     "score": 94.4
   },
   {
     "label": "Gemini 4 Argon",
     "score": 94.3
-  },
-  {
-    "label": "GPT-6 Astra",
-    "score": 93.8
   }
 ];
 
 export const SHIP_SENSE_TEASER_RUN = {
   "version": "v4.6",
   "bankItems": 95,
-  "modelCount": 64,
+  "modelCount": 65,
   "currentCount": 22
 };
