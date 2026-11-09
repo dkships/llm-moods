@@ -944,6 +944,11 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("claude", "Claude Fable 5.2", null)).toBe(true);
     expect(isReleasedVersion("claude", "Mythos 5.2", null)).toBe(true);
     expect(isReleasedVersion("claude", "Fable 5.3", null)).toBe(false);
+    // Overtaken without shipping: the Nov 9 launch shipped as 5.2, not 5.5.
+    expect(isReleasedVersion("claude", "Fable 5.5", null)).toBe(true);
+    expect(isReleasedVersion("claude", "Mythos 5.5", null)).toBe(true);
+    expect(isReleasedVersion("claude", "Claude Fable 5.5", null)).toBe(true);
+    expect(isReleasedVersion("claude", "Fable 6", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 3.7 Flash", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 3.7", null)).toBe(true); // bare, no Pro pending
     expect(isReleasedVersion("grok", "Grok 4.7", null)).toBe(true); // shipped 2026-09-21
@@ -1137,9 +1142,9 @@ describe("mergeRumorRows", () => {
 
   it("collapses a family-prefixed Claude label into the bare-line card (live board 2026-09-28)", () => {
     const out = mergeRumorRows([
-      rrow({ version_label: "Fable 5.5", claim_type: "launch", mention_count: 4, last_seen_at: "2026-09-27",
+      rrow({ version_label: "Fable 6", claim_type: "launch", mention_count: 4, last_seen_at: "2026-09-27",
         representative_sources: [{ url: "u1", platform: "twitter" }] }),
-      rrow({ version_label: "Claude Fable 5.5", claim_type: "imminent", last_seen_at: "2026-09-26",
+      rrow({ version_label: "Claude Fable 6", claim_type: "imminent", last_seen_at: "2026-09-26",
         representative_sources: [{ url: "u2", platform: "reddit" }] }),
     ]);
     expect(out).toHaveLength(1);

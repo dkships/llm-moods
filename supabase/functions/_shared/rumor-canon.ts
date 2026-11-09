@@ -442,6 +442,17 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releasedOn: "2026-11-09",
     },
     {
+      // Rumored for weeks as "Fable 5.5" / "Mythos 5.5" (partner checkpoints, Arena
+      // routing, a hidden site mention, "coming next week" on Nov 7); the launch
+      // on 2026-11-09 shipped as Fable 5.2 / Mythos 5.2, so these cards retire with
+      // it. Overtaken, not released: no model called 5.5 has shipped.
+      key: "fable55",
+      label: "Fable 5.5",
+      codename: null,
+      aliases: ["fable55", "mythos55", "claudefable55", "claudemythos55"],
+      overtakenBy: "fable52",
+    },
+    {
       key: "sonnet5",
       label: "Sonnet 5",
       codename: null,
