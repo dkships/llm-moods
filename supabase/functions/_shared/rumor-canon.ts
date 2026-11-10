@@ -728,7 +728,7 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
     },
     {
       // Announced 2026-10-28, two weeks after Argon, first to Fairwind cyber
-      // defenders with wider access undated. Own key: "Gemini 4 Carbon"
+      // defenders; generally available 2026-11-10. Own key: "Gemini 4 Carbon"
       // squashes to gemini4carbon, so it never folds into the Argon card.
       key: "gemini4carbon",
       label: "Gemini 4 Carbon",

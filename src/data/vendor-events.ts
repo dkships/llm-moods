@@ -324,6 +324,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     notes: "Google's strongest model, pitched at autonomous coding and cyber defense. Available first to trusted cyber defenders in the Fairwind program; developer and consumer access has no date yet.",
   },
   {
+    id: "google-gemini-4-carbon-ga",
+    vendor: "google",
+    modelSlug: "gemini",
+    eventDate: "2026-11-10",
+    eventType: "model_launch",
+    title: "Gemini 4 Carbon launch",
+    url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/gemini-4-carbon-now-available/",
+    notes: "Now generally available through the API in Google AI Studio and Gemini for business for paying developers and enterprises; rolling out to Google AI Ultra subscribers in other Google products.",
+  },
+  {
     id: "openai-gpt-6-1-terra-launch",
     vendor: "openai",
     modelSlug: "chatgpt",
