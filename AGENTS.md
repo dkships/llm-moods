@@ -22,7 +22,7 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 - Edge Function deploys need a Lovable-side trigger via `mcp__lovable__send_message`; verify the result independently, as that tool has a known stale-response bug
 - Always commit after completing work — don't leave dirty `main`
 - Shared scraper utilities in `supabase/functions/_shared/utils.ts`
-- Use `product-qa-sweep` for dashboard, public route, scraper monitor, or responsive UI verification.
+- Verify dashboard, public route, scraper monitor and responsive UI changes in a real browser at desktop and mobile widths, in addition to `npm run test`.
 
 ## Public App Guardrails
 - Public route inventory is fixed to `/`, `/dashboard`, `/model/:slug`, `/compare`, `/benchmark`, `/research`, `/research/:slug`, `/rumors`, `/privacy`, and `*` (404)
@@ -33,8 +33,8 @@ Real-time AI sentiment dashboard tracking community vibes for 4 LLM models (Clau
 - Public pages must keep a skip link, `main#main-content`, visible keyboard focus styles, and reduced-motion support
 - Keep the dark-only public theme contract in `src/index.css` unless a deliberate theming project changes it end-to-end
 
-## Hallucination Prevention
-See `~/.agents/AGENTS.md`. For llm-moods: sources = code and model API responses.
+## Sources Of Truth
+Code and model API responses. Check them before stating how the app behaves.
 
 ## Definition Of Done
 - Changes build successfully (`npm run build`)
