@@ -8,6 +8,7 @@ import { useVendorStatus, type StatusSeverity } from "@/hooks/useVendorStatus";
 import { useScoreAnomalies } from "@/hooks/useScoreAnomalies";
 import { VENDOR_BY_MODEL, type ModelSlug } from "@/data/vendor-events";
 import { formatTimeAgo } from "@/lib/vibes";
+import { getSafeExternalUrl } from "@/lib/safe-url";
 import { correlateStatusWithAnomalies, type CorrelatedStatusEvent } from "@/lib/status-correlation";
 
 interface StatusCardProps {
@@ -67,6 +68,8 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
   const dateLabel = formatAnomalyDate(event.updatedAt);
   const topCorrelations = event.correlatedAnomalies.slice(0, 2);
   const remainingCount = event.correlatedAnomalies.length - topCorrelations.length;
+  // Incident links come from third-party status feeds; render only http(s).
+  const eventUrl = getSafeExternalUrl(event.url);
 
   return (
     <li className="flex items-start justify-between gap-3 py-3 border-b border-border last:border-b-0">
@@ -97,9 +100,9 @@ const StatusEventRow = memo(({ event }: { event: CorrelatedStatusEvent }) => {
           </ul>
         )}
       </div>
-      {event.url && (
+      {eventUrl && (
         <a
-          href={event.url}
+          href={eventUrl}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={`Read ${event.title} on the official status page`}
