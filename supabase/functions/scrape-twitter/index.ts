@@ -5,6 +5,7 @@ import {
   apifyRunUrl,
   checkApifyBudget,
   scrubApifyRun,
+  withLedgerCost,
 } from "../_shared/apify-budget.ts";
 import {
   createRunRecord,
@@ -40,7 +41,7 @@ import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-twitter";
 // Deploy-verification marker, written into scraper_runs.metadata. Bump on change.
-const CODE_VERSION = "2026-10-23.1";
+const CODE_VERSION = "2026-11-12.1";
 const APIFY_MAX_TOTAL_CHARGE_USD = 0.15;
 // Actor is config-driven (`scraper_config.actor_id`); flip back to
 // apidojo/tweet-scraper with no redeploy. xquik ($0.00015/tweet, no run fee)
@@ -86,6 +87,13 @@ function buildActorInput(actorId: string, searchTerms: string[], sort: string, m
     maxItemsPerTarget: Math.ceil(maxItems / searchTerms.length),
     includeSearchTerms: true,
   };
+}
+
+// Apify's run usage plus the corrected `ledger_usd` the budget guard sums.
+// Called after the run so the item count is known.
+function ledgerUsage(summary: ReturnType<typeof buildTwitterSummary>) {
+  const run = summary as { actorId?: string; apifyUsage?: unknown };
+  return withLedgerCost(run.apifyUsage, run.actorId ?? DEFAULT_ACTOR_ID, summary.apify_items_fetched, APIFY_MAX_TOTAL_CHARGE_USD);
 }
 
 function buildTwitterSummary() {
@@ -504,7 +512,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
         classifier_quota_deferred: summary.classifierQuotaDeferred,
         classification_success: summary.classification_success,
         classification_queued: summary.classificationQueued,
-        apify_usage: (summary as any).apifyUsage ?? null,
+        apify_usage: ledgerUsage(summary),
         code_version: CODE_VERSION,
         apify_budget: (summary as any).apifyBudget ?? null,
         dedup_skipped: summary.dedupSkipped,
@@ -543,7 +551,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
         errors: [message],
         metadata: {
           error: message,
-          apify_usage: (apifySummary as { apifyUsage?: unknown }).apifyUsage ?? null,
+          apify_usage: ledgerUsage(apifySummary),
           code_version: CODE_VERSION,
         },
         completed_at: new Date().toISOString(),

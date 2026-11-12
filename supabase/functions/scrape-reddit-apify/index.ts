@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { abortApifyRun, apifyDatasetItemsUrl, apifyRunUrl, checkApifyBudget } from "../_shared/apify-budget.ts";
+import { abortApifyRun, apifyDatasetItemsUrl, apifyRunUrl, checkApifyBudget, estimateRunCost } from "../_shared/apify-budget.ts";
 import {
   createRunRecord,
   deriveRunMetrics,
@@ -32,24 +32,22 @@ import {
 import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-reddit-apify";
+// Deploy-verification marker, written into scraper_runs.metadata. Bump on change.
+const CODE_VERSION = "2026-11-12.1";
 const APIFY_ACTOR_TIMEOUT_SECS = 120;
 const APIFY_POLL_TIMEOUT_SECS = 105;
 const APIFY_POLL_INTERVAL_MS = 10_000;
 const APIFY_MAX_TOTAL_CHARGE_USD = 0.35;
 const REDDIT_MAX_AGE_HOURS = 72;
 
+// Fallback only; production reads the `start_url` config rows (same 5 subs
+// since 2026-11-12).
 const DEFAULT_START_URLS = [
   "https://www.reddit.com/r/ClaudeAI/new/",
   "https://www.reddit.com/r/ClaudeCode/new/",
   "https://www.reddit.com/r/ChatGPT/new/",
-  "https://www.reddit.com/r/OpenAI/new/",
-  "https://www.reddit.com/r/ChatGPTPro/new/",
-  "https://www.reddit.com/r/GoogleGemini/new/",
   "https://www.reddit.com/r/GeminiAI/new/",
-  "https://www.reddit.com/r/GoogleGeminiAI/new/",
   "https://www.reddit.com/r/grok/new/",
-  "https://www.reddit.com/r/LocalLLaMA/new/",
-  "https://www.reddit.com/r/artificial/new/",
 ];
 
 const SUBREDDIT_MODEL_MAP: Record<string, string> = {
@@ -217,7 +215,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     // no redeploy: scraper_config key `listing_mode` = new_page | subreddit.
     const listingMode = getConfigValue(config, "listing_mode", "subreddit");
 
-    const runForSubreddits = async (subs: string[]): Promise<{ items: any[]; status: string; usageUsd: number; error?: string }> => {
+    const runForSubreddits = async (subs: string[]): Promise<{ items: any[]; status: string; usageUsd: number; started: boolean; error?: string }> => {
       const label = subs.length === 1 ? `r/${subs[0]}` : `${subs.length} subreddits`;
       const runMaxItems = Math.max(perRunMaxItems, maxPostsPerSub * subs.length);
       try {
@@ -245,12 +243,12 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
         });
         if (!startRes.ok) {
           const t = await startRes.text().catch(() => "");
-          return { items: [], status: `start_${startRes.status}`, usageUsd: 0, error: `${label} start HTTP ${startRes.status}: ${t.slice(0, 160)}` };
+          return { items: [], status: `start_${startRes.status}`, usageUsd: 0, started: false, error: `${label} start HTTP ${startRes.status}: ${t.slice(0, 160)}` };
         }
         const runData = await startRes.json();
         const runId = runData?.data?.id;
         const datasetId = runData?.data?.defaultDatasetId;
-        if (!runId || !datasetId) return { items: [], status: "no_run", usageUsd: 0, error: `${label} missing runId` };
+        if (!runId || !datasetId) return { items: [], status: "no_run", usageUsd: 0, started: false, error: `${label} missing runId` };
 
         let status = "";
         let usageUsd = 0;
@@ -272,9 +270,9 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
         const data = dRes.ok ? await dRes.json().catch(() => []) : [];
         const runItems = Array.isArray(data) ? data : [];
         const error = (status !== "SUCCEEDED" && runItems.length === 0) ? `${label}: ${status || "no-status"}, 0 items` : undefined;
-        return { items: runItems, status, usageUsd, error };
+        return { items: runItems, status, usageUsd, started: true, error };
       } catch (e) {
-        return { items: [], status: "error", usageUsd: 0, error: `${label}: ${e instanceof Error ? e.message : String(e)}` };
+        return { items: [], status: "error", usageUsd: 0, started: false, error: `${label}: ${e instanceof Error ? e.message : String(e)}` };
       }
     };
 
@@ -315,7 +313,16 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       const community = String(item?.communityName ?? item?.parsedCommunityName ?? "unknown").replace(/^r\//i, "");
       perSubItems[community] = (perSubItems[community] ?? 0) + 1;
     }
-    const apifyUsageSummary = { actor: actorId, mode: singleRunMode ? "single_run" : "fan_out", listing_mode: listingMode, subreddits: subreddits.length, per_subreddit_status: perSubStatus, per_subreddit_items: perSubItems, total_usage_usd: Number(totalUsageUsd.toFixed(4)) };
+    // `total_usage_usd` is Apify's preliminary figure; the budget guard sums
+    // `ledger_usd` (see ACTOR_EVENT_PRICES in _shared/apify-budget.ts).
+    const runCost = estimateRunCost({
+      actorId,
+      actorRuns: runResults.filter((r) => r.started).length,
+      items: items.length,
+      reportedUsd: totalUsageUsd,
+      chargeCapUsd: perRunChargeUsd,
+    });
+    const apifyUsageSummary = { actor: actorId, mode: singleRunMode ? "single_run" : "fan_out", listing_mode: listingMode, subreddits: subreddits.length, per_subreddit_status: perSubStatus, per_subreddit_items: perSubItems, total_usage_usd: Number(totalUsageUsd.toFixed(4)), ...runCost };
     apifyRunMetadata = apifyUsageSummary;
 
     const posts = items.filter((item: any) => item.dataType === "post");
@@ -559,6 +566,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
         classification_queued: summary.classificationQueued,
         apify_usage: summary.apifyUsage,
         apify_budget: summary.apifyBudget,
+        code_version: CODE_VERSION,
       },
       completed_at: completedAt,
     });
@@ -588,7 +596,7 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
       await updateRunRecord(supabase, runRecord!.id, {
         status: "failed",
         errors: [message],
-        metadata: { error: message, apify_usage: apifyRunMetadata },
+        metadata: { error: message, apify_usage: apifyRunMetadata, code_version: CODE_VERSION },
         completed_at: new Date().toISOString(),
       });
     }

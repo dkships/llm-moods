@@ -61,7 +61,7 @@ Read `AGENT-REFERENCE.md` before changing `_shared/classifier.ts` or any scraper
   - Rollback, no redeploy (all providers stay live): `CLASSIFIER_MODEL=gpt-6-sol` (previous production; stricter on relevance — 18 of 200 wrongly dropped vs Terra's 8), then `gpt-5.6-terra`, or `claude-haiku-4-5-20251001` / `gemini-2.5-flash`.
 - Strict tool use (`strict:true`) stays OFF — nullable-union schema 400s under the structured-output subset (verified in prod 2026-06-02)
 - Reddit comment ingestion stays disabled (`include_comments=false`) until a comment→parent-post attribution fix exists
-- `maxTotalChargeUsd` is the authoritative Apify per-run cost cap. The guard in `_shared/apify-budget.ts` sums **this pipeline's own runs** from `scraper_runs.metadata.apify_usage` (rolling 30d / 24h) — never account-wide Apify usage, which is shared with unrelated actors and blocked LLM Vibes for a week in Aug 2026.
+- `maxTotalChargeUsd` is the authoritative Apify per-run cost cap. The guard in `_shared/apify-budget.ts` sums **this pipeline's own runs** from `scraper_runs.metadata.apify_usage` (rolling 30d / 24h) — never account-wide Apify usage, which is shared with unrelated actors and blocked LLM Vibes for a week in Aug 2026. It sums `ledger_usd` (event-price estimate or Apify's figure, whichever is higher), so an actor swap must also update `ACTOR_EVENT_PRICES` in that file.
 - There is no `GEMINI_FREE_API_KEY` — spillover and the self-bias oracle use the paid `GEMINI_API_KEY` (billing must stay active)
 
 ## Rumors radar (`/rumors`)

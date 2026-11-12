@@ -4,6 +4,47 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-11-12 — Reddit trimmed to 5 subs + Apify ledger fix (live-DB measured)
+
+Trigger: the Apify account's $29/month hard cap. Measured 2026-10-30..11-12 (14 daily
+Reddit runs, `harshmaur/reddit-scraper-pro`, 20 newest posts per sub, one run per sub):
+
+| sub | net-new rows (14 d) | classified relevant (14 d) |
+|---|---|---|
+| GeminiAI | 306 | 135 |
+| ClaudeAI | 294 | 128 |
+| ChatGPT | 289 | 119 |
+| grok | 285 | 92 |
+| ClaudeCode | 246 | 80 |
+| singularity | 84 | 6 |
+| LocalLLaMA | 55 | 12 |
+| Bard | 46 | 9 |
+
+- Every sub costs $0.01 start + 20 × $0.0014 = ~$0.038/day ($1.14/month). Bard returned
+  0 items on 11-12.
+- **Dropped r/Bard, r/singularity and r/LocalLLaMA** (live `scraper_config` rows deleted
+  11-12, `20261112190000_reddit_trim_5_subs.sql`). The two leak hubs were kept for the
+  rumors radar, and `get_rumor_candidates` does read `irrelevant` posts (no
+  classification filter, only the leak-lexicon regex). Over 30 days the extractor checked
+  16 singularity and 15 LocalLLaMA posts and pulled 9 raw claims (6 and 3), all with
+  confidence ≤0.5 or for untracked families (Qwen, Flint); `buildContribution` drops
+  anything under 0.55. None of the 30-day `model_rumors.representative_sources` come from
+  either sub (twitter 32, bluesky 5, Bard 1 on an already-released row, openrouter 1).
+- **Ledger fix.** Both scrapers stored Apify's `usageTotalUsd` from the first poll that
+  saw a terminal status. The Get-run docs say that response "can still show preliminary
+  stats, costs, and event counts"; stable figures need a re-read ~10 s later. Reddit
+  recorded $1.94 against ~$4.26 billed over the 14 days; Twitter runs returning 250
+  tweets recorded $0.0003-0.0016 with `chargedEventCounts` 0, against $0.0375 billed. The
+  guard (live limits $28/month, $2/day) read $5.55 for 30 days when real spend was about
+  $11.4. Each run now records `ledger_usd` = max(Apify's figure, run starts × start price
+  + items × item price), with prices in `ACTOR_EVENT_PRICES` (`_shared/apify-budget.ts`);
+  the guard sums it. Rejected: re-reading the previous run's cost on the next invocation
+  (Reddit stored no run ids, and it adds a second write path for a ~10 s settle delay).
+  Rows before the fix stay under-recorded until they leave the 30-day window (~12-12).
+- Code `2026-11-12.1` for both `scrape-reddit-apify` (new marker) and `scrape-twitter`.
+- Expected LLM Vibes Apify spend: Reddit 5 × $0.038 × 30 = $5.70, Twitter 2 × $0.0375 × 30
+  = $2.25, total ~$7.95/month (was ~$11.37 with 8 subs).
+
 ## 2026-10-29 — gpt-6.1-terra evaluated as classifier (not adopted)
 
 Same harness as 2026-10-07 (production `classifyBatchTargeted`, batch 20), on a fresh

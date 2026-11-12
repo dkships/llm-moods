@@ -61,10 +61,103 @@ function pathValue(payload: unknown, path: string[]): unknown {
   return current;
 }
 
-// Reddit fans out one actor run per subreddit and records the sum as
-// `total_usage_usd`; Twitter records the scrubbed run's `usageTotalUsd`.
+// Pay-per-event prices (USD) of the actors this pipeline runs or can roll back
+// to by config. Update this table on any actor swap or price change.
+//
+// Why the ledger does not trust Apify's own figure: the scrapers read a run's
+// `usageTotalUsd` at the first poll that sees a terminal status, and Apify
+// documents that "the first response after completion can still show
+// preliminary stats, costs, and event counts" (docs.apify.com/api/v2/actor-run-get;
+// stable after ~10 s). Measured 2026-10-30..11-12: Reddit recorded $1.94
+// against ~$4.26 billed, and Twitter runs that returned 250 tweets recorded
+// $0.0003-0.0016 with `chargedEventCounts` 0 against $0.0375 billed.
+//
+//   ledger_usd = max(Apify's figure, starts x runStartUsd + items x perItemUsd)
+export interface ActorEventPrices {
+  runStartUsd: number;
+  perItemUsd: number;
+}
+
+export const ACTOR_EVENT_PRICES: Record<string, ActorEventPrices> = {
+  "harshmaur/reddit-scraper-pro": { runStartUsd: 0.01, perItemUsd: 0.0014 },
+  "harshmaur/reddit-scraper": { runStartUsd: 0.02, perItemUsd: 0.0018 },
+  "xquik/x-tweet-scraper": { runStartUsd: 0, perItemUsd: 0.00015 },
+  "apidojo/tweet-scraper": { runStartUsd: 0, perItemUsd: 0.0004 },
+};
+
+// "charge_cap": the actor is not in ACTOR_EVENT_PRICES, so each run counts at
+// its maxTotalChargeUsd. Overstates spend rather than understating it.
+export type CostBasis = "event_prices" | "charge_cap";
+
+export interface RunCostInput {
+  actorId: string;
+  actorRuns: number;
+  items: number;
+  reportedUsd: number;
+  chargeCapUsd: number;
+}
+
+export interface RunCost {
+  apify_reported_usd: number;
+  estimated_usd: number;
+  ledger_usd: number;
+  cost_basis: CostBasis;
+}
+
+function roundUsd(value: number): number {
+  return Number(value.toFixed(6));
+}
+
+export function estimateRunCost(input: RunCostInput): RunCost {
+  // Reddit passes the URL form of the id ("owner~name").
+  const prices = ACTOR_EVENT_PRICES[input.actorId.replace("~", "/")];
+  const runs = Math.max(0, input.actorRuns);
+  const items = Math.max(0, input.items);
+  const reported = Math.max(0, input.reportedUsd);
+
+  const estimated = prices
+    ? runs * prices.runStartUsd + items * prices.perItemUsd
+    : runs * input.chargeCapUsd;
+
+  return {
+    apify_reported_usd: roundUsd(reported),
+    estimated_usd: roundUsd(estimated),
+    ledger_usd: roundUsd(Math.max(reported, estimated)),
+    cost_basis: prices ? "event_prices" : "charge_cap",
+  };
+}
+
+// Adds the ledger fields to a single run's scrubbed usage (Twitter). A run
+// without an id never started, so there is nothing to price.
+export function withLedgerCost(
+  usage: unknown,
+  actorId: string,
+  items: number,
+  chargeCapUsd: number,
+): Record<string, unknown> | null {
+  if (!isRecord(usage)) {
+    return null;
+  }
+  if (!usage.id) {
+    return usage;
+  }
+
+  const cost = estimateRunCost({
+    actorId,
+    actorRuns: 1,
+    items,
+    reportedUsd: numericFrom(usage.usageTotalUsd) ?? 0,
+    chargeCapUsd,
+  });
+  return { ...usage, ...cost };
+}
+
+// `ledger_usd` is the corrected cost (since 2026-11-12). Older rows only have
+// Apify's preliminary figure: Reddit's summed `total_usage_usd`, or Twitter's
+// scrubbed `usageTotalUsd`.
 function runUsageUsd(metadata: unknown): number {
-  return numericFrom(pathValue(metadata, ["apify_usage", "total_usage_usd"]))
+  return numericFrom(pathValue(metadata, ["apify_usage", "ledger_usd"]))
+    ?? numericFrom(pathValue(metadata, ["apify_usage", "total_usage_usd"]))
     ?? numericFrom(pathValue(metadata, ["apify_usage", "usageTotalUsd"]))
     ?? 0;
 }
