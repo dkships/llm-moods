@@ -334,6 +334,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     notes: "Now generally available through the API in Google AI Studio and Gemini for business for paying developers and enterprises; rolling out to Google AI Ultra subscribers in other Google products.",
   },
   {
+    id: "google-gemini-4-hydrogen-launch",
+    vendor: "google",
+    modelSlug: "gemini",
+    eventDate: "2026-11-12",
+    eventType: "model_launch",
+    title: "Gemini 4 Hydrogen launch",
+    url: "https://blog.google/innovation-and-ai/models-and-research/gemini-models/introducing-gemini-4-hydrogen/",
+    notes: "Google's fast Gemini 4 model, generally available as gemini-4-hydrogen and its recommended upgrade from Gemini 3.8 Flash. $1.50/$7.50 per million tokens; thinking level high by default, with a new xhigh level.",
+  },
+  {
     id: "openai-gpt-6-1-terra-launch",
     vendor: "openai",
     modelSlug: "chatgpt",

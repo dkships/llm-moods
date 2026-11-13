@@ -922,6 +922,12 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("gemini", null, "Carbon")).toBe(true);
     expect(isReleasedVersion("gemini", "Carbon", null)).toBe(true); // GA 2026-11-10
     expect(isReleasedVersion("gemini", "Gemini 4 Carbon Pro", null)).toBe(false);
+    expect(isReleasedVersion("gemini", "Gemini 4 Hydrogen", null)).toBe(true); // GA 2026-11-12
+    expect(isReleasedVersion("gemini", null, "Hydrogen")).toBe(true);
+    expect(isReleasedVersion("gemini", "Hydrogen", null)).toBe(true);
+    expect(isReleasedVersion("gemini", "Gemini 4 Hydrogen Pro", null)).toBe(false);
+    // Overtaken without shipping: Gemini 4 Hydrogen took the Flash slot.
+    expect(isReleasedVersion("gemini", "Gemini 4 Flash", null)).toBe(true);
     // Overtaken without shipping: Gemini 4 Argon took the 3.5 Pro slot.
     expect(isReleasedVersion("gemini", "Gemini 3.5 Pro", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 3.5", null)).toBe(true);
@@ -931,7 +937,7 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("claude", "Opus 6", null)).toBe(false);
     expect(isReleasedVersion("chatgpt", "GPT-6.2", null)).toBe(false);
     expect(isReleasedVersion("gemini", "Gemini 4.5 Pro", null)).toBe(false);
-    expect(isReleasedVersion("gemini", "Gemini 4 Flash", null)).toBe(false);
+    expect(isReleasedVersion("gemini", "Gemini 4.5 Flash", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 5", null)).toBe(false);
     expect(isReleasedVersion("grok", "Grok 4.8", null)).toBe(false);
     // The shipped 3.5 Flash-Lite must not retire the next one by bare-name match.

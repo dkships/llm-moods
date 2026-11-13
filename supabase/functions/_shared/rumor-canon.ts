@@ -740,6 +740,29 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releasedOn: "2026-10-28",
     },
     {
+      // Generally available 2026-11-12 as gemini-4-hydrogen: the fast Gemini 4
+      // model, Google's "recommended upgrade from Gemini 3.8 Flash". Own key,
+      // so it never folds into the Argon or Carbon cards.
+      key: "gemini4hydrogen",
+      label: "Gemini 4 Hydrogen",
+      codename: "Hydrogen",
+      aliases: ["hydrogen", "gemini4hydrogen"],
+      released: true,
+      releasePrompt: "Gemini 4 Hydrogen",
+      releaseAliases: ["gemini4hydrogen"],
+      releasedOn: "2026-11-12",
+    },
+    {
+      // The rumored Flash-tier Gemini 4 model. Nothing shipped under this name:
+      // Gemini 4 Hydrogen took the Flash slot on 2026-11-12, so the card
+      // retires with that launch (the Gemini 3.5 Pro precedent).
+      key: "gemini4flash",
+      label: "Gemini 4 Flash",
+      codename: null,
+      aliases: ["gemini4flash", "4flash"],
+      overtakenBy: "gemini4hydrogen",
+    },
+    {
       // Shipped 2026-06-30 as gemini-3.1-flash-lite-image; leak posts about an
       // "updated NB2Lite" describe a refresh of a live model, not a new one.
       key: "nb2lite",
