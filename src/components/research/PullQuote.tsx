@@ -35,7 +35,7 @@ const PullQuote = ({ text, handle, platform, timestamp, href, archivedHref }: Pu
         href={href}
         target="_blank"
         rel="noopener noreferrer"
-        className="whitespace-nowrap text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        className="min-w-0 max-w-full [overflow-wrap:anywhere] text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
       >
         {handle}
       </a>
