@@ -392,7 +392,7 @@ const Benchmark = () => {
           <p>
             {describeScoringDates(run)} The Ship Sense Score is the equal-weight
             mean of the three dimensions, with a 95% confidence interval from an
-            item-clustered bootstrap. Restraint, Conviction and false claims are
+            item-clustered bootstrap. Restraint and Conviction are
             graded by fixed rules; whether an answer names each data problem is
             read by a three-lab model panel in which a model's own lab never
             votes. Every model runs at its shipped API defaults.
