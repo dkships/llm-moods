@@ -13,7 +13,7 @@ const Privacy = () => {
   });
 
   return (
-          <section className="container max-w-3xl pb-16 pt-10 sm:pt-12">
+          <section className="container max-w-3xl pb-20 pt-12 sm:pt-16">
             <h1 className="text-page text-foreground">Privacy &amp; data practices</h1>
             <p className="mt-4 text-body text-text-secondary">
               LLM Vibes has no accounts or advertising trackers. It is an independent, open-source
@@ -29,7 +29,7 @@ const Privacy = () => {
               .
             </p>
 
-            <h2 className="mt-10 text-section text-foreground">Site analytics</h2>
+            <h2 className="mt-10 border-t border-border pt-8 text-section text-foreground">Site analytics</h2>
             <p className="mt-3 text-body text-text-secondary">
               The site is hosted on Lovable. Lovable injects project analytics into published sites and
               records visits and pageviews. The injected script sends the page address and path, referrer,
@@ -48,7 +48,7 @@ const Privacy = () => {
               .
             </p>
 
-            <h2 className="mt-10 text-section text-foreground">Public posts</h2>
+            <h2 className="mt-10 border-t border-border pt-8 text-section text-foreground">Public posts</h2>
             <p className="mt-3 text-body text-text-secondary">
               LLM Vibes scrapes public posts about AI models from Reddit, Hacker News, Bluesky,
               X/Twitter, and Apple App Store reviews. Each is stored with its text, a source link,
@@ -58,7 +58,7 @@ const Privacy = () => {
               can still be in the store until they age out below.
             </p>
 
-            <h2 className="mt-10 text-section text-foreground">How long it keeps it</h2>
+            <h2 className="mt-10 border-t border-border pt-8 text-section text-foreground">How long it keeps it</h2>
             <p className="mt-3 text-body text-text-secondary">
               Scraped posts are deleted roughly 90 days after they were posted. Three things
               outlive that window: daily aggregate scores (numbers only, no post content), rumor
@@ -66,7 +66,7 @@ const Privacy = () => {
               quotes embedded in research articles. Internal error logs are deleted after 14 days.
             </p>
 
-            <h2 className="mt-10 text-section text-foreground">Removing a quoted post</h2>
+            <h2 className="mt-10 border-t border-border pt-8 text-section text-foreground">Removing a quoted post</h2>
             <p className="mt-3 text-body text-text-secondary">
               If a post of yours appears here and you want it removed, open a{" "}
               <a

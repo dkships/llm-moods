@@ -1,6 +1,8 @@
 import { Link } from "react-router-dom";
-import { Rss } from "lucide-react";
+import { ArrowRight, Rss } from "lucide-react";
 import Surface from "@/components/Surface";
+import PageHeader from "@/components/PageHeader";
+import SectionHeader from "@/components/SectionHeader";
 import useHead from "@/hooks/useHead";
 import Tag from "@/components/Tag";
 import { controlPill } from "@/components/ControlPill";
@@ -82,9 +84,12 @@ const FeaturedPost = ({ post }: { post: ResearchPost }) => {
           <p className="text-mono-cap text-text-tertiary">
             <time dateTime={post.publishedAt}>{formatDate(post.publishedAt)}</time>
           </p>
-          <h2 className="mt-3 text-section text-foreground sm:text-page">{post.title}</h2>
+          <h2 className="mt-3 text-page text-foreground">{post.title}</h2>
           <p className="mt-4 text-body text-text-secondary">{post.summary}</p>
           <PostTags post={post} />
+          <span className="mt-6 inline-flex items-center gap-2 text-meta text-foreground">
+            Read analysis <ArrowRight className="h-4 w-4" aria-hidden="true" />
+          </span>
         </div>
         {sparkline && (
           <div className="border-t border-border bg-background/40 p-4 sm:p-6 md:border-l md:border-t-0 md:p-8">
@@ -114,14 +119,12 @@ const ResearchIndex = () => {
 
   return (
     <>
-          <section className="container pb-8 pt-10 sm:pt-12">
+          <section className="container page-intro">
             <div className="flex items-start justify-between gap-4">
-              <div>
-                <h1 className="text-page text-foreground">Research</h1>
-                <p className="mt-2 max-w-2xl text-body text-text-secondary">
-                  Independent analysis of AI model quality, sourced from the LLM Vibes data set.
-                </p>
-              </div>
+              <PageHeader
+                title="Research"
+                description="Independent analysis of AI model quality, sourced from the LLM Vibes data set."
+              />
               <a
                 href="/research/feed.xml"
                 className={controlPill("group shrink-0")}
@@ -134,16 +137,20 @@ const ResearchIndex = () => {
           </section>
 
           <section className="container pb-12">
+            <SectionHeader title="Latest analysis" />
             <FeaturedPost post={posts[0]} />
 
             {posts.length > 1 && (
-              <Surface as="section" size="bare" elevation="card" className="mt-6 overflow-hidden" aria-label="Earlier research">
+              <section className="mt-12" aria-label="Earlier research">
+                <SectionHeader title="More research" />
+                <Surface size="bare" className="overflow-hidden">
                 <ul className="divide-y divide-border">
                   {posts.slice(1).map((post) => (
                     <ArchiveRow key={post.slug} post={post} />
                   ))}
                 </ul>
-              </Surface>
+                </Surface>
+              </section>
             )}
           </section>
     </>

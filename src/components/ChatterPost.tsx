@@ -1,4 +1,5 @@
 import { memo } from "react";
+import { ArrowUpRight } from "lucide-react";
 import Surface from "@/components/Surface";
 import Tag from "@/components/Tag";
 import { formatTimeAgo, formatSourceDisplay, decodeHTMLEntities } from "@/lib/vibes";
@@ -34,10 +35,13 @@ const ChatterPost = memo(({ post, extraMeta, hideModel = false }: ChatterPostPro
   ].filter(Boolean) as string[];
 
   const content = (
-    <div className="flex flex-col gap-2">
-      <p className="text-mono-cap text-text-tertiary">
-        {metaPieces.join(" · ")}
-      </p>
+    <div className="flex flex-col gap-3">
+      <div className="flex items-start justify-between gap-4">
+        <p className="text-mono-cap text-text-tertiary">
+          {metaPieces.join(" · ")}
+        </p>
+        {sourceUrl && <ArrowUpRight className="h-4 w-4 shrink-0 text-text-tertiary" aria-hidden="true" />}
+      </div>
       {/* Cap the measure: full-width cards ran ~180-character lines on desktop. */}
       <p className="line-clamp-2 max-w-[75ch] text-body text-foreground">
         {decodeHTMLEntities(post.translated_content || post.content || post.title || "")}

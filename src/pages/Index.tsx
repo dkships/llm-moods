@@ -38,10 +38,11 @@ const Index = () => {
   return (
     <>
       {/* Hero */}
-      <section className="container relative overflow-hidden pb-12 pt-16 sm:pb-16 sm:pt-20 lg:pt-24">
+      <section className="container relative overflow-hidden pb-14 pt-14 sm:pb-20 sm:pt-20">
         <div className="pointer-events-none absolute -right-[18%] -top-40 h-[620px] w-[620px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.14)_0%,_hsl(var(--glow)/0.04)_36%,_transparent_68%)] sm:-right-[12%]" aria-hidden="true" />
         <div className="pointer-events-none absolute -left-[24%] top-40 h-[420px] w-[420px] rounded-full bg-[radial-gradient(ellipse_at_center,_hsl(var(--glow)/0.06)_0%,_transparent_70%)] sm:-left-[8%]" aria-hidden="true" />
         <div className="relative flex flex-col items-center text-center">
+          <p className="mb-6 text-mono-cap text-text-tertiary">Community sentiment, measured daily</p>
           <h1 className="text-hero text-foreground">
             Is your AI having<br />
             a <span className="text-primary glow-text">bad day</span>?
@@ -50,11 +51,14 @@ const Index = () => {
             A daily read on how the community feels about each model.
           </p>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
-            <Button asChild size="lg" variant="outline" className="group gap-2 border-primary/40 text-meta text-foreground transition-colors hover:border-primary/60 hover:bg-primary/10 hover:text-foreground">
+            <Button asChild size="lg" variant="outline" className="min-h-12 gap-3 rounded-lg border-foreground bg-foreground text-meta text-background hover:bg-foreground/90 hover:text-background">
               <Link to="/dashboard">
                 Check the Vibes
-                <ArrowRight className="h-4 w-4 text-primary transition-transform group-hover:translate-x-1" />
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
               </Link>
+            </Button>
+            <Button asChild size="lg" variant="ghost" className="min-h-12 rounded-lg text-meta text-text-secondary hover:text-foreground">
+              <Link to="/compare">Compare models</Link>
             </Button>
           </div>
           <p className="mt-8 text-mono-cap text-text-tertiary">
@@ -65,7 +69,7 @@ const Index = () => {
 
       {/* Live Vibes Preview */}
       <section className="border-y border-border bg-card/20">
-        <div className="container py-10 sm:py-12">
+        <div className="container py-10 sm:py-14">
             <div className="mb-5 flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
               <h2 className="text-section text-foreground">Live model scores</h2>
               <span className="text-mono-cap text-text-tertiary">
@@ -95,7 +99,7 @@ const Index = () => {
 
       {/* How it works */}
       <section>
-            <div className="container py-12 sm:py-16">
+            <div className="container py-14 sm:py-20">
               <SectionHeader title="How it works" className="mb-6 sm:mb-8" />
               <ol className="grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-3">
                 {[
@@ -112,9 +116,9 @@ const Index = () => {
                     body: "Volume-weighted into a 0–100 daily score per model. Higher means happier users.",
                   },
                 ].map((step, i) => (
-                  <li key={step.title} className="border-t border-border pt-5 text-left">
-                    <div className="flex items-baseline gap-3">
-                      <span className="text-mono-cap text-text-tertiary">0{i + 1}</span>
+                  <li key={step.title} className="border-t border-border pt-6 text-left">
+                    <div className="flex items-center gap-3">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-card text-mono-cap text-text-tertiary">0{i + 1}</span>
                       <p className="text-section text-foreground">{step.title}</p>
                     </div>
                     <p className="mt-2.5 text-body text-text-secondary">

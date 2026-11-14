@@ -1,8 +1,8 @@
 import type { ElementType, ReactNode, ComponentPropsWithoutRef } from "react";
 
 const sizeClasses = {
-  default: "rounded-xl p-4 sm:p-6", // standard card
-  compact: "rounded-lg p-4", // chatter rows, dense rows
+  default: "rounded-xl p-5 sm:p-6", // standard card
+  compact: "rounded-xl p-5", // chatter rows, dense rows
   bare: "rounded-xl", // wrappers that own their own padding
 } as const;
 

@@ -242,7 +242,7 @@ const Compare = () => {
 
   return (
     <>
-      <section className="container pb-8 pt-10 sm:pt-12">
+      <section className="container page-intro">
         <PageHeader
           title="Compare AI models"
           description="Pick any two tracked models to see how their community sentiment, trend, and complaints stack up side by side."
@@ -267,7 +267,7 @@ const Compare = () => {
           </Surface>
         ) : (
           <>
-            <div className="space-y-3">
+            <Surface className="grid gap-5 lg:grid-cols-2 lg:gap-8">
               <div role="group" aria-labelledby="compare-pick-a" className="flex flex-wrap items-center gap-2">
                 <span id="compare-pick-a" className="w-full text-meta text-text-tertiary sm:w-16">Model A</span>
                 {(models ?? []).map((m) => (
@@ -296,7 +296,7 @@ const Compare = () => {
                   </FilterChip>
                 ))}
               </div>
-            </div>
+            </Surface>
 
             {/* One grid with shared row tracks (not two independent column
                 stacks): cells are emitted in A, B pairs per row (header,

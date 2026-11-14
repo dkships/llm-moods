@@ -112,7 +112,7 @@ const ResearchPostPage = () => {
   }
 
   return (
-          <article className="container pb-16 pt-10 sm:pt-12">
+          <article className="container pb-20 pt-10 sm:pt-14">
             <div className="mx-auto max-w-3xl">
               <Link
                 to="/research"
@@ -122,7 +122,7 @@ const ResearchPostPage = () => {
                 Back to Research
               </Link>
 
-              <header className="mb-8 border-b border-border pb-8">
+              <header className="mb-10 border-b border-border pb-10">
                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-mono-cap text-text-tertiary">
                   <span>
                     {formatDate(post.publishedAt)} · {post.author}
@@ -135,10 +135,10 @@ const ResearchPostPage = () => {
                     than the article's own H2s (prose-h2:text-2xl), so the title read
                     as a subheading below sm. Headlines can still run ~6-7 lines at
                     320px, but a wrapping H1 beats one that's outranked by its H2s. */}
-                <h1 className="mt-3 text-page text-foreground">
+                <h1 className="mt-4 text-page text-foreground">
                   {post.title}
                 </h1>
-                <p className="mt-4 text-body text-text-secondary">{post.summary}</p>
+                <p className="mt-5 text-body text-text-secondary">{post.summary}</p>
                 <div className="mt-5 flex flex-wrap items-center gap-2">
                   {post.tags.map((tag) => (
                     <Tag key={tag} shape="pill">{tag}</Tag>
@@ -175,7 +175,7 @@ const ResearchPostPage = () => {
               <footer className="mt-12 border-t border-border pt-6">
                 <ShareLinks url={`https://llmvibes.ai/research/${post.slug}`} title={post.title} />
 
-                <p className="mt-4 text-meta text-text-tertiary">
+                <p className="mt-4 break-words text-meta text-text-tertiary">
                   Cite this analysis: {post.author}, &ldquo;{post.title.replace(/\.$/, "")},&rdquo; LLM Vibes,{" "}
                   {formatDate(post.publishedAt)}. llmvibes.ai/research/{post.slug}
                 </p>

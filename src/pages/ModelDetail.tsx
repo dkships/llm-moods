@@ -24,7 +24,7 @@ import { useVendorStatus } from "@/hooks/useVendorStatus";
 import { VENDOR_BY_MODEL, type ModelSlug } from "@/data/vendor-events";
 import { eventGlyph } from "@/components/VibesChart";
 import {
-  getVibeStatus, formatComplaintLabel, SOURCE_LABELS, sentimentAlpha,
+  getVibeStatus, formatComplaintLabel, SOURCE_LABELS,
   getModelAccent, toWholePercents,
 } from "@/lib/vibes";
 import { ChartSkeleton, BarsSkeleton, ChatterSkeleton, Shimmer } from "@/components/Skeletons";
@@ -233,7 +233,7 @@ const ModelDetail = () => {
   return (
     <>
           {/* Model Header */}
-          <section className="container pb-8 pt-10 sm:pt-12">
+          <section className="container page-intro">
             <Link
               to="/dashboard"
               className="mb-5 inline-flex min-h-11 items-center gap-1.5 rounded-md text-meta text-text-tertiary transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
@@ -241,66 +241,70 @@ const ModelDetail = () => {
               <ArrowLeft className="h-3.5 w-3.5" />
               Dashboard
             </Link>
-            {enriched && <p className={`text-mono-cap text-text-tertiary`}>{vibe.label}</p>}
-            <div className="mt-1 flex items-center gap-3">
-              <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: accent }} />
-              <h1 className="text-page text-foreground">{model.name}</h1>
-            </div>
-            {enriched ? (
-              <>
-                <div className="mt-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:gap-5">
-                  <p
-                    className="text-score sm:text-score-xl"
-                    style={{ color: vibe.color, textShadow: `0 0 30px ${sentimentAlpha(vibe.color, 0.25)}, 0 0 60px ${sentimentAlpha(vibe.color, 0.08)}` }}
-                  >
-                    {latestScore}
-                  </p>
-                  <p className={`pb-2 text-mono-cap text-text-secondary`}>{trendCaption}</p>
+            <Surface className="grid items-end gap-x-8 sm:grid-cols-[1fr_auto] sm:p-8">
+              <div>
+                {enriched && <p className="text-mono-cap text-text-tertiary">{vibe.label}</p>}
+                <div className="mt-2 flex items-center gap-3">
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: accent }} />
+                  <h1 className="text-page text-foreground">{model.name}</h1>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-mono-cap text-text-tertiary">
-                  <span>{metaParts.join(" · ")}</span>
-                  {enriched?.isStale && (
-                    <Tag tone="warning" shape="pill" title="Score not refreshed with new posts recently">
-                      Stale
-                    </Tag>
-                  )}
-                  {enriched?.scoreBasisStatus === "thin_sample" && (
-                    <Tag tone="warning" shape="pill" title="Today's score rests on a small number of high-confidence posts">
-                      Low sample
-                    </Tag>
-                  )}
-                  {failedPosts > 0 && (
-                    <Tag tone="warning" shape="pill" title="Posts that couldn't be classified after several attempts">
-                      {failedPosts.toLocaleString()} abandoned
-                    </Tag>
-                  )}
+              </div>
+              {enriched ? (
+                <>
+                  <div className="mt-6 flex flex-wrap items-end gap-x-6 gap-y-3 sm:mt-0">
+                    <p className="flex items-baseline gap-3">
+                      <span className="text-score sm:text-score-xl" style={{ color: vibe.color }}>
+                        {latestScore}
+                      </span>
+                      <span className="text-meta text-text-tertiary">/ 100</span>
+                    </p>
+                    <p className={`pb-2 text-mono-cap text-text-secondary`}>{trendCaption}</p>
+                  </div>
+                  <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1.5 sm:col-span-2 text-mono-cap text-text-tertiary">
+                    <span>{metaParts.join(" · ")}</span>
+                    {enriched?.isStale && (
+                      <Tag tone="warning" shape="pill" title="Score not refreshed with new posts recently">
+                        Stale
+                      </Tag>
+                    )}
+                    {enriched?.scoreBasisStatus === "thin_sample" && (
+                      <Tag tone="warning" shape="pill" title="Today's score rests on a small number of high-confidence posts">
+                        Low sample
+                      </Tag>
+                    )}
+                    {failedPosts > 0 && (
+                      <Tag tone="warning" shape="pill" title="Posts that couldn't be classified after several attempts">
+                        {failedPosts.toLocaleString()} abandoned
+                      </Tag>
+                    )}
+                  </div>
+                </>
+              ) : landingError ? (
+                <p className="mt-4 text-body text-text-secondary">Live score unavailable right now.</p>
+              ) : (
+                <div className="mt-4 space-y-3" role="status" aria-live="polite">
+                  <Shimmer className="h-14 w-32" />
+                  <Shimmer className="h-4 w-52" />
                 </div>
-              </>
-            ) : landingError ? (
-              <p className="mt-4 text-body text-text-secondary">Live score unavailable right now.</p>
-            ) : (
-              <div className="mt-4 space-y-3" role="status" aria-live="polite">
-                <Shimmer className="h-14 w-32" />
-                <Shimmer className="h-4 w-52" />
-              </div>
-            )}
-            {siblingModels.length > 0 && (
-              <div className="mt-4 flex flex-wrap items-center gap-x-3 text-meta text-text-tertiary">
-                <span>Also tracking:</span>
-                {siblingModels.map((m, i) => (
-                  <span key={m.slug} className="inline-flex items-center gap-3">
-                    <Link
-                      to={`/model/${m.slug}`}
-                      onMouseEnter={() => prefetch(m.slug, m.id)}
-                      className="inline-flex min-h-11 items-center rounded-md text-text-secondary underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
-                    >
-                      {m.name}
-                    </Link>
-                    {i < siblingModels.length - 1 && <span aria-hidden="true">·</span>}
-                  </span>
-                ))}
-              </div>
-            )}
+              )}
+              {siblingModels.length > 0 && (
+                <div className="mt-6 flex flex-wrap items-center gap-x-3 sm:col-span-2 border-t border-border pt-3 text-meta text-text-tertiary">
+                  <span>Also tracking:</span>
+                  {siblingModels.map((m, i) => (
+                    <span key={m.slug} className="inline-flex items-center gap-3">
+                      <Link
+                        to={`/model/${m.slug}`}
+                        onMouseEnter={() => prefetch(m.slug, m.id)}
+                        className="inline-flex min-h-11 items-center rounded-md text-text-secondary underline underline-offset-4 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                      >
+                        {m.name}
+                      </Link>
+                      {i < siblingModels.length - 1 && <span aria-hidden="true">·</span>}
+                    </span>
+                  ))}
+                </div>
+              )}
+            </Surface>
           </section>
 
           {/* Recent incident analysis — only when a research post references this model */}

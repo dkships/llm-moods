@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import SectionHeader from "@/components/SectionHeader";
+import PageHeader from "@/components/PageHeader";
 import Surface from "@/components/Surface";
 import ModelCard from "@/components/ModelCard";
 import ChatterPost from "@/components/ChatterPost";
@@ -89,19 +90,17 @@ const Dashboard = () => {
   return (
     <>
           {/* Page Header */}
-          <section className="container pb-8 pt-10 sm:pt-12">
-            <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1">
-              <h1 className="text-page text-foreground">Current vibes</h1>
-              <p
-                className="text-meta text-text-tertiary"
-                role="status"
-                aria-live="polite"
-              >
-                {oldestModelIngestAt
-                  ? `Updated ${formatTimeAgo(oldestModelIngestAt)} · ${today}`
-                  : today}
-              </p>
-            </div>
+          <section className="container page-intro">
+            <PageHeader
+              title="Current vibes"
+              description="A daily pulse on how people feel about the models they use."
+              meta={today}
+              freshness={oldestModelIngestAt && (
+                <p className="text-meta text-text-tertiary" role="status" aria-live="polite">
+                  Updated {formatTimeAgo(oldestModelIngestAt)}
+                </p>
+              )}
+            />
           </section>
 
           {/* Model Cards */}

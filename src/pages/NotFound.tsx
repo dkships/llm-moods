@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import useHead from "@/hooks/useHead";
+import Surface from "@/components/Surface";
 
 const NotFound = () => {
   useHead({
@@ -13,8 +14,9 @@ const NotFound = () => {
 
   return (
         <section className="container flex min-h-[calc(100svh-14rem)] items-center justify-center py-16">
-          <div className="text-center">
-            <h1 className="mb-4 text-score-xl text-foreground">404</h1>
+          <Surface className="w-full max-w-xl text-center sm:p-12">
+            <p className="mb-6 text-mono-cap text-text-tertiary">Off the radar</p>
+            <h1 className="mb-6 text-score-xl text-foreground">404</h1>
             <p className="text-section text-text-secondary mb-8">
               This page doesn't exist.
             </p>
@@ -35,7 +37,7 @@ const NotFound = () => {
               </Link>
               .
             </p>
-          </div>
+          </Surface>
         </section>
   );
 };

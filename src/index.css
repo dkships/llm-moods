@@ -52,7 +52,8 @@
        --warning (8.6:1) and --primary (9.9:1) when they sit in the same row. */
     --destructive-text: 0 85% 66%;
 
-    --border: 220 14% 24%;
+    --border: 220 14% 21%;
+    --border-hover: 220 12% 36%;
     --input: 220 14% 24%;
     --ring: 142 70% 52%;
 
@@ -106,6 +107,7 @@
 
   h1, h2, h3, h4, h5, h6 {
     @apply font-display;
+    text-wrap: balance;
   }
 
   code, pre, .font-mono {
@@ -122,13 +124,13 @@
      See "ONE RHYTHM" in the UX & UI polish doc. */
   .text-hero {
     @apply font-display font-bold;
-    font-size: 36px;
+    font-size: 40px;
     line-height: 1.1;
     letter-spacing: -0.02em;
   }
   @media (min-width: 640px) {
     .text-hero {
-      font-size: 64px;
+      font-size: 72px;
       line-height: 1.05;
     }
   }
@@ -146,27 +148,37 @@
   }
   .text-page {
     @apply font-display font-bold;
-    font-size: 36px;
-    line-height: 1.05;
-    letter-spacing: -0.02em;
+    font-size: clamp(32px, 4vw, 40px);
+    line-height: 1.15;
+    letter-spacing: -0.035em;
   }
   .text-section {
     @apply font-display font-semibold;
-    font-size: 18px;
+    font-size: 20px;
+    line-height: 1.35;
+    letter-spacing: -0.02em;
   }
   .text-body {
     @apply font-body font-normal;
-    font-size: 14px;
-    line-height: 1.55;
+    font-size: 15px;
+    line-height: 1.7;
   }
   .text-meta {
     @apply font-mono font-normal;
     font-size: 12px;
+    line-height: 1.65;
   }
   .text-mono-cap {
     @apply font-mono font-medium uppercase;
     font-size: 11px;
-    letter-spacing: 0.06em;
+    letter-spacing: 0.08em;
+    line-height: 1.6;
+  }
+
+  /* A shared opening rhythm keeps every public page aligned with navigation. */
+  .page-intro {
+    padding-top: clamp(2.5rem, 5vw, 4rem);
+    padding-bottom: 2.5rem;
   }
 
   .glow-text {
@@ -177,38 +189,23 @@
     @apply border border-border bg-card;
   }
 
-  /* Card elevation utilities (opt-in). `surface-card` adds a resting shadow and
-     the faint top highlight; `surface-lift` adds a calm shadow lift on hover for
-     interactive cards. Both compose with `.glass`. */
+  /* Interactive surfaces keep their position; a brighter edge signals focus. */
   .surface-card {
     box-shadow: var(--shadow-card);
     background-image: var(--gradient-surface);
   }
   .surface-lift {
-    transition: box-shadow 0.25s ease, border-color 0.2s ease, transform 0.25s ease;
+    transition: border-color 0.2s ease;
   }
   @media (hover: hover) and (pointer: fine) {
     .surface-lift:hover {
-      border-color: hsl(var(--border) / 0.95);
-      box-shadow: var(--shadow-elevated);
-      transform: translateY(-2px);
+      border-color: hsl(var(--border-hover));
     }
   }
-  .surface-lift:active {
-    transform: translateY(0);
-    box-shadow: var(--shadow-card);
-    transition-duration: 75ms;
-  }
-  /* Keyboard-focus equivalent of the hover lift above, kept outside the
-     hover media query so tabbing to a card's interactive content gets the
-     same affordance regardless of pointer capability. The second selector
-     covers cards whose focusable link wraps the surface (e.g. ModelCard),
-     where :focus-within on the surface itself can't match. */
+  /* Match the pointer affordance for keyboard users, including wrapped links. */
   .surface-lift:focus-within,
   a:focus-visible > .surface-lift {
-    border-color: hsl(var(--border) / 0.95);
-    box-shadow: var(--shadow-elevated);
-    transform: translateY(-2px);
+    border-color: hsl(var(--border-hover));
   }
 
   .scrollbar-thin {

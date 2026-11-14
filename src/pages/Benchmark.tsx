@@ -134,10 +134,10 @@ const GenerationRow = ({ g, showBench }: { g: ShipSenseGeneration; showBench?: b
   const decisive = g.verdict === "decisive-up" || g.verdict === "decisive-down";
   return (
     <li className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 py-3">
-      <p className="text-body text-text-secondary">
-        <span className="whitespace-nowrap">{g.prevLabel} {fmt1(g.prevScore)}</span>
-        <span className="mx-2 text-text-tertiary">→</span>
-        <span className="whitespace-nowrap text-foreground">
+      <p className="flex min-w-0 max-w-full flex-wrap items-baseline gap-x-2 gap-y-1 text-body text-text-secondary">
+        <span className="max-w-full">{g.prevLabel} {fmt1(g.prevScore)}</span>
+        <span className="text-text-tertiary">→</span>
+        <span className="max-w-full text-foreground">
           {g.currLabel} {fmt1(g.currScore)}
         </span>
       </p>
@@ -168,7 +168,7 @@ const Benchmark = () => {
 
   return (
     <>
-      <section className="container pb-8 pt-10 sm:pt-12">
+      <section className="container page-intro">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <p className="text-mono-cap text-text-tertiary">

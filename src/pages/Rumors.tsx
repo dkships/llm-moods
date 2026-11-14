@@ -39,7 +39,7 @@ const Rumors = () => {
 
   return (
     <>
-          <section className="container pb-8 pt-10 sm:pt-12">
+          <section className="container page-intro">
             <PageHeader
               title="Rumors"
               description="What the community is saying about unreleased Claude, ChatGPT, Gemini, and Grok models — the next version, its stage, and when it's rumored to land. Unconfirmed community estimates, not forecasts."

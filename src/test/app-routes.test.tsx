@@ -193,7 +193,7 @@ describe("public app routes", () => {
 
     expect(await screen.findByRole("heading", { name: /is your ai having a bad day/i })).toBeInTheDocument();
     expect(screen.getByText(/skip to main content/i)).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /mixed signals.*chatgpt.*59/i })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /chatgpt.*mixed signals.*59/i })).toBeInTheDocument();
     expect(screen.getAllByText(/328 POSTS/).length).toBeGreaterThan(0);
   });
 

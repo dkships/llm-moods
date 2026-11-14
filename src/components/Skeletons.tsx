@@ -2,35 +2,29 @@ export const Shimmer = ({ className = "" }: { className?: string }) => (
   <div className={`animate-pulse rounded-lg bg-secondary/35 ${className}`} />
 );
 
-// Mirrors ModelCard's anatomy (label / name+score / sparkline / meta /
-// complaint row) so the loaded card lands in place instead of reflowing.
-// The sentiment strip is positioned exactly as ModelCard positions it —
-// absolute, so it contributes no flow height, and a left rail on mobile that
-// becomes a top bar at `sm`. This is the single card skeleton for both `/` and
-// `/dashboard`; they render the identical ModelCard, so they must not have
-// differently-shaped placeholders.
+// Match the model name, score, trend, sparkline, and complaint row so loading
+// preserves the card's visual rhythm.
 export const CardSkeleton = () => (
-  <div className="glass relative min-h-56 overflow-hidden rounded-xl sm:min-h-64">
-    <Shimmer className="absolute inset-y-0 left-0 w-[3px] rounded-none sm:inset-x-0 sm:bottom-auto sm:h-1.5 sm:w-auto" />
-    {/* Shimmer heights are ModelCard's real line boxes: text-mono-cap 11px x
-        1.5 = 17, text-score 48px x 1 = 48, text-body 14px x 1.55 = 22. */}
-    <div className="px-5 py-4 sm:p-6">
-      <Shimmer className="h-[17px] w-24" />
-      <div className="mt-1 flex items-start justify-between gap-3">
-        <Shimmer className="h-[27px] w-28" />
-        <Shimmer className="h-12 w-14" />
-      </div>
-      <Shimmer className="mt-3 h-10 w-full sm:mt-4 sm:h-12" />
-      <Shimmer className="mt-2.5 h-[17px] w-36 sm:mt-3" />
-      <div className="mt-3 border-t border-border pt-3 sm:mt-4">
-        <Shimmer className="h-[22px] w-40" />
-      </div>
+  <div className="glass rounded-xl p-5 sm:p-6">
+    <div className="flex items-center justify-between gap-3">
+      <Shimmer className="h-[27px] w-28" />
+      <Shimmer className="h-4 w-4" />
+    </div>
+    <Shimmer className="mt-1 h-[18px] w-24" />
+    <div className="mt-5 flex items-end justify-between gap-3">
+      <Shimmer className="h-12 w-28" />
+      <Shimmer className="mb-1 h-[18px] w-14" />
+    </div>
+    <Shimmer className="mt-4 h-10 w-full" />
+    <Shimmer className="mt-3 h-[18px] w-24" />
+    <div className="mt-4 border-t border-border pt-4">
+      <Shimmer className="h-[26px] w-40" />
     </div>
   </div>
 );
 
 export const RumorCardSkeleton = () => (
-  <div className="glass space-y-4 rounded-xl p-4 sm:p-6">
+  <div className="glass space-y-4 rounded-xl p-5 sm:p-6">
     <div className="flex justify-between">
       <Shimmer className="h-3.5 w-24" />
       <Shimmer className="h-3.5 w-28" />
@@ -54,7 +48,7 @@ export const RumorCardSkeleton = () => (
 );
 
 export const ChatterSkeleton = () => (
-  <div className="glass rounded-lg p-4 flex flex-col gap-2">
+  <div className="glass rounded-xl p-5 flex flex-col gap-3">
     <Shimmer className="h-3 w-40" />
     <Shimmer className="h-4 w-full" />
     <Shimmer className="h-4 w-2/3" />
@@ -67,7 +61,7 @@ export const ChatterSkeleton = () => (
 // had no counterpart in the loaded markup.
 export const ChartSkeleton = () => (
   <div>
-    <Shimmer className="mb-4 h-[23px] w-36" />
+    <Shimmer className="mb-5 h-[27px] w-36" />
     <Shimmer className="h-64 w-full" />
     <div className="mt-4 flex gap-2">
       <Shimmer className="h-11 w-14" />

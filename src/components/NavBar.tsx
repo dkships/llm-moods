@@ -75,8 +75,8 @@ const NavBar = () => {
   }, [isMenuOpen]);
 
   const desktopLinkClass = (active: boolean) =>
-    `inline-flex shrink-0 items-center rounded-md px-2 py-1 text-mono-cap transition-colors ${FOCUS_RING} ${
-      active ? "bg-primary/10 text-primary" : "text-text-tertiary hover:text-foreground"
+    `inline-flex min-h-11 shrink-0 items-center rounded-md px-3 py-2 text-mono-cap transition-colors ${FOCUS_RING} ${
+      active ? "bg-primary/10 text-primary" : "text-text-secondary hover:bg-secondary/50 hover:text-foreground"
     }`;
 
   const menuLinkClass = (active: boolean) =>
@@ -85,7 +85,7 @@ const NavBar = () => {
     }`;
 
   return (
-    <header className="sticky top-0 z-50 border-b border-border/80 bg-background/70 backdrop-blur-xl supports-[backdrop-filter]:bg-background/55 shadow-[0_1px_0_0_hsl(0_0%_100%/0.02)]">
+    <header className="sticky top-0 z-50 border-b border-border/80 bg-background/95 backdrop-blur-xl supports-[backdrop-filter]:bg-background/85">
       <a href="#main-content" className="skip-link">
         Skip to main content
       </a>
@@ -95,14 +95,16 @@ const NavBar = () => {
           aria-label="LLM Vibes"
           className={`inline-flex min-h-11 min-w-0 items-center gap-1.5 rounded-md sm:gap-2 ${FOCUS_RING}`}
         >
-          <SvgMark />
+          <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-primary/20 bg-primary/5">
+            <SvgMark />
+          </span>
           <span className="whitespace-nowrap text-section text-foreground">
             LLM <span className="text-primary">Vibes</span>
           </span>
         </Link>
 
         {/* Wide screens: every link in one row. */}
-        <nav aria-label="Primary" className="hidden items-center gap-3 sm:flex lg:gap-5">
+        <nav aria-label="Primary" className="hidden items-center gap-1 md:flex lg:gap-2">
           {items.map((item) => (
             <Link
               key={item.to}
@@ -132,7 +134,7 @@ const NavBar = () => {
           aria-controls={menuId}
           aria-label={isMenuOpen ? "Close menu" : "Open menu"}
           onClick={() => setIsMenuOpen((open) => !open)}
-          className={`inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-secondary/40 px-3 text-mono-cap text-text-secondary transition-colors hover:text-foreground sm:hidden ${FOCUS_RING}`}
+          className={`inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-secondary/40 px-3 text-mono-cap text-text-secondary transition-colors hover:text-foreground md:hidden ${FOCUS_RING}`}
         >
           {activeItem ? <span className="text-primary">{activeItem.label}</span> : <span>Menu</span>}
           {isMenuOpen ? <X className="h-4 w-4" aria-hidden="true" /> : <Menu className="h-4 w-4" aria-hidden="true" />}
@@ -140,7 +142,7 @@ const NavBar = () => {
       </div>
 
       {isMenuOpen && (
-        <nav id={menuId} aria-label="Primary" className="border-t border-border/80 sm:hidden">
+        <nav id={menuId} aria-label="Primary" className="border-t border-border/80 md:hidden">
           <ul className="container flex flex-col gap-1 py-3">
             {items.map((item) => (
               <li key={item.to}>
