@@ -12,6 +12,7 @@ export const BIO_LINKS: ReadonlyArray<{ label: string; href: string; external: b
   { label: "dmkthinks.org", href: "https://dmkthinks.org", external: true },
   { label: "linkedin.com/in/thedmkelly", href: "https://www.linkedin.com/in/thedmkelly/", external: true },
   { label: "github.com/dkships", href: "https://github.com/dkships", external: true },
+  { label: "x.com/dmkthinks", href: "https://x.com/dmkthinks", external: true },
 ];
 
 export const AUTHOR_NAME = "David Kelly";

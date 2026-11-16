@@ -85,6 +85,15 @@ const Privacy = () => {
                 className={LINK_CLASS}
               >
                 LinkedIn
+              </a>{" "}
+              or{" "}
+              <a
+                href="https://x.com/dmkthinks"
+                target="_blank"
+                rel="noopener noreferrer"
+                className={LINK_CLASS}
+              >
+                X
               </a>
               . This covers chatter-feed posts, rumor sources, and quotes in research articles.
             </p>
