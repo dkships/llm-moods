@@ -4,7 +4,7 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
-## 2026-11-17 — gpt-6.2-sol evaluated as classifier (not adopted)
+## 2026-11-17 — gpt-6.2-sol evaluated and adopted as classifier (standard priority)
 
 First run of `classifier-eval-batch` (Batch API, keys stay in Supabase; procedure in
 AGENT-REFERENCE.md). 240 posts that production gpt-6.1-sol classified in the 14 days to
@@ -33,12 +33,26 @@ stored production labels, which come from the same model, prompt and effort on f
 - gpt-6.2-sol accepts `reasoning_effort: "low"`. `NO_NONE_EFFORT` now covers `gpt-6.2`
   (commit e9a64d5). The **deployed drain predates that fix**, so redeploy
   `drain-classification-queue` before any `CLASSIFIER_MODEL=gpt-6.2-sol` flip.
-- Decision: stay on gpt-6.1-sol @ low. There is no quality or cost gain to buy with a
-  launch-day model swap. Revisit if 6.1 Sol is deprecated, 6.2 gets cheaper, or a re-run
-  shows a real category gap.
+- First recommendation was to stay on 6.1. David chose the newest model for its small
+  sentiment and relevance edge, after seeing the cost below.
+- **gpt-6.2-sol rejects `service_tier: "flex"` on Chat Completions** (400: "use
+  background=true with background_options.completion_window"), found with the eval's
+  `cache_probe`. A bare `CLASSIFIER_MODEL` flip would have failed every request. `NO_FLEX`
+  sends `auto` for `gpt-6.2*` (commit 51315f5). At standard priority the static prefix is
+  prompt-cached: 4,657 of 4,660 tokens on a repeat call. Flex has never reported a hit. Expect
+  ≈$24/mo at standard vs ≈$16/mo for 6.1 on flex.
+- **Cutover, live-verified 2026-11-17 23:04 UTC:** the drain at `2026-11-17.2-gpt-62-standard`
+  was deployed first and confirmed through the cron reply's `code_version`. Then the secret
+  was flipped. An off-schedule HN scrape classified 39 posts (19 relevant, 20 irrelevant) as
+  `targeted-gpt-6.2-sol-2026-06-01`: 3 calls, tier `default`, 0 errors. Those first concurrent
+  calls showed 0 cached tokens (cold cache); recheck `cached_tokens` in `classifier_usage_daily`
+  on the next days. Rollback: `CLASSIFIER_MODEL=gpt-6.1-sol`, no redeploy.
 - Separate finding from `classifier_usage_daily` (30 days to 11-17): 406 of 1,957 calls
   (21%) fell back from flex to standard pricing. That is ≈$6.7 of ≈$19.7 spent, about $3.4/mo
-  above what all-flex would cost. It's a bigger lever than any model swap.
+  above what all-flex would cost. Fixed the same day (330c089): the drain defers a flex
+  capacity 429 to a flex retry 4 minutes later and pays standard only for rows 45+ minutes old.
+  A deferral doesn't count as an attempt. This applies to flex models; 6.2 runs at standard
+  regardless.
 
 ## 2026-11-12 — Reddit trimmed to 5 subs + Apify ledger fix (live-DB measured)
 
