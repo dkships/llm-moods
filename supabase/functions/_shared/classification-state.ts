@@ -1,9 +1,11 @@
 import {
   classifyBatchTargeted,
+  FLEX_UNAVAILABLE,
   isClassifierFailure,
   providerForModel,
   resolveClassifierModel,
   type ClassifyResult,
+  type FlexFallback,
 } from "./classifier.ts";
 
 type DenoGlobal = typeof globalThis & {
@@ -44,6 +46,7 @@ export interface PendingModelMentionRow {
   content: string | null;
   source_url: string | null;
   classification_attempts: number | null;
+  created_at?: string | null;
   models?: { name?: string | null; slug?: string | null } | { name?: string | null; slug?: string | null }[] | null;
 }
 
@@ -121,6 +124,16 @@ export function targetModelLabel(row: PendingModelMentionRow): string {
   return relatedModel?.slug || relatedModel?.name || row.model_id;
 }
 
+// Rows this old pay standard price on a flex capacity 429 instead of waiting
+// another flex retry. Kept under pipeline-watchdog's QUEUE_OLDEST_WARN_MIN (60)
+// so deferral never trips the queue-age alarm.
+const FLEX_DEFER_MAX_AGE_MS = 45 * 60 * 1000;
+
+export function flexFallbackFor(rows: Pick<PendingModelMentionRow, "created_at">[], now: Date): FlexFallback {
+  const oldest = Math.min(...rows.map((r) => (r.created_at ? Date.parse(r.created_at) : now.getTime())));
+  return now.getTime() - oldest >= FLEX_DEFER_MAX_AGE_MS ? "auto" : "defer";
+}
+
 function retryAt(result: ClassifyResult, attempts: number, now: Date): string {
   const retryAfterMs = result.retry_after_ms && result.retry_after_ms > 0
     ? result.retry_after_ms
@@ -134,7 +147,10 @@ export function buildClassificationStateUpdate(
   options: ClassificationStateOptions = {},
 ): Record<string, unknown> {
   const now = options.now ?? new Date();
-  const nextAttempts = (row.classification_attempts ?? 0) + 1;
+  // A flex deferral is a pacing signal, not an attempt: counting it would push
+  // the row toward the 5-attempt dead-letter during a long flex outage.
+  const consumesAttempt = result.error_type !== FLEX_UNAVAILABLE;
+  const nextAttempts = (row.classification_attempts ?? 0) + (consumesAttempt ? 1 : 0);
   const classifierVersion = options.classifierVersion ?? currentClassifierVersion();
   const maxAttempts = options.maxAttempts ?? 5;
 
@@ -298,7 +314,7 @@ export async function processPendingClassifications(
 
   const { data, error } = await supabase
     .from("scraped_posts")
-    .select("id, model_id, title, content, source_url, classification_attempts, models(name, slug)")
+    .select("id, model_id, title, content, source_url, classification_attempts, created_at, models(name, slug)")
     .in("classification_status", ["pending", "retry"])
     .or(`next_classification_at.is.null,next_classification_at.lte.${now.toISOString()}`)
     .order("next_classification_at", { ascending: true, nullsFirst: true })
@@ -314,6 +330,7 @@ export async function processPendingClassifications(
   const items = rows.map((row) => ({ text: modelMentionText(row), targetModel: targetModelLabel(row) }));
   const usageByKey = new Map<string, ClassifierUsageTotals>();
   const results = await classifyBatchTargeted(items, apiKey, batchSize, options.logError, {
+    flexFallback: flexFallbackFor(rows, now),
     onUsage: (sample) => {
       const tier = sample.serviceTier ?? "default";
       const key = `${sample.model}|${tier}`;

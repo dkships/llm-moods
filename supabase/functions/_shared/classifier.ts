@@ -72,6 +72,14 @@ export interface UsageSample {
 
 export type OpenAiServiceTier = "flex" | "auto" | "default";
 
+// What a flex capacity 429 (unbilled) does. "auto" retries the request at
+// standard price right away; "defer" returns a quota_deferred result so the
+// queue retries on flex after FLEX_DEFER_RETRY_MS. Callers that need an answer
+// now (evals, one-shot reclassify) keep the "auto" default.
+export type FlexFallback = "auto" | "defer";
+export const FLEX_UNAVAILABLE = "flex_unavailable";
+const FLEX_DEFER_RETRY_MS = 4 * 60 * 1000;
+
 export interface ClassifyOptions {
   model?: string;
   onUsage?: (sample: UsageSample) => void | Promise<void>;
@@ -86,6 +94,8 @@ export interface ClassifyOptions {
   // Batch rates with no batching rework; capacity 429s / timeouts fall back to
   // "auto" for that request. "default" forces standard pricing.
   serviceTier?: OpenAiServiceTier;
+  // OpenAI flex only. See FlexFallback.
+  flexFallback?: FlexFallback;
   // Anthropic only. Eval knob; the default is defaultToolChoice(model). Models
   // that reject forcing (Sonnet 5.5, Opus 5.5) get auto either way.
   toolChoice?: ToolChoiceMode;
@@ -871,6 +881,13 @@ async function fetchOpenAi(
       // (not billed). Fall back to standard priority for this request instead
       // of deferring the batch on the quota path.
       if (tier === "flex" && /resource_unavailable/i.test(details.reason)) {
+        if (options.flexFallback === "defer") {
+          if (logError) await logError(`OpenAI flex capacity unavailable; deferring batch for a later flex retry`, "classify-flex-deferred");
+          return makeSkippedResult("quota_deferred", FLEX_UNAVAILABLE, {
+            error_type: FLEX_UNAVAILABLE,
+            retry_after_ms: FLEX_DEFER_RETRY_MS,
+          });
+        }
         if (logError) await logError(`OpenAI flex capacity unavailable; retrying with service_tier=auto`, "classify-flex-fallback");
         tier = "auto";
         continue;

@@ -21,6 +21,10 @@ import { corsHeaders } from "../_shared/utils.ts";
 //             with fetch answered from the batch output, so parsing and
 //             alignment are exactly production's. Returns labels + usage.
 //
+//   cache_probe → sends one production request (first BATCH_SIZE posts)
+//             `repeats` times per variant, synchronously, and reports
+//             cached_tokens. Variants may only set CACHE_PROBE_KEYS.
+//
 //   caller ──pg_net──▶ submit ──▶ OpenAI / Anthropic batch
 //   caller ──pg_net──▶ collect ◀── batch output ──▶ replay ──▶ labels
 //
@@ -30,7 +34,7 @@ import { corsHeaders } from "../_shared/utils.ts";
 //     'action','submit', ...));
 // then read the reply from net._http_response.
 
-const CODE_VERSION = "2026-11-17.1";
+const CODE_VERSION = "2026-11-17.2";
 const BATCH_SIZE = 20; // drain DEFAULT_BATCH_SIZE
 const MAX_POSTS = 500;
 const MAX_ARMS = 8;
@@ -41,6 +45,9 @@ const ARM_ID = /^[a-z0-9-]{1,40}$/;
 const OPENAI = "https://api.openai.com/v1";
 const ANTHROPIC = "https://api.anthropic.com/v1";
 const ANTHROPIC_VERSION = "2023-06-01";
+const CACHE_PROBE_KEYS = new Set(["service_tier", "prompt_cache_key", "prompt_cache_options", "prompt_cache_retention"]);
+const MAX_PROBE_VARIANTS = 6;
+const MAX_PROBE_REPEATS = 4;
 
 type Effort = "none" | "low" | "medium" | "high";
 type Provider = "openai" | "anthropic";
@@ -255,6 +262,51 @@ async function collect(arms: Arm[], ids: string[], rows: PendingModelMentionRow[
   return { missing_posts: ids.length - rows.length, arms: out };
 }
 
+function parseVariants(raw: unknown): Record<string, unknown>[] | string {
+  if (!Array.isArray(raw) || raw.length === 0 || raw.length > MAX_PROBE_VARIANTS) { return `variants: 1-${MAX_PROBE_VARIANTS} required`; }
+  for (const v of raw) {
+    if (!v || typeof v !== "object" || Object.keys(v).some((k) => !CACHE_PROBE_KEYS.has(k))) {
+      return `variant keys must be in ${[...CACHE_PROBE_KEYS].join(", ")}`;
+    }
+  }
+  return raw as Record<string, unknown>[];
+}
+
+async function cacheProbe(arm: Arm, items: { text: string; targetModel: string }[], variants: Record<string, unknown>[], repeats: number) {
+  // Capture the first production request body, then replay it per variant.
+  let body: Record<string, unknown> | null = null;
+  await runProduction(arm, items.slice(0, BATCH_SIZE), async (b) => {
+    body ??= b;
+    return new Response(JSON.stringify({ error: { message: "capture" } }), { status: 400 });
+  });
+  if (!body) { throw new Error("no request captured"); }
+
+  const calls: unknown[] = [];
+  for (const [variant, extra] of variants.entries()) {
+    for (let r = 0; r < repeats; r++) {
+      const started = Date.now();
+      const res = await realFetch(`${OPENAI}/chat/completions`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${apiKey("openai")}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ ...(body as Record<string, unknown>), ...extra }),
+      });
+      const data = await res.json().catch(() => null);
+      calls.push({
+        variant,
+        repeat: r,
+        status: res.status,
+        tier: data?.service_tier ?? null,
+        prompt: data?.usage?.prompt_tokens ?? null,
+        cached: data?.usage?.prompt_tokens_details?.cached_tokens ?? null,
+        completion: data?.usage?.completion_tokens ?? null,
+        ms: Date.now() - started,
+        error: res.ok ? undefined : JSON.stringify(data?.error ?? data).slice(0, 200),
+      });
+    }
+  }
+  return calls;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") { return new Response(null, { headers: corsHeaders }); }
 
@@ -277,10 +329,17 @@ Deno.serve(async (req) => {
     if (body?.action === "submit") {
       return json({ code_version: CODE_VERSION, posts: rows.length, batches: await submit(arms, items) });
     }
+    if (body?.action === "cache_probe") {
+      const variants = parseVariants(body?.variants);
+      if (typeof variants === "string") { return json({ code_version: CODE_VERSION, error: variants }, 400); }
+      if (providerOf(arms[0].model) !== "openai") { return json({ code_version: CODE_VERSION, error: "cache_probe is OpenAI only" }, 400); }
+      const repeats = Math.max(1, Math.min(Number(body?.repeats) || 3, MAX_PROBE_REPEATS));
+      return json({ code_version: CODE_VERSION, calls: await cacheProbe(arms[0], items, variants, repeats) });
+    }
     if (body?.action === "collect") {
       return json({ code_version: CODE_VERSION, posts: rows.length, ...await collect(arms, ids, rows, items, body?.batch_ids ?? {}) });
     }
-    return json({ code_version: CODE_VERSION, error: "action must be submit or collect" }, 400);
+    return json({ code_version: CODE_VERSION, error: "action must be submit, collect or cache_probe" }, 400);
   } catch (e) {
     return json({ code_version: CODE_VERSION, error: e instanceof Error ? e.message : String(e) }, 500);
   }

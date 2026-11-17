@@ -568,6 +568,82 @@ describe("free-Gemini spillover", () => {
       p_completion_tokens: 90,
     });
   });
+
+  // Flex capacity 429s are not billed; paying standard on every one cost about
+  // a third of the classifier bill (406 of 1,957 calls, 2026-10-19..11-17).
+  describe("flex capacity deferral", () => {
+    const now = new Date("2026-11-17T20:00:00.000Z");
+    const flexUnavailable = () => new Response(JSON.stringify({
+      error: { type: "resource_unavailable", code: "resource_unavailable", message: "Flex capacity is unavailable." },
+    }), { status: 429, headers: { "Content-Type": "application/json" } });
+    const okReply = () => new Response(JSON.stringify({
+      service_tier: "default",
+      choices: [{ message: { content: JSON.stringify({ results: [
+        { relevant: true, sentiment: "positive", complaint_category: null, praise_category: "output_quality", confidence: 0.9, language: null, english_translation: null },
+        { relevant: true, sentiment: "negative", complaint_category: "hallucinations", praise_category: null, confidence: 0.85, language: null, english_translation: null },
+      ] }) } }],
+      usage: { prompt_tokens: 2100, completion_tokens: 90, total_tokens: 2190 },
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+    function stubOpenAiEnv() {
+      vi.stubGlobal("Deno", {
+        env: { get: (k: string) => (({ CLASSIFIER_MODEL: "gpt-6.2-sol", OPENAI_API_KEY: "ok", GEMINI_API_KEY: "gk" } as Record<string, string>)[k]) },
+      });
+    }
+
+    function rowsCreatedMinutesAgo(minutes: number) {
+      const createdAt = new Date(now.getTime() - minutes * 60_000).toISOString();
+      return claudeRows.map((r) => ({ ...r, created_at: createdAt }));
+    }
+
+    it("defers fresh rows to a later flex retry instead of paying standard", async () => {
+      stubOpenAiEnv();
+      const bodies: Record<string, unknown>[] = [];
+      const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return flexUnavailable();
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const updates: MockUpdate[] = [];
+      const summary = await processPendingClassifications(mockSupabase(rowsCreatedMinutesAgo(5), updates), "ok", {
+        limit: 10,
+        batchSize: 20,
+        now,
+        logError: vi.fn(async () => {}),
+      });
+
+      expect(bodies.map((b) => b.service_tier)).toEqual(["flex"]);
+      expect(summary.retry).toBe(2);
+      expect(updates.every((u) => u.values.classification_status === "retry")).toBe(true);
+      // A deferral is not an attempt: it must not push the row toward dead-letter.
+      expect(updates.every((u) => u.values.classification_attempts === 0)).toBe(true);
+      expect(updates[0].values.next_classification_at).toBe("2026-11-17T20:04:00.000Z");
+    });
+
+    it("pays standard once the oldest row nears the watchdog's queue-age alarm", async () => {
+      stubOpenAiEnv();
+      const bodies: Record<string, unknown>[] = [];
+      const fetchMock = vi.fn(async (_url: unknown, init?: RequestInit) => {
+        bodies.push(JSON.parse(String(init?.body)));
+        return bodies.length === 1 ? flexUnavailable() : okReply();
+      });
+      vi.stubGlobal("fetch", fetchMock);
+
+      const updates: MockUpdate[] = [];
+      const client = mockSupabase(rowsCreatedMinutesAgo(50), updates) as unknown as { rpc: ReturnType<typeof vi.fn> };
+      client.rpc = vi.fn(async () => ({ error: null }));
+      const summary = await processPendingClassifications(client as never, "ok", {
+        limit: 10,
+        batchSize: 20,
+        now,
+        logError: vi.fn(async () => {}),
+      });
+
+      expect(bodies.map((b) => b.service_tier)).toEqual(["flex", "auto"]);
+      expect(summary.classified).toBe(2);
+    });
+  });
 });
 
 describe("batch alignment hardening (2026-07 audit)", () => {
