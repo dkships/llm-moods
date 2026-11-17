@@ -4,6 +4,74 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-11-17 — Source quality pass, score-design backtest, incident feed repair
+
+Trigger: where should the classifier's money go? 14 days of labeled posts (16,503):
+
+| source | share of classifier volume | relevant | cost per 100 relevant (6.2 + data) | tone (positive share of pos+neg) |
+|---|---|---|---|---|
+| Bluesky | 31% | 8.5% | $0.79 | mixed |
+| Twitter | 30% | 17% | $0.51 | mixed |
+| Hacker News | 18% | 34% | $0.20 | mixed, Claude-heavy (728 relevant vs Grok 6) |
+| App Store | 12% | 84% | $0.08 | 78-93% positive for every model |
+| Reddit (5 subs) | 9% | ~39% | $0.65 | 21-57% positive |
+
+**Filters, each measured on the labeled posts before shipping** (code `2026-11-17.1`):
+- Bluesky link shares: a third-party link with no first-person voice drops 22% of
+  volume and 1.8% of relevant posts. Links to GitHub, X, Bluesky, YouTube, note.com,
+  Substack, personal blogs and shared chats are exempt. Without that exemption the
+  rule lost 8.9% of relevant posts. Twitter links are all `t.co`, so the rule can't
+  apply there.
+- Bluesky noisy authors (`get_noisy_authors`: 10+ posts in 14 days, none relevant):
+  46 accounts at launch. Combined with the link rule, it drops 38% of volume and 1.8%
+  of relevant posts.
+- Rejected: dropping non-Latin-script posts (16% of volume, but 29% of relevant;
+  Japanese Claude Code reports are real signal), an engagement floor on Twitter (20%
+  of relevant), and a link rule on Twitter (14%).
+- Twitter sentiment lanes lost bare `openai` / `anthropic` (company-name-only tweets:
+  11% of volume, 1.4% of relevant).
+
+**Search terms.** The Bluesky terms and the Twitter rumor lane still listed shipped or
+dead codenames. Orionmist, Lithiumflow and Honeycomb matched 0 posts in 14 days, and
+"GPT-6" matched 882 posts with 32 relevant. Bluesky terms now live in `scraper_config`.
+Rumor terms come from the radar's unreleased rumors (`_shared/search-terms.ts`). On
+the Twitter side they fill the `{ACTIVE_RUMORS}` placeholder. Current-model names are
+config rows to refresh on launch day; Bluesky run metadata has `term_hits` per term.
+A live probe (25 newest posts per term) found the best yield on current model names
+(Opus 5.5, about 35% relevant) and product surfaces (Claude Code, about 30%). Bare
+"Gemini" was flooded by one bot, and Bluesky barely discusses Grok. Bluesky search
+ANDs the words; it doesn't match phrases.
+
+**Reddit trial** (one run each via the new `subreddits` body override, $0.114):
+r/ChatGPTPro 13 of 22 rows relevant (59%, 11 negative / 2 positive), r/codex 9 of 21
+(43%, 4 / 5), r/OpenAI 8 of 24 (33%). The r/ChatGPT baseline is 41% over 14 days.
+Added **r/codex** (`20261118030000_reddit_add_codex.sql`, +$1.14/mo), so ChatGPT gets
+the same chat + coding-agent pair as Claude (ClaudeAI + ClaudeCode). r/ChatGPTPro is
+the best yield but wasn't added on one strongly negative 18-post sample; trial it for
+two weeks first.
+
+**Score design backtest** (offline, production `computeScore`, 60 days of labels,
+33 scored days after a 28-day warm-up; small sample, so read it as direction):
+
+| | A: today | C: vs peers on the same venue | B: vs own normal |
+|---|---|---|---|
+| r(score, that day's App Store share), ChatGPT / Claude | 0.47 / 0.44 | 0.16 / 0.13 | 0.15 / 0.41 |
+| mean daily jitter (points) | 5.6-9.8 | 4.9-6.8 | 5.1-7.3 |
+| incident-day effect, ChatGPT (7 days) / Claude (5 days), SD | -0.89 / -0.14 | -0.79 / -0.15 | -0.90 / -0.51 |
+| 33-day mean Gemini / Claude / ChatGPT / Grok | 65 / 63 / 60 / 52 | 54 / 55 / 45 / 44 | ~50 by design |
+
+The production score rises on days with more App Store posts. Not shipped: it changes
+the public number, so David decides.
+
+**Incident feed repaired.** `vendor-status-ingest-6h` had failed 28 of 28 runs in
+the last 7 days with "ON CONFLICT DO UPDATE command cannot affect row a second time".
+The xAI feed lists one incident per affected component (75 events, 30 ids), and the
+single-transaction function also blocked OpenAI and Anthropic. Nothing new had been
+recorded since 10-28. Fix (`20261118020000_vendor_ingest_dedupe.sql`): DISTINCT ON
+the incident id, plus a per-snapshot exception block. The first run ingested 82 events
+and recovered 57 missed incidents. The xAI status page also lists Cursor and other
+components that aren't Grok.
+
 ## 2026-11-17 — gpt-6.2-sol evaluated and adopted as classifier (standard priority)
 
 First run of `classifier-eval-batch` (Batch API, keys stay in Supabase; procedure in
