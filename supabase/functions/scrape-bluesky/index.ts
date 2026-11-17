@@ -2,11 +2,13 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 import {
   createRunRecord,
   deriveRunMetrics,
+  getConfigValues,
   internalOnlyResponse,
   isInternalServiceRequest,
   isRunPipelineTriggerRequest,
   isSchedulerRequest,
   isUniqueViolation,
+  loadScraperConfig,
   readJsonBody,
   type RunRecordRow,
   updateRunRecord,
@@ -17,6 +19,8 @@ import {
   matchModels,
   meetsMinLength,
   isLikelyNonExperienceShare,
+  isLikelyLinkShare,
+  loadNoisyAuthors,
   loadRecentTitleKeys,
   isDuplicate,
   logToErrorLog,
@@ -24,26 +28,23 @@ import {
   upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
 import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
+import { loadRumorTerms } from "../_shared/search-terms.ts";
 
 const SOURCE = "scrape-bluesky";
-// Neutral brand terms plus the current unreleased generation names. The previous
-// negative-skew queries ("Gemini sucks", "Grok worse", etc.) had no positive
-// counterpart, so they oversampled negative posts and biased the headline score.
-const SEARCH_TERMS = [
-  "Claude AI",
+// Deploy marker, echoed in run metadata. 2026-11-17.1 = config-driven terms,
+// radar rumor terms, link-share + noisy-author skips, per-term hit counts.
+const CODE_VERSION = "2026-11-17.1";
+// Fallback only; production reads the `search_term` scraper_config rows (brand
+// and product terms plus current model names, edited with SQL, no redeploy).
+// Rumor terms are appended at run time from the live radar (_shared/search-terms.ts).
+// Neutral terms only: the old negative-skew queries ("Gemini sucks") had no
+// positive counterpart and biased the headline score. Searches AND the words.
+const DEFAULT_SEARCH_TERMS = [
   "ChatGPT",
-  "Opus 5",
-  "Claude Honeycomb",
-  "Fable 5.1",
-  "GPT-6",
+  "Claude AI",
+  "Claude Code",
   "Gemini AI",
-  "Gemini 3.5 Pro",
-  "Gemini 4",
-  "Orionmist",
-  "Nightwhisper",
-  "Lithiumflow",
   "Grok AI",
-  "Grok 5",
 ];
 
 // Accounts whose whole timeline is worth reading, not just keyword hits —
@@ -164,6 +165,16 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
     await logToErrorLog(supabase, SOURCE, "Bluesky scraper started", "health-check");
 
     const { modelMap, keywords } = await loadKeywords(supabase);
+    const config = await loadScraperConfig(supabase, SOURCE);
+    const configuredTerms = getConfigValues(config, "search_term");
+    const rumorTerms = await loadRumorTerms(supabase);
+    const searchTerms = [...new Map(
+      [...(configuredTerms.length > 0 ? configuredTerms : DEFAULT_SEARCH_TERMS), ...rumorTerms.map((t) => t.text)]
+        .map((term) => [term.toLowerCase(), term] as const),
+    ).values()];
+    // Accounts with 10+ posts in 14 days and none classified relevant (bots,
+    // SEO feeds). Self-updating: one relevant post or 14 quiet days clears them.
+    const noisyAuthors = await loadNoisyAuthors(supabase, "bluesky");
     const { data: existing } = await supabase
       .from("scraped_posts")
       .select("source_url")
@@ -188,6 +199,10 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
       classificationQueued: 0,
       dedupSkipped: 0,
       contentSkipped: 0,
+      linkShareSkipped: 0,
+      noisyAuthorSkipped: 0,
+      // Posts kept per search term; a term stuck at 0 is stale.
+      termHits: Object.fromEntries(searchTerms.map((term) => [term, 0])) as Record<string, number>,
       errors: [] as string[],
     };
 
@@ -204,7 +219,7 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
 
     // One gate for search hits and author-feed posts alike: recency, length,
     // non-experience filter, keyword match, URL + title dedupe.
-    const considerPost = (post: any) => {
+    const considerPost = (post: any, origin: string) => {
       const text = post.record?.text || "";
       const createdAt = post.record?.createdAt ? new Date(post.record.createdAt) : null;
       if (!createdAt || Number.isNaN(createdAt.getTime()) || createdAt < cutoff) return;
@@ -218,6 +233,17 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
         !isRumorOrReleaseCandidate(text, "")
       ) {
         summary.contentSkipped++;
+        return;
+      }
+      // Rumor and launch posts stay exempt: the rumors radar reads them even
+      // when the classifier marks them irrelevant.
+      const isRumor = isRumorOrReleaseCandidate(text, "");
+      if (!isRumor && isLikelyLinkShare(text, "")) {
+        summary.linkShareSkipped++;
+        return;
+      }
+      if (!isRumor && noisyAuthors.has(post.author?.handle || "")) {
+        summary.noisyAuthorSkipped++;
         return;
       }
 
@@ -257,10 +283,11 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
         quotedStatusId: quotedPostId(post),
       });
       candidateUrls.add(sourceUrl);
+      summary.termHits[origin] = (summary.termHits[origin] ?? 0) + 1;
     };
 
-    for (let i = 0; i < SEARCH_TERMS.length; i++) {
-      const term = SEARCH_TERMS[i];
+    for (let i = 0; i < searchTerms.length; i++) {
+      const term = searchTerms[i];
       if (i > 0) await delay(1000);
 
       try {
@@ -278,7 +305,7 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
         const posts = json.posts || [];
         summary.posts_found += posts.length;
 
-        for (const post of posts) considerPost(post);
+        for (const post of posts) considerPost(post, term);
       } catch (error) {
         summary.errors.push(`"${term}": ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -297,7 +324,7 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
         const json = await res.json();
         const feedPosts = (json.feed || []).map((item: any) => item?.post).filter(Boolean);
         summary.posts_found += feedPosts.length;
-        for (const post of feedPosts) considerPost(post);
+        for (const post of feedPosts) considerPost(post, `@${actor}`);
       } catch (error) {
         summary.errors.push(`@${actor}: ${error instanceof Error ? error.message : String(error)}`);
       }
@@ -356,6 +383,12 @@ export async function handleScrapeBluesky(req: Request): Promise<Response> {
         classification_queued: summary.classificationQueued,
         dedup_skipped: summary.dedupSkipped,
         content_skipped: summary.contentSkipped,
+        link_share_skipped: summary.linkShareSkipped,
+        noisy_author_skipped: summary.noisyAuthorSkipped,
+        noisy_authors: noisyAuthors.size,
+        term_hits: summary.termHits,
+        rumor_terms: rumorTerms.map((t) => t.text),
+        code_version: CODE_VERSION,
       },
       completed_at: new Date().toISOString(),
     });

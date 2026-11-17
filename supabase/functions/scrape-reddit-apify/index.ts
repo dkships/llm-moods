@@ -33,7 +33,12 @@ import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 const SOURCE = "scrape-reddit-apify";
 // Deploy-verification marker, written into scraper_runs.metadata. Bump on change.
-const CODE_VERSION = "2026-11-12.1";
+// 2026-11-17.1 = trial override (`subreddits` in the request body) and
+// r/ChatGPTPro + r/codex mapped to chatgpt.
+const CODE_VERSION = "2026-11-17.1";
+// A one-off trial may name at most this many subreddits (gated callers only).
+const MAX_TRIAL_SUBREDDITS = 5;
+const SUBREDDIT_NAME = /^[A-Za-z0-9_]{2,30}$/;
 const APIFY_ACTOR_TIMEOUT_SECS = 120;
 const APIFY_POLL_TIMEOUT_SECS = 105;
 const APIFY_POLL_INTERVAL_MS = 10_000;
@@ -59,6 +64,11 @@ const SUBREDDIT_MODEL_MAP: Record<string, string> = {
   "r/chatgpt": "chatgpt",
   "r/OpenAI": "chatgpt",
   "r/openai": "chatgpt",
+  "r/ChatGPTPro": "chatgpt",
+  "r/chatgptpro": "chatgpt",
+  // OpenAI's coding agent, the counterpart of r/ClaudeCode.
+  "r/codex": "chatgpt",
+  "r/Codex": "chatgpt",
   "r/GoogleGemini": "gemini",
   "r/googlegemini": "gemini",
   "r/GeminiAI": "gemini",
@@ -193,11 +203,19 @@ export async function handleScrapeRedditApify(req: Request): Promise<Response> {
     // out with bounded concurrency so the window fits the function budget. With
     // comments off, `single_run_mode` collapses the window to one run (see below).
     const startUrls = getConfigValues(config, "start_url");
-    const subreddits = Array.from(new Set(
+    const configuredSubs = Array.from(new Set(
       (startUrls.length > 0 ? startUrls : DEFAULT_START_URLS)
         .map(subredditFromUrl)
         .filter((s): s is string => Boolean(s)),
     ));
+    // A trial run names its own subreddits so the configured ones aren't
+    // re-billed. Only gated callers reach this point.
+    const trialSubs: string[] = Array.isArray(body.subreddits)
+      ? (body.subreddits as unknown[])
+        .filter((s): s is string => typeof s === "string" && SUBREDDIT_NAME.test(s))
+        .slice(0, MAX_TRIAL_SUBREDDITS)
+      : [];
+    const subreddits: string[] = trialSubs.length > 0 ? trialSubs : configuredSubs;
 
     const actorId = getConfigValue(config, "actor_id", "harshmaur/reddit-scraper").replace("/", "~");
     const includeComments = getConfigBoolean(config, "include_comments", true);

@@ -38,10 +38,13 @@ import {
   upsertPendingScrapedPost,
 } from "../_shared/utils.ts";
 import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
+import { expandRumorPlaceholder, loadRumorTerms } from "../_shared/search-terms.ts";
 
 const SOURCE = "scrape-twitter";
 // Deploy-verification marker, written into scraper_runs.metadata. Bump on change.
-const CODE_VERSION = "2026-11-12.1";
+// 2026-11-17.1 = the rumor lane's {ACTIVE_RUMORS} placeholder is filled from
+// the live radar instead of a hand-kept codename list.
+const CODE_VERSION = "2026-11-17.1";
 const APIFY_MAX_TOTAL_CHARGE_USD = 0.15;
 // Actor is config-driven (`scraper_config.actor_id`); flip back to
 // apidojo/tweet-scraper with no redeploy. xquik ($0.00015/tweet, no run fee)
@@ -130,15 +133,19 @@ async function runApifyPath(
   titleKeys: Set<string>,
   config: Record<string, string[]>,
 ) {
-  const searchTerms = getConfigValues(config, "search_term");
+  const configuredTerms = getConfigValues(config, "search_term");
+  const rumorTerms = await loadRumorTerms(supabase);
+  const searchTerms = (configuredTerms.length > 0 ? configuredTerms : DEFAULT_SEARCH_TERMS)
+    .map((query) => expandRumorPlaceholder(query, rumorTerms));
   const actorId = getConfigValue(config, "actor_id", DEFAULT_ACTOR_ID);
   const apifyInput = buildActorInput(
     actorId,
-    searchTerms.length > 0 ? searchTerms : DEFAULT_SEARCH_TERMS,
+    searchTerms,
     getConfigValue(config, "sort_mode", "Latest"),
     getConfigNumber(config, "max_items", 50),
   );
   (summary as any).actorId = actorId;
+  (summary as any).rumorTerms = rumorTerms.map((t) => t.text);
   const budget = await checkApifyBudget(supabase, APIFY_MAX_TOTAL_CHARGE_USD);
   if (!budget.allowed) {
     return {
@@ -514,6 +521,7 @@ export async function handleScrapeTwitter(req: Request): Promise<Response> {
         classification_queued: summary.classificationQueued,
         apify_usage: ledgerUsage(summary),
         code_version: CODE_VERSION,
+        rumor_terms: (summary as any).rumorTerms ?? [],
         apify_budget: (summary as any).apifyBudget ?? null,
         dedup_skipped: summary.dedupSkipped,
         content_skipped: summary.contentSkipped,

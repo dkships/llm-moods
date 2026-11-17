@@ -36,6 +36,21 @@ export async function loadKeywords(supabase: any): Promise<{ modelMap: Record<st
   return { modelMap, keywords };
 }
 
+// Accounts that post often and never relevantly for this source (bots, SEO
+// feeds; see the get_noisy_authors SQL function). Never throws: on error the
+// scrape runs unfiltered.
+export async function loadNoisyAuthors(supabase: any, source: string): Promise<Set<string>> {
+  try {
+    const { data, error } = await supabase.rpc("get_noisy_authors", { p_source: source });
+    if (error || !Array.isArray(data)) {
+      return new Set();
+    }
+    return new Set(data.map((row: { author_handle: string | null }) => row.author_handle).filter(Boolean) as string[]);
+  } catch {
+    return new Set();
+  }
+}
+
 function hasExplicitChatGptMarker(text: string): boolean {
   return CHATGPT_EXPLICIT_PATTERNS.some((pattern) => pattern.test(text));
 }
@@ -171,6 +186,28 @@ export function isLikelyNoveltyOrAnnouncement(title: string, content: string): b
     return true;
   }
   return false;
+}
+
+// A link to a third-party site with no first-person voice is almost always a
+// news or SEO reshare. Bluesky renders links as bare `domain.tld/path...`, so
+// both forms count. Links to hosts where people publish their own words
+// (GitHub issues, X/Bluesky threads, personal blogs, shared chats) are
+// commentary, not news, and are kept. Measured 2026-11-17 on 14 days of
+// labeled Bluesky posts: drops 22% of volume, loses 1.8% of relevant posts.
+const LINK_IN_TEXT = /https?:\/\/\S+|\b[\w-]+\.(?:com|ai|io|co|net|org|app|cloud|news|dev|me|ly|gg)\/\S*/i;
+const USER_CONTENT_HOST =
+  /\b(?:github\.com|github\.io|gist\.github|x\.com|twitter\.com|t\.co|bsky\.app|youtube\.com|youtu\.be|note\.com|zenn\.dev|qiita\.com|substack\.com|hatenablog|medium\.com|linkedin\.com|reddit\.com|news\.ycombinator\.com|mastodon|claude\.ai|chatgpt\.com|gemini\.google\.com|g\.co|grok\.com|neocities\.org|netlify\.app|simonwillison\.net)\b/i;
+const FIRST_PERSON_USE = [
+  /\b(?:i|we)\s+(?:asked|connected|debugged|hooked up|noticed|prefer|prompted|ran|rely|switched|tested|tried|use|used|love|hate|pay|paid|cancel(?:led)?|got|had|gave|built|made|spent)\b/i,
+  /\bi(?:'ve| have| just| am|'m)?\s+(?:asked|connected|debugged|hooked up|noticed|preferred|prompted|run|ran|relied|switched|tested|tried|used|been using|using|paying|cancel(?:l)?ing)\b/i,
+  /\b(?:my|our)\s+(?:code|project|prompt|prompts|refactor|setup|usage|workflow|subscription|plan|account|chats?|conversation|codebase|app)\b/i,
+];
+
+export function isLikelyLinkShare(title: string, content: string): boolean {
+  const text = `${title} ${content}`;
+  if (!LINK_IN_TEXT.test(text)) return false;
+  if (USER_CONTENT_HOST.test(text)) return false;
+  return !FIRST_PERSON_USE.some((pattern) => pattern.test(text));
 }
 
 export function isLikelyNonExperienceShare(title: string, content: string): boolean {
