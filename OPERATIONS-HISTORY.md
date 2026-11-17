@@ -4,6 +4,42 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-11-17 — gpt-6.2-sol evaluated as classifier (not adopted)
+
+First run of `classifier-eval-batch` (Batch API, keys stay in Supabase; procedure in
+AGENT-REFERENCE.md). 240 posts that production gpt-6.1-sol classified in the 14 days to
+11-17: 60 per tracked model (36 kept, 24 dropped), all five sources. Production
+`classifyBatchTargeted`, batch 20. References: `claude-opus-5-5` and `gpt-6.2-astra`, both
+at medium. They agree on 83.8% of full labels (201 posts both agree on). The two gpt-6.1-sol
+batch reruns sat at 11/12 requests for over 30 minutes. The 6.1 row therefore uses the
+stored production labels, which come from the same model, prompt and effort on flex.
+
+| arm | Opus full | Opus sentiment | Opus relevance | dropped / kept vs Opus | neg. category vs Opus | both refs agree | re-run | $/1k posts (batch) |
+|---|---|---|---|---|---|---|---|---|
+| gpt-6.1-sol @ low (prod labels) | 83.8 | 89.2 | 90.8 | 8 / 14 | 37/42 | 93.0 | — | ≈$0.46 (30-day ledger) |
+| gpt-6.2-sol @ low, run 1 / 2 | 83.3 / 83.3 | 90.8 | 92.1 | 7 / 12, 6 / 13 | 33/43, 35/44 | 95.0 | 97.5% | $0.429 |
+| gpt-6.2-sol @ medium | 80.4 | 90.4 | 92.5 | 7 / 11 | 32/44 | 94.0 | — | $0.472 |
+
+- Against Opus the two are tied on full label. 6.2 is ~1.5 pts better on sentiment and
+  relevance, and 2-4 posts worse on negative complaint categories (one post ≈ 2.3 pts, so
+  both gaps are noise). 6.2 agrees more with Astra (92% vs 87%), but Astra 6.2 is the same
+  generation, so that column flatters it.
+- When 6.1 and 6.2 low disagree (31 posts), Opus sides with 6.1 on 14, with 6.2 on 13, and
+  with neither on 4.
+- Same list price as 6.1 Sol ($2 / $10; flex and Batch at half). 6.2 low writes ~43.6 output
+  tokens per post vs 6.1's ~45.4 in production. That works out to under $1/mo at ~35.7k posts
+  per month.
+- Effort medium costs 10% more and is worse on categories. Low is the right setting.
+- gpt-6.2-sol accepts `reasoning_effort: "low"`. `NO_NONE_EFFORT` now covers `gpt-6.2`
+  (commit e9a64d5). The **deployed drain predates that fix**, so redeploy
+  `drain-classification-queue` before any `CLASSIFIER_MODEL=gpt-6.2-sol` flip.
+- Decision: stay on gpt-6.1-sol @ low. There is no quality or cost gain to buy with a
+  launch-day model swap. Revisit if 6.1 Sol is deprecated, 6.2 gets cheaper, or a re-run
+  shows a real category gap.
+- Separate finding from `classifier_usage_daily` (30 days to 11-17): 406 of 1,957 calls
+  (21%) fell back from flex to standard pricing. That is ≈$6.7 of ≈$19.7 spent, about $3.4/mo
+  above what all-flex would cost. It's a bigger lever than any model swap.
+
 ## 2026-11-12 — Reddit trimmed to 5 subs + Apify ledger fix (live-DB measured)
 
 Trigger: the Apify account's $29/month hard cap. Measured 2026-10-30..11-12 (14 daily
