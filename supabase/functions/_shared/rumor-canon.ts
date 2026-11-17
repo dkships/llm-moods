@@ -577,6 +577,19 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releasedOn: "2026-10-26",
     },
     {
+      // Shipped 2026-11-17 as GPT-6.2 Astra and GPT-6.2 Sol, with no Terra or
+      // Luna. Leak posts called it "GPT-6.2" with codename Sol, which resolves
+      // to this generation key. A numbered "GPT-6.2 Terra" or "GPT-6.2 Luna"
+      // label keeps its own key and stays on the radar.
+      key: "gpt62",
+      label: "GPT-6.2",
+      codename: null,
+      aliases: ["gpt62", "gpt62astra", "gpt62sol", "gpt62astraandsol"],
+      released: true,
+      releasePrompt: "GPT-6.2 (Astra, Sol) and earlier",
+      releasedOn: "2026-11-17",
+    },
+    {
       // The rumored GPT-6 Terra never shipped (GPT-6 launched without a mid
       // tier); GPT-6.1 Terra took that slot on 2026-10-26. Codename-only "Terra"
       // rows meant this tier, so they retire with it; any numbered spelling

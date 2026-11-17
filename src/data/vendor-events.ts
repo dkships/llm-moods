@@ -363,6 +363,16 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     url: "https://www.anthropic.com/news/claude-fable-and-mythos-5-2",
     notes: "API id claude-fable-5-2, generally available the same day; the Mythos 5.2 sibling is limited to verified programs. $8/$40 per million tokens, 20% below Fable 5.1.",
   },
+  {
+    id: "openai-gpt-6-2-astra-sol-launch",
+    vendor: "openai",
+    modelSlug: "chatgpt",
+    eventDate: "2026-11-17",
+    eventType: "model_launch",
+    title: "GPT-6.2 Astra and Sol launch",
+    url: "https://openai.com/index/introducing-gpt-6-2-astra-sol",
+    notes: "Two models at once, in ChatGPT, Codex and the API the same day. Astra is $8/$40 per million tokens, 20% below GPT-6 Astra; Sol keeps GPT-6.1 Sol's $2/$10. OpenAI says both give better results with fewer output tokens.",
+  },
 ];
 
 export function getEventsForModel(slug: string | undefined): VendorEvent[] {
