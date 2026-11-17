@@ -564,9 +564,9 @@ function responseSchema(mode: "single" | "batch") {
 
 // gpt-6.1-sol has no reasoning_effort "none" (HTTP 400, verified 2026-10-07);
 // "low" is its floor. gpt-6.1-terra accepts "none" but also gets "low": the
-// 2026-10-29 eval scored them within noise (OPERATIONS-HISTORY). Every other
-// model keeps "none".
-const NO_NONE_EFFORT = /^gpt-6\.1/;
+// 2026-10-29 eval scored them within noise (OPERATIONS-HISTORY). gpt-6.2-sol
+// lists low..max with no "none" either. Every other model keeps "none".
+const NO_NONE_EFFORT = /^gpt-6\.[12]/;
 
 function defaultReasoningEffort(model: string): "none" | "low" {
   return NO_NONE_EFFORT.test(model.toLowerCase()) ? "low" : "none";

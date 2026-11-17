@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.pipeline-watchdog]
 verify_jwt = false
+
+[functions.classifier-eval-batch]
+verify_jwt = false

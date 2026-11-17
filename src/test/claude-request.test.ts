@@ -222,4 +222,14 @@ describe("OpenAI reasoning_effort default", () => {
     expect(sent[0].reasoning_effort).toBe("low");
     expect(sent[1].reasoning_effort).toBe("none");
   });
+
+  it("sends low to gpt-6.2-sol, which has no none effort either", async () => {
+    const fetchMock = vi.fn(async () => openAiReply());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await classifyBatch(["a", "b"], "k", 25, vi.fn(async () => {}), { model: "gpt-6.2-sol" });
+
+    const sent = fetchMock.mock.calls.map((c) => JSON.parse((c as unknown as [string, RequestInit])[1].body as string));
+    expect(sent[0].reasoning_effort).toBe("low");
+  });
 });
