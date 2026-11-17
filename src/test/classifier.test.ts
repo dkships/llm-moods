@@ -587,7 +587,7 @@ describe("free-Gemini spillover", () => {
 
     function stubOpenAiEnv() {
       vi.stubGlobal("Deno", {
-        env: { get: (k: string) => (({ CLASSIFIER_MODEL: "gpt-6.2-sol", OPENAI_API_KEY: "ok", GEMINI_API_KEY: "gk" } as Record<string, string>)[k]) },
+        env: { get: (k: string) => (({ CLASSIFIER_MODEL: "gpt-6.1-sol", OPENAI_API_KEY: "ok", GEMINI_API_KEY: "gk" } as Record<string, string>)[k]) },
       });
     }
 

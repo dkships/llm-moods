@@ -17,8 +17,9 @@ const SOURCE = "drain-classification-queue";
 // change; verify after redeploy with a dry_run invocation and check the
 // response's code_version. "r1" = the compact-irrelevant revert (2026-07-30);
 // 2026-08-22 = OpenAI flex service tier + classifier_usage_daily ledger.
-// 2026-11-17 = gpt-6.2 low-effort floor + flex capacity deferral.
-const CODE_VERSION = "2026-11-17-gpt-62-flex-defer";
+// 2026-11-17 = gpt-6.2 low-effort floor + flex capacity deferral; .2 = gpt-6.2
+// runs at standard priority (it rejects flex).
+const CODE_VERSION = "2026-11-17.2-gpt-62-standard";
 // Fallbacks for invocations that omit limit/batch_size. Match the pg_cron
 // production body (limit=200, batch_size=20); batch_size stays at 20 to
 // respect the batch-JSON-size cap decision (see AGENT-REFERENCE.md).

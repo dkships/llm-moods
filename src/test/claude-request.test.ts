@@ -232,4 +232,16 @@ describe("OpenAI reasoning_effort default", () => {
     const sent = fetchMock.mock.calls.map((c) => JSON.parse((c as unknown as [string, RequestInit])[1].body as string));
     expect(sent[0].reasoning_effort).toBe("low");
   });
+
+  it("sends gpt-6.2-sol at standard priority, since it 400s on service_tier=flex", async () => {
+    const fetchMock = vi.fn(async () => openAiReply());
+    vi.stubGlobal("fetch", fetchMock);
+
+    await classifyBatch(["a", "b"], "k", 25, vi.fn(async () => {}), { model: "gpt-6.2-sol" });
+    await classifyBatch(["a", "b"], "k", 25, vi.fn(async () => {}), { model: "gpt-6.1-sol" });
+
+    const sent = fetchMock.mock.calls.map((c) => JSON.parse((c as unknown as [string, RequestInit])[1].body as string));
+    expect(sent[0].service_tier).toBe("auto");
+    expect(sent[1].service_tier).toBe("flex");
+  });
 });

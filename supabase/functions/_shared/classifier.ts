@@ -106,9 +106,16 @@ const OPENAI_SERVICE_TIERS = new Set<OpenAiServiceTier>(["flex", "auto", "defaul
 // drain's pass budget (a 20-post batch normally completes in well under 60 s).
 const OPENAI_FLEX_TIMEOUT_MS = Number(envValue("OPENAI_FLEX_TIMEOUT_MS", "120000"));
 
+// gpt-6.2-sol rejects service_tier=flex on Chat Completions with a 400 ("use
+// background=true with background_options.completion_window"), verified
+// 2026-11-17. It runs at standard priority, where its static instruction prefix
+// is prompt-cached (4,657 of 4,660 tokens on a repeat call).
+const NO_FLEX = /^gpt-6\.2/;
+
 export function openAiServiceTier(options: ClassifyOptions = {}): OpenAiServiceTier {
   const raw = (options.serviceTier ?? envValue("OPENAI_SERVICE_TIER", "flex")).toLowerCase();
-  return OPENAI_SERVICE_TIERS.has(raw as OpenAiServiceTier) ? raw as OpenAiServiceTier : "flex";
+  const tier = OPENAI_SERVICE_TIERS.has(raw as OpenAiServiceTier) ? raw as OpenAiServiceTier : "flex";
+  return tier === "flex" && NO_FLEX.test(classifierModel(options).toLowerCase()) ? "auto" : tier;
 }
 
 function classifierModel(options: ClassifyOptions = {}): string {
