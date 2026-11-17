@@ -665,6 +665,12 @@ export type Database = {
           unclassified_posts: number
         }[]
       }
+      get_noisy_authors: {
+        Args: { p_days?: number; p_min_posts?: number; p_source: string }
+        Returns: {
+          author_handle: string
+        }[]
+      }
       get_public_failed_classification_summary: {
         Args: { days_back?: number }
         Returns: {
