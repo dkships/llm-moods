@@ -528,6 +528,7 @@ export type Database = {
           neutral_count: number | null
           period: string
           period_start: string
+          pooled_score: number | null
           positive_count: number | null
           queued_posts: number
           score: number
@@ -553,6 +554,7 @@ export type Database = {
           neutral_count?: number | null
           period: string
           period_start: string
+          pooled_score?: number | null
           positive_count?: number | null
           queued_posts?: number
           score: number
@@ -578,6 +580,7 @@ export type Database = {
           neutral_count?: number | null
           period?: string
           period_start?: string
+          pooled_score?: number | null
           positive_count?: number | null
           queued_posts?: number
           score?: number
