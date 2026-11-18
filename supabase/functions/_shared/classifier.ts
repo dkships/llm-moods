@@ -72,6 +72,16 @@ export interface UsageSample {
 
 export type OpenAiServiceTier = "flex" | "auto" | "default";
 
+// How the OpenAI request lays out instructions and posts. GPT-5.6 and later
+// cache up to a breakpoint at the END of a message, not an arbitrary shared
+// prefix, so one message holding instructions + posts only ever hits on a
+// byte-identical request (0 of 76 production calls, 2026-11-18).
+//
+//   single     [user: instructions + posts]            never cached
+//   two_user   [user: instructions] [user: posts]      instructions cached
+//   developer  [developer: instructions] [user: posts] instructions cached
+export type OpenAiPromptLayout = "single" | "two_user" | "developer";
+
 // What a flex capacity 429 (unbilled) does. "auto" retries the request at
 // standard price right away; "defer" returns a quota_deferred result so the
 // queue retries on flex after FLEX_DEFER_RETRY_MS. Callers that need an answer
@@ -96,6 +106,8 @@ export interface ClassifyOptions {
   serviceTier?: OpenAiServiceTier;
   // OpenAI flex only. See FlexFallback.
   flexFallback?: FlexFallback;
+  // OpenAI only. Default is env OPENAI_PROMPT_LAYOUT. See OpenAiPromptLayout.
+  promptLayout?: OpenAiPromptLayout;
   // Anthropic only. Eval knob; the default is defaultToolChoice(model). Models
   // that reject forcing (Sonnet 5.5, Opus 5.5) get auto either way.
   toolChoice?: ToolChoiceMode;
@@ -116,6 +128,14 @@ export function openAiServiceTier(options: ClassifyOptions = {}): OpenAiServiceT
   const raw = (options.serviceTier ?? envValue("OPENAI_SERVICE_TIER", "flex")).toLowerCase();
   const tier = OPENAI_SERVICE_TIERS.has(raw as OpenAiServiceTier) ? raw as OpenAiServiceTier : "flex";
   return tier === "flex" && NO_FLEX.test(classifierModel(options).toLowerCase()) ? "auto" : tier;
+}
+
+const OPENAI_PROMPT_LAYOUTS = new Set<OpenAiPromptLayout>(["single", "two_user", "developer"]);
+const DEFAULT_PROMPT_LAYOUT: OpenAiPromptLayout = "single";
+
+function openAiPromptLayout(options: ClassifyOptions = {}): OpenAiPromptLayout {
+  const raw = (options.promptLayout ?? envValue("OPENAI_PROMPT_LAYOUT", DEFAULT_PROMPT_LAYOUT)).toLowerCase();
+  return OPENAI_PROMPT_LAYOUTS.has(raw as OpenAiPromptLayout) ? raw as OpenAiPromptLayout : DEFAULT_PROMPT_LAYOUT;
 }
 
 function classifierModel(options: ClassifyOptions = {}): string {
@@ -589,8 +609,27 @@ function defaultReasoningEffort(model: string): "none" | "low" {
   return NO_NONE_EFFORT.test(model.toLowerCase()) ? "low" : "none";
 }
 
+// Instructions and posts kept apart so the OpenAI path can put a message
+// boundary (a cache breakpoint) between them.
+interface PromptParts {
+  instructions: string;
+  postsBlock: string;
+}
+
+function openAiMessages(parts: PromptParts, layout: OpenAiPromptLayout) {
+  if (layout === "single") {
+    return [{ role: "user", content: parts.instructions + parts.postsBlock }];
+  }
+
+  const instructionRole = layout === "developer" ? "developer" : "user";
+  return [
+    { role: instructionRole, content: parts.instructions },
+    { role: "user", content: parts.postsBlock },
+  ];
+}
+
 function requestBody(
-  prompt: string,
+  prompt: string | PromptParts,
   maxTokens: number,
   mode: "single" | "batch",
   options: ClassifyOptions = {},
@@ -601,7 +640,9 @@ function requestBody(
   const effort = options.reasoningEffort ?? defaultReasoningEffort(model);
   const body: Record<string, unknown> = {
     model,
-    messages: [{ role: "user", content: prompt }],
+    messages: typeof prompt === "string"
+      ? [{ role: "user", content: prompt }]
+      : openAiMessages(prompt, openAiPromptLayout(options)),
     response_format: {
       type: "json_schema",
       json_schema: responseSchema(mode),
@@ -845,7 +886,7 @@ async function fetchGemini(
 // 429/transient backoff is the safety net, mirroring the Anthropic path.
 // readGeminiFailure parses OpenAI's {error:{type,message}} shape fine.
 async function fetchOpenAi(
-  prompt: string,
+  prompt: PromptParts,
   apiKey: string,
   maxTokens: number,
   mode: "single" | "batch",
@@ -1175,7 +1216,7 @@ function callClassifier(
     return fetchAnthropic(instructions, postsBlock, apiKey, maxTokens, mode, logError, options);
   }
   if (provider === "openai") {
-    return fetchOpenAi(instructions + postsBlock, apiKey, maxTokens, mode, logError, options);
+    return fetchOpenAi({ instructions, postsBlock }, apiKey, maxTokens, mode, logError, options);
   }
   return fetchGemini(instructions + postsBlock, apiKey, maxTokens, mode, logError, options);
 }

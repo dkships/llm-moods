@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { classifyBatchTargeted, type ClassifyResult, type UsageSample } from "../_shared/classifier.ts";
+import { classifyBatchTargeted, type ClassifyResult, type OpenAiPromptLayout, type UsageSample } from "../_shared/classifier.ts";
 import { modelMentionText, targetModelLabel, type PendingModelMentionRow } from "../_shared/classification-state.ts";
 import {
   internalOnlyResponse,
@@ -34,12 +34,13 @@ import { corsHeaders } from "../_shared/utils.ts";
 //     'action','submit', ...));
 // then read the reply from net._http_response.
 
-const CODE_VERSION = "2026-11-17.2";
+const CODE_VERSION = "2026-11-18.1-prompt-layout";
 const BATCH_SIZE = 20; // drain DEFAULT_BATCH_SIZE
 const MAX_POSTS = 500;
 const MAX_ARMS = 8;
 const ALLOWED_MODEL = /^(gpt-|claude-)[a-z0-9.-]+$/;
 const ALLOWED_EFFORTS = new Set(["none", "low", "medium", "high"]);
+const ALLOWED_LAYOUTS = new Set(["single", "two_user", "developer"]);
 const UUID = /^[0-9a-f-]{36}$/i;
 const ARM_ID = /^[a-z0-9-]{1,40}$/;
 const OPENAI = "https://api.openai.com/v1";
@@ -51,7 +52,7 @@ const MAX_PROBE_REPEATS = 4;
 
 type Effort = "none" | "low" | "medium" | "high";
 type Provider = "openai" | "anthropic";
-interface Arm { id: string; model: string; effort: Effort }
+interface Arm { id: string; model: string; effort: Effort; layout?: OpenAiPromptLayout }
 interface StoredReply { status: number; body: unknown }
 
 const realFetch = globalThis.fetch.bind(globalThis);
@@ -71,7 +72,8 @@ function parseArms(raw: unknown): Arm[] | string {
     if (!ARM_ID.test(String(a?.id)) || !ALLOWED_MODEL.test(String(a?.model)) || !ALLOWED_EFFORTS.has(String(a?.effort))) {
       return `bad arm ${JSON.stringify(a)}`;
     }
-    arms.push({ id: a.id, model: a.model, effort: a.effort });
+    if (a.layout !== undefined && !ALLOWED_LAYOUTS.has(String(a.layout))) { return `bad layout ${JSON.stringify(a)}`; }
+    arms.push({ id: a.id, model: a.model, effort: a.effort, layout: a.layout });
   }
   return arms;
 }
@@ -121,6 +123,7 @@ async function runProduction(
     const results = await classifyBatchTargeted(items, "eval", BATCH_SIZE, async () => {}, {
       model: arm.model,
       reasoningEffort: arm.effort,
+      promptLayout: arm.layout,
       serviceTier: "default",
       onUsage: (s) => { usage.push(s); },
     });
