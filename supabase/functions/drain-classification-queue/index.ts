@@ -19,7 +19,8 @@ const SOURCE = "drain-classification-queue";
 // 2026-08-22 = OpenAI flex service tier + classifier_usage_daily ledger.
 // 2026-11-17 = gpt-6.2 low-effort floor + flex capacity deferral; .2 = gpt-6.2
 // runs at standard priority (it rejects flex).
-const CODE_VERSION = "2026-11-17.2-gpt-62-standard";
+// 2026-11-18 = gpt-6.2 sends instructions as a developer message so they cache.
+const CODE_VERSION = "2026-11-18.1-developer-layout";
 // Fallbacks for invocations that omit limit/batch_size. Match the pg_cron
 // production body (limit=200, batch_size=20); batch_size stays at 20 to
 // respect the batch-JSON-size cap decision (see AGENT-REFERENCE.md).

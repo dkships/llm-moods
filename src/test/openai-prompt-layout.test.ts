@@ -16,13 +16,13 @@ interface ChatMessage {
 }
 
 // Runs one production batch against a stub and returns the messages it sent.
-async function sentMessages(layout?: OpenAiPromptLayout): Promise<ChatMessage[]> {
+async function sentMessages(layout?: OpenAiPromptLayout, model = MODEL): Promise<ChatMessage[]> {
   const fetchMock = vi.fn().mockResolvedValue(
     new Response(JSON.stringify({ error: { message: "capture" } }), { status: 400 }),
   );
   vi.stubGlobal("fetch", fetchMock);
 
-  await classifyBatchTargeted(ITEMS, "openai-key", 20, undefined, { model: MODEL, promptLayout: layout });
+  await classifyBatchTargeted(ITEMS, "openai-key", 20, undefined, { model, promptLayout: layout });
 
   const body = JSON.parse(String(fetchMock.mock.calls[0][1].body));
   return body.messages;
@@ -31,8 +31,14 @@ async function sentMessages(layout?: OpenAiPromptLayout): Promise<ChatMessage[]>
 // GPT-5.6+ caches up to the end of a message, so the static instructions only
 // cache when they are a message of their own.
 describe("OpenAI prompt layout", () => {
-  it("keeps one user message by default", async () => {
+  it("defaults gpt-6.2 to the cacheable developer layout", async () => {
     const messages = await sentMessages();
+
+    expect(messages.map((m) => m.role)).toEqual(["developer", "user"]);
+  });
+
+  it("keeps one user message for models evaluated on it", async () => {
+    const messages = await sentMessages(undefined, "gpt-6.1-sol");
 
     expect(messages).toHaveLength(1);
     expect(messages[0].role).toBe("user");

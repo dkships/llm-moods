@@ -4,6 +4,54 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-11-18 — Day-after check: prompt cache fixed, Google incident feed cleared
+
+**Day-after state.** 22 hours after the 11-17 changes: 1,375 posts classified by
+`gpt-6.2-sol` with 0 errors and an empty queue, 0 failed runs across all 14 cron
+jobs, Apify at $5.48 over 30 days. Relevant share, prior 14 days -> since cutover:
+Bluesky 8.4% -> 23.6% (n=368), Twitter 17.5% -> 29.5% (n=579), Hacker News 33.6% ->
+49.6% (n=117), Reddit 34.8% -> 40.1% (n=187). The classifier changed at the same
+moment and it was GPT-6.2 launch day (HN rose with no scraper change), so these are
+not clean filter measurements. Re-measure about 11-24.
+
+**Prompt cache.** `cached_tokens` was 0 on all 76 production `gpt-6.2-sol` calls.
+Cause: GPT-5.6 and later cache up to a breakpoint at the end of a message, not an
+arbitrary shared prefix (OpenAI prompt-caching guide). Production sent instructions
+and posts as one user message, so only a byte-identical request could hit. That is
+what the 11-17 `cache_probe` measured (4,657 of 4,660 on a repeat), and why it looked
+fine. Probes on `gpt-6.2-sol` at standard priority, different 20-post batches sent
+1-2 minutes after a warm call:
+
+| Layout | Cached tokens on a new batch |
+|---|---|
+| `single`: one user message (old production) | 0 of 3,543 |
+| `two_user`: instructions and posts as two user messages | 0 of 4,857, 0 of 4,079 |
+| `developer`: instructions as a developer message | 1,936 of 4,481, 1,936 of 4,265 |
+
+Label check, 300 posts (stratified by model and classified/irrelevant, 11-04 on),
+Batch API, `single` run twice for a noise floor against `developer`:
+
+| Pair | Relevance agree | Sentiment agree (both relevant) | Full label agree |
+|---|---|---|---|
+| single vs single | 298 / 300 | 152 / 157 | 285 / 300 |
+| single-a vs developer | 291 / 300 | 147 / 152 | 275 / 300 |
+| single-b vs developer | 293 / 300 | 149 / 153 | 283 / 300 |
+
+Sentiment is inside the noise band. Relevance differs on a few more posts than the
+two single runs differ from each other, with no direction: 155 relevant against 158,
+102 positive against 103, 46 negative against 48. On the 9 posts where `developer`
+disagreed with both single runs, the stored production label (single layout) sided
+with `developer` on 6. Against stored production labels `developer` agreed on
+relevance for 283 of 300 and each single run for 280. Read: borderline posts, not a
+shift. Shipped as the `gpt-6.2*` default (`DEVELOPER_LAYOUT_MODELS`); other models
+keep `single`, the layout they were evaluated on. Revert: `OPENAI_PROMPT_LAYOUT=single`.
+About 45% of input tokens per warm call now bill at the cached rate.
+
+**Google incident feed.** `vendor_incidents` has never held a Google row. Not a
+fault: `status.cloud.google.com/incidents.json` listed 8 incidents in total, 1 in the
+last 30 days, and the only Gemini/Vertex match was from 2026-02-27. The keyword
+filter matches that one correctly; it is outside the 30-day window.
+
 ## 2026-11-17 (evening) — Fixed-mix score shipped, Threads trialed, r/ChatGPTPro added
 
 **Score.** David asked for the best approach rather than picking from the A/B/C

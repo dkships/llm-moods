@@ -120,8 +120,8 @@ const OPENAI_FLEX_TIMEOUT_MS = Number(envValue("OPENAI_FLEX_TIMEOUT_MS", "120000
 
 // gpt-6.2-sol rejects service_tier=flex on Chat Completions with a 400 ("use
 // background=true with background_options.completion_window"), verified
-// 2026-11-17. It runs at standard priority, where its static instruction prefix
-// is prompt-cached (4,657 of 4,660 tokens on a repeat call).
+// 2026-11-17. It runs at standard priority, where prompt caching works (see
+// OpenAiPromptLayout for what it takes to get a hit).
 const NO_FLEX = /^gpt-6\.2/;
 
 export function openAiServiceTier(options: ClassifyOptions = {}): OpenAiServiceTier {
@@ -131,11 +131,20 @@ export function openAiServiceTier(options: ClassifyOptions = {}): OpenAiServiceT
 }
 
 const OPENAI_PROMPT_LAYOUTS = new Set<OpenAiPromptLayout>(["single", "two_user", "developer"]);
-const DEFAULT_PROMPT_LAYOUT: OpenAiPromptLayout = "single";
+
+// gpt-6.2-sol caches the instructions under the developer layout (1,936 of
+// ~4,300 prompt tokens on a new batch, 2 of 2 probes; two_user got 0 of 2) and
+// labels the same as under single (2026-11-18 eval, OPERATIONS-HISTORY). Other
+// models keep the layout they were evaluated on. Revert without a redeploy:
+// OPENAI_PROMPT_LAYOUT=single.
+const DEVELOPER_LAYOUT_MODELS = /^gpt-6\.2/;
 
 function openAiPromptLayout(options: ClassifyOptions = {}): OpenAiPromptLayout {
-  const raw = (options.promptLayout ?? envValue("OPENAI_PROMPT_LAYOUT", DEFAULT_PROMPT_LAYOUT)).toLowerCase();
-  return OPENAI_PROMPT_LAYOUTS.has(raw as OpenAiPromptLayout) ? raw as OpenAiPromptLayout : DEFAULT_PROMPT_LAYOUT;
+  const fallback: OpenAiPromptLayout = DEVELOPER_LAYOUT_MODELS.test(classifierModel(options).toLowerCase())
+    ? "developer"
+    : "single";
+  const raw = (options.promptLayout ?? envValue("OPENAI_PROMPT_LAYOUT", fallback)).toLowerCase();
+  return OPENAI_PROMPT_LAYOUTS.has(raw as OpenAiPromptLayout) ? raw as OpenAiPromptLayout : fallback;
 }
 
 function classifierModel(options: ClassifyOptions = {}): string {
