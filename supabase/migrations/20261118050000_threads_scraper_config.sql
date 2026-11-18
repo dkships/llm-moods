@@ -1,14 +1,15 @@
--- Threads via Apify (scrape-threads, lergassy/threads-scraper), 2026-11-17.
--- Same terms as Bluesky: single words search best on Threads, and bare
--- "Gemini" is mostly astrology there. 25 posts per term is one recent page.
--- The cron row is added separately (20261118060000) after the trial run.
+-- Threads via Apify (scrape-threads), 2026-11-17. Same terms as Bluesky.
+-- Production went through the trial as lergassy/threads-scraper at 25 posts
+-- per term, then was switched to futurizerush/meta-threads-scraper at 10 (the
+-- actor's minimum), because lergassy's "recent" page is not recent. No cron row:
+-- the trial was 4 relevant of 45 (OPERATIONS-HISTORY 2026-11-17 evening).
 -- Applied to production 2026-11-17 via query_database.
 
 INSERT INTO public.scraper_config (scraper, key, value)
 SELECT 'scrape-threads', v.key, v.value
 FROM (VALUES
-  ('actor_id', 'lergassy/threads-scraper'),
-  ('max_posts_per_term', '25'),
+  ('actor_id', 'futurizerush/meta-threads-scraper'),
+  ('max_posts_per_term', '10'),
   ('monitoring_store', 'llm-vibes-threads'),
   ('search_term', 'ChatGPT'),
   ('search_term', 'Claude AI'),
