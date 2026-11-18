@@ -46,7 +46,7 @@ import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 const SOURCE = "scrape-threads";
 const POST_SOURCE = "threads";
 // Deploy-verification marker, written into scraper_runs.metadata. Bump on change.
-const CODE_VERSION = "2026-11-17.1";
+const CODE_VERSION = "2026-11-17.2";
 
 // lergassy/threads-scraper: $0.002/post ($0.0018 on the Starter tier), no
 // start fee on normal runs, 99.8% of 18k public runs succeeded in the 30 days
@@ -69,10 +69,6 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function isoDay(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 // Recent page only, exact wording only, and only posts that contain the
 // keyword: the actor's defaults (top + recent + tags, expanded wordings) cost
 // several times more posts per term.
@@ -85,7 +81,8 @@ function buildActorInput(searchTerms: string[], maxPostsPerTerm: number, monitor
     strictKeywordMatch: true,
     maxPosts: maxPostsPerTerm,
     maxItems: maxPostsPerTerm * searchTerms.length,
-    postedAfter: isoDay(new Date(Date.now() - RECENT_HOURS * HOUR_MS)),
+    // No `postedAfter`: on 2026-11-17 it dropped all 92 posts of a recent
+    // page. The RECENT_HOURS cutoff below does the same job.
     includeViews: false,
     includeRunSummary: false,
     // Named store: later runs return only posts earlier runs did not deliver,
@@ -114,6 +111,8 @@ function buildThreadsSummary() {
     contentSkipped: 0,
     noisyAuthorSkipped: 0,
     staleSkipped: 0,
+    oldestPostedAt: null as string | null,
+    newestPostedAt: null as string | null,
     termHits: {} as Record<string, number>,
     languages: {} as Record<string, number>,
     errors: [] as string[],
@@ -248,6 +247,15 @@ async function runApifyPath(
     }
 
     const createdMs = new Date(post.createdAt).getTime();
+    if (Number.isFinite(createdMs)) {
+      const iso = new Date(createdMs).toISOString();
+      if (!summary.oldestPostedAt || iso < summary.oldestPostedAt) {
+        summary.oldestPostedAt = iso;
+      }
+      if (!summary.newestPostedAt || iso > summary.newestPostedAt) {
+        summary.newestPostedAt = iso;
+      }
+    }
     if (!Number.isFinite(createdMs) || createdMs < cutoff) {
       summary.staleSkipped++;
       continue;
@@ -401,6 +409,7 @@ export async function handleScrapeThreads(req: Request): Promise<Response> {
         content_skipped: result.contentSkipped,
         noisy_author_skipped: result.noisyAuthorSkipped,
         stale_skipped: result.staleSkipped,
+        posted_at_range: [result.oldestPostedAt, result.newestPostedAt],
         term_hits: result.termHits,
         languages: result.languages,
         skipped_reason: result.reason ?? null,
