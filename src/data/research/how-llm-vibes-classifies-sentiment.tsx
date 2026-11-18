@@ -44,6 +44,12 @@ const HowLlmVibesClassifiesSentimentBody = () => (
       stricter about relevance and drops more borderline posts. Model names in the body reflect the setup at
       publication.
     </p>
+    <p>
+      <em>Update, November 17:</em> the classifier is now GPT-6.2 Sol (by way of GPT-6.1 Sol in October), again a
+      config flip. The bigger change is to the daily score: it now holds each source at its usual share of a
+      model's weight, so a day with few App Store reviews no longer reads as a drop. The daily-score section
+      below explains how.
+    </p>
 
     <h2>What gets scraped</h2>
     <p>Six sources, six edge functions, six independent cron schedules.</p>
@@ -209,6 +215,25 @@ score = round((effective_positive / total_weight) × 100)`}</code>
       as stored — a 1-point correction isn't worth rewriting the public record — but the July 10 deploy also
       changed the source mix (new sources, bigger Twitter pulls), so treat cross-boundary comparisons with
       care for that reason.
+    </p>
+    <p>
+      Since November 17, that pooled number is no longer the published score. The mix of sources behind a
+      model's day is set mostly by our scrapers, not by how people feel, and App Store reviews run 78–93%
+      positive for every model. So a day when few reviews came in read as a drop: on November 16, ChatGPT's
+      pooled score fell from 50 to 42 with no App Store reviews in the sample and every other source flat. The
+      published score now holds each source at its usual share of the model's weight over the trailing 28 days
+      (same caps), and measures each source against its own usual level:
+    </p>
+    <pre>
+      <code>{`score = Σ over sources: share × (n × today + 5 × usual) / (n + 5)
+n = eligible posts from that source today`}</code>
+    </pre>
+    <p>
+      A source with only a few posts today is pulled toward its usual level, and a source with none counts at
+      that level, so only a change in how people talk on a source moves the number. Recomputed over 51 days of
+      history, the change kept every model's average within a point and cut day-to-day movement by 30–50%. The
+      pooled score is still computed and stored beside it as <code>pooled_score</code>. Scores from September 28
+      on use the new method; earlier days, including every chart pinned in our research posts, are as stored.
     </p>
     <p>The top-complaint label per day is the highest-weighted complaint category from negative posts that day.</p>
 

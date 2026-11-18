@@ -109,11 +109,11 @@ const Index = () => {
                   },
                   {
                     title: "Classify",
-                    body: "Each post sentiment-labeled by GPT-6 Sol into 12 complaint categories.",
+                    body: "Each post sentiment-labeled by GPT-6.2 Sol into 12 complaint categories.",
                   },
                   {
                     title: "Score",
-                    body: "Volume-weighted into a 0–100 daily score per model. Higher means happier users.",
+                    body: "A 0–100 daily score per model, each source held at its usual share. Higher means happier users.",
                   },
                 ].map((step, i) => (
                   <li key={step.title} className="border-t border-border pt-6 text-left">

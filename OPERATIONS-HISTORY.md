@@ -4,6 +4,68 @@ Historical audit records and one-time investigations. Not operating instructions
 the live rules live in `CLAUDE.md`. Read this when you need the provenance of a number
 or a past decision.
 
+## 2026-11-17 (evening) — Fixed-mix score shipped, Threads trialed, r/ChatGPTPro added
+
+**Score.** David asked for the best approach rather than picking from the A/B/C
+table below. C ("vs peers on the same venue") was dropped: it shifts every
+model 8-15 points (ChatGPT 60 -> 45), which would miscalibrate the labels and
+break the charts pinned in research posts. A fourth design, D ("fixed own
+mix"), went through the same 60-day backtest. It holds each source at its usual
+share of the model's weight (trailing 28 days, production caps) and measures it
+against its own usual level, shrinking a thin source toward that level with
+K = 5 posts. The production function (`computeFixedMixScore`) on 33 days:
+
+| | ChatGPT | Claude | Gemini | Grok |
+|---|---|---|---|---|
+| mean, pooled -> fixed mix | 59.6 -> 59.9 | 62.7 -> 62.6 | 65.0 -> 64.1 | 52.2 -> 52.1 |
+| r(score, App Store share) | 0.46 -> 0.07 | 0.45 -> 0.33 | 0.14 -> -0.11 | -0.18 -> -0.18 |
+| jitter, mean abs day-to-day change (raw) | 5.6 -> 4.4 | 8.2 -> 6.5 | 9.8 -> 5.0 | 7.5 -> 3.9 |
+| incident-day effect (SD) | -0.89 -> -1.28 | -0.14 -> -0.20 | — | -2.29 -> -2.17 |
+
+Why: source volume is set mostly by scraper config, not by mood. ChatGPT
+11-16 scored 42 against 50 the day before with no App Store rows and every
+other source flat. On Grok 11-04, App Store hit its 35% cap, so the
+leftover weight went to whatever else was there, and seven negative Reddit
+posts took a third of the day.
+Count-based shares (the first D run) lifted Grok by 5 points, but weight-based
+shares (production) keep every mean within a point. Correction to the earlier
+entry: the incident-day row can't rank designs. Five Claude incident days give
+a standard error of about 0.45 SD, so B's -0.51 against A's -0.14 is noise, not
+evidence that "vs own normal" detects bad days better.
+
+Shipped in `2fde09c`: `vibes_scores.pooled_score` keeps the old number, and
+`reaggregate-vibes` accepts the scheduler token. Recomputed 2026-09-28 -> 11-17
+(204 model-days; the Opus 5.5 article pins charts through 09-27, left as
+stored). Live, smoothed: means 59.0 -> 59.7 / 63.7 -> 63.1 / 63.2 -> 62.2 /
+51.8 -> 50.9 (ChatGPT / Claude / Gemini / Grok), jitter 3.8 -> 2.7 / 4.4 ->
+3.1 / 6.6 -> 3.4 / 4.8 -> 2.4, largest single-day change 14 (ChatGPT 11-16,
+43 -> 57).
+
+**Threads via Apify.** `scrape-threads` was built, deployed and trialed; it is not scheduled.
+- `lergassy/threads-scraper` (99.8% run success, $0.0018-0.002/post): its
+  logged-out "recent" page is one page per query and not recent. The newest of 69
+  posts was 2.8 days old and the oldest 17 months, so its date filter correctly
+  dropped all of them.
+- `futurizerush/meta-threads-scraper` ($0.0025/post + $0.005/run): 45 posts, all
+  from the last 16 hours. 23 matched a model, 4 were relevant (ChatGPT 3/10,
+  Claude 1/6, Gemini 0/7). Grok never matches because bare `grok` is not a model
+  keyword.
+- Content: "Gemini AI" returns air-sign horoscopes, and ChatGPT/Claude return
+  prompt-marketing bait ("use these 5 prompts 👇"). About two posts carried real
+  user sentiment. That's ≈$3 per 100 relevant posts, against $0.20-0.79 for every
+  other source. Apify bills per post before any filter runs, so only better terms
+  could change the cost. The official Threads API returns the same posts, so it
+  wouldn't help either.
+- Trial spend: ≈$0.25 (ledger $0.28).
+
+**r/ChatGPTPro added** (`20261118070000`). Its 59% relevance is the best of any
+sub. Its 2/13 positive split has a 95% interval of about 2-45%, which covers
+r/ChatGPT's 28% (14-day shares: r/ChatGPT 28%, r/GeminiAI 27%, r/grok 27%,
+r/ClaudeAI 61%, r/ClaudeCode 51%). It is the power-user counterpart of
+r/ClaudeAI. Under the fixed mix it can move only Reddit's level for ChatGPT,
+re-baselined over 28 days, not ChatGPT's Reddit share. Re-check around 11-24
+with ~140 posts. +$1.14/mo.
+
 ## 2026-11-17 — Source quality pass, score-design backtest, incident feed repair
 
 Trigger: where should the classifier's money go? 14 days of labeled posts (16,503):

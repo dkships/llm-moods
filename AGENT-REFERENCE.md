@@ -8,7 +8,9 @@ one-time investigations stay in `OPERATIONS-HISTORY.md`.
 
 The `isInternalServiceRequest` gate rule came up in Phase 10B when Lovable's curl tool removed the gate from `reclassify-posts` to invoke it (the tool sends user JWT, not service-role) — Phase 11B re-added the gate after a $0.01-per-call attack vector was identified.
 
-If a one-shot reclassify or backfill is needed, the supported invocation path is a **temporary helper edge function**, not raw SQL:
+**Score backfill (since 2026-11-17):** `reaggregate-vibes` also accepts the scheduler token, so it needs no helper. From `query_database`: `select net.http_post(url := '<project>/functions/v1/reaggregate-vibes', headers := jsonb_build_object('Content-Type','application/json'), body := jsonb_build_object('scheduler','pg_cron','pipeline','reaggregate-vibes','token',(select token from public.scheduler_tokens where id=1),'days_back',N,'dry_run',true,'diff_report',true), timeout_milliseconds := 300000);` then read `net._http_response`. The diff report keys on exact `period_start`, and pre-2026-09 rows don't align, so compare old and new by Pacific day. Keep `days_back` so the range starts on or after 2026-09-28 (research charts pin windows through 09-27).
+
+If a one-shot reclassify or other gated backfill is needed, the supported invocation path is a **temporary helper edge function**, not raw SQL:
 
 1. Create an ephemeral edge function (slug must NOT start with underscore) that reads `SUPABASE_SERVICE_ROLE_KEY` from `Deno.env` and forwards a Bearer-authenticated POST to the gated function (e.g. `reclassify-posts?mode=multi_model`).
 2. Invoke the helper via Lovable's `curl_edge_functions` (which sends user JWT, but the helper itself uses the service-role key for the downstream call).
@@ -52,7 +54,9 @@ Sentiment is classified by **GPT-6 Sol** (`CLASSIFIER_MODEL=gpt-6-sol`, flex tie
 
 **Twitter rumor lane placeholder:** the rumor `search_term` row holds `{ACTIVE_RUMORS}`, which `expandRumorPlaceholder` fills on each run. Version labels become quoted phrases and codename pairs become AND groups. With no live rumor, the placeholder and its trailing `OR` are removed. Old code would send the placeholder literally, so deploy the scraper before writing such a row.
 
-**Reddit trial runs:** a gated request body may carry `subreddits: [...]` (at most 5) to scrape only those subs once, without re-billing the configured ones. Invoke it via `net.http_post` with the scheduler token read inside SQL. r/OpenAI, r/ChatGPTPro and r/codex map to chatgpt.
+**Reddit trial runs:** a gated request body may carry `subreddits: [...]` (at most 5) to scrape only those subs once, without re-billing the configured ones. Invoke it via `net.http_post` with the scheduler token read inside SQL. r/OpenAI, r/ChatGPTPro and r/codex map to chatgpt. Configured subs (7, since 2026-11-17): r/ChatGPT, r/ChatGPTPro, r/codex, r/ClaudeAI, r/ClaudeCode, r/GeminiAI, r/grok.
+
+**Threads scraper** (`scrape-threads`, built 2026-11-17, **unscheduled**): Apify keyword search, terms in `scraper_config` (`scraper='scrape-threads'`). Two actors via `actor_id`: `futurizerush/meta-threads-scraper` (current; `search_filter: recent` plus `start_date`, $0.0025/post + $0.005/run, min 10 posts per term) and `lergassy/threads-scraper` (its logged-out "recent" page is not recent: the newest of 69 posts was 2.8 days old). The trial gave 4 relevant of 45 fetched, about $3 per 100 relevant posts against $0.20-0.79 elsewhere. "Gemini AI" returns horoscopes, and ChatGPT/Claude return prompt-marketing bait. Bare `grok` is not a model keyword, so Grok posts never match. Re-test with one `net.http_post` (scheduler token, `pipeline: "scrape-threads"`); schedule only if relevance per dollar approaches Bluesky's. Spend goes through the Apify ledger (`APIFY_LEDGER_SOURCES`).
 
 **Hacker News scraper** (free Algolia, no key): stories pass now reads `story_text` so Ask HN / Tell HN self-posts ingest as `title_and_body` (full scoring weight), and a second pass queries `tags=comment` for the same 5 neutral terms — comments are where HN model-experience sentiment lives; a comment must itself name a model to match (`matchModels` on comment text, no community shortcut), capped at `MAX_COMMENTS_PER_RUN=60` (~$1-2/mo Haiku).
 
