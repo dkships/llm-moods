@@ -41,17 +41,21 @@ import {
 import { isRumorOrReleaseCandidate } from "../_shared/rumor-detect.ts";
 
 // Threads keyword search through Apify (added 2026-11-17). Meta's own keyword
-// search API needs app review; this actor reads what a logged-out visitor sees:
-// one page of 20-25 posts per query and result type.
+// search API needs app review; these actors read what a logged-out visitor
+// sees. Two input/output shapes are supported, picked by scraper_config.actor_id.
 const SOURCE = "scrape-threads";
 const POST_SOURCE = "threads";
 // Deploy-verification marker, written into scraper_runs.metadata. Bump on change.
-const CODE_VERSION = "2026-11-17.2";
+const CODE_VERSION = "2026-11-17.3";
 
-// lergassy/threads-scraper: $0.002/post ($0.0018 on the Starter tier), no
-// start fee on normal runs, 99.8% of 18k public runs succeeded in the 30 days
-// to 2026-11-17. Config-driven via scraper_config.actor_id.
-const DEFAULT_ACTOR_ID = "lergassy/threads-scraper";
+// lergassy/threads-scraper: $0.002/post, no start fee. Its logged-out
+// "recent" page is one page per query and was not recent: on 2026-11-17 the
+// newest of 69 posts was 2.8 days old and the oldest 17 months.
+// futurizerush/meta-threads-scraper: $0.0025/post + $0.005/run, pages further
+// back as the limit grows and takes a start date.
+const FUTURIZERUSH_ACTOR_ID = "futurizerush/meta-threads-scraper";
+const DEFAULT_ACTOR_ID = FUTURIZERUSH_ACTOR_ID;
+const FUTURIZERUSH_MIN_POSTS = 10;
 const APIFY_MAX_TOTAL_CHARGE_USD = 0.3;
 const RUN_TIMEOUT_SECS = 240;
 const POLL_INTERVAL_MS = 10000;
@@ -69,10 +73,25 @@ function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Recent page only, exact wording only, and only posts that contain the
-// keyword: the actor's defaults (top + recent + tags, expanded wordings) cost
-// several times more posts per term.
-function buildActorInput(searchTerms: string[], maxPostsPerTerm: number, monitoringStore: string) {
+interface ActorInput {
+  maxItems: number;
+  [key: string]: unknown;
+}
+
+// Recent posts only, exact wording only, and only posts that contain the
+// keyword: the actors' defaults cost several times more posts per term.
+function buildActorInput(actorId: string, searchTerms: string[], maxPostsPerTerm: number, monitoringStore: string): ActorInput {
+  if (actorId === FUTURIZERUSH_ACTOR_ID) {
+    const maxPosts = Math.max(FUTURIZERUSH_MIN_POSTS, maxPostsPerTerm);
+    return {
+      mode: "search",
+      keywords: searchTerms,
+      search_filter: "recent",
+      start_date: `${RECENT_HOURS / 24} days`,
+      max_posts: maxPosts,
+      maxItems: maxPosts * searchTerms.length,
+    };
+  }
   return {
     mode: "search",
     keywords: searchTerms,
@@ -81,13 +100,46 @@ function buildActorInput(searchTerms: string[], maxPostsPerTerm: number, monitor
     strictKeywordMatch: true,
     maxPosts: maxPostsPerTerm,
     maxItems: maxPostsPerTerm * searchTerms.length,
-    // No `postedAfter`: on 2026-11-17 it dropped all 92 posts of a recent
-    // page. The RECENT_HOURS cutoff below does the same job.
+    // Drops older posts before billing. On 2026-11-17 it removed all 92 posts
+    // of the "recent" page, correctly: none was from the last two days.
+    postedAfter: new Date(Date.now() - RECENT_HOURS * HOUR_MS).toISOString().slice(0, 10),
     includeViews: false,
     includeRunSummary: false,
     // Named store: later runs return only posts earlier runs did not deliver,
     // so overlapping pages are not billed twice.
     ...(monitoringStore ? { monitoringStoreName: monitoringStore } : {}),
+  };
+}
+
+// One post, whichever actor produced it.
+interface ThreadsPost {
+  text: string;
+  createdMs: number;
+  url: string;
+  username: string | null;
+  isVerified: boolean;
+  engagement: number;
+  language: string;
+  query: string;
+  isRepost: boolean;
+}
+
+function normalizeRow(row: any): ThreadsPost | null {
+  const isPost = row?.type === "post" || row?.record_type === "post";
+  const text = row?.text ?? row?.text_content;
+  if (!isPost || typeof text !== "string" || !text) {
+    return null;
+  }
+  return {
+    text,
+    createdMs: new Date(row.createdAt ?? row.created_at).getTime(),
+    url: String(row.url ?? row.post_url ?? ""),
+    username: typeof row.username === "string" ? row.username : null,
+    isVerified: Boolean(row.isVerified ?? row.is_verified),
+    engagement: (Number(row.likeCount ?? row.like_count) || 0) + (Number(row.repostCount ?? row.repost_count) || 0),
+    language: String(row.language || row.languageGuess || "unknown"),
+    query: String(row.query ?? row.search_keyword ?? "unknown"),
+    isRepost: Boolean(row.isRepost ?? row.is_repost),
   };
 }
 
@@ -136,7 +188,7 @@ function countInto(counts: Record<string, number>, key: string) {
 
 // Starts the run, waits for it, and returns the dataset rows, or null when
 // the run did not succeed (already logged, with usage recorded for the ledger).
-async function fetchActorRows(summary: ThreadsSummary, supabase: any, apifyToken: string, input: ReturnType<typeof buildActorInput>) {
+async function fetchActorRows(summary: ThreadsSummary, supabase: any, apifyToken: string, input: ActorInput) {
   const actorId = summary.actorId ?? DEFAULT_ACTOR_ID;
   const startRes = await fetch(apifyRunUrl(actorId.replace("/", "~"), apifyToken, input.maxItems, {
     timeoutSecs: RUN_TIMEOUT_SECS,
@@ -212,8 +264,9 @@ async function runApifyPath(
 ): Promise<ThreadsSummary> {
   const configuredTerms = getConfigValues(config, "search_term");
   const searchTerms = configuredTerms.length > 0 ? configuredTerms : DEFAULT_SEARCH_TERMS;
-  summary.actorId = getConfigValue(config, "actor_id", DEFAULT_ACTOR_ID);
+  summary.actorId = getConfigValue(config, "actor_id", DEFAULT_ACTOR_ID) ?? DEFAULT_ACTOR_ID;
   const input = buildActorInput(
+    summary.actorId,
     searchTerms,
     getConfigNumber(config, "max_posts_per_term", 25),
     getConfigValue(config, "monitoring_store", "llm-vibes-threads") ?? "",
@@ -232,7 +285,7 @@ async function runApifyPath(
     return summary;
   }
 
-  const posts = rawRows.filter((row: any) => row.type === "post" && typeof row.text === "string" && row.text);
+  const posts = rawRows.map(normalizeRow).filter((post): post is ThreadsPost => post !== null);
   summary.apify_items_fetched = rawRows.length;
   summary.posts_found = posts.length;
 
@@ -240,13 +293,13 @@ async function runApifyPath(
   const cutoff = Date.now() - RECENT_HOURS * HOUR_MS;
 
   for (const post of posts) {
-    countInto(summary.termHits, String(post.query ?? "unknown"));
-    countInto(summary.languages, String(post.language ?? post.languageGuess ?? "unknown"));
+    countInto(summary.termHits, post.query);
+    countInto(summary.languages, post.language);
     if (post.isRepost) {
       continue;
     }
 
-    const createdMs = new Date(post.createdAt).getTime();
+    const createdMs = post.createdMs;
     if (Number.isFinite(createdMs)) {
       const iso = new Date(createdMs).toISOString();
       if (!summary.oldestPostedAt || iso < summary.oldestPostedAt) {
@@ -261,14 +314,14 @@ async function runApifyPath(
       continue;
     }
 
-    const text = String(post.text).slice(0, 2000);
+    const text = post.text.slice(0, 2000);
     const rumorCandidate = isRumorOrReleaseCandidate(text, "");
     if (!meetsMinLength(text, "") || (isLikelyNonExperienceShare(text, "") && !rumorCandidate)) {
       summary.contentSkipped++;
       continue;
     }
 
-    const authorHandle = typeof post.username === "string" ? post.username : null;
+    const authorHandle = post.username;
     if (authorHandle && noisyAuthors.has(authorHandle) && !rumorCandidate) {
       summary.noisyAuthorSkipped++;
       continue;
@@ -280,7 +333,7 @@ async function runApifyPath(
     }
     summary.filtered_candidates++;
 
-    const sourceUrl = typeof post.url === "string" ? post.url : "";
+    const sourceUrl = post.url;
     if (!sourceUrl || existingUrls.has(sourceUrl)) {
       summary.dedupSkipped++;
       continue;
@@ -299,10 +352,10 @@ async function runApifyPath(
         title: text.slice(0, 120),
         content: text,
         content_type: "full_content",
-        score: (Number(post.likeCount) || 0) + (Number(post.repostCount) || 0),
+        score: post.engagement,
         posted_at: new Date(createdMs).toISOString(),
         author_handle: authorHandle,
-        author_verified: Boolean(post.isVerified),
+        author_verified: post.isVerified,
       });
 
       if (upsertResult.error) {

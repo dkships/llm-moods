@@ -86,6 +86,9 @@ export const ACTOR_EVENT_PRICES: Record<string, ActorEventPrices> = {
   // Free-tier list price ($0.0018 on Starter), plus the $0.005 monitoring-run
   // fee that starts 2026-11-23: overstates a little rather than under.
   "lergassy/threads-scraper": { runStartUsd: 0.005, perItemUsd: 0.002 },
+  // Starter-tier prices are $0.005/run and $0.0025/post; the free-tier run fee
+  // ($0.02) is used so the ledger never undercounts.
+  "futurizerush/meta-threads-scraper": { runStartUsd: 0.02, perItemUsd: 0.0025 },
 };
 
 // "charge_cap": the actor is not in ACTOR_EVENT_PRICES, so each run counts at
