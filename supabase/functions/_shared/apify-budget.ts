@@ -24,7 +24,7 @@ const MONTHLY_SPEND_LIMIT_USD = envNumber("APIFY_MONTHLY_SPEND_LIMIT_USD", 24);
 // week while its own runs had cost $5. The guard now sums the per-run cost
 // this pipeline records in `scraper_runs.metadata.apify_usage` over a rolling
 // window, so the limits below describe LLM Vibes' spend and nothing else.
-export const APIFY_LEDGER_SOURCES = ["scrape-reddit-apify", "scrape-twitter"];
+export const APIFY_LEDGER_SOURCES = ["scrape-reddit-apify", "scrape-twitter", "scrape-threads"];
 const LEDGER_WINDOW_DAYS = 30;
 const HOUR_MS = 3600000;
 const DAY_MS = 24 * HOUR_MS;
@@ -83,6 +83,9 @@ export const ACTOR_EVENT_PRICES: Record<string, ActorEventPrices> = {
   "harshmaur/reddit-scraper": { runStartUsd: 0.02, perItemUsd: 0.0018 },
   "xquik/x-tweet-scraper": { runStartUsd: 0, perItemUsd: 0.00015 },
   "apidojo/tweet-scraper": { runStartUsd: 0, perItemUsd: 0.0004 },
+  // Free-tier list price ($0.0018 on Starter), plus the $0.005 monitoring-run
+  // fee that starts 2026-11-23: overstates a little rather than under.
+  "lergassy/threads-scraper": { runStartUsd: 0.005, perItemUsd: 0.002 },
 };
 
 // "charge_cap": the actor is not in ACTOR_EVENT_PRICES, so each run counts at
