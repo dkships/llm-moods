@@ -14,6 +14,7 @@ import {
 } from "../_shared/runtime.ts";
 
 const SOURCE = "aggregate-vibes";
+const CODE_VERSION = "2026-11-17.1-fixed-mix";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -66,13 +67,14 @@ Deno.serve(async (req) => {
       function_name: SOURCE,
       error_message: `Score refresh complete: daily=${summary.daily_rows} hourly=${summary.hourly_rows}`,
       context: JSON.stringify({
+        code_version: CODE_VERSION,
         posts_scanned: summary.posts_scanned,
         skipped_days: summary.skipped_days,
         models: summary.models,
       }),
     });
 
-    return new Response(JSON.stringify({ status: "complete", summary }, null, 2), {
+    return new Response(JSON.stringify({ status: "complete", code_version: CODE_VERSION, summary }, null, 2), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {

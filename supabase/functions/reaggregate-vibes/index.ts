@@ -1,5 +1,5 @@
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
-import { internalOnlyResponse, isInternalServiceRequest, readJsonBody } from "../_shared/runtime.ts";
+import { internalOnlyResponse, isInternalServiceRequest, isSchedulerRequest, readJsonBody } from "../_shared/runtime.ts";
 import {
   claimServiceLock,
   refreshScores,
@@ -7,6 +7,8 @@ import {
   type ModelRow,
   type ScoreUpsertRow,
 } from "../_shared/score-refresh.ts";
+
+const CODE_VERSION = "2026-11-17.1-fixed-mix";
 
 // Cron currently calls this function with the public anon JWT. Keep handler
 // auth compatible with pg_cron and use service-role credentials only from env.
@@ -94,13 +96,18 @@ async function buildBackfillDiffReport(
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
-  if (!isInternalServiceRequest(req)) return internalOnlyResponse(corsHeaders);
+  // Service-role, or the scheduler token read inside SQL (net.http_post), so a
+  // backfill needs no temporary helper function and the token never leaves
+  // the database.
+  const body = await readJsonBody(req);
+  if (!isInternalServiceRequest(req) && !await isSchedulerRequest(body, "reaggregate-vibes")) {
+    return internalOnlyResponse(corsHeaders);
+  }
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   let lockOwner: string | null = null;
 
   try {
-    const body = await readJsonBody(req);
     const daysBack = Math.max(0, Math.min(Number(body.days_back ?? 2), 90));
     const minPosts = Math.max(1, Number(body.min_posts ?? 5));
     const dryRun = body.dry_run === true;
@@ -152,6 +159,7 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       status: "complete",
+      code_version: CODE_VERSION,
       dry_run: dryRun,
       days_back: daysBack,
       summary,

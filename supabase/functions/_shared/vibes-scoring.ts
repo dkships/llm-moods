@@ -17,6 +17,8 @@ export interface ScoreResult {
   total_posts: number;
   eligible_posts: number;
   top_complaint: string | null;
+  // Pre-cap scoring weight per source (confidence x engagement).
+  source_weights: Record<string, number>;
 }
 
 export interface DailyScoreSeedRow {
@@ -53,6 +55,33 @@ export const SOURCE_SHARE_CAPS: Readonly<Record<string, number>> = { appstore: 0
 
 export function sourceShareCap(source: string): number {
   return SOURCE_SHARE_CAPS[source] ?? DEFAULT_MAX_SOURCE_SHARE;
+}
+
+// Weight the non-dominant sources must reach before the caps apply in full.
+const ALTERNATE_SOURCE_WEIGHT_FOR_HARD_CAP = 3.0;
+
+// Fixed-mix daily score (2026-11-17). The pooled score moves with the day's
+// source mix, and the mix is set mostly by scraper config, not by mood. App
+// Store reviews run 78-93% positive for every model, so a day with few of them
+// read as a drop: ChatGPT 2026-11-16 fell 50 -> 42 with no App Store rows and
+// every other source flat. The fixed-mix score holds each source at its usual
+// share of this model's weight (trailing 28 days, same caps) and measures it
+// against its own usual level, shrinking a thin source toward that level:
+//
+//   score = sum over sources of share * (n * today + K * usual) / (n + K)
+//
+// A source with no posts today counts at its usual level. Backtest in
+// OPERATIONS-HISTORY.md (2026-11-17, "fixed mix").
+export const MIX_BASELINE_DAYS = 28;
+export const MIX_MIN_SOURCE_POSTS = 10;
+export const MIX_SHRINK_POSTS = 5;
+
+export type ScoreMethod = "fixed_mix" | "pooled";
+
+export interface FixedMixResult {
+  score: number;
+  method: ScoreMethod;
+  source_shares: Record<string, number>;
 }
 
 const PARTS_CACHE = new Map<string, Intl.DateTimeFormat>();
@@ -341,7 +370,6 @@ export function isScoredSource(source: string | null | undefined): boolean {
 
 export function computeScore(allPosts: ScoreInputPost[]): ScoreResult {
   const MIN_CONFIDENCE = 0.65;
-  const ALTERNATE_SOURCE_WEIGHT_FOR_HARD_CAP = 3.0;
 
   const posts = allPosts.filter((post) => isScoredSource(post.source));
 
@@ -445,5 +473,66 @@ export function computeScore(allPosts: ScoreInputPost[]): ScoreResult {
     total_posts: posts.length,
     eligible_posts: eligible.length,
     top_complaint: topComplaint,
+    source_weights: sourceRawWeights,
   };
+}
+
+// Final share of weight per source after the per-source caps.
+export function capSourceShares(rawWeights: Record<string, number>): Record<string, number> {
+  const scale = computeSourceScale(rawWeights, ALTERNATE_SOURCE_WEIGHT_FOR_HARD_CAP);
+  const scaled = Object.entries(rawWeights)
+    .filter(([, weight]) => weight > 0)
+    .map(([source, weight]) => [source, weight * (scale[source] ?? 1)] as const);
+  const total = scaled.reduce((sum, [, weight]) => sum + weight, 0);
+  if (total <= 0) {
+    return {};
+  }
+
+  return Object.fromEntries(scaled.map(([source, weight]) => [source, weight / total]));
+}
+
+function groupBySource(posts: ScoreInputPost[]): Map<string, ScoreInputPost[]> {
+  const groups = new Map<string, ScoreInputPost[]>();
+  for (const post of posts) {
+    const source = post.source || "unknown";
+    const group = groups.get(source) ?? [];
+    group.push(post);
+    groups.set(source, group);
+  }
+  return groups;
+}
+
+// `trailing` is this model's scored posts from the MIX_BASELINE_DAYS before
+// the day being scored. Without enough history on any source (a new model)
+// it returns the pooled score.
+export function computeFixedMixScore(
+  today: ScoreInputPost[],
+  trailing: ScoreInputPost[],
+): FixedMixResult {
+  const usualLevel: Record<string, number> = {};
+  const usualWeight: Record<string, number> = {};
+  for (const [source, posts] of groupBySource(trailing)) {
+    const result = computeScore(posts);
+    if (result.eligible_posts < MIX_MIN_SOURCE_POSTS) {
+      continue;
+    }
+    usualLevel[source] = result.score;
+    usualWeight[source] = result.source_weights[source] ?? 0;
+  }
+
+  const shares = capSourceShares(usualWeight);
+  if (Object.keys(shares).length === 0) {
+    return { score: computeScore(today).score, method: "pooled", source_shares: {} };
+  }
+
+  const todayBySource = groupBySource(today);
+  let score = 0;
+  for (const [source, share] of Object.entries(shares)) {
+    const result = computeScore(todayBySource.get(source) ?? []);
+    const n = result.eligible_posts;
+    const estimate = (n * result.score + MIX_SHRINK_POSTS * usualLevel[source]) / (n + MIX_SHRINK_POSTS);
+    score += share * estimate;
+  }
+
+  return { score: Math.round(score), method: "fixed_mix", source_shares: shares };
 }

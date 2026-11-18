@@ -1,10 +1,12 @@
 import {
   applyScoreSmoothing,
+  computeFixedMixScore,
   computeScore,
   DEFAULT_MIN_POSTS,
   getLocalDateLabel,
   getPacificDayWindow,
   isScoredSource,
+  MIX_BASELINE_DAYS,
   PACIFIC_TIMEZONE,
   type ScoreInputPost,
   type ScoreResult,
@@ -41,6 +43,9 @@ export interface ScoreUpsertRow {
   period: "daily" | "hourly";
   period_start: string;
   score: number;
+  // The pre-2026-11-17 pooled score of the same posts (daily rows only), kept
+  // for comparison and audit.
+  pooled_score?: number | null;
   positive_count: number;
   negative_count: number;
   neutral_count: number;
@@ -81,6 +86,16 @@ function maxIso(rows: ReadonlyArray<unknown>, key: string): string | null {
     }
   }
   return maxValue;
+}
+
+// Pacific day labels of the MIX_BASELINE_DAYS before `label`.
+function trailingDayLabels(label: string): string[] {
+  const [year, month, day] = label.split("-").map(Number);
+  const labels: string[] = [];
+  for (let d = 1; d <= MIX_BASELINE_DAYS; d++) {
+    labels.push(getLocalDateLabel(new Date(Date.UTC(year, month - 1, day - d, 12)), PACIFIC_TIMEZONE));
+  }
+  return labels;
 }
 
 function dayWindows(daysBack: number, now: Date): TimeZoneDayWindow[] {
@@ -166,6 +181,48 @@ async function fetchPostsInRange(supabase: any, rangeStart: string, rangeEnd: st
   }
 
   return rows;
+}
+
+// Classified posts only: the baseline for the fixed-mix score. Irrelevant
+// rows are ~70% of scraped_posts and carry no score input.
+async function fetchBaselinePosts(supabase: any, rangeStart: string, rangeEnd: string): Promise<ScrapedScorePost[]> {
+  const rows: ScrapedScorePost[] = [];
+
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from("scraped_posts")
+      .select("model_id, sentiment, complaint_category, confidence, score, content_type, source, posted_at")
+      .eq("classification_status", "classified")
+      .gte("posted_at", rangeStart)
+      .lt("posted_at", rangeEnd)
+      .order("posted_at", { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+
+    if (error) throw new Error(`Failed to fetch baseline posts: ${error.message}`);
+    const page = (data ?? []) as ScrapedScorePost[];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
+
+  return rows;
+}
+
+// model_id|Pacific day label -> scored posts, for trailing-window lookups.
+function bucketByModelDay(posts: ScrapedScorePost[]): Map<string, ScoreInputPost[]> {
+  const buckets = new Map<string, ScoreInputPost[]>();
+  for (const post of posts) {
+    const postedAt = new Date(post.posted_at);
+    if (!Number.isFinite(postedAt.getTime()) || !isScoredSource(post.source)) continue;
+    const key = `${post.model_id}|${getLocalDateLabel(postedAt, PACIFIC_TIMEZONE)}`;
+    const bucket = buckets.get(key) ?? [];
+    bucket.push(...asScoreInput([post]));
+    buckets.set(key, bucket);
+  }
+  return buckets;
+}
+
+function trailingPosts(buckets: Map<string, ScoreInputPost[]>, modelId: string, label: string): ScoreInputPost[] {
+  return trailingDayLabels(label).flatMap((day) => buckets.get(`${modelId}|${day}`) ?? []);
 }
 
 async function fetchSeedRows(supabase: any, modelId: string, beforePeriodStart: string): Promise<DailySeedRow[]> {
@@ -305,6 +362,10 @@ export async function refreshScores(
   // counts, or classification coverage.
   const posts = (await fetchPostsInRange(supabase, rangeStart, rangeEnd))
     .filter((post) => isScoredSource(post.source));
+  const baselineStart = getPacificDayWindow(
+    new Date(new Date(dailyRangeStart).getTime() - (MIX_BASELINE_DAYS * 24 - 12) * 3600 * 1000),
+  ).rangeStart;
+  const baselineBuckets = bucketByModelDay(await fetchBaselinePosts(supabase, baselineStart, dailyRangeEnd));
   const computedAt = new Date().toISOString();
   const postsByDay = new Map<string, ScrapedScorePost[]>();
   const rows: ScoreUpsertRow[] = [];
@@ -338,6 +399,7 @@ export async function refreshScores(
       skipped_days: 0,
       thin_sample: 0,
       partial_coverage: 0,
+      fixed_mix: 0,
     };
 
     for (const window of windows) {
@@ -361,13 +423,18 @@ export async function refreshScores(
         const basis = basisForResult(result, queuedPosts, classificationCoverage, minPosts, failedShare);
         const scoreConfidence = confidenceForResult(result, basis, classificationCoverage, minPosts);
         const measurementPeriodStart = window.periodStart;
-        const score = applyScoreSmoothing(result.score, previousScore, result.eligible_posts, minPosts);
+        const mixed = computeFixedMixScore(
+          asScoreInput(classifiedPosts),
+          trailingPosts(baselineBuckets, model.id, window.label),
+        );
+        const score = applyScoreSmoothing(mixed.score, previousScore, result.eligible_posts, minPosts);
 
         rows.push({
           model_id: model.id,
           period: "daily",
           period_start: window.periodStart,
           score,
+          pooled_score: result.score,
           positive_count: result.positive_count,
           negative_count: result.negative_count,
           neutral_count: result.neutral_count,
@@ -389,6 +456,7 @@ export async function refreshScores(
 
         previousScore = score;
         modelSummary.daily_rows++;
+        if (mixed.method === "fixed_mix") modelSummary.fixed_mix++;
         if (basis === "thin_sample") modelSummary.thin_sample++;
         if (basis === "partial_coverage") modelSummary.partial_coverage++;
         continue;

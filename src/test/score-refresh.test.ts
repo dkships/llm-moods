@@ -14,6 +14,7 @@ function createRefreshClient(options: {
       if (table === "scraped_posts") {
         const builder = {
           select: () => builder,
+          eq: () => builder,
           gte: () => builder,
           lt: () => builder,
           order: () => builder,
@@ -115,6 +116,45 @@ describe("score refresh pipeline", () => {
       score_basis_status: "partial_coverage",
     });
     expect(upserts[0].classification_coverage).toBe(0.5);
+  });
+
+  it("scores a day against the model's usual source mix and keeps the pooled score", async () => {
+    const upserts: Record<string, unknown>[] = [];
+    const scored = (sentiment: "positive" | "negative", source: string, postedAt: string) => ({
+      model_id: model.id,
+      sentiment,
+      complaint_category: null,
+      confidence: 1,
+      score: 0,
+      content_type: "full_content",
+      source,
+      posted_at: postedAt,
+      created_at: postedAt,
+      classification_status: "classified",
+    });
+    // Ten earlier days: App Store all positive, HN half and half.
+    const history = Array.from({ length: 10 }, (_, i) => {
+      const day = `2026-05-0${i % 7 + 1}T18:00:00.000Z`;
+      return [scored("positive", "appstore", day), scored("positive", "hackernews", day), scored("negative", "hackernews", day)];
+    }).flat();
+    // Today: HN only, at its usual 50.
+    const today = [
+      ...Array.from({ length: 10 }, () => scored("positive", "hackernews", "2026-05-08T15:00:00.000Z")),
+      ...Array.from({ length: 10 }, () => scored("negative", "hackernews", "2026-05-08T15:00:00.000Z")),
+    ];
+    const supabase = createRefreshClient({ posts: [...history, ...today], upserts });
+
+    const summary = await refreshScores(supabase, [model], {
+      daysBack: 0,
+      includeHourly: false,
+      now: new Date("2026-05-08T16:00:00.000Z"),
+    });
+
+    // Usual mix: HN holds 2/3 of the weight and is capped at half, so App
+    // Store (level 100) and HN (level 50) count equally: usual level 75. A
+    // day with no App Store posts and HN at its usual level stays at 75.
+    expect(upserts[0]).toMatchObject({ score: 75, pooled_score: 50 });
+    expect(summary.models.claude).toMatchObject({ fixed_mix: 1 });
   });
 });
 

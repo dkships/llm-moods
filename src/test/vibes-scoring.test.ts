@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   applyScoreSmoothing,
+  computeFixedMixScore,
   computeScore,
   getMatchingWindow,
   getPacificDayWindow,
@@ -306,5 +307,72 @@ describe("2026-09 source-mix fixes", () => {
     const posts = Array.from({ length: 12 }, () => post("positive", "appstore"));
 
     expect(computeScore(posts).score).toBe(100);
+  });
+});
+
+describe("2026-11 fixed-mix score", () => {
+  const post = (
+    sentiment: "positive" | "negative" | "neutral",
+    source: string,
+  ) => ({
+    sentiment,
+    complaint_category: sentiment === "negative" ? "coding_quality" : null,
+    confidence: 1,
+    score: 0,
+    content_type: "full_content",
+    source,
+  });
+  const many = (count: number, sentiment: "positive" | "negative", source: string) =>
+    Array.from({ length: count }, () => post(sentiment, source));
+
+  // Usual mix: App Store at 100 (capped to 35% of weight), HN at 50 (65%).
+  // Usual level = 0.35 * 100 + 0.65 * 50 = 67.5.
+  const trailing = [
+    ...many(50, "positive", "appstore"),
+    ...many(25, "positive", "hackernews"),
+    ...many(25, "negative", "hackernews"),
+  ];
+
+  it("does not drop on a day when one source sends no posts", () => {
+    // ChatGPT 2026-11-16: no App Store rows, every other source flat, and
+    // the pooled score fell 50 -> 42.
+    const today = [...many(10, "positive", "hackernews"), ...many(10, "negative", "hackernews")];
+
+    expect(computeScore(today).score).toBe(50);
+    expect(computeFixedMixScore(today, trailing)).toMatchObject({ score: 68, method: "fixed_mix" });
+  });
+
+  it("moves when sentiment on a source moves", () => {
+    // HN all negative: (20*0 + 5*50) / 25 = 10, so 0.35 * 100 + 0.65 * 10 = 41.5.
+    const today = many(20, "negative", "hackernews");
+
+    expect(computeFixedMixScore(today, trailing).score).toBe(42);
+  });
+
+  it("shrinks a thin source toward its usual level", () => {
+    // Grok 2026-11-04: 7 negative Reddit posts took a third of the day.
+    // One App Store post: (1*0 + 5*100) / 6 = 83.3, so 0.35 * 83.3 + 0.65 * 50 = 61.7.
+    const today = [
+      post("negative", "appstore"),
+      ...many(10, "positive", "hackernews"),
+      ...many(10, "negative", "hackernews"),
+    ];
+
+    expect(computeFixedMixScore(today, trailing).score).toBe(62);
+  });
+
+  it("leaves out a source with too little history", () => {
+    const today = [...many(10, "positive", "hackernews"), ...many(10, "negative", "hackernews"), ...many(5, "negative", "threads")];
+    const thinHistory = [...trailing, ...many(3, "positive", "threads")];
+
+    const result = computeFixedMixScore(today, thinHistory);
+    expect(result.score).toBe(68);
+    expect(Object.keys(result.source_shares).sort()).toEqual(["appstore", "hackernews"]);
+  });
+
+  it("falls back to the pooled score when the model has no history", () => {
+    const today = [...many(10, "positive", "hackernews"), ...many(10, "negative", "hackernews")];
+
+    expect(computeFixedMixScore(today, [])).toMatchObject({ score: 50, method: "pooled" });
   });
 });
