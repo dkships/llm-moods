@@ -766,6 +766,19 @@ const FAMILY_ALIASES: Record<TrackedFamily, AliasEntry[]> = {
       releasedOn: "2026-11-12",
     },
     {
+      // Generally available 2026-11-18 as gemini-4-neon: a new Gemini 4 tier
+      // that Google places "between Gemini 4 Hydrogen and Gemini 4 Carbon".
+      // Own key, so it never folds into another Gemini 4 card.
+      key: "gemini4neon",
+      label: "Gemini 4 Neon",
+      codename: "Neon",
+      aliases: ["neon", "gemini4neon"],
+      released: true,
+      releasePrompt: "Gemini 4 Neon",
+      releaseAliases: ["gemini4neon"],
+      releasedOn: "2026-11-18",
+    },
+    {
       // The rumored Flash-tier Gemini 4 model. Nothing shipped under this name:
       // Gemini 4 Hydrogen took the Flash slot on 2026-11-12, so the card
       // retires with that launch (the Gemini 3.5 Pro precedent).

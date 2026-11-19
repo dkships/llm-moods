@@ -927,6 +927,10 @@ describe("isReleasedVersion", () => {
     expect(isReleasedVersion("gemini", null, "Hydrogen")).toBe(true);
     expect(isReleasedVersion("gemini", "Hydrogen", null)).toBe(true);
     expect(isReleasedVersion("gemini", "Gemini 4 Hydrogen Pro", null)).toBe(false);
+    expect(isReleasedVersion("gemini", "Gemini 4 Neon", null)).toBe(true); // GA 2026-11-18
+    expect(isReleasedVersion("gemini", null, "Neon")).toBe(true);
+    expect(isReleasedVersion("gemini", "Neon", null)).toBe(true);
+    expect(isReleasedVersion("gemini", "Gemini 4 Neon Pro", null)).toBe(false);
     // Overtaken without shipping: Gemini 4 Hydrogen took the Flash slot.
     expect(isReleasedVersion("gemini", "Gemini 4 Flash", null)).toBe(true);
     // Overtaken without shipping: Gemini 4 Argon took the 3.5 Pro slot.
