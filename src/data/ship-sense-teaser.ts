@@ -13,14 +13,14 @@ export const SHIP_SENSE_TEASER: ShipSenseTeaserRow[] = [
     "score": 94.6
   },
   {
-    "label": "Gemini 4 Argon",
-    "score": 93.6
+    "label": "Gemini 4 Neon",
+    "score": 93.9
   }
 ];
 
 export const SHIP_SENSE_TEASER_RUN = {
   "version": "v4.10",
   "bankItems": 100,
-  "modelCount": 71,
-  "currentCount": 24
+  "modelCount": 72,
+  "currentCount": 25
 };
