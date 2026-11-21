@@ -38,6 +38,9 @@ export const RESEARCH_BODIES: Record<string, LazyExoticComponent<ComponentType>>
   "opus-5-5-vs-opus-5-launch-sentiment-2026": lazy(
     () => import("./research/opus-5-5-vs-opus-5-launch-sentiment-2026"),
   ),
+  "gpt-6-2-astra-launch-claims-vs-reception-2026": lazy(
+    () => import("./research/gpt-6-2-astra-launch-claims-vs-reception-2026"),
+  ),
 };
 
 export function getResearchBody(slug: string): LazyExoticComponent<ComponentType> | undefined {

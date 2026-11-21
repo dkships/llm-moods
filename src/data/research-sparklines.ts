@@ -26,6 +26,25 @@ export interface ResearchSparkline {
 }
 
 export const RESEARCH_SPARKLINES: Record<string, ResearchSparkline> = {
+  "gpt-6-2-astra-launch-claims-vs-reception-2026": {
+    startDate: "2026-09-28",
+    caption: "ChatGPT daily score, Sep 28 – Nov 20, 2026",
+    subject: "ChatGPT daily score",
+    series: [
+      {
+        label: "ChatGPT",
+        emphasis: "primary",
+        scores:
+        [54, 53, 58, 54, 62, 59, 58, 59, 63, 64, 61, 58, 62, 57, 59, 60, 61, 64, 63, 61, 63, 60, 55, 54,
+        56, 56, 62, 62, 59, 56, 60, 57, 58, 59, 60, 57, 65, 64, 63, 62, 59, 63, 58, 59, 60, 66, 65, 63,
+        57, 54, 58, 59, 59, 60],
+      },
+    ],
+    markers: [
+      { eventId: "openai-gpt-6-1-sol-launch", label: "GPT-6.1 Sol" },
+      { eventId: "openai-gpt-6-2-astra-sol-launch", label: "GPT-6.2" },
+    ],
+  },
   "opus-5-5-vs-opus-5-launch-sentiment-2026": {
     startDate: "2026-07-13",
     caption: "Claude daily score, Jul 13 – Sep 26, 2026",
@@ -101,17 +120,16 @@ export const RESEARCH_SPARKLINES: Record<string, ResearchSparkline> = {
     ],
   },
   "claude-april-2026": {
-    startDate: "2026-02-15",
-    caption: "Claude daily score, Feb 15 – Apr 21, 2026",
+    startDate: "2026-03-20",
+    caption: "Claude daily score, Mar 20 – Apr 24, 2026",
     subject: "Claude daily score",
     series: [
       {
         label: "Claude",
         emphasis: "primary",
         scores:
-        [70, 75, 72, 67, null, null, null, null, null, 60, null, null, null, 36, 32, null, 42, null, 30,
-        40, 40, 40, 42, 31, 35, 26, 26, 26, 29, 17, 50, 40, 52, 51, 59, 56, 60, 61, 60, 53, 39, 51, 52,
-        49, 42, 55, 46, 60, 54, 51, 50, 43, 44, 38, 40, 35, 33, 34, 26, 39, 44, 55, 49, 50, 39, 43],
+        [55, 56, 61, 53, 70, 55, 48, 38, 49, 53, 49, 42, 57, 46, 59, 56, 53, 45, 46, 43, 35, 43, 36,
+        29, 33, 30, 52, 45, 58, 51, 48, 42, 29, 37, 45, 44],
       },
     ],
     markers: [
@@ -119,42 +137,37 @@ export const RESEARCH_SPARKLINES: Record<string, ResearchSparkline> = {
     ],
   },
   "cross-model-deltas-march-april-2026": {
-    startDate: "2026-02-15",
-    caption: "Daily scores for all four models, Feb 15 – Apr 21, 2026",
+    startDate: "2026-03-20",
+    caption: "Daily scores for all four models, Mar 20 – Apr 24, 2026",
     subject: "Claude vs the other three models",
     series: [
       {
         label: "ChatGPT",
         emphasis: "muted",
         scores:
-        [80, 78, 81, 84, 50, null, 30, 18, 11, 47, null, 63, 42, 30, null, null, 33, 20, 12, 20, 30, 35,
-        30, 26, 56, 30, 30, 30, 79, 72, 58, 35, 28, 18, 21, 28, 22, 19, 37, 19, 8, 20, 22, 23, 16, 18,
-        32, 26, 30, 38, 50, 51, 59, 44, 43, 45, 49, 43, 57, 51, 45, 42, 39, 46, 39, 32],
+        [20, 24, 30, 18, 24, 37, 19, 15, 26, 20, 21, 19, 16, 30, 26, 31, 42, 52, 54, 61, 34, 46, 49,
+        44, 36, 59, 44, 37, 43, 41, 49, 29, 25, 50, 41, 46],
       },
       {
         label: "Gemini",
         emphasis: "muted",
         scores:
-        [73, 77, 75, 79, null, null, null, null, null, null, null, null, null, 47, null, null, null, 28,
-        28, 28, 28, 48, 41, 41, 41, 65, 65, 65, 65, 65, 65, 65, 65, 29, 49, 48, 49, 53, 36, 36, 37, 38,
-        51, 38, 37, 24, 35, 35, 50, 51, 34, 29, 33, 34, 36, 31, 63, 29, 30, 38, 46, 26, 25, 33, 26, 23],
+        [33, 56, 52, 42, 48, 46, 40, 40, 37, 50, 42, 23, 35, 32, 39, 53, 57, 35, 32, 29, 35, 36, 34,
+        59, 29, 31, 28, 39, 33, 28, 36, 26, 45, 44, 28, 41],
       },
       {
         label: "Grok",
         emphasis: "muted",
         scores:
-        [46, 50, 47, 51, null, null, null, null, null, null, null, null, null, null, null, null, null,
-        null, 51, 51, 51, 29, 21, 21, 21, 21, 21, 21, 21, 13, 13, 13, 13, 27, 18, 23, 39, 32, 38, 32,
-        40, 33, 37, 41, 47, 16, 21, 28, 32, 28, 32, 40, 30, 46, 34, 32, 33, 30, 17, 10, 25, 48, 40, 27,
-        37, 43],
+        [26, 15, 27, 40, 57, 36, 31, 40, 25, 45, 29, 43, 16, 27, 31, 42, 25, 29, 64, 33, 37, 36, 31,
+        35, 31, 14, 21, 30, 51, 42, 45, 41, 58, 39, 26, 25],
       },
       {
         label: "Claude",
         emphasis: "primary",
         scores:
-        [70, 75, 72, 67, null, null, null, null, null, 60, null, null, null, 36, 32, null, 42, null, 30,
-        40, 40, 40, 42, 31, 35, 26, 26, 26, 29, 17, 50, 40, 52, 51, 59, 56, 60, 61, 60, 53, 39, 51, 52,
-        49, 42, 55, 46, 60, 54, 51, 50, 43, 44, 38, 40, 35, 33, 34, 26, 39, 44, 55, 49, 50, 39, 43],
+        [55, 56, 61, 53, 70, 55, 48, 38, 49, 53, 49, 42, 57, 46, 59, 56, 53, 45, 46, 43, 35, 43, 36,
+        29, 33, 30, 52, 45, 58, 51, 48, 42, 29, 37, 45, 44],
       },
     ],
     markers: [

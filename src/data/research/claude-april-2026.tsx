@@ -21,7 +21,7 @@ const ClaudeApril2026Body = () => (
     <h2 id="the-28-day-gap">The 28-day gap</h2>
     <p>
       On March 26, 2026, a Bluesky user posted: "Restart session, clear conversations, clear claude md, give it
-      specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf."{" "}
+      specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf…"{" "}
       <ExternalLink href="https://bsky.app/profile/tetrac-official.bsky.social/post/3mhxg72ka722t">
         That post
       </ExternalLink>{" "}
@@ -30,16 +30,15 @@ const ClaudeApril2026Body = () => (
       <ExternalLink href="https://www.anthropic.com/engineering/april-23-postmortem">
         confirmed the bug 28 days later
       </ExternalLink>
-      , on April 23. Our scrapers logged the grumbling on day zero. We just couldn't tell you so in real time.
+      , on April 23. LLM Vibes logged the grumbling on day zero. I just couldn't tell you so in real time.
     </p>
     <p>
-      This piece is the receipts. What our data shows, where it lined up with Anthropic's postmortem, and where
-      it didn't.
+      This piece compares my data with Anthropic's postmortem: where they line up, and where they don't.
     </p>
 
     <StatCallout
       stats={[
-        { value: "32 points", label: "Daily score drop, Mar 24 → Mar 27" },
+        { value: "20 points", label: "Claude's daily score, six-day average before the bug shipped (58) → the day after (38)" },
         { value: "28 days", label: "Until Anthropic confirmed the bug" },
       ]}
     />
@@ -59,7 +58,8 @@ const ClaudeApril2026Body = () => (
       <ExternalLink href="https://www.anthropic.com/engineering/april-23-postmortem">
         April 23 engineering postmortem
       </ExternalLink>{" "}
-      named three bugs running March 4 – April 20. Our classifier had already tagged complaints for all three.
+      named three bugs running March 4 – April 20. The LLM Vibes classifier had already tagged complaints for
+      all three.
     </p>
     <ResearchTableFrame label="Anthropic confirmed bugs matched to LLM Vibes complaint categories">
       <table className="w-full">
@@ -110,16 +110,16 @@ const ClaudeApril2026Body = () => (
       </table>
     </ResearchTableFrame>
     <p>
-      For two of three bugs, our scrapers logged matching user-language complaints on the day the bug shipped.
+      For two of three bugs, the scrapers logged matching user-language complaints on the day the bug shipped.
       The mainstream tech press cycle (VentureBeat, Fortune, Simon Willison, The Register, The Decoder) landed
       between April 13 and April 24. The clearest match was the cache bug. Anthropic specifically called out
-      faster usage-limit drain, and we had an <code>api_reliability</code> spike on March 27, one day after
-      deployment.
+      faster usage-limit drain, and the second quote below is a user describing exactly that on March 27, one
+      day after deployment.
     </p>
 
     <h2 id="the-receipts">The receipts</h2>
     <p>
-      Verbatim from our <code>scraped_posts</code> table, paired with the postmortem dates.
+      Three posts from the <code>scraped_posts</code> table, paired with the postmortem dates.
     </p>
     <PullQuote
       text="Restart session, clear conversations, clear claude md, give it specific skill and working examples and it's dumb af. Feels like sonnet 3.5 wtf…"
@@ -135,10 +135,9 @@ const ClaudeApril2026Body = () => (
       platform="Reddit"
       timestamp="2026-03-27 21:36 UTC"
       href="https://www.reddit.com/r/ClaudeAI/comments/1s5hfa4/27_of_the_5hour_tokens_usage_consumed_in_an/"
-      archivedHref="https://web.archive.org/web/2026/https://www.reddit.com/r/ClaudeAI/comments/1s5hfa4/27_of_the_5hour_tokens_usage_consumed_in_an/"
     />
     <PullQuote
-      text="Paying for Claude Max 20x and the token limits still tank mid-session on heavy coding work. If you're selling a premium tier for power users, actually build for power users."
+      text="Paying for Claude Max 20x and the token limits still tank mid-session on heavy coding work. If you're selling a premium tier for power users, actually build for power users. …"
       handle="@mkalkere"
       platform="X"
       timestamp="2026-03-29 23:55 UTC"
@@ -147,69 +146,76 @@ const ClaudeApril2026Body = () => (
     />
     <p>
       Bug 2 (thinking-cache) shipped March 26. The first quote arrived same-day, comparing Claude to a model
-      two generations old. Our classifier tagged it <code>general_drop</code> and <code>lazy_responses</code>,
-      the categories Anthropic later mapped to "forgetful and repetitive."
+      two generations old. The classifier tagged it <code>general_drop</code> and <code>lazy_responses</code>.
+      Anthropic's postmortem later described the cache bug's symptoms as "forgetfulness, repetition, and odd
+      tool choices."
     </p>
     <p>
-      The second quote is the token-drain symptom Anthropic admitted to in the postmortem, captured 24 hours
-      after deployment. The user describes the cache bug's exact mechanism in plain English without knowing what
-      it was. The third quote shows the issue spreading into the paid Claude Max tier within three days, well
-      before any tech outlet had filed copy on it.
+      The second quote is the token-drain symptom from the postmortem, posted a day after deployment. A jump
+      to 27% right at the window rollover is the kind of usage drain Anthropic later attributed to the cache
+      bug. I can't prove this user hit that bug. The third quote is a Max 20x subscriber three days in. It's
+      one post, but it's two weeks before the first press coverage on April 13.
     </p>
 
-    <h2 id="what-we-got-right">What we got right</h2>
+    <h2 id="what-we-got-right">What the data got right</h2>
     <p>
       Same-day capture on March 26: an LLM Vibes scraper logged @tetrac-official's "feels like sonnet 3.5"
-      post on the day Anthropic shipped the cache change. Over the same 72 hours our daily score for Claude
-      fell 32 points, 70 → 38, March 24 → 27. Same-day capture again on March 27: our{" "}
-      <code>api_reliability</code> complaint volume jumped on the day Anthropic later said the cache bug
-      began burning quota. A one-day match between an internal engineering change and an external sentiment
-      pattern is the case for tools like ours existing at all.
+      post on the day Anthropic shipped the cache change. The score moved with it. Over the six days before
+      the bug shipped (March 20–25), Claude's daily score averaged 58. On March 26 it was 48, and on March 27
+      it was 38.
     </p>
     <p>
-      The cross-model isolation also held up, but not in the way the bug-window numbers alone would tell you.
-      During the cache-bug window (March 26 – April 10), Claude scored 47.6, ChatGPT 32.0, Gemini 38.4, Grok
-      34.6. Claude was still ahead in absolute terms. Bug-window deltas don't differentiate it either: Claude
-      dropped 23, ChatGPT dropped 49, Gemini dropped 38, Grok dropped 14. By that read, ChatGPT looked far
-      worse than Claude. The signal that singled Claude out is the <em>post-fix recovery shape</em>. Between
-      April 11 and April 15, ChatGPT moved back toward its baseline (32 → 46), Gemini drifted slightly down
-      (38 → 36), and Claude fell another 12 points to 36, then kept going. (Grok also slid on much thinner
-      post volume; Claude's drop is the only one with high-volume support.) That post-fix divergence is the
-      strongest evidence we have that the problem was Claude's, not a press cycle hitting every model.
+      One caution on that drop. The highest day in the run-up, a 70 on March 24, was followed by a 55 on
+      March 25, the day before the bug shipped. So some of the fall from the peak is ordinary day-to-day
+      swing. The 20 points I'm counting is from the six-day average, not from the peak.
+    </p>
+    <p>
+      The other three models help here. During the cache-bug window (March 26 – April 10), Claude averaged
+      47.6, down about 11 points from its six days before. ChatGPT went the other way, from 25.5 to 32.0.
+      Grok was flat (33.5 to 34.6). Gemini slipped from 46.2 to 38.4, on about a third of Claude's post
+      volume. Claude was the only well-covered model that fell when the bug shipped. My read is that this is
+      the strongest evidence the problem was Claude's and not a bad news week for every model.
+    </p>
+    <p>
+      After the fix on April 10, Claude's score dropped again, to an average of 36 for April 11–15, while
+      ChatGPT rose to 46. Then Claude recovered to the high 40s (48.8 for April 16–20).
     </p>
 
-    <h2 id="what-we-got-wrong">What we got wrong</h2>
+    <h2 id="what-we-got-wrong">What the data got wrong</h2>
     <p>
-      Three things, in order of how much they undercut the dashboard.
+      Four things, in order of how much they undercut the dashboard.
     </p>
     <p>
-      The April 11–15 trough (single-day low of 29, window average 36, the lowest sustained stretch on
-      Claude's chart through April 24) landed{" "}
-      <em>after</em> Anthropic fixed the cache bug on April 10 and <em>before</em> the verbosity-prompt bug
-      on April 16. That window is press-cycle echo, not silent-bug detection. The Register published on April
-      13, VentureBeat and Hacker News followed, and our scrapers captured the resulting wave of "Claude is
-      broken" posts. Many of those came from users whose actual issues had already been fixed. The dashboard
-      looks more like an early-grumble detector than a clean leading indicator.
+      The April 11–15 trough (single-day low of 29, window average 36, the lowest stretch on Claude's chart
+      with real post volume) landed <em>after</em> Anthropic fixed the cache bug on April 10 and{" "}
+      <em>before</em> the verbosity-prompt bug on April 16. My read is that this window is an echo of the
+      press cycle and not a hidden bug. The Register published on April 13, VentureBeat and Hacker News
+      followed, and the scrapers captured the resulting wave of "Claude is broken" posts. Many of those came
+      from users whose actual issues had already been fixed. So the lowest score landed on the wrong week.
     </p>
     <p>
-      The February 19 – March 7 volume gap is on us. The scraper orchestrator was committed in early March
-      but ran on manual triggers only; the hourly cron schedule landed April 22. After a May 2026
-      reclassification pass that recovered previously-failed posts, the gap is smaller than our April
-      retrospective reported, but the "Feb 15–18 baseline" still stands on only four days of meaningful data,
-      not a solid statistical floor. The miss cost less than I feared. It's still worth naming: a leading
-      indicator running on manual-trigger scrapers is the kind of mistake you only notice when you need the
-      indicator.
+      The "before" is only six days. LLM Vibes started scraping on March 8, ran on manual triggers until an
+      hourly schedule landed on April 22, and didn't collect steady daily volume for Claude until March 20.
+      That was six days before the cache bug shipped. An earlier version of this article compared the bug
+      window against a "February baseline." Those February rows were placeholder data from the app's first
+      build, not scraped posts. I've removed every number that depended on them, and the downloadable
+      dataset now starts on March 8.
     </p>
     <p>
-      The classifier itself is one of the tracked models. Sentiment runs through Claude Haiku 4.5, classifying
-      posts about Claude, ChatGPT, Gemini, and Grok.
+      The score is all of Claude. The postmortem says the bugs affected Claude Code, the Agent SDK and
+      Cowork, and that the API was not impacted. The first quote above is about Claude in general, not Claude
+      Code. I split the same window by product surface in{" "}
+      <a href="/research/surface-segmentation-march-may-2026">a later piece</a>.
+    </p>
+    <p>
+      The classifier came from one of the tracked labs. When these posts were scored, sentiment ran through
+      a Google Gemini Flash model, classifying posts about Gemini alongside Claude, ChatGPT and Grok.
       <sup id="ref-1">
         <a href="#note-1" className="inline-flex min-h-6 min-w-6 items-center justify-center" aria-label="[1] See footnote 1">
           [1]
         </a>
       </sup>{" "}
-      The structural risk is real: the classifier could favor Claude. We cross-check labels against an
-      independent Gemini grader before changing the production classifier.
+      The structural risk is real: the classifier could have favored Gemini.
     </p>
 
     <h2 id="what-this-changes">What this changes</h2>
@@ -217,40 +223,40 @@ const ClaudeApril2026Body = () => (
       When SaaS reliability mattered enough, third-party status pages and observability tools (StatusGator,
       Downdetector, Datadog's third-party monitors) emerged because vendor-published uptime numbers turned out
       to be a conflict of interest. Frontier-model quality is now in roughly the same position. Anthropic
-      published its postmortem 28 days after the bug shipped. That lag, from internal detection to external
-      confirmation, is the gap independent telemetry fills. The user-side signal was visible the day the bug
-      shipped.
+      published its postmortem 28 days after the bug shipped. The user-side signal was visible the day the
+      bug shipped.
     </p>
     <p>
-      For a frontier-model team, an outside signal is valuable because it exists, not because the score is
-      right. Internal evals measure what the model can do on curated tasks. A noisy public-grumble dataset measures
-      what users feel when those tasks meet their workflows. The two answer different questions, but if they
-      diverge for a week, the divergence itself is the bug report, and the retro doesn't have to wait 28
-      days.
+      For a frontier-model team, an outside signal is useful even when the score is noisy, because it comes
+      from somewhere other than the lab. Internal evals measure what the model can do on curated tasks. A
+      public-grumble dataset measures what users feel when those tasks meet their workflows. They answer
+      different questions. If the two disagree for a week, I'd treat that as a bug report.
     </p>
     <p>
-      AI accountability needs more sources of telemetry that don't sit inside the lab's CI pipeline. We share
-      a classifier vendor with our subjects, our scrapers are imperfect, and our lowest score landed on the
-      wrong week. We're one source. There should be five.
+      LLM Vibes is one outside source, and an imperfect one. The classifier came from a lab it was grading,
+      the scrapers had gaps, and the lowest score landed on the wrong week. I'd like to see more sources like
+      it, built by other people.
     </p>
 
     <h2 id="methodology">Methodology</h2>
     <p>
       During this article's window, LLM Vibes scraped posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across five social platforms:
       Reddit (Apify), Hacker News (Algolia API), Bluesky (AT Protocol), Twitter/X (Apify), and Mastodon (5
-      instances). Each scraper ran on its own cron three times a day, and the scoring pipeline aggregates a
-      daily 0–100 score per model.
+      instances). The scrapers ran on manual triggers until April 22, which is why some days are thin, and
+      the scoring pipeline aggregated a daily 0–100 score per model.
     </p>
     <p>
-      Each post is classified for sentiment and complaint category by Claude Haiku 4.5 via the Anthropic
-      API, in batches of 20. Multi-model posts use a per-model targeted prompt so a sentence like "DeepSeek
-      fixed Gemini's mess" scores correctly for each model. The daily score is volume-weighted negative-vs-
-      positive on a 0–100 scale.
+      Each post was classified for sentiment and complaint category by a Gemini Flash model, in batches.
+      Multi-model posts used a per-model targeted prompt so a sentence like "Claude fixed what Gemini broke"
+      scored correctly for each model. The daily score was volume-weighted negative-vs-positive on a 0–100
+      scale. The pipeline has changed since; the{" "}
+      <a href="/research/how-llm-vibes-classifies-sentiment">methodology page</a> describes the current one.
     </p>
     <p>
-      The numbers in this article come from the <code>vibes_scores</code> and <code>scraped_posts</code> tables,
-      filtered to days with ≥10 total Claude posts (matching the methodology in the public retrospective). All
-      quoted text is verbatim. The full data analysis lives in the{" "}
+      The numbers in this article come from the <code>vibes_scores</code> table as it stands today, and the{" "}
+      <a href="/research/claude-april-2026/data.csv">downloadable dataset</a> is the same rows, March 8 –
+      April 24. Window figures are plain averages of the daily scores. Quoted text is verbatim, with cuts
+      marked. The full data analysis lives in the{" "}
       <ExternalLink href="https://github.com/dkships/llm-moods">public repository</ExternalLink> under{" "}
       <code>docs/claude-april-2026-degradation-analysis.md</code>, and the internal retrospective is at{" "}
       <code>docs/llm-vibes-retrospective-april-2026.md</code>.
@@ -267,9 +273,8 @@ const ClaudeApril2026Body = () => (
       <code>supabase/functions/_shared/</code>.
     </p>
     <p>
-      One open item. Recovery-shape divergence (one model still falling while its peers recover) caught this
-      regression, and it still isn't a first-class metric on the dashboard. It should be. The repo is open;
-      PRs welcome.
+      One open item. The comparison that mattered here was Claude against the other three models over the
+      same days, and the dashboard still doesn't show that as its own number. It should.
     </p>
 
     <h2 id="notes">Notes</h2>
@@ -281,12 +286,11 @@ const ClaudeApril2026Body = () => (
       >
         [1]
       </a>{" "}
-      Self-bias risk on the classifier. Claude Haiku 4.5 is the model performing classification and is
-      also one of the four tracked models, so the risk now runs toward favoring Claude. Mitigation: around
-      classifier changes we rerun a sample of labels through an independent Gemini grader and compare.
-      That is a check, not an always-on monitor. An earlier comparison of the two graders found roughly 92%
-      agreement on sentiment, which suggests vendor identity isn't the main driver of the label, but it does
-      not prove neutrality.
+      Self-bias risk on the classifier. When this article's posts were scored, a Gemini Flash model did the
+      classification, and Gemini is one of the four tracked models, so the risk ran toward favoring Gemini.
+      In April 2026 I reran a sample of labels through Claude Sonnet 4.6 and the two graders agreed on
+      sentiment about 92% of the time. That suggests the grader's vendor wasn't the main driver of the
+      label. It doesn't prove neutrality. The production classifier has changed several times since.
     </p>
 
     <AuthorBio />

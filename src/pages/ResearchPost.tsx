@@ -11,6 +11,7 @@ import { PROSE_CLASS_NAME } from "@/lib/prose-styles";
 import NotFound from "@/pages/NotFound";
 import { AUTHOR_NAME, AUTHOR_SAMEAS } from "@/components/research/AuthorBio";
 import ShareLinks from "@/components/research/ShareLinks";
+import { keepModelNamesWhole } from "@/lib/title-format";
 
 const formatDate = (iso: string) =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", {
@@ -136,7 +137,7 @@ const ResearchPostPage = () => {
                     as a subheading below sm. Headlines can still run ~6-7 lines at
                     320px, but a wrapping H1 beats one that's outranked by its H2s. */}
                 <h1 className="mt-4 text-page text-foreground">
-                  {post.title}
+                  {keepModelNamesWhole(post.title)}
                 </h1>
                 <p className="mt-5 text-body text-text-secondary">{post.summary}</p>
                 <div className="mt-5 flex flex-wrap items-center gap-2">

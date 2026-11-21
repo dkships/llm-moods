@@ -1,7 +1,9 @@
 /**
  * Body component for /research/cross-model-deltas-march-april-2026.
- * Hand-ported from markdown to JSX. EmbeddedModelChart is rendered
- * directly inline rather than via a `chart-model` markdown sentinel.
+ * Four live EmbeddedModelCharts pinned to Mar 10 – Apr 25, 2026 and one
+ * table. Window figures are plain averages of the daily scores in
+ * public/research/claude-april-2026/data.csv (live vibes_scores rows from
+ * the first day of scraping; no rows before Mar 8, 2026).
  */
 
 import EmbeddedModelChart from "@/components/research/EmbeddedModelChart";
@@ -10,189 +12,160 @@ import ResearchTableFrame from "@/components/research/ResearchTableFrame";
 
 const CrossModelDeltasBody = () => (
   <>
-    <h2>Watch the recovery shape, not the drop</h2>
+    <h2 id="the-snapshot">The snapshot said Claude was fine</h2>
     <p>
-      How a model's score recovers after a known fix tells you more than the depth of the original drop. In
-      the <a href="/research/claude-april-2026">March–April 2026 Claude incident</a>, ChatGPT drifted back
-      toward its baseline once Anthropic's fix shipped. Gemini stayed roughly flat. Claude kept falling, the
-      deepest of the four. That post-fix divergence is what singled Claude out. Not its bug-window drop.
-      Definitely not its score on any single day.
+      Between March 26 and April 10, 2026, Claude had a bug.{" "}
+      <a href="/research/claude-april-2026">Anthropic confirmed it four weeks later</a>. Over those same 16
+      days, Claude's average score on LLM Vibes was 47.6. ChatGPT's was 32.0.
     </p>
     <p>
-      The most common misread of a multi-model dashboard like LLM Vibes is comparing two scores at a single
-      moment. <em>"Claude is 48, ChatGPT is 31, so Claude is better."</em> That number says less than it looks
-      like.
+      So if you had opened the dashboard in the middle of Claude's regression and compared the two numbers,
+      you'd have said Claude was the healthier model. That's the most common way to misread a multi-model
+      dashboard, and it's the reason I wrote this.
     </p>
     <p>
-      What it actually says is: at this moment, in the population of posts we scraped, the volume-weighted
-      positive share for Claude is higher than for ChatGPT. Models attract different audiences with different
-      complaint cultures. Reddit's r/ChatGPT runs hotter than r/ClaudeAI on any given day. A snapshot doesn't
-      tell you whether a model is improving, regressing, or holding steady. Only the delta from its own
-      baseline does, and the cross-model incident below shows even that delta can mislead.
+      A score at one moment says how positive the posts about a model were that day. Models attract
+      different audiences with different habits of complaining, so one model's 48 and another's 32 aren't on
+      the same scale. The comparison that works is each model against its own recent past.
     </p>
 
-    <h2>The four models, side by side</h2>
+    <h2 id="side-by-side">The four models, side by side</h2>
 
-    <EmbeddedModelChart modelSlug="claude" startDate="2026-02-10" endDate="2026-04-25" />
-    <EmbeddedModelChart modelSlug="chatgpt" startDate="2026-02-10" endDate="2026-04-25" />
-    <EmbeddedModelChart modelSlug="gemini" startDate="2026-02-10" endDate="2026-04-25" />
-    <EmbeddedModelChart modelSlug="grok" startDate="2026-02-10" endDate="2026-04-25" />
+    <EmbeddedModelChart modelSlug="claude" startDate="2026-03-10" endDate="2026-04-25" />
+    <EmbeddedModelChart modelSlug="chatgpt" startDate="2026-03-10" endDate="2026-04-25" />
+    <EmbeddedModelChart modelSlug="gemini" startDate="2026-03-10" endDate="2026-04-25" />
+    <EmbeddedModelChart modelSlug="grok" startDate="2026-03-10" endDate="2026-04-25" />
 
-    <p>
-      Each chart shows the model's own daily score, February 10 through April 25, 2026, the publication
-      window. The Claude chart is shaded with the three Anthropic-confirmed bug windows. The other three are
-      not shaded because their vendors have not published comparable postmortems for the same period.
+    <p className="mt-2 text-sm text-text-tertiary">
+      <em>
+        Each model's daily score, March 10 through April 25, 2026. The Claude chart is shaded with the three
+        bug windows Anthropic confirmed. Days before March 20 rest on very few posts and are drawn with
+        hollow dots.
+      </em>
     </p>
 
-    <h2>The numbers that matter</h2>
+    <h2 id="the-numbers">Each model against its own week before</h2>
     <p>
-      Across the cache-bug window (March 26 – April 10, 2026), each tracked model's volume-weighted score was:
+      LLM Vibes started collecting steady daily volume on March 20, six days before the cache bug shipped.
+      So the "before" for each model is those six days. Here's each model's average score before, during,
+      and after.
     </p>
-    <ResearchTableFrame label="Model sentiment scores and baseline deltas during the Claude cache bug">
+    <ResearchTableFrame label="Average daily score before, during and after the Claude cache bug">
       <table className="w-full">
+        <caption className="sr-only">
+          For each tracked model: the change in average daily score from the six days before the cache bug
+          shipped to the bug window, then the two averages themselves, and the average for the five days
+          after the fix.
+        </caption>
         <thead>
           <tr>
-            <th>Model</th>
-            <th className="whitespace-nowrap">Mar 26 – Apr 10 score</th>
-            <th className="whitespace-nowrap">Feb baseline</th>
-            <th className="whitespace-nowrap">Delta from baseline</th>
-            <th className="whitespace-nowrap">Press-cycle echo (Apr 11–15)</th>
+            <th scope="col">Model</th>
+            <th scope="col" className="whitespace-nowrap">Change</th>
+            <th scope="col" className="whitespace-nowrap">Six days before (Mar 20–25)</th>
+            <th scope="col" className="whitespace-nowrap">Bug window (Mar 26 – Apr 10)</th>
+            <th scope="col" className="whitespace-nowrap">After the fix (Apr 11–15)</th>
           </tr>
         </thead>
         <tbody>
           <tr>
             <td>Claude</td>
+            <td>
+              <strong>−10.7</strong>
+            </td>
+            <td>58.3</td>
             <td>47.6</td>
-            <td>71.0</td>
-            <td>
-              <strong>−23</strong>
-            </td>
-            <td>
-              <strong>36</strong>
-            </td>
+            <td>36.0</td>
           </tr>
           <tr>
             <td>ChatGPT</td>
+            <td>+6.5</td>
+            <td>25.5</td>
             <td>32.0</td>
-            <td>80.8</td>
-            <td>
-              <strong>−49</strong>
-            </td>
-            <td>46</td>
+            <td>46.4</td>
           </tr>
           <tr>
             <td>Gemini</td>
+            <td>−7.8</td>
+            <td>46.2</td>
             <td>38.4</td>
-            <td>76.0</td>
-            <td>
-              <strong>−38</strong>
-            </td>
-            <td>36</td>
+            <td>36.2</td>
           </tr>
           <tr>
             <td>Grok</td>
+            <td>+1.1</td>
+            <td>33.5</td>
             <td>34.6</td>
-            <td>48.5</td>
-            <td>
-              <strong>−14</strong>
-            </td>
-            <td>26</td>
+            <td>26.4</td>
           </tr>
         </tbody>
       </table>
     </ResearchTableFrame>
     <p>
-      Claude held the highest absolute score in this window. It also had the smallest meaningful drop from its
-      own February baseline of any well-trafficked model. ChatGPT and Gemini dropped much further from their
-      baselines. By either reading, Claude looked fine.
+      Read the bug-window column on its own and Claude wins. Read the change column and Claude is the model
+      with the biggest drop. ChatGPT, the model that looked worst in the snapshot, was improving the whole time.
     </p>
     <p>
-      The signal was in the post-fix shape. ChatGPT recovered toward its baseline (32 → 46) after Anthropic
-      confirmed the fix on April 10. Gemini drifted slightly down (38 → 36). Claude kept sliding the deepest
-      of the four (48 → 36).
-    </p>
-
-    <h2>Why the recovery shape matters more than the bug-window delta</h2>
-    <p>Three reasons.</p>
-    <p>
-      Cohort drift. Each model has a different audience mix. ChatGPT pulls in heavy mainstream traffic from
-      Reddit and Twitter; Claude pulls in a more developer-skewed cohort that's more demanding and more vocal.
-      The volume-weighted score reflects both quality and audience tolerance. Bug-window deltas alone can't
-      separate "the underlying model regressed" from "an audience that complains more loudly than usual got an
-      excuse to do it." Both produce the same drop.
-    </p>
-    <p>
-      Press-cycle echo. When a story goes mainstream (VentureBeat, Fortune, Hacker News, The Register), the wave
-      of "X is broken" posts arrives <em>after</em> the fix. Our scrapers pick up that echo for every model
-      visible in the news cycle. The interesting question is who{" "}
-      <em>kept</em> sliding through the wave, not who showed up in it. A model whose post-fix score recovers toward baseline (ChatGPT, Gemini)
-      is a model where the press-cycle posts are stale complaints. A model whose post-fix score keeps falling
-      (Claude) is a model where the underlying complaints are still arriving.
-    </p>
-    <p>
-      Vendor-wide trends. When all four models drop together during the same week, that's industry sentiment,
-      not a single model's quality. The cross-vendor median delta during the bug window was about −30.
-      Claude's −23 was the smallest of the three high-volume models. Only the recovery column singles it out.
+      Gemini fell too, by about 8 points. I don't read much into that. Gemini had 111 posts with a stance in
+      its six days before, against 279 for Claude and 318 for ChatGPT, and two of its six days had fewer
+      than ten posts. Grok was thinner still, at 87.
     </p>
 
-    <h2>Caveats</h2>
+    <h2 id="after-the-fix">The week after the fix was Claude's worst</h2>
     <p>
-      The Feb baseline numbers in the table above come from approximately four days of
-      meaningful pre-bug coverage (Feb 15–18). The Feb 19 – Mar 7 scraper-volume gap erased the rest of
-      February. Each baseline therefore carries roughly ±3 points of sampling noise. The deltas are accurate
-      to the underlying data; the baselines themselves are the weakest part of the table.
+      Anthropic shipped the fix on April 10. Claude's score didn't recover. It fell again, to an average of
+      36.0 for April 11–15, its lowest stretch with real post volume. ChatGPT kept climbing, to 46.4.
     </p>
     <p>
-      During this window the classifier was Claude Haiku 4.5, which scored all four models including itself,
-      so the risk to watch was a pro-Claude tilt. (Production has since moved to OpenAI's GPT-6 Sol, which
-      flips the risk toward ChatGPT.) The validation check samples recent low-confidence or incomplete posts, reruns them
-      through an independent Gemini grader, and compares its sentiment and complaint labels against
-      the stored Claude labels without writing public scores. We run it around classifier changes, not as an
-      always-on monitor. It does not remove self-bias risk, but it keeps a cutover auditable against a
-      different vendor's read. An earlier Gemini/Claude comparison in April 2026 found roughly 92% sentiment
-      agreement, which suggests the vendor behind the classifier isn't the main driver of a model's score.
-      Full method and category caveats are in the{" "}
-      <a href="/research/how-llm-vibes-classifies-sentiment">methodology post</a>.
+      My read is that those five days were the press cycle. The Register published on April 13, other
+      outlets and Hacker News followed, and the posts that week were people reacting to the coverage. Many
+      of them had issues that were already fixed. Then the score came back. Claude averaged 48.8 for April
+      16–20, about where it had been during the bug.
+    </p>
+    <p>
+      So the lowest number on the chart came after the problem was gone. If you had used the size of the dip
+      to date the bug, you'd have been off by two weeks.
     </p>
 
-    <h2>How to read the dashboard</h2>
-    <p>Three rules.</p>
-    <ol>
-      <li>
-        Compare a model to itself across time, not to other models on the same day. Each model card on{" "}
-        <a href="/dashboard">the dashboard</a> shows yesterday's delta in the trend pill. That's the right
-        first-pass metric for "is X getting worse?"
-      </li>
-      <li>
-        After a known regression and fix, watch the recovery column, not the trough. If three models trend
-        upward and one stays flat or falls, the flat one is the model whose underlying issue isn't actually
-        resolved, regardless of which had the deepest absolute drop or the largest bug-window delta.
-      </li>
-      <li>
-        Treat a single ≥2σ daily deviation as a watch flag, not a verdict. The anomaly detector
-        (<code>src/hooks/useScoreAnomalies.ts</code>) surfaces these automatically in the dev build. A first-day
-        regression is rarely the strongest signal. Sustained multi-day drops, especially through and after
-        a confirmed fix, match what a real engineering bug looks like in user behavior.
-      </li>
-    </ol>
-
-    <h2>What this means for the next incident</h2>
+    <h2 id="caveats">Caveats</h2>
     <p>
-      The next regression will happen. News cycles pull every visible model down at once, so the tell won't
-      be the drop. It'll be the week after: most models climb back, one doesn't.
+      The "before" is six days. That's all the steady data there was. An earlier version of this article
+      compared the bug window with a "February baseline" and concluded that every model had dropped. Those
+      February rows were placeholder data from the app's first build, not scraped posts. Against real data,
+      ChatGPT rose and Grok was flat. I've rewritten the article around the real numbers, and the{" "}
+      <a href="/research/claude-april-2026/data.csv">dataset</a> now starts on March 8, the first day of
+      scraping.
     </p>
     <p>
-      Today that still means eyeballing four charts side by side. A per-model recovery-shape metric would do
-      it automatically, and it isn't built yet. To read the data yourself, the{" "}
-      <a href="/research/claude-april-2026/data.csv">public CSV</a> for the Claude case study has the raw
-      scores; the other three models' histories are queryable via the public <code>get_public_vibes_history</code>{" "}
-      RPC defined in the repository's migrations.
+      I can't say why ChatGPT started so low. Its scores in the teens and 20s in late March came when the
+      scrapers were only days old. I'd treat its level in that stretch with suspicion and its direction with
+      a little more confidence.
+    </p>
+    <p>
+      During this window the classifier was a Google Gemini Flash model, which graded posts about Gemini
+      along with the other three. In April 2026 I reran a sample of its labels through Claude Sonnet 4.6 and
+      the two agreed on sentiment about 92% of the time. That's a check, not proof of neutrality. The
+      pipeline has changed since, and the{" "}
+      <a href="/research/how-llm-vibes-classifies-sentiment">methodology page</a> describes the current one.
     </p>
 
+    <h2 id="how-to-read-the-dashboard">How I read the dashboard now</h2>
     <p>
-      The lesson from March 2026: LLM Vibes caught Claude breaking by watching what happened <em>after</em>{" "}
-      Anthropic said it was fixed. One model's score didn't behave like the other three. Build the same instinct
-      into how you read the dashboard.
+      I compare each model with its own recent days first. The dashboard's anomaly flag works this way: it
+      checks a model's score against that model's own trailing two weeks, never against another model.
+    </p>
+    <p>
+      Then I look at whether the other models moved on the same days. When one model drops and the others
+      don't, the cause is probably that model. When they all move together, it's more likely news, or
+      something that changed in my own pipeline.
+    </p>
+    <p>
+      And I check the post count before I believe a move. A ten-point swing on 15 posts is noise. On this
+      incident that rule is what keeps me from saying anything about Gemini.
+    </p>
+    <p>
+      The last thing this taught me is to separate the bug from the coverage of the bug. The score moved
+      twice, once when the bug shipped and once when the press wrote about it. Only the first move was
+      about the product.
     </p>
 
     <AuthorBio />

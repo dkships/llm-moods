@@ -6,12 +6,22 @@
     <atom:link href="https://llmvibes.ai/research/feed.xml" rel="self" type="application/rss+xml" />
     <description>Independent analysis of AI model quality and incidents from the LLM Vibes data set.</description>
     <language>en-us</language>
-    <lastBuildDate>Thu, 01 Oct 2026 12:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Sat, 21 Nov 2026 12:00:00 GMT</lastBuildDate>
+    <item>
+      <title>The first Astra opened at 69% positive. GPT-6.2 opened at 43%.</title>
+      <link>https://llmvibes.ai/research/gpt-6-2-astra-launch-claims-vs-reception-2026</link>
+      <guid isPermaLink="true">https://llmvibes.ai/research/gpt-6-2-astra-launch-claims-vs-reception-2026</guid>
+      <description>OpenAI called GPT-6.2 Astra and Sol a new standard for professional work. One early reviewer called them unusable, and Sam Altman&apos;s own launch thread said they need to be nicer to work with. In two samples, about 4 in 10 posts that took a side were positive. For the first Astra it was 7 in 10.</description>
+      <pubDate>Sat, 21 Nov 2026 12:00:00 GMT</pubDate>
+      <category>chatgpt</category>
+      <category>cross-model</category>
+      <category>case-study</category>
+    </item>
     <item>
       <title>Opus 5.5 got the warmest Claude launch we&apos;ve measured. Opus 5 looked warm too, for three days.</title>
       <link>https://llmvibes.ai/research/opus-5-5-vs-opus-5-launch-sentiment-2026</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/opus-5-5-vs-opus-5-launch-sentiment-2026</guid>
-      <description>Everyone was waiting for an Opus 5.1 to fix Opus 5. Anthropic shipped Opus 5.5 instead, and over six days the Claude score rose 27 points and posts naming it warmed up after day two. Opus 5 opened strong too, then cooled by day five. OpenAI&apos;s GPT-6 Sol and Luna launched the same day and landed flat.</description>
+      <description>Everyone was waiting for an Opus 5.1 to fix Opus 5. Anthropic shipped Opus 5.5 instead, and over six days the Claude score rose 27 points and posts naming it warmed up after day two. Opus 5 opened strong too, then cooled by day four. OpenAI&apos;s GPT-6 Sol and Luna launched the same day and landed flat.</description>
       <pubDate>Thu, 01 Oct 2026 12:00:00 GMT</pubDate>
       <category>claude</category>
       <category>anthropic</category>
@@ -20,10 +30,10 @@
       <category>case-study</category>
     </item>
     <item>
-      <title>Fable 5&apos;s launch took 17% of tracked AI chatter. Its return from the government ban took 21%.</title>
+      <title>Fable 5&apos;s launch took 17% of tracked AI chatter. Its return from the government ban took 23%.</title>
       <link>https://llmvibes.ai/research/fable-5-lifecycle-june-july-2026</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/fable-5-lifecycle-june-july-2026</guid>
-      <description>Launched June 9, suspended by government directive June 12, redeployed behind a stricter classifier July 1, farewell postponed twice — then called off. Five weeks of daily data on the strangest frontier-model lifecycle yet.</description>
+      <description>Launched June 9, suspended by government directive June 12, redeployed behind a stricter classifier July 1, then kept in paid plans after two deadline extensions. Its return week drew 23% of tracked AI chatter, against 17% for launch week.</description>
       <pubDate>Fri, 17 Jul 2026 12:00:00 GMT</pubDate>
       <category>claude</category>
       <category>anthropic</category>
@@ -31,10 +41,10 @@
       <category>case-study</category>
     </item>
     <item>
-      <title>Grok 4.5&apos;s launch pop faded in five days. The audience it pulled in stayed.</title>
+      <title>Grok 4.5&apos;s launch pop faded in five days. Nine days in, its share of chatter was still triple.</title>
       <link>https://llmvibes.ai/research/grok-45-launch-july-2026</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/grok-45-launch-july-2026</guid>
-      <description>What survives the messiest measurement week in our dataset: a tripled share of voice, a five-day sentiment pop, a feed that flipped from Musk-chatter to product-chatter, and a switching story that&apos;s real but smaller and more price-driven than the headlines.</description>
+      <description>What holds up from a messy measurement week: a tripled share of voice that was still there nine days in, a five-day sentiment pop, a feed that flipped from Musk posts to product posts, and a switching story that&apos;s real but smaller and more price-driven than the headlines.</description>
       <pubDate>Fri, 17 Jul 2026 12:00:00 GMT</pubDate>
       <category>grok</category>
       <category>cross-model</category>
@@ -46,7 +56,7 @@
       <title>Claude Code lost 19 points during the cache bug. The rest of Claude lost 4.</title>
       <link>https://llmvibes.ai/research/surface-segmentation-march-may-2026</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/surface-segmentation-march-may-2026</guid>
-      <description>Aggregate model scores treat each frontier model as one product. Sliced by product surface across 60 days of public posts, Claude Code and ChatGPT.com are where the conversation actually happens, and the same model&apos;s scores diverge sharply by surface during a regression.</description>
+      <description>Aggregate model scores treat each frontier model as one product. Sliced by product surface across two months of public posts, Claude Code&apos;s score fell about 19 points during the cache-bug window while the rest of Claude fell about 4, and most of that gap opened in the last five days.</description>
       <pubDate>Sat, 16 May 2026 12:00:00 GMT</pubDate>
       <category>methodology</category>
       <category>cross-model</category>
@@ -58,7 +68,7 @@
       <title>We caught Claude&apos;s March slide 28 days before Anthropic confirmed it</title>
       <link>https://llmvibes.ai/research/claude-april-2026</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/claude-april-2026</guid>
-      <description>Independent sentiment data caught Claude Code grumbling on March 26, the day Anthropic shipped the cache bug. 28 days before the postmortem.</description>
+      <description>Independent sentiment data caught Claude grumbling on March 26, the day Anthropic shipped the cache bug. 28 days before the postmortem.</description>
       <pubDate>Sat, 25 Apr 2026 12:00:00 GMT</pubDate>
       <category>claude</category>
       <category>anthropic</category>
@@ -70,15 +80,15 @@
       <title>How LLM Vibes classifies sentiment</title>
       <link>https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</guid>
-      <description>The full pipeline from scraper to score. Six sources, 12 complaint categories, a volume-weighted 0–100 score, and the failure modes we&apos;ve documented but not yet solved.</description>
+      <description>How the pipeline goes from scraped post to daily score: five sources, one LLM grader, a fixed-mix 0–100 score that holds each source at its usual share, and the limitations I know about.</description>
       <pubDate>Sat, 25 Apr 2026 12:00:00 GMT</pubDate>
       <category>methodology</category>
     </item>
     <item>
-      <title>Every model dropped during the cache bug. Only Claude kept falling after the fix.</title>
+      <title>On average, Claude outscored ChatGPT during its own regression. The change gave it away.</title>
       <link>https://llmvibes.ai/research/cross-model-deltas-march-april-2026</link>
       <guid isPermaLink="true">https://llmvibes.ai/research/cross-model-deltas-march-april-2026</guid>
-      <description>Comparing absolute scores or even bug-window deltas across LLM Vibes models can mislead you. What actually caught Claude&apos;s March 2026 regression was the post-fix recovery shape: ChatGPT recovered, Gemini stayed flat, Claude kept sliding.</description>
+      <description>During the March 2026 cache bug, Claude averaged 48 and ChatGPT 32, so a side-by-side read said Claude was fine. Against each model&apos;s own six days before, Claude fell 11 points while ChatGPT rose 6. Compare a model with its own recent past, not with its neighbors.</description>
       <pubDate>Sat, 25 Apr 2026 12:00:00 GMT</pubDate>
       <category>cross-model</category>
       <category>case-study</category>

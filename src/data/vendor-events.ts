@@ -148,10 +148,10 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     modelSlug: "claude",
     eventDate: "2026-07-20",
     eventType: "pricing_change",
-    title: "Fable 5 made permanent in Max and Team Premium plans",
+    title: "Fable 5 included in Max and Team Premium plans",
     url: "https://x.com/claudeai/status/2078302415804379218",
     notes:
-      "Included at 50% of usage limits with no end date; Pro and Team Standard keep usage-credit access plus a one-time $100 credit.",
+      "Announced July 18, effective July 20: included at 50% of usage limits, with no end date given; Pro and Team Standard keep usage-credit access plus a one-time $100 credit.",
   },
   {
     id: "openai-gpt-5-6-launch",
@@ -166,11 +166,11 @@ export const VENDOR_EVENTS: VendorEvent[] = [
     id: "xai-grok-4-5-launch",
     vendor: "xai",
     modelSlug: "grok",
-    eventDate: "2026-07-09",
+    eventDate: "2026-07-08",
     eventType: "model_launch",
     title: "Grok 4.5 launch",
     url: "https://x.ai/news/grok-4-5",
-    notes: "Musk announced July 8; public release July 9 (Cursor users got it a day early).",
+    notes: "Announced on x.ai July 8, with Cursor users getting it that day; general release July 9.",
   },
   {
     id: "google-gemini-3-6-flash-launch",

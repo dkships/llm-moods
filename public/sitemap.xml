@@ -38,49 +38,55 @@
   <!-- lastmod = updatedAt ?? publishedAt from src/data/research-posts.ts; update when a post changes. -->
   <url>
     <loc>https://llmvibes.ai/research</loc>
-    <lastmod>2026-10-01</lastmod>
+    <lastmod>2026-11-21</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
+    <loc>https://llmvibes.ai/research/gpt-6-2-astra-launch-claims-vs-reception-2026</loc>
+    <lastmod>2026-11-21</lastmod>
+    <changefreq>monthly</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
     <loc>https://llmvibes.ai/research/opus-5-5-vs-opus-5-launch-sentiment-2026</loc>
-    <lastmod>2026-10-01</lastmod>
+    <lastmod>2026-11-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://llmvibes.ai/research/fable-5-lifecycle-june-july-2026</loc>
-    <lastmod>2026-07-17</lastmod>
+    <lastmod>2026-11-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://llmvibes.ai/research/grok-45-launch-july-2026</loc>
-    <lastmod>2026-09-24</lastmod>
+    <lastmod>2026-11-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://llmvibes.ai/research/claude-april-2026</loc>
-    <lastmod>2026-09-24</lastmod>
+    <lastmod>2026-11-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
     <loc>https://llmvibes.ai/research/how-llm-vibes-classifies-sentiment</loc>
-    <lastmod>2026-09-24</lastmod>
+    <lastmod>2026-11-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://llmvibes.ai/research/cross-model-deltas-march-april-2026</loc>
-    <lastmod>2026-09-24</lastmod>
+    <lastmod>2026-11-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
     <loc>https://llmvibes.ai/research/surface-segmentation-march-may-2026</loc>
-    <lastmod>2026-05-16</lastmod>
+    <lastmod>2026-11-21</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>

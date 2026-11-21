@@ -11,6 +11,7 @@ import { RESEARCH_SPARKLINES } from "@/data/research-sparklines";
 import ResearchSparkline from "@/components/research/ResearchSparkline";
 import NotFound from "@/pages/NotFound";
 import type { ResearchPost } from "@/data/research-posts";
+import { keepModelNamesWhole } from "@/lib/title-format";
 
 const formatDate = (iso: string, month: "long" | "short" = "long") =>
   new Date(`${iso}T12:00:00Z`).toLocaleDateString("en-US", {
@@ -63,7 +64,7 @@ const ArchiveRow = ({ post }: { post: ResearchPost }) => (
         <time dateTime={post.publishedAt}>{formatDate(post.publishedAt, "short")}</time>
       </p>
       <div className="mt-1.5 max-w-3xl md:mt-0">
-        <h3 className="text-section text-foreground">{post.title}</h3>
+        <h3 className="text-section text-foreground">{keepModelNamesWhole(post.title)}</h3>
         <p className="mt-1.5 line-clamp-2 text-body text-text-secondary">{post.summary}</p>
       </div>
     </Link>
@@ -84,7 +85,7 @@ const FeaturedPost = ({ post }: { post: ResearchPost }) => {
           <p className="text-mono-cap text-text-tertiary">
             <time dateTime={post.publishedAt}>{formatDate(post.publishedAt)}</time>
           </p>
-          <h2 className="mt-3 text-page text-foreground">{post.title}</h2>
+          <h2 className="mt-3 text-page text-foreground">{keepModelNamesWhole(post.title)}</h2>
           <p className="mt-4 text-body text-text-secondary">{post.summary}</p>
           <PostTags post={post} />
           <span className="mt-6 inline-flex items-center gap-2 text-meta text-foreground">

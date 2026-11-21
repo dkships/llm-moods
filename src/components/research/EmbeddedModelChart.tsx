@@ -128,16 +128,19 @@ const EmbeddedModelChartContent = ({ modelSlug, daysBack, startDate, endDate, ca
       {chartEvents.length > 0 && (
         <ul className="mt-3 space-y-1 border-t border-border pt-3">
           {chartEvents.map((evt, i) => (
-            <li key={`evt-${i}`} className="flex flex-wrap items-center gap-x-2 gap-y-1 text-meta">
+            <li key={`evt-${i}`} className="flex items-baseline gap-x-2 text-meta">
               <span
                 className="inline-block h-2 w-3 shrink-0 rounded-sm"
                 style={{ background: evt.color, opacity: 0.7 }}
                 aria-hidden="true"
               />
-              <span className="text-text-secondary">{evt.title}</span>
-              <span className="font-mono text-text-tertiary">
-                {evt.startLabel}
-                {evt.endLabel ? ` → ${evt.endLabel}` : ""}
+              {/* One wrapping box, so a long title never leaves its swatch alone on a line. */}
+              <span className="min-w-0">
+                <span className="text-text-secondary">{evt.title}</span>{" "}
+                <span className="whitespace-nowrap font-mono text-text-tertiary">
+                  {evt.startLabel}
+                  {evt.endLabel ? ` → ${evt.endLabel}` : ""}
+                </span>
               </span>
             </li>
           ))}

@@ -1,0 +1,11 @@
+launch,launch_date,days_1_4_positive,days_1_4_negative,days_1_4_neutral,share_positive_of_sided_pct
+GPT-5.6,2026-07-09,48,37,,56.5
+GPT-6 Astra,2026-09-03,74,34,10,68.5
+GPT-6 Sol + Luna,2026-09-22,26,25,2,51.0
+GPT-6.1 Sol,2026-09-29,16,15,1,51.6
+GPT-6.1 Terra,2026-10-26,10,12,2,45.5
+GPT-6.2 Astra + Sol,2026-11-17,53,70,8,43.1
+Claude Opus 5.5,2026-09-22,178,42,13,80.9
+Claude Fable 5.2,2026-11-09,32,20,12,61.5
+Gemini 4 Argon,2026-10-13,71,42,8,62.8
+Grok 4.7,2026-09-21,36,53,6,40.4

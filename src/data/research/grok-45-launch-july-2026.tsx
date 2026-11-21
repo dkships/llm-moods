@@ -43,18 +43,17 @@ const Grok45LaunchBody = () => (
   <>
     <h2 id="the-launch-pop">The launch pop</h2>
     <p>
-      On July 6, Grok's share of the AI-model chatter we track hit its lowest point in our dataset: 4.7% of
+      On July 6, Grok's share of the AI-model chatter I track hit its lowest point in my dataset: 4.7% of
       posts, on a 7-day trailing basis. Two days later xAI{" "}
       <ExternalLink href="https://techcrunch.com/2026/07/08/spacexai-releases-grok-4-5-which-elon-describes-as-an-opus-class-model/">
         shipped Grok 4.5
       </ExternalLink>
-      , and by July 13 that share had tripled to 14.5%. It was still there on July 16.
+      , and by July 13 that share had tripled to 14.5%. It was still 14.5% on July 16, nine days in.
     </p>
     <p>
       The sentiment story is shorter. Grok's daily score averaged 29.6 over the thirty days before launch. On
       launch day it hit 57, tied for its best day since early June, and held an average of 55.5 through July
-      11. Then it faded: 42.5 across July 13–16. The pop lasted about five days. The audience it pulled in
-      didn't leave.
+      11. Then it faded: 42.5 across July 13–16. The pop lasted about five days.
     </p>
 
     <StatCallout
@@ -67,8 +66,8 @@ const Grok45LaunchBody = () => (
     <EmbeddedModelChart modelSlug="grok" startDate="2026-06-01" endDate="2026-07-16" />
     <p className="mt-2 text-sm text-text-tertiary">
       <em>
-        Grok's daily sentiment score, June 1 – July 16, 2026. The launch line is July 9 (Musk announced July
-        8; Cursor users got it a day early). Post volume went from 13.5 posts/day pre-launch to 55.9 after,
+        Grok's daily sentiment score, June 1 – July 16, 2026. The launch line is July 8, the day xAI shipped
+        Grok 4.5. Post volume went from 13.5 posts/day pre-launch to 55.9 after,
         peaking at 93 on July 13.
       </em>
     </p>
@@ -89,26 +88,26 @@ const Grok45LaunchBody = () => (
     />
     <p className="mt-2 text-sm text-text-tertiary">
       <em>
-        Grok's share of all model-classified posts in our corpus, 7-day trailing. The dashed line is July 8.
+        Grok's share of all model-classified posts in my corpus, 7-day trailing. The dashed line is July 8.
         Raw daily counts are in the CSV.
       </em>
     </p>
     <p>
       Two things make me trust this series across a messy week (more on the messiness below). The climb
-      starts July 8–9, two days before our own pipeline changed. And share of voice is a ratio: a pipeline
+      starts July 8–9, two days before my own pipeline changed. And share of voice is a ratio: a pipeline
       change that ingests more posts for every model doesn't move it much. Attention is roughly zero-sum,
-      and the week after launch the loser was ChatGPT: its share of our corpus went from 40% the week of June
-      22 to 26% the week of July 13. Claude held 42%. The Fable 5 access drama was its own attention magnet
-      that same week.
+      and by mid-July the loser was ChatGPT. Its share of the four models' posts in my corpus went from
+      40.5% (June 22–28) to 27.7% (July 13–16, only four days of data). Claude rose from 33.6% to 42.4%
+      over the same windows, and Grok from 5.9% to 14.7%. The Fable 5 access drama was its own attention
+      magnet that same week.
     </p>
 
     <h2 id="what-launch-week-sounded-like">What launch week actually sounded like</h2>
     <p>
-      The dominant theme wasn't capability. It was price. On July 9, 29% of the Grok posts we ingested used
-      pricing or value language ("cheap," "$2/M," "cost"), against a low-single-digit norm. The Decoder's
-      launch summary,{" "}
+      On July 9, 29% of the Grok posts I ingested used pricing or value language ("cheap," "$2/M,"
+      "cost"), against a low-single-digit norm. The Decoder's launch summary,{" "}
       <ExternalLink href="https://bsky.app/profile/ainieuwtjes.bsky.social/post/3mq5wdedtva2p">
-        reposted widely
+        posted on Bluesky
       </ExternalLink>
       , put the thesis in one line: "Grok 4.5 is so cheap compared to Fable 5 and GPT 5.5 that benchmark gaps
       may not matter much."
@@ -121,35 +120,22 @@ const Grok45LaunchBody = () => (
       href="https://bsky.app/profile/deepakness.bsky.social/post/3mq5v2lgdty2e"
       archivedHref="https://web.archive.org/web/2026/https://bsky.app/profile/deepakness.bsky.social/post/3mq5v2lgdty2e"
     />
-    <PullQuote
-      text="First Day Vibes - Grok 4.5 vs GPT 5.6. Grok 4.5 - great for easy coding, can spin a lot for complex coding. cost optimized… Fable 5 - still the best model we have around but can get vastly better. performance optimzied"
-      handle="@bindureddy"
-      platform="X"
-      timestamp="2026-07-11 04:06 UTC"
-      href="https://x.com/bindureddy/status/2075793737536385426"
-      archivedHref="https://web.archive.org/web/2026/https://x.com/bindureddy/status/2075793737536385426"
-    />
     <p>
-      That pair is the launch reception in miniature: solid, fast, cheap, and second place on quality. The
-      negative posts weren't about the model either. They were about capacity. Day-one complaints in our
-      sample were rate limits ("
-      <ExternalLink href="https://x.com/HO8M21319/status/2074827326550925592">
-        impossible to even chat with Grok without hitting the weekly limit
-      </ExternalLink>
-      ") and app bugs, the complaints of a product straining under demand rather than failing on output.
+      That post fits what I saw more broadly: solid, fast, cheap, and behind Opus and Fable on quality. The
+      day-one complaints in my sample were mostly about rate limits and app bugs.
     </p>
 
     <h2 id="the-switching-story">The switching story: smaller and more price-driven than the headlines</h2>
     <p>
       The tech-press framing of this launch was defection: users abandoning Claude and ChatGPT for the
-      cheaper model. Our passive corpus barely shows it. Across 16,724 unique posts in 90 days, explicit
+      cheaper model. My passive corpus barely shows it. Across 16,724 unique posts in 96 days (April 13 – July 17), explicit
       switching statements ("switched to Grok," "cancelled my Claude subscription," "moved to Grok," and a
       dozen pattern variants) matched <strong>three posts</strong>.
     </p>
     <p>
-      A negative result from a passive sample is weak evidence, so we tested it: a targeted Top-sorted
-      search of X for those exact phrases, run July 17 through the same Apify actor our pipeline uses. That
-      search found what our broad-term sampling missed: roughly a dozen post-launch Grok-bound
+      A negative result from a passive sample is weak evidence, so I tested it: a targeted Top-sorted
+      search of X for those exact phrases, run July 17 through the same Apify actor my pipeline used at the
+      time. That search found what my broad-term sampling missed: roughly a dozen post-launch Grok-bound
       defection statements among 80 returned tweets, including two with four-digit like counts inside 72
       hours of launch.
     </p>
@@ -170,18 +156,16 @@ const Grok45LaunchBody = () => (
       archivedHref="https://web.archive.org/web/2026/https://x.com/Grummz/status/2075980632694616398"
     />
     <p>
-      So the switching current is real. Three things shrink it back to size. The volume is modest. A dozen
-      declarations, not a wave, concentrated July 10–13. The stated reasons are Claude's pricing and limits
-      at least as often as Grok's quality. Both quotes above are complaints about Anthropic wearing a Grok
-      hat. And the same phrase search returns parallel cancel-for-Codex and cancel-for-GPT streams running
-      since April; public churn-posting is a genre, and Grok 4.5 is its newest destination, not its cause.
+      So the switching is real, but small: about a dozen declarations, concentrated July 10–13. The two
+      quotes above give different reasons. @farzyness praises Grok's price and speed, while @Grummz is
+      complaining about Anthropic. The same phrase search also returns cancel-for-Codex and cancel-for-GPT
+      posts running since April, so public churn-posting predates Grok 4.5.
     </p>
     <p>
       What the corpus has in volume instead of switching is <em>comparison</em>: nearly half the posts that
       name Grok 4.5 were classified under a different model, because they're side-by-side posts:
-      build-offs, benchmark threads, "which one for my stack" questions. The pattern is remarkably
-      consistent: Fable 5 holds the quality crown, Grok 4.5 wins on price, and the poster keeps both
-      opinions in the same breath.
+      build-offs, benchmark threads, "which one for my stack" questions. A common take in those
+      posts is that Fable 5 is better and Grok 4.5 is cheaper.
     </p>
     <p>
       When I wrote this, the Fable 5 free-access window ran to July 19, and I expected the real
@@ -190,12 +174,12 @@ const Grok45LaunchBody = () => (
       piece</a> has the details), which took the deadline off the table.
     </p>
 
-    <h2 id="the-worst-measurement-week">Untangling the worst possible measurement week</h2>
+    <h2 id="the-worst-measurement-week">Sorting out a messy measurement week</h2>
     <p>
-      Grok 4.5 launched into a 72-hour pileup: GPT-5.6 shipped July 9, and on July 10 we deployed our own
-      accuracy-audit fixes — a Bluesky query rebalance, new sources, and a scoring change that rescored
-      neutral posts. Every cross-model claim in this article has to survive that pileup, so here's the
-      damage report.
+      Grok 4.5 launched into a 72-hour pileup: GPT-5.6 shipped July 9, and on July 10 I deployed my own
+      accuracy-audit fixes: a Bluesky query rebalance, new sources, and a scoring change that rescored
+      neutral posts. Every cross-model claim in this article has to survive that pileup, so the table below
+      sorts which signals do.
     </p>
     <ResearchTableFrame label="Which July signals survive the three-event pileup">
       <table className="w-full">
@@ -212,7 +196,7 @@ const Grok45LaunchBody = () => (
         <tbody>
           <tr>
             <td>Grok share of voice 3×</td>
-            <td>Climb starts Jul 8–9, before our deploy; ratios resist ingestion changes</td>
+            <td>Climb starts Jul 8–9, before my deploy; ratios resist ingestion changes</td>
             <td>
               <strong>Yes</strong>
             </td>
@@ -231,7 +215,7 @@ const Grok45LaunchBody = () => (
             <td>ChatGPT score +16 after Jul 8</td>
             <td>GPT-5.6 launched Jul 9 AND the scoring change lifted news-heavy days</td>
             <td>
-              <strong>No</strong> — hopelessly confounded, we don't cite it
+              <strong>No</strong> — hopelessly confounded, I don't cite it
             </td>
           </tr>
           <tr>
@@ -244,9 +228,10 @@ const Grok45LaunchBody = () => (
     </ResearchTableFrame>
     <p>
       This is why the article leans on share-of-voice, volume direction, and post text rather than score
-      deltas across July 10. Every model's average score is higher after July 8 — Gemini's rose 13 points and
-      nobody launched a Gemini. When everything goes up, the instrument moved, and the honest move is to say
-      so.<sup id="ref-1">
+      deltas across July 10. Three of four models' average scores rose from July 1–7 to July 8–16: ChatGPT 32.3 to 48.1,
+      Gemini 29.7 to 42.3, Grok 35.4 to 49.1. Gemini rose about 13 points and nobody launched a Gemini,
+      which tells me the instrument moved. Claude went the other way, from 59.1 to 49.9, and I can't tell
+      how much of that is real either.<sup id="ref-1">
         <a href="#note-1" className="inline-flex min-h-6 min-w-6 items-center justify-center" aria-label="[1] See footnote 1">
           [1]
         </a>
@@ -255,16 +240,16 @@ const Grok45LaunchBody = () => (
 
     <h2 id="the-conversation-flip">The launch changed what Grok chatter is about</h2>
     <p>
-      The most interesting number in the dataset isn't sentiment. Before launch, Grok's feed in our corpus
+      The biggest change in the text was the topic. Before launch, Grok's feed in my corpus
       was politics-adjacent: 18% of Grok posts from June 1 to July 7 mentioned Musk or Elon by name, and only
       10% used product language — coding, API, benchmarks, pricing, agents. After launch those proportions
-      flipped hard: 9% Musk, 61% product.
+      reversed: 9% Musk, 61% product.
     </p>
     <p>
-      That flip is why Grok's baseline score sat in the high 20s all June while every other model lived in
-      the 30s and 40s. Grok's chatter wasn't unhappy users; it was people arguing about its owner. The launch
-      pulled a different crowd into the conversation — builders benchmarking a tool — and for at least a
-      week, product-Grok decoupled from politics-Grok. Whether that lasts is the question I'd watch. The
+      Grok's average score in June was 29.1, below ChatGPT (32.6), Gemini (38.8) and Claude (50.0). My guess
+      is that the politics-heavy mix kept it down, but I haven't tested that. The launch pulled in builders
+      benchmarking a tool, and for at least a week product posts outnumbered Musk posts about 7 to 1.
+      Whether that lasts is the question I'd watch. The
       biggest{" "}
       <ExternalLink href="https://news.ycombinator.com/item?id=48835111">
         Hacker News launch thread
@@ -275,11 +260,12 @@ const Grok45LaunchBody = () => (
 
     <h2 id="methodology">Methodology</h2>
     <p>
-      LLM Vibes scrapes posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across six sources:
-      Reddit and Twitter/X via Apify, Hacker News stories and comments via Algolia, Bluesky, Mastodon, and
-      App Store reviews. At the time, each post was classified for per-model sentiment and complaint
-      category by Claude Haiku 4.5 via the Anthropic API. The daily 0–100 score is confidence- and engagement-weighted; the full
-      scoring code is public in <code>supabase/functions/_shared/vibes-scoring.ts</code>.
+      As of July 2026, LLM Vibes scraped posts about four LLM models (Claude, ChatGPT, Gemini, Grok) across
+      six sources: Reddit and Twitter/X via Apify, Hacker News stories and comments via Algolia, Bluesky,
+      Mastodon, and App Store reviews. Each post was classified for per-model sentiment and complaint
+      category by Claude Haiku 4.5 via the Anthropic API. The daily 0–100 score was confidence- and
+      engagement-weighted. The scoring code is public in{" "}
+      <code>supabase/functions/_shared/vibes-scoring.ts</code> and has changed since.
     </p>
     <p>
       This article's corpus is 18,746 model-classified rows (16,724 unique posts — multi-model posts produce
@@ -287,17 +273,17 @@ const Grok45LaunchBody = () => (
       <code>get_public_recent_chatter</code> RPC. Share of voice counts model-rows, so a Grok-vs-Fable
       comparison post counts toward both models — that's deliberate, it's chatter about both. Keyword and
       switching-phrase matching is regex over title + content; the patterns are listed in the repo. Daily
-      scores come from <code>get_public_vibes_history</code>. Where scores cross our July 10 pipeline
+      scores come from <code>get_public_vibes_history</code>. Where scores cross my July 10 pipeline
       deploy, they're flagged as non-comparable rather than adjusted. The targeted switching-phrase search
       was a one-shot, Top-sorted query set ("switched to grok," "cancelled claude," and variants) through
-      the same <code>apidojo~tweet-scraper</code> actor the pipeline uses, run July 17, 80 tweets returned;
+      the same <code>apidojo~tweet-scraper</code> actor the pipeline used at the time, run July 17, 80 tweets returned;
       Top-sorting biases it toward high-engagement posts, which is the point — it bounds the visible
       ceiling of the switching narrative, not its base rate.
     </p>
     <p>
       The classifier was a Claude model scoring posts about Claude's competitors, including this article's
-      subject. The self-bias check we run against an independent Gemini grader (88.9% sentiment agreement on
-      the June run of the live classifier) is described in{" "}
+      subject. The self-bias check I ran against an independent Gemini grader (88.9% sentiment agreement on
+      the June run of the classifier then in use) is described in{" "}
       <a href="/research/how-llm-vibes-classifies-sentiment">How LLM Vibes classifies sentiment</a>.
     </p>
 
@@ -321,13 +307,13 @@ const Grok45LaunchBody = () => (
       >
         [1]
       </a>{" "}
-      The July 10 deploy rescored neutral posts from 0.3 to 0.5 on the positive-negative axis, after our
+      The July 10 deploy rescored neutral posts from 0.3 to 0.5 on the positive-negative axis, after my
       accuracy audit found the old weighting punished models on launch-news days — exactly the kind of day
-      this article is about. The fix was right and its timing was terrible for this analysis. On July 17 we
+      this article is about. The fix was right and its timing was terrible for this analysis. On July 17 I
       recomputed every model-day in the June–July window from raw posts under the current formula and
       compared against stored scores: the formula's own effect is about 1 point on average (neutral share
       runs ~6%, so the coefficient change barely moves the needle). Cross-boundary score deltas still stay
-      out of our claims — the source mix changed in the same deploy, and that's the confound that matters.
+      out of my claims — the source mix changed in the same deploy, and that's the confound that matters.
     </p>
 
     <AuthorBio />

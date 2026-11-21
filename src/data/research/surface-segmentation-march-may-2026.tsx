@@ -20,15 +20,21 @@ const SurfaceSegmentationBody = () => (
     <h2 id="the-19-point-split">The 19-point split</h2>
     <p>
       On March 27, 2026, a day after Anthropic shipped a thinking-cache regression into Claude Sonnet 4.6 and
-      Opus 4.6, Theo Browne posted on Bluesky: "Claude Code is kind of like if Codex was drunk. Fun, friendly,
-      bit more creative, makes really dumb mistakes, probably shouldn't be trusted with prod." The dashboard's
-      daily Claude score moved that week. Our scrapers captured the grumbling. The score did not tell us which
-      Claude was being grumbled about.
+      Opus 4.6, Theo Browne posted on X (a bot account mirrored it to Bluesky): "Claude Code is kind of like if
+      Codex was drunk. Fun, friendly, bit more creative, makes really dumb mistakes, probably shouldn't be
+      trusted with prod." The dashboard's daily Claude score moved that week. The scrapers captured the
+      grumbling, but the score didn't say which Claude people were grumbling about.
     </p>
     <p>
       Over the 16 days of the cache bug, the average score for posts about Claude Code fell from 63.6 to 44.9.
-      Over the same 16 days, the average for everything else our scrapers caught about Claude fell from 56.3 to
+      Over the same 16 days, the average for everything else the scrapers caught about Claude fell from 56.3 to
       52.5. Same model, same week, two very different stories.
+    </p>
+    <p>
+      The baseline for Claude Code is the five scored days from March 20 to 24 (66, 44, 71, 37 and 100), and the
+      100 on March 24 rests on 16 posts. The baseline for everything else is the six scored days from March 20
+      to 25. Weighting each day by its post count, Claude Code fell about 20 points (63.7 to 43.6) and the rest
+      of Claude fell about 5.5 (57.5 to 51.9).
     </p>
 
     <StatCallout
@@ -40,24 +46,24 @@ const SurfaceSegmentationBody = () => (
 
     <PullQuote
       text="Claude Code is kind of like if Codex was drunk. Fun, friendly, bit more creative, makes really dumb mistakes, probably shouldn't be trusted with prod."
-      handle="@theo-t3gg"
+      handle="@theo (mirrored by theo.xmirror.bot)"
       platform="Bluesky"
       timestamp="2026-03-27 03:10 UTC"
-      href="https://bsky.app/profile/theo-t3gg.bsky.social/post/3mhz6rvi2z42g"
-      archivedHref="https://web.archive.org/web/2026/https://bsky.app/profile/theo-t3gg.bsky.social/post/3mhz6rvi2z42g"
+      href="https://bsky.app/profile/theo.xmirror.bot/post/3mhz6rvi2z42g"
+      archivedHref="https://web.archive.org/web/2026/https://bsky.app/profile/theo.xmirror.bot/post/3mhz6rvi2z42g"
     />
 
     <p>
-      Aggregate model scores treat each frontier model as one product. Users don't. A "Claude is bad this week"
-      headline almost always means "Claude Code is bad this week," because Claude Code is where the public
-      conversation about Claude actually happens. This piece is what the data looks like when you slice the
-      same scoring pipeline by product surface instead of by model.
+      Aggregate model scores treat each frontier model as one product, but people use different parts of it.
+      Claude Code was 1,183 of the 3,962 Claude posts in the table below (30%), and 98.8% of the Claude posts
+      that named a surface. So a bad week for Claude Code can move the Claude score without telling you anything
+      about claude.ai. This piece slices the same scoring pipeline by product surface instead of by model.
     </p>
 
     <h2 id="what-the-data-actually-says">What the data actually says</h2>
     <p>
-      Across the 60-day window of March 15 to May 14, 2026, we ran every Claude, ChatGPT, Gemini, and Grok post
-      our scrapers captured through a lexical surface detector. The detector lives at{" "}
+      Across the two months from March 15 to May 14, 2026, I ran every Claude, ChatGPT, Gemini, and Grok post
+      the scrapers captured through a lexical surface detector. The detector lives at{" "}
       <code>src/lib/product-surface.ts</code> and matches plain-language references like "Claude Code,"
       "claude.ai," "Anthropic API," "ChatGPT mobile," "Codex," "Gemini app," and so on, model by model. Posts
       that don't match a named surface stay in an <code>unknown</code> bucket.
@@ -102,10 +108,10 @@ const SurfaceSegmentationBody = () => (
           </tr>
           <tr>
             <td>ChatGPT</td>
-            <td>ChatGPT.com / app</td>
+            <td>Posts that say "ChatGPT"</td>
             <td className="whitespace-nowrap">4,077</td>
             <td className="whitespace-nowrap">38.1</td>
-            <td><code>hallucinations</code></td>
+            <td><code>general_drop</code></td>
           </tr>
           <tr>
             <td>ChatGPT</td>
@@ -119,7 +125,7 @@ const SurfaceSegmentationBody = () => (
             <td>Unknown</td>
             <td className="whitespace-nowrap">1,086</td>
             <td className="whitespace-nowrap">26.1</td>
-            <td><code>hallucinations</code></td>
+            <td><code>general_drop</code></td>
           </tr>
           <tr>
             <td>Gemini</td>
@@ -133,7 +139,7 @@ const SurfaceSegmentationBody = () => (
             <td>Unknown</td>
             <td className="whitespace-nowrap">2,124</td>
             <td className="whitespace-nowrap">38.6</td>
-            <td><code>hallucinations</code></td>
+            <td><code>general_drop</code></td>
           </tr>
           <tr>
             <td>Grok</td>
@@ -147,23 +153,23 @@ const SurfaceSegmentationBody = () => (
             <td>Unknown</td>
             <td className="whitespace-nowrap">1,858</td>
             <td className="whitespace-nowrap">34.6</td>
-            <td><code>other</code></td>
+            <td><code>general_drop</code></td>
           </tr>
         </tbody>
       </table>
     </ResearchTableFrame>
 
     <p>
-      Two patterns to notice. First, for Claude and ChatGPT, one surface dominates the named conversation. Of
-      the 1,197 Claude posts that named a surface, 98.8% named Claude Code. Of the 4,110 ChatGPT posts that
-      named a surface, 99.2% named ChatGPT.com or the mobile app. API and SDK mentions never cleared the
-      five-post daily floor, so they don't appear in the dataset at all. The API isn't where the public
-      conversation happens.
+      Two patterns to notice. First, for Claude, one surface dominates the named conversation. Of the 1,197
+      Claude posts that named a surface, 98.8% named Claude Code. API and SDK mentions never cleared the
+      five-post daily floor, so they don't appear in the dataset at all. That means there were too few API and
+      SDK posts to chart, and I can't say more than that. ChatGPT's 4,110 named-surface posts are mostly posts
+      that contain the word "ChatGPT", which I come back to below.
     </p>
     <p>
       Second, for Gemini and Grok, almost no posts name a surface at all. The detector matched 126 Gemini
       posts (5.6%) and 10 Grok posts (0.5%) across the whole window, every one in a cell too thin to chart.
-      Why is its own section below.
+      I come back to why below.
     </p>
 
     <h2 id="claude-during-the-cache-bug">Claude during the cache bug</h2>
@@ -173,9 +179,13 @@ const SurfaceSegmentationBody = () => (
         April 23 postmortem
       </ExternalLink>{" "}
       named a thinking-cache regression running March 26 to April 10. The user-facing symptom Anthropic later
-      described was forgetfulness, token-drain, and odd tool choices. That is a Claude Code complaint shape,
-      not a claude.ai complaint shape. Sustained agentic sessions hit the cache hardest, and sustained
-      agentic sessions live in Claude Code.
+      described was forgetfulness, token drain, and odd tool choices. Those show up in long agentic sessions,
+      and most long agentic sessions with Claude happen in Claude Code. That fits Claude Code moving more than
+      the rest of Claude, though I haven't tested it directly.
+    </p>
+    <p>
+      The postmortem also lists an earlier Claude Code change, a lower default reasoning effort from March 4 to
+      April 7, which overlapped this window. The data can't separate that change from the cache bug.
     </p>
 
     <EmbeddedModelChart modelSlug="claude" startDate="2026-03-15" endDate="2026-05-14" caption="Claude · daily score · Mar 15 – May 14, 2026" />
@@ -183,7 +193,7 @@ const SurfaceSegmentationBody = () => (
       <em>
         Claude's aggregate daily sentiment score across the window. Shaded band is Anthropic's confirmed
         cache-bug window (March 26 – April 10). The post-bug trough through April 11 – 15 is press-cycle echo,
-        documented in our{" "}
+        documented in my{" "}
         <a href="/research/claude-april-2026">earlier piece on the 28-day gap</a>. May 7 is a one-day
         cron-rebuild blackout, not a score drop.
       </em>
@@ -197,44 +207,44 @@ const SurfaceSegmentationBody = () => (
       href="https://bsky.app/profile/agentwyre.ai/post/3miavi3f2lk2e"
       archivedHref="https://web.archive.org/web/2026/https://bsky.app/profile/agentwyre.ai/post/3miavi3f2lk2e"
     />
-    <PullQuote
-      text="yeah my sense is compared to actually using claude code directly, it's quite dumb in its approach, doesn't really problem solve very hard and is fairly limited in its available tooling"
-      handle="@goose.art"
-      platform="Bluesky"
-      timestamp="2026-03-29 03:06 UTC"
-      href="https://bsky.app/profile/goose.art/post/3mi664nkv2s2l"
-      archivedHref="https://web.archive.org/web/2026/https://bsky.app/profile/goose.art/post/3mi664nkv2s2l"
-    />
 
     <p>
-      Both posts land mid-cache-bug. Both name Claude Code as the surface. The first is operational
-      (Claude Code's git behavior was destroying uncommitted work, with a linked GitHub issue), the second is
-      quality (the model's reasoning felt thinner than direct API use). The classifier tagged them{" "}
-      <code>api_reliability</code> and <code>reasoning</code> respectively. Both feed the Claude Code line,
-      not the claude.ai line, not the API line.
+      That post is from an automated account relaying a separate Claude Code bug report from the same week (a
+      git reset problem, GitHub issue #40710). It isn't about the thinking-cache bug. It's the only quote I'm
+      using from this window, so the quote evidence here is thin, and the case rests on the daily numbers.
     </p>
 
     <StatCallout
       stats={[
         { value: "52 points", label: "Claude Code vs other-Claude score gap, April 10" },
-        { value: "16 of 16", label: "Days the gap held, cache-bug window" },
+        { value: "16 vs 68", label: "Claude Code vs everything else, April 10" },
       ]}
     />
 
     <p>
       The cleanest single-day datapoint is April 10, the day Anthropic shipped the cache fix. Claude Code's
       score that day was 16 out of 100. The score for everything else captured about Claude was 68. Same
-      model, same calendar day, 52-point gap. The fix landed, and bad Claude Code experiences kept driving
-      the day's grumbling. By April 12 the two lines converged again. The dashboard's aggregate Claude score
-      averaged the two, and the day-by-day Claude Code shape disappeared into a calmer middle.
+      model, same calendar day, 52-point gap.
+    </p>
+    <p>
+      The two series tracked each other until early April. From March 26 to April 5, Claude Code averaged 52.2
+      and everything else 49.9. From April 6 to 10, Claude Code averaged 29.0 and everything else 58.2, and
+      Claude Code scored below the rest on four of those five days. Across the full 16 days it scored below on 8.
+      By April 12 the two lines were back together (31 and 29). The dashboard's aggregate Claude score averaged
+      the two, so the Claude Code drop got diluted.
     </p>
 
-    <h2 id="chatgpt-shows-the-same-shape">ChatGPT shows the same shape</h2>
+    <h2 id="chatgpt-and-the-detector">ChatGPT and the detector</h2>
     <p>
-      The dominant-surface pattern holds for ChatGPT too. Of the 4,110 ChatGPT posts that named a product
-      surface, 4,077 named ChatGPT.com or the mobile app. Codex (OpenAI's coding agent) had 33 mentions
-      across the 60 days, which is too thin to chart daily and barely enough for a window aggregate. The
-      OpenAI API never cleared the floor at all.
+      The ChatGPT rows in the table don't compare surfaces. The detector's ChatGPT app pattern matches any post
+      containing "chatgpt", so the 4,077-post row is the posts that say "ChatGPT", and the Unknown row (1,086
+      posts) is posts about ChatGPT that don't use the word. That's two ways of writing about one product.
+      The detector can't separate ChatGPT's surfaces yet, so I'm not reading anything into the 38.1 versus 26.1
+      gap.
+    </p>
+    <p>
+      Codex (OpenAI's coding agent) had 33 mentions across the two months, too thin to chart daily. The OpenAI
+      API never cleared the floor. Here is one example of what the "ChatGPT" bucket holds:
     </p>
     <PullQuote
       text="Decided to ask ChatGPT about something (ran out of Claude credits) and I got really grossed out by its default voice of lame LinkedIn influencer"
@@ -244,58 +254,50 @@ const SurfaceSegmentationBody = () => (
       href="https://bsky.app/profile/solarboi.com/post/3ml4rh4ddnk2p"
       archivedHref="https://web.archive.org/web/2026/https://bsky.app/profile/solarboi.com/post/3ml4rh4ddnk2p"
     />
-    <p>
-      The complaint is product-surface specific in a way that wouldn't translate to the API. The API doesn't
-      have a default voice; the chatbot does. The ChatGPT.com average over the window is 38.1, lower than
-      Claude Code's 52.1, and the top complaint category is <code>hallucinations</code> rather than{" "}
-      <code>general_drop</code>. Different surface, different complaint shape, even when you control for the
-      vendor.
-    </p>
 
-    <h2 id="what-we-cant-see-about-gemini-and-grok">What we can't see about Gemini and Grok</h2>
+    <h2 id="what-i-cant-see-about-gemini-and-grok">What I can't see about Gemini and Grok</h2>
     <p>
-      We can't tell you the same story about Gemini and Grok at this volume. The detector matched 126 Gemini
-      posts and 10 Grok posts over the 60 days. That's not enough to build a per-surface score for either.
+      I can't tell the same story about Gemini and Grok at this volume. The detector matched 126 Gemini
+      posts and 10 Grok posts over the two months. That's not enough to build a per-surface score for either.
     </p>
     <p>
       Two honest hypotheses. The first is that the detector has blind spots: there's no pattern for "Gemini
       Code Assist" (Google's developer integration), the "AI Studio" pattern requires the literal phrase, and
       Grok's surfaces are mostly named after the X integration, not as standalone products. Widening the
-      patterns would catch more, but doing it after the fact would let us pick patterns that flatter the
+      patterns would catch more, but doing it after the fact would let me pick patterns that flatter the
       story. The second hypothesis is that the public conversation about Gemini and Grok runs at the brand
       level. People post about "Gemini" or "Grok," not about "the Gemini app" or "Grok in X." A vendor that
       ships one or two consumer surfaces with thin developer communities will look that way on social.
     </p>
     <p>
-      We don't know the ratio. The methodology section lists the per-vendor coverage rates so a reader can
+      I don't know the ratio. The methodology section lists the per-vendor coverage rates so a reader can
       decide for themselves. Widening the detector deliberately, with test cases, is on the queue.
     </p>
 
     <h2 id="how-a-pm-reads-this">How a PM reads this</h2>
     <p>
-      The dashboard's headline score is fine for "is something broken." It's the wrong instrument for "who
-      owns the next response." Three concrete re-read rules came out of this slice:
+      The dashboard's headline score tells you whether something is broken. It doesn't tell you who should
+      respond. Here are three ways I'd read a move in the score after working through this slice.
     </p>
     <p>
-      One: when the Claude score moves and Claude Code volume is the dominant share of the day's matched
-      posts, suspect a tooling regression. Anthropic's cache bug fit this shape. So would a Claude Code
-      release that changed defaults. So would a CLI installer breakage.
+      When the Claude score moves and Claude Code is a large share of the day's matched posts, a tooling
+      problem is a good first guess. The cache bug looked like that. A Claude Code release that changed
+      defaults or a broken CLI installer would too.
     </p>
     <p>
-      Two: when the ChatGPT score moves and ChatGPT.com volume is the dominant share, suspect a
-      consumer-visible change. UI changes, voice-tone changes, the model picker switching defaults: these
-      are the things that drive a ChatGPT.com grumble wave. The API isn't where that signal lives.
+      I can't apply the same check to ChatGPT yet, because the detector can't separate its surfaces. Once it
+      can, a consumer-visible change such as a UI update, a tone change or a new default in the model picker
+      is what I'd look for when the app's share of posts is high.
     </p>
     <p>
-      Three: when the score moves and matched-surface volume is low, the change is probably brand-level
-      rather than product-level. Pricing news, a leadership departure, a competitor launch, a viral
-      benchmark. The score is responding to talking-about rather than using.
+      When the score moves and few posts name a surface, my guess is that the cause is brand-level: a pricing
+      announcement, a leadership departure, a competitor launch or a popular benchmark. People are reacting to
+      news more than to using the product.
     </p>
     <p>
-      Routing is the point. The cache bug's reliability signal belonged on the Claude Code team's desk. The
-      ChatGPT.com voice complaints belong with the consumer product team. The API teams should expect a
-      different signal entirely, or none, from public scrapers, and need their own telemetry to compensate.
-      One aggregate score per model can't make that routing call.
+      The point is routing. The cache-bug complaints belong on the Claude Code team's desk. Public scrapers say
+      little about API users, so API teams need their own data. One score per model can't tell you which team
+      should respond.
     </p>
 
     <h2 id="methodology">Methodology</h2>
@@ -309,25 +311,26 @@ const SurfaceSegmentationBody = () => (
     </p>
     <p>
       Window-wide coverage rates were 30.2% for Claude, 79.1% for ChatGPT, 5.6% for Gemini, and 0.5% for
-      Grok. ChatGPT's high rate is mostly because the patterns are loose for it (any post containing
-      "chatgpt" matches). Claude's rate is honest: about a third of Claude posts name a specific surface,
-      most of those name Claude Code. Gemini's and Grok's rates are too low to surface-segment, as discussed
+      Grok. ChatGPT's 79.1% says little about surfaces, because its pattern matches any post containing
+      "chatgpt". Claude's 30.2% is a fair number: about 3 in 10 Claude posts name a specific surface, and
+      98.8% of those name Claude Code. Gemini's and Grok's rates are too low to surface-segment, as discussed
       above.
     </p>
     <p>
       Per-surface scores in the table and the cache-bug analysis use a simplified formula:{" "}
       <code>score = 100 × (positive + 0.3 × neutral) / (positive + negative + neutral)</code>, with posts
       filtered to <code>confidence ≥ 0.65</code> and a (model, surface, day) cell skipped when eligible
-      posts &lt; 5. The production dashboard score in <code>supabase/functions/_shared/vibes-scoring.ts</code>{" "}
-      adds source-share capping and engagement weighting we don't replicate here. (The production formula's
+      posts &lt; 5. As of May 2026, the production dashboard score in{" "}
+      <code>supabase/functions/_shared/vibes-scoring.ts</code> added source-share capping and engagement
+      weighting that I didn't replicate here. (The production formula's
       neutral coefficient moved from 0.3 to 0.5 in July 2026; this article's dataset and per-surface numbers
       predate that change and keep the 0.3 they were computed with.) The downloadable CSV ships
       the per-cell raw counts behind every charted number; cells below the five-post floor are omitted, so
       window totals computed from the CSV reflect chartable volume, not raw scrape volume.
     </p>
     <p>
-      During this window, sentiment ran through Claude Haiku 4.5 via the Anthropic API, classifying posts
-      about its competitors.
+      During this window, sentiment ran through Google's Gemini 2.5 Flash, classifying posts about Gemini
+      and its three competitors.
       <sup id="ref-1">
         <a href="#note-1" className="inline-flex min-h-6 min-w-6 items-center justify-center" aria-label="[1] See footnote 1">
           [1]
@@ -361,12 +364,12 @@ const SurfaceSegmentationBody = () => (
       >
         [1]
       </a>{" "}
-      Classifier self-bias risk. Claude Haiku 4.5 classified posts about its three competitors and itself, so
-      the risk to watch was a pro-Claude tilt. We cross-check a sample of recent uncertain posts against an
-      independent Gemini grader around classifier changes. The cross-check doesn't prove neutrality,
-      and the surface-coverage numbers are a separate axis: Gemini's low surface-coverage rate could look like
-      classifier sandbagging if you squint at it. It isn't. Posts simply don't name Gemini's surfaces in plain
-      English often enough for the detector to bucket them.
+      Classifier self-bias risk. Gemini 2.5 Flash classified posts about its three competitors and itself, so
+      the risk to watch was a pro-Gemini tilt. In April 2026 I reran a sample of its labels through Claude
+      Sonnet 4.6 and the two agreed on sentiment about 92% of the time. That check didn't prove neutrality.
+      The surface-coverage numbers are a separate question: Gemini's low surface-coverage rate has nothing to
+      do with the classifier. Posts don't name Gemini's surfaces in plain English often enough for the
+      detector to bucket them.
     </p>
 
     <AuthorBio />
